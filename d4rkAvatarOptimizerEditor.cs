@@ -207,6 +207,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             var combinedMeshRenderer = new GameObject();
             combinedMeshRenderer.name = "CombinedSkinnedMesh" + combinedMeshID;
             combinedMeshRenderer.transform.SetParent(root.transform);
+            combinedMeshRenderer.transform.localPosition = Vector3.zero;
+            combinedMeshRenderer.transform.localRotation = Quaternion.identity;
+            combinedMeshRenderer.transform.localScale = Vector3.one;
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
@@ -214,7 +217,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                DestroyImmediate(skinnedMesh);
+                DestroyImmediate(skinnedMesh.gameObject);
             }
 
             combinedMeshID++;
