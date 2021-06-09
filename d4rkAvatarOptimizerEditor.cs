@@ -103,6 +103,64 @@ public class d4rkAvatarOptimizerEditor : Editor
         return bones.Count - 1;
     }
 
+    private static IEnumerable<AnimatorState> EnumerateAllStates(AnimatorController controller)
+    {
+        foreach (var layer in controller.layers)
+        {
+            var queue = new Queue<AnimatorStateMachine>();
+            queue.Enqueue(layer.stateMachine);
+
+            while (queue.Count > 0)
+            {
+                var stateMachine = queue.Dequeue();
+                foreach (var subStateMachine in stateMachine.stateMachines)
+                {
+                    queue.Enqueue(subStateMachine.stateMachine);
+                }
+                foreach (var state in stateMachine.states.Select(s => s.state))
+                {
+                    yield return state;
+                }
+            }
+        }
+    }
+
+    private static void SwitchBlendShapeAnimation(AnimatorController fxLayer,string newPath, string oldPath, string blendShapeName)
+    {
+        blendShapeName = "blendShape." + blendShapeName;
+        foreach (var state in EnumerateAllStates(fxLayer))
+        {
+            var clip = state.motion as AnimationClip;
+            if (clip != null)
+            {
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                {
+                    if(binding.path == oldPath && binding.propertyName == blendShapeName)
+                    {
+                        var newBinding = binding;
+                        newBinding.path = newPath;
+                        var newClip = Instantiate(clip);
+                        newClip.ClearCurves();
+                        foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
+                        {
+                            if (b2 == binding)
+                                continue;
+                            AnimationUtility.SetEditorCurve(newClip, b2,
+                                AnimationUtility.GetEditorCurve(clip, b2));
+                        }
+                        AnimationUtility.SetEditorCurve(newClip, newBinding,
+                            AnimationUtility.GetEditorCurve(clip, binding));
+                        newClip.name = clip.name;
+                        if (!clip.name.EndsWith("(OptimizedCopy)"))
+                            newClip.name += "(OptimizedCopy)";
+                        state.motion = newClip;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     private static void CombineSkinnedMeshes(GameObject root)
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges(root);
@@ -251,8 +309,26 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
 
+            var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+            var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+            var newFxLayer = Instantiate(fxLayer);
+            if (avDescriptor != null && fxLayer != null)
+            {
+                string path = "Assets/d4rkAvatarOptimizer/" + fxLayer.name + "(OptimizedCopy).controller";
+                AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
+                newFxLayer = (AnimatorController)
+                    AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
+            }
+
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
+                if (avDescriptor != null)
+                {
+                    if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
+                    {
+                        avDescriptor.VisemeSkinnedMesh = meshRenderer;
+                    }
+                }
                 for (int i = 0; i < skinnedMesh.sharedMesh.blendShapeCount; i++)
                 {
                     var blendShapeName = skinnedMesh.sharedMesh.GetBlendShapeName(i);
@@ -265,20 +341,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                             break;
                         }
                     }
-                }
-            }
-
-            var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-            var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
-            var newFxLayer = Instantiate(fxLayer);
-
-            foreach (var skinnedMesh in combinableSkinnedMeshes)
-            {
-                if (avDescriptor != null)
-                {
-                    if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
+                    if (avDescriptor != null && fxLayer != null)
                     {
-                        avDescriptor.VisemeSkinnedMesh = meshRenderer;
+                        var t = skinnedMesh.transform;
+                        string oldPath = t.name;
+                        while ((t = t.parent) != root.transform)
+                        {
+                            oldPath = t.name + "/" + oldPath;
+                        }
+                        SwitchBlendShapeAnimation(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
                     }
                 }
                 DestroyImmediate(skinnedMesh.gameObject);
@@ -288,6 +359,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 newFxLayer.name = fxLayer.name + "(OptimizedCopy)";
                 avDescriptor.baseAnimationLayers[4].animatorController = newFxLayer;
+                AssetDatabase.SaveAssets();
             }
 
             combinedMeshID++;
