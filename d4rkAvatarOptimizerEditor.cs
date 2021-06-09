@@ -251,6 +251,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
 
+            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            {
+                for (int i = 0; i < skinnedMesh.sharedMesh.blendShapeCount; i++)
+                {
+                    var blendShapeName = skinnedMesh.sharedMesh.GetBlendShapeName(i);
+                    var blendShapeWeight = skinnedMesh.GetBlendShapeWeight(i);
+                    for (int j = 0; j < combinedMesh.blendShapeCount; j++)
+                    {
+                        if (blendShapeName == combinedMesh.GetBlendShapeName(j))
+                        {
+                            meshRenderer.SetBlendShapeWeight(j, blendShapeWeight);
+                            break;
+                        }
+                    }
+                }
+            }
+
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
             var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
             var newFxLayer = Instantiate(fxLayer);
