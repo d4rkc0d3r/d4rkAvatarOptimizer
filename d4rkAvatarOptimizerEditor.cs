@@ -204,7 +204,41 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 combinedMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
             }
-            
+
+            int vertexOffset = 0;
+            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            {
+                Matrix4x4 toRoot = root.transform.worldToLocalMatrix
+                    * skinnedMesh.transform.localToWorldMatrix;
+                var mesh = skinnedMesh.sharedMesh;
+                for (int i = 0; i < mesh.blendShapeCount; i++)
+                {
+                    for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
+                    {
+                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
+                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
+                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        mesh.GetBlendShapeFrameVertices(i, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
+                        var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
+                        var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
+                        var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
+                        for (int k = 0; k < mesh.vertexCount; k++)
+                        {
+                            targetDeltaVertices[k + vertexOffset] =
+                                toRoot.MultiplyVector(sourceDeltaVertices[k]);
+                            targetDeltaNormals[k + vertexOffset] =
+                                toRoot.MultiplyVector(sourceDeltaNormals[k]);
+                            targetDeltaTangents[k + vertexOffset] =
+                                toRoot.MultiplyVector(sourceDeltaTangents[k]);
+                        }
+                        var name = mesh.GetBlendShapeName(i);
+                        var weight = mesh.GetBlendShapeFrameWeight(i, j);
+                        combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
+                    }
+                }
+                vertexOffset += mesh.vertexCount;
+            }
+
             var combinedMeshRenderer = new GameObject();
             combinedMeshRenderer.name = "CombinedSkinnedMesh" + combinedMeshID;
             combinedMeshRenderer.transform.SetParent(root.transform);
