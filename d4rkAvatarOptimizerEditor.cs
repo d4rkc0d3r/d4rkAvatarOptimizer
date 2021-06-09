@@ -10,8 +10,25 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer t;
 
+    private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
+    {
+        return true;
+        foreach (var material in candidate.sharedMaterials)
+        {
+            if (material.shader.name == "Standard")
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static bool CanCombineWith(List<SkinnedMeshRenderer> list, SkinnedMeshRenderer candidate)
     {
+        if (!IsCombinableSkinnedMesh(list[0]))
+            return false;
+        if (!IsCombinableSkinnedMesh(candidate))
+            return false;
         return true;
     }
 
@@ -46,9 +63,174 @@ public class d4rkAvatarOptimizerEditor : Editor
         return matchedSkinnedMeshes;
     }
 
+    private static bool IsSimilarMatrix(Matrix4x4 a, Matrix4x4 b)
+    {
+        return Enumerable.Range(0, 16).All(j => 0.01 < System.Math.Abs(a[j] - b[j]));
+    }
+
+    private static int GetMergedBoneID(List<Matrix4x4> bindPoses, Matrix4x4 bindPose)
+    {
+        for (int i = 0; i < bindPoses.Count; i++)
+        {
+            if (IsSimilarMatrix(bindPoses[i], bindPose))
+            {
+                return i;
+            }
+        }
+        bindPoses.Add(bindPose);
+        return bindPoses.Count - 1;
+    }
+
+    private static IEnumerable<Transform> GetAllChildren(Transform root)
+    {
+        var queue = new Queue<Transform>(root.Cast<Transform>());
+        while (queue.Count > 0)
+        {
+            Transform parent = queue.Dequeue();
+            yield return parent;
+            foreach (var child in parent.Cast<Transform>())
+            {
+                queue.Enqueue(child);
+            }
+        }
+    }
+
+    private static Matrix4x4 TransformOldBindPose(GameObject root, SkinnedMeshRenderer meshRenderer, Matrix4x4 bindPose)
+    {
+        Matrix4x4 m = /*meshRenderer.transform.worldToLocalMatrix */ bindPose;
+        foreach (var bone in GetAllChildren(root.transform))
+        {
+            if (IsSimilarMatrix(bone.worldToLocalMatrix, m))
+            {
+                return bone.worldToLocalMatrix * root.transform.localToWorldMatrix;
+            }
+        }
+        return Matrix4x4.identity;
+    }
+
+    private static void CombineSkinnedMeshes(GameObject root)
+    {
+        var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges(root);
+        int combinedMeshID = 0;
+        foreach (var combinableSkinnedMeshes in combinableSkinnedMeshList)
+        {
+            var targetUv = new List<Vector4>();
+            var targetVertices = new List<Vector3>();
+            var targetIndices = new List<List<int>>();
+            var targetNormals = new List<Vector3>();
+            var targetTangents = new List<Vector4>();
+            var targetWeights = new List<BoneWeight>();
+            var targetBindPoses = new List<Matrix4x4>();
+
+            int meshID = 0;
+            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            {
+                Matrix4x4 toRoot = skinnedMesh.transform.localToWorldMatrix
+                    * root.transform.worldToLocalMatrix;
+                var mesh = skinnedMesh.sharedMesh;
+                var bindPoseIDMap = new Dictionary<int, int>();
+                var indexOffset = targetVertices.Count;
+                var sourceVertices = mesh.vertices;
+                var sourceIndices = mesh.triangles;
+                var sourceUv = mesh.uv;
+                var sourceNormals = mesh.normals;
+                var sourceTangents = mesh.tangents;
+                var sourceWeights = mesh.boneWeights;
+
+                for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
+                {
+                    targetUv.Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
+                    targetVertices.Add(toRoot.MultiplyPoint3x4(sourceVertices[vertIndex]));
+                    targetNormals.Add(toRoot.MultiplyVector(sourceNormals[vertIndex]).normalized);
+                    targetTangents.Add(sourceTangents[vertIndex]);
+                    var boneWeight = sourceWeights[vertIndex];
+                    int newIndex;
+                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
+                    {
+                        newIndex = GetMergedBoneID(targetBindPoses,
+                            TransformOldBindPose(root, skinnedMesh,
+                            mesh.bindposes[boneWeight.boneIndex0]));
+                        bindPoseIDMap[boneWeight.boneIndex0] = newIndex;
+                    }
+                    boneWeight.boneIndex0 = newIndex;
+                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex1, out newIndex))
+                    {
+                        newIndex = GetMergedBoneID(targetBindPoses,
+                            TransformOldBindPose(root, skinnedMesh,
+                            mesh.bindposes[boneWeight.boneIndex1]));
+                        bindPoseIDMap[boneWeight.boneIndex1] = newIndex;
+                    }
+                    boneWeight.boneIndex1 = newIndex;
+                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex2, out newIndex))
+                    {
+                        newIndex = GetMergedBoneID(targetBindPoses,
+                            TransformOldBindPose(root, skinnedMesh,
+                            mesh.bindposes[boneWeight.boneIndex2]));
+                        bindPoseIDMap[boneWeight.boneIndex2] = newIndex;
+                    }
+                    boneWeight.boneIndex2 = newIndex;
+                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex3, out newIndex))
+                    {
+                        newIndex = GetMergedBoneID(targetBindPoses,
+                            TransformOldBindPose(root, skinnedMesh,
+                            mesh.bindposes[boneWeight.boneIndex3]));
+                        bindPoseIDMap[boneWeight.boneIndex3] = newIndex;
+                    }
+                    boneWeight.boneIndex3 = newIndex;
+                    targetWeights.Add(boneWeight);
+                }
+                
+                for (var matID = 0; matID < mesh.subMeshCount; matID++)
+                {
+                    uint startIndex = mesh.GetIndexStart(matID);
+                    uint endIndex = mesh.GetIndexCount(matID) + startIndex;
+                    var indices = new List<int>();
+                    for (uint i = startIndex; i < endIndex; i++)
+                    {
+                        indices.Add(sourceIndices[i] + indexOffset);
+                    }
+                    targetIndices.Add(indices);
+                }
+
+                meshID++;
+            }
+
+            var combinedMesh = new Mesh();
+            combinedMesh.indexFormat = targetVertices.Count >= 65536
+                ? UnityEngine.Rendering.IndexFormat.UInt32
+                : UnityEngine.Rendering.IndexFormat.UInt16;
+            combinedMesh.SetVertices(targetVertices);
+            combinedMesh.bindposes = targetBindPoses.ToArray();
+            combinedMesh.boneWeights = targetWeights.ToArray();
+            combinedMesh.SetUVs(0, targetUv);
+            combinedMesh.bounds = combinableSkinnedMeshes[0].sharedMesh.bounds;
+            combinedMesh.SetNormals(targetNormals);
+            combinedMesh.SetTangents(targetTangents);
+            combinedMesh.subMeshCount = targetIndices.Count;
+            for (int i = 0; i < targetIndices.Count; i++)
+            {
+                combinedMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
+            }
+            
+            var combinedMeshRenderer = new GameObject();
+            combinedMeshRenderer.name = "CombinedSkinnedMesh" + combinedMeshID;
+            combinedMeshRenderer.transform.SetParent(root.transform);
+            var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
+            meshRenderer.sharedMesh = combinedMesh;
+            meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
+
+            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            {
+                DestroyImmediate(skinnedMesh);
+            }
+
+            combinedMeshID++;
+        }
+    }
+
     private static void Optimize(GameObject root)
     {
-
+        CombineSkinnedMeshes(root);
     }
     
     public override void OnInspectorGUI()
