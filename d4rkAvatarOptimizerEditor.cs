@@ -401,6 +401,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                         FixBlendShapeAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
                     }
                 }
+                var properties = new MaterialPropertyBlock();
+                if (meshRenderer.HasPropertyBlock())
+                {
+                    meshRenderer.GetPropertyBlock(properties);
+                }
+                properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
+                meshRenderer.SetPropertyBlock(properties);
                 FixToggleAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, meshID);
                 DestroyImmediate(skinnedMesh.gameObject);
                 meshID++;
