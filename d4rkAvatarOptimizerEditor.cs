@@ -62,25 +62,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         return matchedSkinnedMeshes;
     }
-
-    private static bool IsSimilarMatrix(Matrix4x4 a, Matrix4x4 b)
-    {
-        return Enumerable.Range(0, 16).All(j => 0.01 < System.Math.Abs(a[j] - b[j]));
-    }
-
-    private static int GetMergedBoneID(List<Matrix4x4> bindPoses, Matrix4x4 bindPose)
-    {
-        for (int i = 0; i < bindPoses.Count; i++)
-        {
-            if (IsSimilarMatrix(bindPoses[i], bindPose))
-            {
-                return i;
-            }
-        }
-        bindPoses.Add(bindPose);
-        return bindPoses.Count - 1;
-    }
-
+    
     private static IEnumerable<Transform> GetAllChildren(Transform root)
     {
         var queue = new Queue<Transform>(root.Cast<Transform>());
@@ -94,18 +76,30 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
     }
-
-    private static Matrix4x4 TransformOldBindPose(GameObject root, SkinnedMeshRenderer meshRenderer, Matrix4x4 bindPose)
+    
+    private static int GetNewBoneIDFromOldID(GameObject root, List<Transform> bones, List<Matrix4x4> bindPoses, Transform toMatch)
     {
-        Matrix4x4 m = /*meshRenderer.transform.worldToLocalMatrix */ bindPose;
+        int index = 0;
+        foreach (var bone in bones)
+        {
+            if (bone == toMatch)
+            {
+                return index;
+            }
+            index++;
+        }
         foreach (var bone in GetAllChildren(root.transform))
         {
-            if (IsSimilarMatrix(bone.worldToLocalMatrix, m))
+            if (bone == toMatch)
             {
-                return bone.worldToLocalMatrix * root.transform.localToWorldMatrix;
+                bones.Add(bone);
+                bindPoses.Add(bone.worldToLocalMatrix * root.transform.localToWorldMatrix);
+                return bones.Count - 1;
             }
         }
-        return Matrix4x4.identity;
+        bones.Add(root.transform);
+        bindPoses.Add(root.transform.localToWorldMatrix);
+        return bones.Count - 1;
     }
 
     private static void CombineSkinnedMeshes(GameObject root)
@@ -114,6 +108,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         int combinedMeshID = 0;
         foreach (var combinableSkinnedMeshes in combinableSkinnedMeshList)
         {
+            var targetBones = new List<Transform>();
             var targetUv = new List<Vector4>();
             var targetVertices = new List<Vector3>();
             var targetIndices = new List<List<int>>();
@@ -125,8 +120,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                Matrix4x4 toRoot = skinnedMesh.transform.localToWorldMatrix
-                    * root.transform.worldToLocalMatrix;
+                Matrix4x4 toRoot = root.transform.worldToLocalMatrix
+                    * skinnedMesh.transform.localToWorldMatrix;
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
@@ -136,6 +131,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var sourceNormals = mesh.normals;
                 var sourceTangents = mesh.tangents;
                 var sourceWeights = mesh.boneWeights;
+                var sourceBones = skinnedMesh.bones;
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
@@ -147,33 +143,29 @@ public class d4rkAvatarOptimizerEditor : Editor
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
                     {
-                        newIndex = GetMergedBoneID(targetBindPoses,
-                            TransformOldBindPose(root, skinnedMesh,
-                            mesh.bindposes[boneWeight.boneIndex0]));
+                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                            sourceBones[boneWeight.boneIndex0]);
                         bindPoseIDMap[boneWeight.boneIndex0] = newIndex;
                     }
                     boneWeight.boneIndex0 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex1, out newIndex))
                     {
-                        newIndex = GetMergedBoneID(targetBindPoses,
-                            TransformOldBindPose(root, skinnedMesh,
-                            mesh.bindposes[boneWeight.boneIndex1]));
+                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                            sourceBones[boneWeight.boneIndex1]);
                         bindPoseIDMap[boneWeight.boneIndex1] = newIndex;
                     }
                     boneWeight.boneIndex1 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex2, out newIndex))
                     {
-                        newIndex = GetMergedBoneID(targetBindPoses,
-                            TransformOldBindPose(root, skinnedMesh,
-                            mesh.bindposes[boneWeight.boneIndex2]));
+                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                            sourceBones[boneWeight.boneIndex2]);
                         bindPoseIDMap[boneWeight.boneIndex2] = newIndex;
                     }
                     boneWeight.boneIndex2 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex3, out newIndex))
                     {
-                        newIndex = GetMergedBoneID(targetBindPoses,
-                            TransformOldBindPose(root, skinnedMesh,
-                            mesh.bindposes[boneWeight.boneIndex3]));
+                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                            sourceBones[boneWeight.boneIndex3]);
                         bindPoseIDMap[boneWeight.boneIndex3] = newIndex;
                     }
                     boneWeight.boneIndex3 = newIndex;
@@ -218,6 +210,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
+            meshRenderer.bones = targetBones.ToArray();
 
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
