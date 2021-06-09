@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEditor.Animations;
 using UnityEditor;
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
@@ -251,6 +252,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.bones = targetBones.ToArray();
 
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+            var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+            var newFxLayer = Instantiate(fxLayer);
 
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
@@ -262,6 +265,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
                 DestroyImmediate(skinnedMesh.gameObject);
+            }
+
+            if (avDescriptor != null && fxLayer != null)
+            {
+                newFxLayer.name = fxLayer.name + "(OptimizedCopy)";
+                avDescriptor.baseAnimationLayers[4].animatorController = newFxLayer;
             }
 
             combinedMeshID++;
