@@ -125,38 +125,57 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void SwitchBlendShapeAnimation(AnimatorController fxLayer,string newPath, string oldPath, string blendShapeName)
+    private static AnimationClip FixBlendShapeAnimationPath(AnimationClip clip, string newPath, string oldPath, string blendShapeName)
+    {
+        foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+        {
+            if (binding.path == oldPath && binding.propertyName == blendShapeName)
+            {
+                var newBinding = binding;
+                newBinding.path = newPath;
+                var newClip = Instantiate(clip);
+                newClip.ClearCurves();
+                foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
+                {
+                    if (b2 == binding)
+                        continue;
+                    AnimationUtility.SetEditorCurve(newClip, b2,
+                        AnimationUtility.GetEditorCurve(clip, b2));
+                }
+                AnimationUtility.SetEditorCurve(newClip, newBinding,
+                    AnimationUtility.GetEditorCurve(clip, binding));
+                newClip.name = clip.name;
+                if (!clip.name.EndsWith("(OptimizedCopy)"))
+                    newClip.name += "(OptimizedCopy)";
+                return newClip;
+            }
+        }
+        return clip;
+    }
+
+    private static void FixBlendShapeAnimationPath(AnimatorController fxLayer,string newPath, string oldPath, string blendShapeName)
     {
         blendShapeName = "blendShape." + blendShapeName;
         foreach (var state in EnumerateAllStates(fxLayer))
         {
             var clip = state.motion as AnimationClip;
-            if (clip != null)
+            var blendTree = state.motion as BlendTree;
+            if (blendTree != null)
             {
-                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                var childNodes = blendTree.children;
+                for (int i = 0; i < childNodes.Length; i++)
                 {
-                    if(binding.path == oldPath && binding.propertyName == blendShapeName)
+                    clip = childNodes[i].motion as AnimationClip;
+                    if (clip != null)
                     {
-                        var newBinding = binding;
-                        newBinding.path = newPath;
-                        var newClip = Instantiate(clip);
-                        newClip.ClearCurves();
-                        foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
-                        {
-                            if (b2 == binding)
-                                continue;
-                            AnimationUtility.SetEditorCurve(newClip, b2,
-                                AnimationUtility.GetEditorCurve(clip, b2));
-                        }
-                        AnimationUtility.SetEditorCurve(newClip, newBinding,
-                            AnimationUtility.GetEditorCurve(clip, binding));
-                        newClip.name = clip.name;
-                        if (!clip.name.EndsWith("(OptimizedCopy)"))
-                            newClip.name += "(OptimizedCopy)";
-                        state.motion = newClip;
-                        break;
+                        childNodes[i].motion = FixBlendShapeAnimationPath(clip, newPath, oldPath, blendShapeName);
                     }
                 }
+                blendTree.children = childNodes;
+            }
+            else if (clip != null)
+            {
+                state.motion = FixBlendShapeAnimationPath(clip, newPath, oldPath, blendShapeName);
             }
         }
     }
@@ -349,7 +368,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             oldPath = t.name + "/" + oldPath;
                         }
-                        SwitchBlendShapeAnimation(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
+                        FixBlendShapeAnimationPath(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
                     }
                 }
                 DestroyImmediate(skinnedMesh.gameObject);
