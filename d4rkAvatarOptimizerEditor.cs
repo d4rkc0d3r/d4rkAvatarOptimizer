@@ -371,6 +371,14 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
+                if (meshRenderer.rootBone == null)
+                {
+                    meshRenderer.rootBone = skinnedMesh.rootBone;
+                }
+                if (meshRenderer.probeAnchor == null)
+                {
+                    meshRenderer.probeAnchor = skinnedMesh.probeAnchor;
+                }
                 var t = skinnedMesh.transform;
                 string oldPath = t.name;
                 while ((t = t.parent) != root.transform)
