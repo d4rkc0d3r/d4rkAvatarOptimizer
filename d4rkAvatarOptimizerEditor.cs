@@ -250,8 +250,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
 
+            var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
+                if (avDescriptor != null)
+                {
+                    if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
+                    {
+                        avDescriptor.VisemeSkinnedMesh = meshRenderer;
+                    }
+                }
                 DestroyImmediate(skinnedMesh.gameObject);
             }
 
