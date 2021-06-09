@@ -125,14 +125,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static AnimationClip FixBlendShapeAnimationPath(AnimationClip clip, string newPath, string oldPath, string blendShapeName)
+    private static AnimationClip FixAnimationPath(AnimationClip clip, string newPath, string newPropertyName, string oldPath, string oldPropertyName)
     {
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
-            if (binding.path == oldPath && binding.propertyName == blendShapeName)
+            if (binding.path == oldPath && binding.propertyName == oldPropertyName)
             {
                 var newBinding = binding;
                 newBinding.path = newPath;
+                newBinding.propertyName = newPropertyName;
                 var newClip = Instantiate(clip);
                 newClip.ClearCurves();
                 foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
@@ -153,7 +154,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return clip;
     }
 
-    private static void FixBlendShapeAnimationPath(AnimatorController fxLayer,string newPath, string oldPath, string blendShapeName)
+    private static void FixBlendShapeAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, string blendShapeName)
     {
         blendShapeName = "blendShape." + blendShapeName;
         foreach (var state in EnumerateAllStates(fxLayer))
@@ -168,14 +169,42 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = FixBlendShapeAnimationPath(clip, newPath, oldPath, blendShapeName);
+                        childNodes[i].motion = FixAnimationPath(clip, newPath, blendShapeName, oldPath, blendShapeName);
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = FixBlendShapeAnimationPath(clip, newPath, oldPath, blendShapeName);
+                state.motion = FixAnimationPath(clip, newPath, blendShapeName, oldPath, blendShapeName);
+            }
+        }
+    }
+
+    private static void FixToggleAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, int meshID)
+    {
+        var oldPropertyName = "m_IsActive";
+        var newPropertyName = "material._IsActiveMesh" + meshID;
+        foreach (var state in EnumerateAllStates(fxLayer))
+        {
+            var clip = state.motion as AnimationClip;
+            var blendTree = state.motion as BlendTree;
+            if (blendTree != null)
+            {
+                var childNodes = blendTree.children;
+                for (int i = 0; i < childNodes.Length; i++)
+                {
+                    clip = childNodes[i].motion as AnimationClip;
+                    if (clip != null)
+                    {
+                        childNodes[i].motion = FixAnimationPath(clip, newPath, newPropertyName, oldPath, oldPropertyName);
+                    }
+                }
+                blendTree.children = childNodes;
+            }
+            else if (clip != null)
+            {
+                state.motion = FixAnimationPath(clip, newPath, newPropertyName, oldPath, oldPropertyName);
             }
         }
     }
@@ -339,8 +368,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                     AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
             }
 
+            meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
+                var t = skinnedMesh.transform;
+                string oldPath = t.name;
+                while ((t = t.parent) != root.transform)
+                {
+                    oldPath = t.name + "/" + oldPath;
+                }
                 if (avDescriptor != null)
                 {
                     if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
@@ -362,16 +398,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     if (avDescriptor != null && fxLayer != null)
                     {
-                        var t = skinnedMesh.transform;
-                        string oldPath = t.name;
-                        while ((t = t.parent) != root.transform)
-                        {
-                            oldPath = t.name + "/" + oldPath;
-                        }
-                        FixBlendShapeAnimationPath(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
+                        FixBlendShapeAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
                     }
                 }
+                FixToggleAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, meshID);
                 DestroyImmediate(skinnedMesh.gameObject);
+                meshID++;
             }
 
             if (avDescriptor != null && fxLayer != null)
