@@ -8,35 +8,16 @@ using UnityEditor;
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
-    static d4rkAvatarOptimizer t;
+    private static d4rkAvatarOptimizer t;
 
     private static bool CanCombineWith(List<SkinnedMeshRenderer> list, SkinnedMeshRenderer candidate)
     {
         return true;
     }
-    
-    public override void OnInspectorGUI()
+
+    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges(GameObject root)
     {
-        t = (d4rkAvatarOptimizer)target;
-
-        t.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", t.MergeBackFaceCullingWithCullingOff);
-        
-        if (GUILayout.Button("Create Optimized Copy"))
-        {
-            var copy = GameObject.Instantiate(t.gameObject);
-            DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
-            var boneCapsule = copy.GetComponentInChildren<BoneCapsule>(true);
-            if (boneCapsule != null)
-                DestroyImmediate(boneCapsule);
-            copy.name = t.gameObject.name + "(OptimizedCopy)";
-            copy.SetActive(true);
-            t.gameObject.SetActive(false);
-            Selection.objects = new Object[] { copy };
-        }
-
-        var skinnedMeshRenderers = t.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
@@ -50,7 +31,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if(CanCombineWith(subList, skinnedMeshRenderer))
+                if (CanCombineWith(subList, skinnedMeshRenderer))
                 {
                     subList.Add(skinnedMeshRenderer);
                     foundMatch = true;
@@ -62,6 +43,36 @@ public class d4rkAvatarOptimizerEditor : Editor
                 matchedSkinnedMeshes.Add(new List<SkinnedMeshRenderer> { skinnedMeshRenderer });
             }
         }
+        return matchedSkinnedMeshes;
+    }
+
+    private static void Optimize(GameObject root)
+    {
+
+    }
+    
+    public override void OnInspectorGUI()
+    {
+        t = (d4rkAvatarOptimizer)target;
+
+        t.MergeBackFaceCullingWithCullingOff =
+            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", t.MergeBackFaceCullingWithCullingOff);
+        
+        if (GUILayout.Button("Create Optimized Copy"))
+        {
+            var copy = GameObject.Instantiate(t.gameObject);
+            Optimize(copy);
+            DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
+            var boneCapsule = copy.GetComponentInChildren<BoneCapsule>(true);
+            if (boneCapsule != null)
+                DestroyImmediate(boneCapsule);
+            copy.name = t.gameObject.name + "(OptimizedCopy)";
+            copy.SetActive(true);
+            t.gameObject.SetActive(false);
+            Selection.objects = new Object[] { copy };
+        }
+
+        var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges(t.gameObject);
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
         {
