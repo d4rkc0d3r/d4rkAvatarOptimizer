@@ -138,7 +138,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     targetUv.Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
                     targetVertices.Add(toRoot.MultiplyPoint3x4(sourceVertices[vertIndex]));
                     targetNormals.Add(toRoot.MultiplyVector(sourceNormals[vertIndex]).normalized);
-                    targetTangents.Add(sourceTangents[vertIndex]);
+                    var t = toRoot.MultiplyVector((Vector3)sourceTangents[vertIndex]);
+                    targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
                     var boneWeight = sourceWeights[vertIndex];
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
