@@ -10,6 +10,7 @@ using UnityEditor;
 public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer t;
+    private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
 
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
     {
@@ -148,6 +149,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 newClip.name = clip.name;
                 if (!clip.name.EndsWith("(OptimizedCopy)"))
                     newClip.name += "(OptimizedCopy)";
+                AssetDatabase.CreateAsset(newClip, trashBinPath + newClip.name + ".anim");
                 return newClip;
             }
         }
@@ -156,6 +158,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void FixBlendShapeAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, string blendShapeName)
     {
+        if (newPath == oldPath)
+            return;
         blendShapeName = "blendShape." + blendShapeName;
         foreach (var state in EnumerateAllStates(fxLayer))
         {
@@ -346,23 +350,31 @@ public class d4rkAvatarOptimizerEditor : Editor
                 vertexOffset += mesh.vertexCount;
             }
 
+            string newMeshName = "CombinedSkinnedMesh" + combinedMeshID;
+            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            {
+                if (skinnedMesh.name == "Body")
+                {
+                    newMeshName = "Body";
+                    skinnedMesh.name = "WasFormerlyKnownAsBody";
+                }
+            }
+
             var combinedMeshRenderer = new GameObject();
-            combinedMeshRenderer.name = "CombinedSkinnedMesh" + combinedMeshID;
-            combinedMeshRenderer.transform.SetParent(root.transform);
-            combinedMeshRenderer.transform.localPosition = Vector3.zero;
-            combinedMeshRenderer.transform.localRotation = Quaternion.identity;
-            combinedMeshRenderer.transform.localScale = Vector3.one;
+            combinedMesh.name = newMeshName;
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
+
+            AssetDatabase.CreateAsset(combinedMesh, trashBinPath + combinedMesh.name + ".asset");
 
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
             var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
             var newFxLayer = Instantiate(fxLayer);
             if (avDescriptor != null && fxLayer != null)
             {
-                string path = "Assets/d4rkAvatarOptimizer/" + fxLayer.name + "(OptimizedCopy).controller";
+                string path = trashBinPath + fxLayer.name + "(OptimizedCopy).controller";
                 AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
                 newFxLayer = (AnimatorController)
                     AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
@@ -385,6 +397,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     oldPath = t.name + "/" + oldPath;
                 }
+                if (oldPath == "WasFormerlyKnownAsBody")
+                {
+                    oldPath = "Body";
+                }
                 if (avDescriptor != null)
                 {
                     if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
@@ -406,7 +422,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     if (avDescriptor != null && fxLayer != null)
                     {
-                        FixBlendShapeAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, blendShapeName);
+                        FixBlendShapeAnimationPaths(newFxLayer, newMeshName, oldPath, blendShapeName);
                     }
                 }
                 var properties = new MaterialPropertyBlock();
@@ -416,17 +432,24 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
                 meshRenderer.SetPropertyBlock(properties);
-                FixToggleAnimationPaths(newFxLayer, combinedMeshRenderer.name, oldPath, meshID);
+                FixToggleAnimationPaths(newFxLayer, newMeshName, oldPath, meshID);
                 DestroyImmediate(skinnedMesh.gameObject);
                 meshID++;
             }
+
+            combinedMeshRenderer.transform.SetParent(root.transform);
+            combinedMeshRenderer.transform.localPosition = Vector3.zero;
+            combinedMeshRenderer.transform.localRotation = Quaternion.identity;
+            combinedMeshRenderer.transform.localScale = Vector3.one;
+            combinedMeshRenderer.name = newMeshName;
 
             if (avDescriptor != null && fxLayer != null)
             {
                 newFxLayer.name = fxLayer.name + "(OptimizedCopy)";
                 avDescriptor.baseAnimationLayers[4].animatorController = newFxLayer;
-                AssetDatabase.SaveAssets();
             }
+
+            AssetDatabase.SaveAssets();
 
             combinedMeshID++;
         }
