@@ -148,9 +148,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 AnimationUtility.SetEditorCurve(newClip, newBinding,
                     AnimationUtility.GetEditorCurve(clip, binding));
                 newClip.name = clip.name;
-                if (!clip.name.EndsWith("(OptimizedCopy)"))
-                    newClip.name += "(OptimizedCopy)";
-                AssetDatabase.CreateAsset(newClip, trashBinPath + newClip.name + ".anim");
+                AssetDatabase.CreateAsset(newClip, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + newClip.name + ".anim"));
                 return newClip;
             }
         }
