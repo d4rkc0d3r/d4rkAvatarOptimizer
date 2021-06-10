@@ -12,6 +12,21 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static d4rkAvatarOptimizer t;
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
 
+    private static void ClearTrashBin()
+    {
+        string[] folderPath = { "Assets/d4rkAvatarOptimizer/TrashBin" };
+        foreach (var asset in AssetDatabase.FindAssets("", folderPath))
+        {
+            var path = AssetDatabase.GUIDToAssetPath(asset);
+            AssetDatabase.DeleteAsset(path);
+        }
+    }
+
+    private static void CreateUniqueAsset(Object asset, string path)
+    {
+        AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + path));
+    }
+
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
     {
         return true;
@@ -148,7 +163,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 AnimationUtility.SetEditorCurve(newClip, newBinding,
                     AnimationUtility.GetEditorCurve(clip, binding));
                 newClip.name = clip.name;
-                AssetDatabase.CreateAsset(newClip, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + newClip.name + ".anim"));
+                CreateUniqueAsset(newClip, newClip.name + ".anim");
                 return newClip;
             }
         }
@@ -360,7 +375,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             combinedMesh.name = newMeshName;
-            AssetDatabase.CreateAsset(combinedMesh, trashBinPath + combinedMesh.name + ".asset");
+            CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
             AssetDatabase.SaveAssets();
 
             var combinedMeshRenderer = new GameObject();
@@ -374,7 +389,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             AnimatorController newFxLayer = null;
             if (avDescriptor != null && fxLayer != null)
             {
-                string path = trashBinPath + fxLayer.name + "(OptimizedCopy).controller";
+                string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + fxLayer.name + ".controller");
                 AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
                 newFxLayer = (AnimatorController)
                     AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
@@ -457,6 +472,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void Optimize(GameObject root)
     {
+        ClearTrashBin();
         CombineSkinnedMeshes(root);
     }
     
