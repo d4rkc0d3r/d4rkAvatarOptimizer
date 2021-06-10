@@ -125,8 +125,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
     }
-
-    private static AnimationClip FixAnimationPath(AnimationClip clip, string newPath, string newPropertyName, string oldPath, string oldPropertyName)
+    
+    private static AnimationClip FixAnimationPath(AnimationClip clip, System.Type newBindingType, string newPath, string newPropertyName, string oldPath, string oldPropertyName)
     {
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
@@ -135,6 +135,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var newBinding = binding;
                 newBinding.path = newPath;
                 newBinding.propertyName = newPropertyName;
+                newBinding.type = newBindingType;
                 var newClip = Instantiate(clip);
                 newClip.ClearCurves();
                 foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
@@ -173,18 +174,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = FixAnimationPath(clip, newPath, blendShapeName, oldPath, blendShapeName);
+                        childNodes[i].motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, blendShapeName, oldPath, blendShapeName);
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = FixAnimationPath(clip, newPath, blendShapeName, oldPath, blendShapeName);
+                state.motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, blendShapeName, oldPath, blendShapeName);
             }
         }
     }
-
+    
     private static void FixToggleAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, int meshID)
     {
         var oldPropertyName = "m_IsActive";
@@ -201,14 +202,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = FixAnimationPath(clip, newPath, newPropertyName, oldPath, oldPropertyName);
+                        childNodes[i].motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, newPropertyName, oldPath, oldPropertyName);
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = FixAnimationPath(clip, newPath, newPropertyName, oldPath, oldPropertyName);
+                state.motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, newPropertyName, oldPath, oldPropertyName);
             }
         }
     }
@@ -360,18 +361,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
-            var combinedMeshRenderer = new GameObject();
             combinedMesh.name = newMeshName;
+            AssetDatabase.CreateAsset(combinedMesh, trashBinPath + combinedMesh.name + ".asset");
+            AssetDatabase.SaveAssets();
+
+            var combinedMeshRenderer = new GameObject();
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
             meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
 
-            AssetDatabase.CreateAsset(combinedMesh, trashBinPath + combinedMesh.name + ".asset");
-
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
             var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
-            var newFxLayer = Instantiate(fxLayer);
+            AnimatorController newFxLayer = null;
             if (avDescriptor != null && fxLayer != null)
             {
                 string path = trashBinPath + fxLayer.name + "(OptimizedCopy).controller";
