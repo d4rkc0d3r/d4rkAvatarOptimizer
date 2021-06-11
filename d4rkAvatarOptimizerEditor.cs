@@ -6,12 +6,15 @@ using UnityEngine;
 using UnityEditor.Animations;
 using UnityEditor;
 
+using AnimationPath = System.ValueTuple<string, string, System.Type>;
+
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer t;
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
+    private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
 
     private static void ClearTrashBin()
     {
@@ -48,6 +51,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (!IsCombinableSkinnedMesh(candidate))
             return false;
         return true;
+    }
+
+    private static void AddAnimationPathChange(string pathSource, string nameSource, System.Type typeSource, string pathTarget, string nameTarget, System.Type typeTarget)
+    {
+        var source = new AnimationPath(pathSource, nameSource, typeSource);
+        var target = new AnimationPath(pathTarget, nameTarget, typeTarget);
+        if (source == target)
+            return;
+        newAnimationPaths[source] = target;
     }
 
     private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges(GameObject root)
@@ -142,69 +154,48 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
     
-    private static AnimationClip FixAnimationPath(AnimationClip clip, System.Type newBindingType, string newPath, string newPropertyName, string oldPath, string oldPropertyName)
+    private static AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
+        var newClip = Instantiate(clip);
+        newClip.ClearCurves();
+        newClip.name = clip.name;
+        bool changed = false;
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
-            if (binding.path == oldPath && binding.propertyName == oldPropertyName)
+            var currentPath = new AnimationPath(binding.path, binding.propertyName, binding.type);
+            AnimationPath modifiedPath;
+            var newBinding = binding;
+            if (newAnimationPaths.TryGetValue(currentPath, out modifiedPath))
             {
-                var newBinding = binding;
-                newBinding.path = newPath;
-                newBinding.propertyName = newPropertyName;
-                newBinding.type = newBindingType;
-                var newClip = Instantiate(clip);
-                newClip.ClearCurves();
-                foreach (var b2 in AnimationUtility.GetCurveBindings(clip))
-                {
-                    if (b2 == binding)
-                        continue;
-                    AnimationUtility.SetEditorCurve(newClip, b2,
-                        AnimationUtility.GetEditorCurve(clip, b2));
-                }
-                AnimationUtility.SetEditorCurve(newClip, newBinding,
-                    AnimationUtility.GetEditorCurve(clip, binding));
-                newClip.name = clip.name;
-                CreateUniqueAsset(newClip, newClip.name + ".anim");
-                return newClip;
+                newBinding.path = modifiedPath.Item1;
+                newBinding.propertyName = modifiedPath.Item2;
+                newBinding.type = modifiedPath.Item3;
+                changed = true;
             }
+            AnimationUtility.SetEditorCurve(newClip, newBinding,
+                AnimationUtility.GetEditorCurve(clip, binding));
+        }
+        if (changed)
+        {
+            CreateUniqueAsset(newClip, newClip.name + ".anim");
+            return newClip;
         }
         return clip;
     }
-
-    private static void FixBlendShapeAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, string blendShapeName)
-    {
-        if (newPath == oldPath)
-            return;
-        blendShapeName = "blendShape." + blendShapeName;
-        foreach (var state in EnumerateAllStates(fxLayer))
-        {
-            var clip = state.motion as AnimationClip;
-            var blendTree = state.motion as BlendTree;
-            if (blendTree != null)
-            {
-                var childNodes = blendTree.children;
-                for (int i = 0; i < childNodes.Length; i++)
-                {
-                    clip = childNodes[i].motion as AnimationClip;
-                    if (clip != null)
-                    {
-                        childNodes[i].motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, blendShapeName, oldPath, blendShapeName);
-                    }
-                }
-                blendTree.children = childNodes;
-            }
-            else if (clip != null)
-            {
-                state.motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, blendShapeName, oldPath, blendShapeName);
-            }
-        }
-    }
     
-    private static void FixToggleAnimationPaths(AnimatorController fxLayer, string newPath, string oldPath, int meshID)
+    private static void FixAllAnimationPaths(GameObject root)
     {
-        var oldPropertyName = "m_IsActive";
-        var newPropertyName = "material._IsActiveMesh" + meshID;
-        foreach (var state in EnumerateAllStates(fxLayer))
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        if (avDescriptor == null || fxLayer == null)
+            return;
+
+        string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + fxLayer.name + ".controller");
+        AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
+        var newFxLayer = (AnimatorController)
+            AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
+
+        foreach (var state in EnumerateAllStates(newFxLayer))
         {
             var clip = state.motion as AnimationClip;
             var blendTree = state.motion as BlendTree;
@@ -216,16 +207,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, newPropertyName, oldPath, oldPropertyName);
+                        childNodes[i].motion = FixAnimationClipPaths(clip);
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = FixAnimationPath(clip, typeof(SkinnedMeshRenderer), newPath, newPropertyName, oldPath, oldPropertyName);
+                state.motion = FixAnimationClipPaths(clip);
             }
         }
+
+        avDescriptor.baseAnimationLayers[4].animatorController = newFxLayer;
+        AssetDatabase.SaveAssets();
     }
 
     private static void CalculateUsedBlendShapePaths(GameObject root)
@@ -443,16 +437,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.bones = targetBones.ToArray();
 
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-            var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
-            AnimatorController newFxLayer = null;
-            if (avDescriptor != null && fxLayer != null)
-            {
-                string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + fxLayer.name + ".controller");
-                AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
-                newFxLayer = (AnimatorController)
-                    AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
-            }
-
+            
             meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
@@ -493,10 +478,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                             break;
                         }
                     }
-                    if (avDescriptor != null && fxLayer != null)
-                    {
-                        FixBlendShapeAnimationPaths(newFxLayer, newMeshName, oldPath, blendShapeName);
-                    }
+                    AddAnimationPathChange(oldPath, "blendShape." + blendShapeName, typeof(SkinnedMeshRenderer),
+                        newMeshName, "blendShape." + blendShapeName, typeof(SkinnedMeshRenderer));
                 }
                 var properties = new MaterialPropertyBlock();
                 if (meshRenderer.HasPropertyBlock())
@@ -505,7 +488,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
                 meshRenderer.SetPropertyBlock(properties);
-                FixToggleAnimationPaths(newFxLayer, newMeshName, oldPath, meshID);
+                AddAnimationPathChange(oldPath, "m_IsActive", typeof(GameObject),
+                        newMeshName, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer));
                 DestroyImmediate(skinnedMesh.gameObject);
                 meshID++;
             }
@@ -516,12 +500,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMeshRenderer.transform.localScale = Vector3.one;
             combinedMeshRenderer.name = newMeshName;
 
-            if (avDescriptor != null && fxLayer != null)
-            {
-                newFxLayer.name = fxLayer.name + "(OptimizedCopy)";
-                avDescriptor.baseAnimationLayers[4].animatorController = newFxLayer;
-            }
-
             AssetDatabase.SaveAssets();
 
             combinedMeshID++;
@@ -531,8 +509,10 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject root)
     {
         ClearTrashBin();
+        newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths(root);
         CombineSkinnedMeshes(root);
+        FixAllAnimationPaths(root);
     }
     
     public override void OnInspectorGUI()
