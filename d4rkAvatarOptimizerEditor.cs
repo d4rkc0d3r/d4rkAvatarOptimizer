@@ -11,6 +11,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer t;
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
+    private static HashSet<string> usedBlendShapes = new HashSet<string>();
 
     private static void ClearTrashBin()
     {
@@ -227,6 +228,54 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void CalculateUsedBlendShapePaths(GameObject root)
+    {
+        usedBlendShapes.Clear();
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        if (avDescriptor == null || fxLayer == null)
+            return;
+        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        {
+            if (binding.type != typeof(SkinnedMeshRenderer)
+                || !binding.propertyName.StartsWith("blendShape."))
+                continue;
+            usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
+        }
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
+            && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var t = avDescriptor.VisemeSkinnedMesh.transform;
+            string path = t.name;
+            while ((t = t.parent) != root.transform)
+            {
+                path = t.name + "/" + path;
+            }
+            path = path + "/blendShape.";
+            foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+            {
+                usedBlendShapes.Add(path + blendShapeName);
+            }
+        }
+        if (avDescriptor.customEyeLookSettings.eyelidType
+            == VRC.SDK3.Avatars.Components.VRCAvatarDescriptor.EyelidType.Blendshapes
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+            var t = meshRenderer.transform;
+            string path = t.name;
+            while ((t = t.parent) != root.transform)
+            {
+                path = t.name + "/" + path;
+            }
+            path = path + "/blendShape.";
+            foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+            {
+                usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+            }
+        }
+    }
+
     private static void CombineSkinnedMeshes(GameObject root)
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges(root);
@@ -336,8 +385,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 Matrix4x4 toRoot = root.transform.worldToLocalMatrix
                     * skinnedMesh.transform.localToWorldMatrix;
                 var mesh = skinnedMesh.sharedMesh;
+                var t = skinnedMesh.transform;
+                string path = t.name;
+                while ((t = t.parent) != root.transform)
+                {
+                    path = t.name + "/" + path;
+                }
+                path = path + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
+                    var name = mesh.GetBlendShapeName(i);
+                    if (!usedBlendShapes.Contains(path + name))
+                        continue;
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
                     {
                         var sourceDeltaVertices = new Vector3[mesh.vertexCount];
@@ -356,7 +415,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                             targetDeltaTangents[k + vertexOffset] =
                                 toRoot.MultiplyVector(sourceDeltaTangents[k]);
                         }
-                        var name = mesh.GetBlendShapeName(i);
                         var weight = mesh.GetBlendShapeFrameWeight(i, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
                     }
@@ -473,6 +531,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject root)
     {
         ClearTrashBin();
+        CalculateUsedBlendShapePaths(root);
         CombineSkinnedMeshes(root);
     }
     
