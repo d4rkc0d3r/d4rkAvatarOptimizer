@@ -11,7 +11,7 @@ using AnimationPath = System.ValueTuple<string, string, System.Type>;
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
-    private static d4rkAvatarOptimizer t;
+    private static GameObject root;
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -29,6 +29,16 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void CreateUniqueAsset(Object asset, string path)
     {
         AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + path));
+    }
+
+    private static string GetTransformPathToRoot(Transform t)
+    {
+        string path = t.name;
+        while ((t = t.parent) != root.transform)
+        {
+            path = t.name + "/" + path;
+        }
+        return path;
     }
 
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
@@ -62,15 +72,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         newAnimationPaths[source] = target;
     }
 
-    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges(GameObject root)
+    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges()
     {
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
-            if (skinnedMeshRenderer == null)
-                continue;
-
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
@@ -93,9 +100,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         return matchedSkinnedMeshes;
     }
     
-    private static IEnumerable<Transform> GetAllChildren(Transform root)
+    private static IEnumerable<Transform> GetAllChildren(Transform t)
     {
-        var queue = new Queue<Transform>(root.Cast<Transform>());
+        var queue = new Queue<Transform>(t.Cast<Transform>());
         while (queue.Count > 0)
         {
             Transform parent = queue.Dequeue();
@@ -107,7 +114,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
     
-    private static int GetNewBoneIDFromOldID(GameObject root, List<Transform> bones, List<Matrix4x4> bindPoses, Transform toMatch)
+    private static int GetNewBoneIDFromOldID(List<Transform> bones, List<Matrix4x4> bindPoses, Transform toMatch)
     {
         int index = 0;
         foreach (var bone in bones)
@@ -183,7 +190,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return clip;
     }
     
-    private static void FixAllAnimationPaths(GameObject root)
+    private static void FixAllAnimationPaths()
     {
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
         var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
@@ -222,7 +229,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         AssetDatabase.SaveAssets();
     }
 
-    private static void CalculateUsedBlendShapePaths(GameObject root)
+    private static void CalculateUsedBlendShapePaths()
     {
         usedBlendShapes.Clear();
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
@@ -239,13 +246,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
             && avDescriptor.VisemeSkinnedMesh != null)
         {
-            var t = avDescriptor.VisemeSkinnedMesh.transform;
-            string path = t.name;
-            while ((t = t.parent) != root.transform)
-            {
-                path = t.name + "/" + path;
-            }
-            path = path + "/blendShape.";
+            string path = GetTransformPathToRoot(avDescriptor.VisemeSkinnedMesh.transform) + "/blendShape.";
             foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
             {
                 usedBlendShapes.Add(path + blendShapeName);
@@ -256,13 +257,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
         {
             var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-            var t = meshRenderer.transform;
-            string path = t.name;
-            while ((t = t.parent) != root.transform)
-            {
-                path = t.name + "/" + path;
-            }
-            path = path + "/blendShape.";
+            string path = GetTransformPathToRoot(meshRenderer.transform) + "/blendShape.";
             foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
             {
                 usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
@@ -275,13 +270,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
-            var t = skinnedMeshRenderer.transform;
-            string path = t.name;
-            while ((t = t.parent) != root.transform)
-            {
-                path = t.name + "/" + path;
-            }
-            path = path + "/blendShape.";
+            string path = GetTransformPathToRoot(skinnedMeshRenderer.transform) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
                 if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
@@ -292,9 +281,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void CombineSkinnedMeshes(GameObject root)
+    private static void CombineSkinnedMeshes()
     {
-        var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges(root);
+        var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
         int combinedMeshID = 0;
         foreach (var combinableSkinnedMeshes in combinableSkinnedMeshList)
         {
@@ -334,28 +323,28 @@ public class d4rkAvatarOptimizerEditor : Editor
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
                             sourceBones[boneWeight.boneIndex0]);
                         bindPoseIDMap[boneWeight.boneIndex0] = newIndex;
                     }
                     boneWeight.boneIndex0 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex1, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
                             sourceBones[boneWeight.boneIndex1]);
                         bindPoseIDMap[boneWeight.boneIndex1] = newIndex;
                     }
                     boneWeight.boneIndex1 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex2, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
                             sourceBones[boneWeight.boneIndex2]);
                         bindPoseIDMap[boneWeight.boneIndex2] = newIndex;
                     }
                     boneWeight.boneIndex2 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex3, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(root, targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
                             sourceBones[boneWeight.boneIndex3]);
                         bindPoseIDMap[boneWeight.boneIndex3] = newIndex;
                     }
@@ -402,12 +391,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     * skinnedMesh.transform.localToWorldMatrix;
                 var mesh = skinnedMesh.sharedMesh;
                 var t = skinnedMesh.transform;
-                string path = t.name;
-                while ((t = t.parent) != root.transform)
-                {
-                    path = t.name + "/" + path;
-                }
-                path = path + "/blendShape.";
+                string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
                     var name = mesh.GetBlendShapeName(i);
@@ -471,12 +455,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     meshRenderer.probeAnchor = skinnedMesh.probeAnchor;
                 }
-                var t = skinnedMesh.transform;
-                string oldPath = t.name;
-                while ((t = t.parent) != root.transform)
-                {
-                    oldPath = t.name + "/" + oldPath;
-                }
+                string oldPath = GetTransformPathToRoot(skinnedMesh.transform);
                 if (oldPath == "WasFormerlyKnownAsBody")
                 {
                     oldPath = "Body";
@@ -528,18 +507,19 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void Optimize(GameObject root)
+    private static void Optimize(GameObject toOptimize)
     {
+        root = toOptimize;
         ClearTrashBin();
         newAnimationPaths.Clear();
-        CalculateUsedBlendShapePaths(root);
-        CombineSkinnedMeshes(root);
-        FixAllAnimationPaths(root);
+        CalculateUsedBlendShapePaths();
+        CombineSkinnedMeshes();
+        FixAllAnimationPaths();
     }
     
     public override void OnInspectorGUI()
     {
-        t = (d4rkAvatarOptimizer)target;
+        var t = (d4rkAvatarOptimizer)target;
 
         t.MergeBackFaceCullingWithCullingOff =
             EditorGUILayout.Toggle("Merge Cull Back with Cull Off", t.MergeBackFaceCullingWithCullingOff);
@@ -558,7 +538,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             Selection.objects = new Object[] { copy };
         }
 
-        var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges(t.gameObject);
+        root = t.gameObject;
+        var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
         {
