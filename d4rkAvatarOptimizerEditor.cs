@@ -268,6 +268,28 @@ public class d4rkAvatarOptimizerEditor : Editor
                 usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
             }
         }
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
+        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = skinnedMeshRenderer.sharedMesh;
+            if (mesh == null)
+                continue;
+            var t = skinnedMeshRenderer.transform;
+            string path = t.name;
+            while ((t = t.parent) != root.transform)
+            {
+                path = t.name + "/" + path;
+            }
+            path = path + "/blendShape.";
+            for (int i = 0; i < mesh.blendShapeCount; i++)
+            {
+                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
+                {
+                    usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
+                }
+            }
+        }
     }
 
     private static void CombineSkinnedMeshes(GameObject root)
