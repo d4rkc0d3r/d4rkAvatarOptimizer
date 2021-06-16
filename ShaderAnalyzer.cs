@@ -124,43 +124,43 @@ namespace d4rkpl4y3r
         private void ParsePropertyBlock()
         {
             bool isInPropertyBlock = false;
-            int propertyBlockCurlyBracketDepth = -1;
-            int curlyBracketDepth = 0;
-            for (int i = 0; i < processedLines.Count; i++)
+            int propertyBlockBraceDepth = -1;
+            int braceDepth = 0;
+            for (int lineIndex = 0; lineIndex < processedLines.Count; lineIndex++)
             {
-                string line = processedLines[i];
+                string line = processedLines[lineIndex];
                 if (line == "{")
                 {
-                    curlyBracketDepth++;
+                    braceDepth++;
                 }
                 else if (line == "}")
                 {
-                    curlyBracketDepth--;
-                    if (isInPropertyBlock && curlyBracketDepth == propertyBlockCurlyBracketDepth)
+                    braceDepth--;
+                    if (isInPropertyBlock && braceDepth == propertyBlockBraceDepth)
                     {
                         isInPropertyBlock = false;
                         return;
                     }
                 }
-                else if (line == "Properties" && processedLines[i + 1] == "{")
+                else if (line == "Properties" && processedLines[lineIndex + 1] == "{")
                 {
                     isInPropertyBlock = true;
-                    propertyBlockCurlyBracketDepth = curlyBracketDepth;
-                    curlyBracketDepth++;
-                    i++;
+                    propertyBlockBraceDepth = braceDepth;
+                    braceDepth++;
+                    lineIndex++;
                 }
                 else if (isInPropertyBlock)
                 {
                     string modifiedLine = line;
-                    int squareBracketOpenIndex = line.IndexOf('[');
-                    while (squareBracketOpenIndex != -1)
+                    int openBracketIndex = line.IndexOf('[');
+                    while (openBracketIndex != -1)
                     {
                         int closeBracketIndex = modifiedLine.IndexOf(']') + 1;
                         if (closeBracketIndex != 0)
                         {
-                            modifiedLine = modifiedLine.Substring(0, squareBracketOpenIndex)
-                                + modifiedLine.Substring(closeBracketIndex, modifiedLine.Length - closeBracketIndex);
-                            squareBracketOpenIndex = modifiedLine.IndexOf('[');
+                            modifiedLine = modifiedLine.Substring(0, openBracketIndex)
+                                + modifiedLine.Substring(closeBracketIndex);
+                            openBracketIndex = modifiedLine.IndexOf('[');
                         }
                         else
                         {
