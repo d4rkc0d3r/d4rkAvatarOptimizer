@@ -30,13 +30,6 @@ public class ShaderAnalyzerDebugger : EditorWindow
             analyzer.Parse();
         }
 
-        for (int i = 0; i < maxLines && i < analyzer.rawLines.Count; i++)
-        {
-            GUILayout.Label(analyzer.rawLines[i]);
-        }
-
-        GUILayout.Space(20);
-
         for (int i = 0; i < maxLines && i < analyzer.processedLines.Count; i++)
         {
             GUILayout.Label(analyzer.processedLines[i]);

@@ -14,7 +14,6 @@ namespace d4rkpl4y3r
     public class ShaderAnalyzer
     {
         public Shader shader;
-        public readonly List<string> rawLines = new List<string>();
         public readonly List<string> processedLines = new List<string>();
         public readonly List<string> properties = new List<string>();
 
@@ -30,33 +29,11 @@ namespace d4rkpl4y3r
 
         public void Parse()
         {
-            rawLines.Clear();
             processedLines.Clear();
             properties.Clear();
-            ReadRawLines();
-            ProcessRawLines();
+            ReadShader();
             ParsePropertyBlock();
-        }
-
-        private void ReadRawLines()
-        {
-            string filePath = AssetDatabase.GetAssetPath(shader);
-            string[] fileContents = null;
-            try
-            {
-                fileContents = File.ReadAllLines(filePath);
-            }
-            catch (FileNotFoundException e)
-            {
-                Debug.LogError("Shader file " + filePath + " not found.  " + e.ToString());
-                return;
-            }
-            catch (IOException e)
-            {
-                Debug.LogError("Error reading shader file.  " + e.ToString());
-                return;
-            }
-            rawLines.AddRange(fileContents);
+            File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastParsedShader.shader", processedLines);
         }
 
         private static int FindEndOfStringLiteral(string text, int startIndex)
@@ -75,9 +52,48 @@ namespace d4rkpl4y3r
             return -1;
         }
 
-        private void ProcessRawLines()
+        private bool ReadShader()
         {
-            for (int lineIndex = 0; lineIndex < rawLines.Count; lineIndex++)
+            maxIncludes = 50;
+            return RecursiveParseFile(AssetDatabase.GetAssetPath(shader), processedLines);
+        }
+
+        private static int maxIncludes = 50;
+        private static bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
+        {
+            bool isTopLevelFile = false;
+            if (alreadyIncludedFiles == null)
+            {
+                alreadyIncludedFiles = new List<string>();
+                isTopLevelFile = true;
+            }
+            if (--maxIncludes < 0)
+            {
+                Debug.LogError("Reach max include depth");
+                return false;
+            }
+            filePath = Path.GetFullPath(filePath);
+            if (alreadyIncludedFiles.Contains(filePath))
+            {
+                return true;
+            }
+            alreadyIncludedFiles.Add(filePath);
+            string[] rawLines = null;
+            try
+            {
+                rawLines = File.ReadAllLines(filePath);
+            }
+            catch (FileNotFoundException e)
+            {
+                return false; //this is probably a unity include file
+            }
+            catch (IOException e)
+            {
+                Debug.LogError("Error reading shader file.  " + e.ToString());
+                return false;
+            }
+
+            for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
             {
                 string trimmedLine = rawLines[lineIndex].Trim();
                 if (trimmedLine == "")
@@ -103,7 +119,7 @@ namespace d4rkpl4y3r
                     {
                         int endCommentBlock = trimmedLine.IndexOf("*/", i + 2);
                         bool isMultiLineCommentBlock = endCommentBlock == -1;
-                        while (endCommentBlock == -1 && ++lineIndex < rawLines.Count)
+                        while (endCommentBlock == -1 && ++lineIndex < rawLines.Length)
                         {
                             endCommentBlock = rawLines[lineIndex].IndexOf("*/");
                         }
@@ -130,6 +146,22 @@ namespace d4rkpl4y3r
                 }
                 if (trimmedLine == "")
                     continue;
+                if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM"))
+                {
+                    alreadyIncludedFiles.Clear();
+                }
+                if (trimmedLine.StartsWith("#include "))
+                {
+                    int firstQuote = trimmedLine.IndexOf('"');
+                    int lastQuote = trimmedLine.LastIndexOf('"');
+                    string includePath = trimmedLine.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
+                    includePath = Path.GetDirectoryName(filePath) + "/" + includePath;
+                    if (!RecursiveParseFile(includePath, processedLines, alreadyIncludedFiles))
+                    {
+                        processedLines.Add(trimmedLine);
+                    }
+                    continue;
+                }
                 if (trimmedLine.EndsWith("{"))
                 {
                     trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd();
@@ -140,6 +172,7 @@ namespace d4rkpl4y3r
                 }
                 processedLines.Add(trimmedLine);
             }
+            return true;
         }
 
         private void ParsePropertyBlock()
