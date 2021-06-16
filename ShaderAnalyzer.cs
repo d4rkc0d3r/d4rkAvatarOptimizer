@@ -72,11 +72,39 @@ namespace d4rkpl4y3r
                 {
                     if (trimmedLine[i] != '/')
                         continue;
-                    i++;
-                    if (trimmedLine[i] == '/')
+                    if (trimmedLine[i + 1] == '/')
                     {
-                        trimmedLine = trimmedLine.Substring(0, i - 1).TrimEnd();
+                        trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
                         break;
+                    }
+                    else if (trimmedLine[i + 1] == '*')
+                    {
+                        int startCommentBlock = i;
+                        int endCommentBlock = trimmedLine.IndexOf("*/", i + 2);
+                        bool isMultiLineCommentBlock = endCommentBlock == -1;
+                        while (endCommentBlock == -1 && ++lineIndex < rawLines.Count)
+                        {
+                            endCommentBlock = rawLines[lineIndex].IndexOf("*/");
+                        }
+                        if (endCommentBlock != -1)
+                        {
+                            if (isMultiLineCommentBlock)
+                            {
+                                trimmedLine = trimmedLine.Substring(0, i)
+                                    + rawLines[lineIndex].Substring(endCommentBlock + 2);
+                            }
+                            else
+                            {
+                                trimmedLine = trimmedLine.Substring(0, i)
+                                    + trimmedLine.Substring(endCommentBlock + 2);
+                            }
+                            i -= 1;
+                        }
+                        else
+                        {
+                            trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
+                            break;
+                        }
                     }
                 }
                 if (trimmedLine == "")
