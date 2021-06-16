@@ -171,7 +171,7 @@ namespace d4rkpl4y3r
                     int parentheses = modifiedLine.IndexOf('(');
                     if (parentheses != -1)
                     {
-                        properties.Add(modifiedLine);
+                        properties.Add(modifiedLine.Substring(0, parentheses).TrimEnd());
                     }
                 }
             }
