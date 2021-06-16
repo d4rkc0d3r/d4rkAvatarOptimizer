@@ -63,9 +63,22 @@ namespace d4rkpl4y3r
 
         private void ProcessRawLines()
         {
-            for (int i = 0; i < rawLines.Count; i++)
+            for (int lineIndex = 0; lineIndex < rawLines.Count; lineIndex++)
             {
-                string trimmedLine = rawLines[i].Trim();
+                string trimmedLine = rawLines[lineIndex].Trim();
+                if (trimmedLine == "")
+                    continue;
+                for (int i = 0; i < trimmedLine.Length - 1; i++)
+                {
+                    if (trimmedLine[i] != '/')
+                        continue;
+                    i++;
+                    if (trimmedLine[i] == '/')
+                    {
+                        trimmedLine = trimmedLine.Substring(0, i - 1).TrimEnd();
+                        break;
+                    }
+                }
                 if (trimmedLine == "")
                     continue;
                 if (trimmedLine.EndsWith("{"))
