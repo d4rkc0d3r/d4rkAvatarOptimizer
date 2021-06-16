@@ -59,6 +59,22 @@ namespace d4rkpl4y3r
             rawLines.AddRange(fileContents);
         }
 
+        private static int FindEndOfStringLiteral(string text, int startIndex)
+        {
+            for (int i = startIndex; i < text.Length; i++)
+            {
+                if (text[i] == '\\')
+                {
+                    i++;
+                }
+                else if (text[i] == '"')
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         private void ProcessRawLines()
         {
             for (int lineIndex = 0; lineIndex < rawLines.Count; lineIndex++)
@@ -68,8 +84,16 @@ namespace d4rkpl4y3r
                     continue;
                 for (int i = 0; i < trimmedLine.Length - 1; i++)
                 {
-                    if (trimmedLine[i] != '/')
+                    if (trimmedLine[i] == '"')
+                    {
+                        int end = FindEndOfStringLiteral(trimmedLine, i + 1);
+                        i = (end == -1) ? trimmedLine.Length : end;
                         continue;
+                    }
+                    else if (trimmedLine[i] != '/')
+                    {
+                        continue;
+                    }
                     if (trimmedLine[i + 1] == '/')
                     {
                         trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
@@ -77,7 +101,6 @@ namespace d4rkpl4y3r
                     }
                     else if (trimmedLine[i + 1] == '*')
                     {
-                        int startCommentBlock = i;
                         int endCommentBlock = trimmedLine.IndexOf("*/", i + 2);
                         bool isMultiLineCommentBlock = endCommentBlock == -1;
                         while (endCommentBlock == -1 && ++lineIndex < rawLines.Count)
