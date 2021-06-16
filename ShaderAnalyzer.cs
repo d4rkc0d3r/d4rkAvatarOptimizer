@@ -41,12 +41,10 @@ namespace d4rkpl4y3r
         private void ReadRawLines()
         {
             string filePath = AssetDatabase.GetAssetPath(shader);
-            string fileContents = null;
+            string[] fileContents = null;
             try
             {
-                StreamReader sr = new StreamReader(filePath);
-                fileContents = sr.ReadToEnd();
-                sr.Close();
+                fileContents = File.ReadAllLines(filePath);
             }
             catch (FileNotFoundException e)
             {
@@ -58,7 +56,7 @@ namespace d4rkpl4y3r
                 Debug.LogError("Error reading shader file.  " + e.ToString());
                 return;
             }
-            rawLines.AddRange(Regex.Split(fileContents, "\r\n|\r|\n"));
+            rawLines.AddRange(fileContents);
         }
 
         private void ProcessRawLines()
