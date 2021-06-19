@@ -8,7 +8,7 @@ using d4rkpl4y3r;
 public class ShaderAnalyzerDebugger : EditorWindow
 {
     private Material mat;
-    private ShaderAnalyzer analyzer = new ShaderAnalyzer();
+    private ParsedShader parsedShader;
     private int maxLines = 5;
     private int maxProperties = 20;
 
@@ -23,23 +23,25 @@ public class ShaderAnalyzerDebugger : EditorWindow
         mat = EditorGUILayout.ObjectField("Material", mat, typeof(Material), false) as Material;
         maxLines = EditorGUILayout.IntField("Max Lines", maxLines);
         maxProperties = EditorGUILayout.IntField("Max Properties", maxProperties);
-        analyzer.shader = mat?.shader;
-
+        
         if (GUILayout.Button("Analyze"))
         {
-            analyzer.Parse();
+            parsedShader = ShaderAnalyzer.Parse(mat?.shader);
         }
 
-        for (int i = 0; i < maxLines && i < analyzer.processedLines.Count; i++)
+        if (parsedShader == null)
+            return;
+
+        for (int i = 0; i < maxLines && i < parsedShader.lines.Count; i++)
         {
-            GUILayout.Label(analyzer.processedLines[i]);
+            GUILayout.Label(parsedShader.lines[i]);
         }
 
         GUILayout.Space(20);
 
-        for (int i = 0; i < maxProperties && i < analyzer.properties.Count; i++)
+        for (int i = 0; i < maxProperties && i < parsedShader.properties.Count; i++)
         {
-            GUILayout.Label(analyzer.properties[i]);
+            GUILayout.Label(parsedShader.properties[i]);
         }
     }
 }

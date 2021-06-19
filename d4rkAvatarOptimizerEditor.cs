@@ -65,8 +65,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void AddAnimationPathChange(string pathSource, string nameSource, System.Type typeSource, string pathTarget, string nameTarget, System.Type typeTarget)
     {
-        var source = new AnimationPath(pathSource, nameSource, typeSource);
-        var target = new AnimationPath(pathTarget, nameTarget, typeTarget);
+        AnimationPath source = (pathSource, nameSource, typeSource);
+        AnimationPath target = (pathTarget, nameTarget, typeTarget);
         if (source == target)
             return;
         newAnimationPaths[source] = target;

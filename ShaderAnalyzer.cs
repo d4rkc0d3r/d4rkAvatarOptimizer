@@ -11,29 +11,37 @@ using System.Linq;
 
 namespace d4rkpl4y3r
 {
-    public class ShaderAnalyzer
+    public class ParsedShader
     {
-        public Shader shader;
-        public readonly List<string> processedLines = new List<string>();
-        public readonly List<string> properties = new List<string>();
+        public string name;
+        public List<string> lines = new List<string>();
+        public List<string> properties = new List<string>();
+    }
 
-        public ShaderAnalyzer()
+    public static class ShaderAnalyzer
+    {
+        private static Dictionary<string, ParsedShader> parsedShaderCache = new Dictionary<string, ParsedShader>();
+
+        public static void ClearParsedShaderCache()
         {
-
+            parsedShaderCache.Clear();
         }
 
-        public ShaderAnalyzer(Shader shader)
+        public static ParsedShader Parse(Shader shader)
         {
-            this.shader = shader;
-        }
-
-        public void Parse()
-        {
-            processedLines.Clear();
-            properties.Clear();
-            ReadShader();
-            ParsePropertyBlock();
-            File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastParsedShader.shader", processedLines);
+            if (shader == null)
+                return null;
+            ParsedShader parsedShader;
+            if (!parsedShaderCache.TryGetValue(shader.name, out parsedShader))
+            {
+                maxIncludes = 50;
+                parsedShader = new ParsedShader();
+                parsedShader.name = shader.name;
+                RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
+                ParsePropertyBlock(parsedShader);
+                File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastParsedShader.shader", parsedShader.lines);
+            }
+            return parsedShader;
         }
 
         private static int FindEndOfStringLiteral(string text, int startIndex)
@@ -50,12 +58,6 @@ namespace d4rkpl4y3r
                 }
             }
             return -1;
-        }
-
-        private bool ReadShader()
-        {
-            maxIncludes = 50;
-            return RecursiveParseFile(AssetDatabase.GetAssetPath(shader), processedLines);
         }
 
         private static int maxIncludes = 50;
@@ -175,14 +177,14 @@ namespace d4rkpl4y3r
             return true;
         }
 
-        private void ParsePropertyBlock()
+        private static void ParsePropertyBlock(ParsedShader parsedShader)
         {
             bool isInPropertyBlock = false;
             int propertyBlockBraceDepth = -1;
             int braceDepth = 0;
-            for (int lineIndex = 0; lineIndex < processedLines.Count; lineIndex++)
+            for (int lineIndex = 0; lineIndex < parsedShader.lines.Count; lineIndex++)
             {
-                string line = processedLines[lineIndex];
+                string line = parsedShader.lines[lineIndex];
                 if (line == "{")
                 {
                     braceDepth++;
@@ -196,7 +198,7 @@ namespace d4rkpl4y3r
                         return;
                     }
                 }
-                else if (line == "Properties" && processedLines[lineIndex + 1] == "{")
+                else if (line == "Properties" && parsedShader.lines[lineIndex + 1] == "{")
                 {
                     isInPropertyBlock = true;
                     propertyBlockBraceDepth = braceDepth;
@@ -225,7 +227,7 @@ namespace d4rkpl4y3r
                     int parentheses = modifiedLine.IndexOf('(');
                     if (parentheses != -1)
                     {
-                        properties.Add(modifiedLine.Substring(0, parentheses).TrimEnd());
+                        parsedShader.properties.Add(modifiedLine.Substring(0, parentheses).TrimEnd());
                     }
                 }
             }
