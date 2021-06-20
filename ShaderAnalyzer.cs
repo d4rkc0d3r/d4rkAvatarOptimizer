@@ -11,11 +11,28 @@ using System.Linq;
 
 namespace d4rkpl4y3r
 {
+    
+
     public class ParsedShader
     {
+        public class Property
+        {
+            public enum Type
+            {
+                Unknown,
+                Color,
+                Float,
+                Float4,
+                Int,
+                Int4,
+                Texture2D
+            }
+            public string name;
+            public Type type = Type.Unknown;
+        }
         public string name;
         public List<string> lines = new List<string>();
-        public List<string> properties = new List<string>();
+        public List<Property> properties = new List<Property>();
     }
 
     public static class ShaderAnalyzer
@@ -177,6 +194,142 @@ namespace d4rkpl4y3r
             return true;
         }
 
+        private static ParsedShader.Property ParseProperty(string line)
+        {
+            string modifiedLine = line;
+            int openBracketIndex = line.IndexOf('[');
+            while (openBracketIndex != -1)
+            {
+                int closeBracketIndex = modifiedLine.IndexOf(']') + 1;
+                if (closeBracketIndex != 0)
+                {
+                    modifiedLine = modifiedLine.Substring(0, openBracketIndex)
+                        + modifiedLine.Substring(closeBracketIndex);
+                    openBracketIndex = modifiedLine.IndexOf('[');
+                }
+                else
+                {
+                    break;
+                }
+            }
+            modifiedLine = modifiedLine.Trim();
+            int parentheses = modifiedLine.IndexOf('(');
+            if (parentheses != -1)
+            {
+                var output = new ParsedShader.Property();
+                output.name = modifiedLine.Substring(0, parentheses).TrimEnd();
+                int quoteIndex = modifiedLine.IndexOf('"', parentheses);
+                quoteIndex = FindEndOfStringLiteral(modifiedLine, quoteIndex + 1);
+                int colonIndex = modifiedLine.IndexOf(',', quoteIndex + 1);
+                modifiedLine = modifiedLine.Substring(colonIndex + 1).TrimStart();
+                if (modifiedLine.StartsWith("Range") || modifiedLine.StartsWith("Float"))
+                {
+                    output.type = ParsedShader.Property.Type.Float;
+                }
+                return output;
+            }
+            return null;
+        }
+
+        private enum ReplacePropertysState
+        {
+            Init,
+            PropertyBlock,
+            ScanForCG,
+            CGInclude,
+            CGProgram
+        }
+
+        private static string ReplaceProteryDefinition(string line, Dictionary<string, string> properyValues)
+        {
+            return line;
+        }
+
+        public static ParsedShader ReplacePropertysWithConstants(ParsedShader source, Dictionary<string, string> properyValues)
+        {
+            var output = new ParsedShader();
+            var cgInclude = new List<string>();
+            int propertyBlockBraceDepth = 0;
+            var state = ReplacePropertysState.Init;
+            for (int lineIndex = 0; lineIndex < source.lines.Count; lineIndex++)
+            {
+                string line = source.lines[lineIndex];
+                switch(state)
+                {
+                    case ReplacePropertysState.Init:
+                        output.lines.Add(line);
+                        if (line == "Properties")
+                        {
+                            state = ReplacePropertysState.PropertyBlock;
+                        }
+                        break;
+                    case ReplacePropertysState.PropertyBlock:
+                        if (line == "{")
+                        {
+                            propertyBlockBraceDepth++;
+                            output.lines.Add(line);
+                        }
+                        else if (line == "}")
+                        {
+                            if (--propertyBlockBraceDepth == 0)
+                            {
+                                state = ReplacePropertysState.ScanForCG;
+                            }
+                            output.lines.Add(line);
+                        }
+                        else
+                        {
+                            var property = ParseProperty(line);
+                            string propertyValue;
+                            if (!properyValues.TryGetValue(property?.name, out propertyValue))
+                            {
+                                //output.lines.Add(line);
+                            }
+                            output.lines.Add(line);
+                        }
+                        break;
+                    case ReplacePropertysState.ScanForCG:
+                        if (line == "CGINCLUDE")
+                        {
+                            state = ReplacePropertysState.CGInclude;
+                        }
+                        else if (line == "CGPROGRAM")
+                        {
+                            output.lines.Add(line);
+                            foreach (string includeLine in cgInclude)
+                            {
+                                output.lines.Add(ReplaceProteryDefinition(includeLine, properyValues));
+                            }
+                            state = ReplacePropertysState.CGProgram;
+                        }
+                        else
+                        {
+                            output.lines.Add(line);
+                        }
+                        break;
+                    case ReplacePropertysState.CGInclude:
+                        if (line == "ENDCG")
+                        {
+                            state = ReplacePropertysState.ScanForCG;
+                        }
+                        else
+                        {
+                            cgInclude.Add(line);
+                        }
+                        break;
+                    case ReplacePropertysState.CGProgram:
+                        if (line == "ENDCG")
+                        {
+                            state = ReplacePropertysState.ScanForCG;
+                        }
+                        output.lines.Add(ReplaceProteryDefinition(line, properyValues));
+                        break;
+                }
+            }
+            File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastOptimizedShader.shader", output.lines);
+            return output;
+        }
+
         private static void ParsePropertyBlock(ParsedShader parsedShader)
         {
             bool isInPropertyBlock = false;
@@ -207,27 +360,10 @@ namespace d4rkpl4y3r
                 }
                 else if (isInPropertyBlock)
                 {
-                    string modifiedLine = line;
-                    int openBracketIndex = line.IndexOf('[');
-                    while (openBracketIndex != -1)
+                    var property = ParseProperty(line);
+                    if (property != null)
                     {
-                        int closeBracketIndex = modifiedLine.IndexOf(']') + 1;
-                        if (closeBracketIndex != 0)
-                        {
-                            modifiedLine = modifiedLine.Substring(0, openBracketIndex)
-                                + modifiedLine.Substring(closeBracketIndex);
-                            openBracketIndex = modifiedLine.IndexOf('[');
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    modifiedLine = modifiedLine.Trim();
-                    int parentheses = modifiedLine.IndexOf('(');
-                    if (parentheses != -1)
-                    {
-                        parsedShader.properties.Add(modifiedLine.Substring(0, parentheses).TrimEnd());
+                        parsedShader.properties.Add(property);
                     }
                 }
             }
