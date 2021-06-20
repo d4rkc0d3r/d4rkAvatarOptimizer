@@ -25,7 +25,8 @@ namespace d4rkpl4y3r
                 Float4,
                 Int,
                 Int4,
-                Texture2D
+                Texture2D,
+                Texture2DArray
             }
             public string name;
             public Type type = Type.Unknown;
@@ -234,6 +235,14 @@ namespace d4rkpl4y3r
                 {
                     output.type = ParsedShader.Property.Type.Color;
                 }
+                else if (modifiedLine.StartsWith("2DArray"))
+                {
+                    output.type = ParsedShader.Property.Type.Texture2DArray;
+                }
+                else if (modifiedLine.StartsWith("2D"))
+                {
+                    output.type = ParsedShader.Property.Type.Texture2D;
+                }
                 return output;
             }
             return null;
@@ -345,6 +354,8 @@ namespace d4rkpl4y3r
                         break;
                 }
             }
+            output.name = "d4rkpl4y3r/Optimizer/LastOptimized";
+            output.lines[0] = "Shader \"" + output.name + "\"";
             File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastOptimizedShader.shader", output.lines);
             return output;
         }
