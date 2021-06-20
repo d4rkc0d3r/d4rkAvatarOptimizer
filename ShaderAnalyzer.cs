@@ -250,7 +250,7 @@ namespace d4rkpl4y3r
 
         private static string ReplacePropertyDefinition(string line, Dictionary<string, string> properyValues)
         {
-            var match = Regex.Match(line, @"(uniform)?\s+([^\s;]+)\s+([^\s;]+)\s*;");
+            var match = Regex.Match(line, @"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;");
             if (match.Success)
             {
                 var name = match.Groups[3].Value;
