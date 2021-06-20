@@ -240,8 +240,19 @@ namespace d4rkpl4y3r
             CGProgram
         }
 
-        private static string ReplaceProteryDefinition(string line, Dictionary<string, string> properyValues)
+        private static string ReplacePropertyDefinition(string line, Dictionary<string, string> properyValues)
         {
+            var match = Regex.Match(line, @"(uniform)?\s+([^\s;]+)\s+([^\s;]+)\s*;");
+            if (match.Success)
+            {
+                var name = match.Groups[3].Value;
+                string value;
+                if (properyValues.TryGetValue(name, out value))
+                {
+                    var type = match.Groups[2].Value;
+                    return "static " + type + " " + name + " = " + value + ";";
+                }
+            }
             return line;
         }
 
@@ -298,7 +309,7 @@ namespace d4rkpl4y3r
                             output.lines.Add(line);
                             foreach (string includeLine in cgInclude)
                             {
-                                output.lines.Add(ReplaceProteryDefinition(includeLine, properyValues));
+                                output.lines.Add(ReplacePropertyDefinition(includeLine, properyValues));
                             }
                             state = ReplacePropertysState.CGProgram;
                         }
@@ -322,7 +333,7 @@ namespace d4rkpl4y3r
                         {
                             state = ReplacePropertysState.ScanForCG;
                         }
-                        output.lines.Add(ReplaceProteryDefinition(line, properyValues));
+                        output.lines.Add(ReplacePropertyDefinition(line, properyValues));
                         break;
                 }
             }
