@@ -226,6 +226,14 @@ namespace d4rkpl4y3r
                 {
                     output.type = ParsedShader.Property.Type.Float;
                 }
+                else if (modifiedLine.StartsWith("Int"))
+                {
+                    output.type = ParsedShader.Property.Type.Int;
+                }
+                else if (modifiedLine.StartsWith("Color"))
+                {
+                    output.type = ParsedShader.Property.Type.Color;
+                }
                 return output;
             }
             return null;
