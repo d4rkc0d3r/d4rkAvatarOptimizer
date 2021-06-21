@@ -41,6 +41,10 @@ public class ShaderAnalyzerDebugger : EditorWindow
                     continue;
                 if (prop.type == ParsedShader.Property.Type.Float)
                     replace[prop.name] = "" + mat.GetFloat(prop.name);
+                if (prop.type == ParsedShader.Property.Type.Int)
+                    replace[prop.name] = "" + mat.GetInt(prop.name);
+                if (prop.type == ParsedShader.Property.Type.Color)
+                    replace[prop.name] = mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
             }
             var shadur = ShaderAnalyzer.ReplacePropertysWithConstants(parsedShader, replace);
 
