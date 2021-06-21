@@ -278,7 +278,6 @@ namespace d4rkpl4y3r
         {
             var output = new ParsedShader();
             var cgInclude = new List<string>();
-            int propertyBlockBraceDepth = 0;
             var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < source.lines.Count; lineIndex++)
             {
@@ -286,26 +285,7 @@ namespace d4rkpl4y3r
                 switch(state)
                 {
                     case ParseState.Init:
-                        output.lines.Add(line);
-                        if (line == "Properties")
-                        {
-                            state = ParseState.PropertyBlock;
-                        }
-                        break;
                     case ParseState.PropertyBlock:
-                        if (line == "{")
-                        {
-                            propertyBlockBraceDepth++;
-                        }
-                        else if (line == "}")
-                        {
-                            if (--propertyBlockBraceDepth == 0)
-                            {
-                                state = ParseState.ShaderLab;
-                            }
-                        }
-                        output.lines.Add(line);
-                        break;
                     case ParseState.ShaderLab:
                         if (line == "CGINCLUDE")
                         {
