@@ -296,7 +296,6 @@ namespace d4rkpl4y3r
                         if (line == "{")
                         {
                             propertyBlockBraceDepth++;
-                            output.lines.Add(line);
                         }
                         else if (line == "}")
                         {
@@ -304,18 +303,8 @@ namespace d4rkpl4y3r
                             {
                                 state = ParseState.ShaderLab;
                             }
-                            output.lines.Add(line);
                         }
-                        else
-                        {
-                            var property = ParseProperty(line);
-                            string propertyValue;
-                            if (!properyValues.TryGetValue(property?.name, out propertyValue))
-                            {
-                                //output.lines.Add(line);
-                            }
-                            output.lines.Add(line);
-                        }
+                        output.lines.Add(line);
                         break;
                     case ParseState.ShaderLab:
                         if (line == "CGINCLUDE")
