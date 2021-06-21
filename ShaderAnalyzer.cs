@@ -11,8 +11,6 @@ using System.Linq;
 
 namespace d4rkpl4y3r
 {
-    
-
     public class ParsedShader
     {
         public class Property
@@ -32,9 +30,18 @@ namespace d4rkpl4y3r
             public Type type = Type.Unknown;
             public List<string> shaderLabParams = new List<string>();
         }
+        public class Pass
+        {
+            public string vertex;
+            public string hull;
+            public string domain;
+            public string geometry;
+            public string fragment;
+        }
         public string name;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
+        public List<Pass> passes = new List<Pass>();
     }
 
     public static class ShaderAnalyzer
@@ -57,7 +64,7 @@ namespace d4rkpl4y3r
                 parsedShader = new ParsedShader();
                 parsedShader.name = shader.name;
                 RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
-                ParsePropertyBlock(parsedShader);
+                SemanticParseShader(parsedShader);
                 File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastParsedShader.shader", parsedShader.lines);
             }
             return parsedShader;
@@ -330,8 +337,38 @@ namespace d4rkpl4y3r
             return output;
         }
 
-        private static void ParsePropertyBlock(ParsedShader parsedShader)
+        private static void ParsePragma(string line, ParsedShader.Pass pass)
         {
+            if (!line.StartsWith("#pragma "))
+                return;
+            line = line.Substring("#pragma ".Length);
+            var match = Regex.Match(line, @"(vertex|hull|domain|geometry|fragment)\s+(\w+)");
+            if (!match.Success)
+                return;
+            switch (match.Groups[1].Value)
+            {
+                case "vertex":
+                    pass.vertex = match.Groups[2].Value;
+                    break;
+                case "hull":
+                    pass.hull = match.Groups[2].Value;
+                    break;
+                case "domain":
+                    pass.domain = match.Groups[2].Value;
+                    break;
+                case "geometry":
+                    pass.geometry = match.Groups[2].Value;
+                    break;
+                case "fragment":
+                    pass.fragment = match.Groups[2].Value;
+                    break;
+            }
+        }
+
+        private static void SemanticParseShader(ParsedShader parsedShader)
+        {
+            var cgIncludePragmas = new ParsedShader.Pass();
+            ParsedShader.Pass currentPass = null;
             int propertyBlockBraceDepth = -1;
             var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < parsedShader.lines.Count; lineIndex++)
@@ -370,10 +407,18 @@ namespace d4rkpl4y3r
                         if (line == "CGINCLUDE")
                         {
                             state = ParseState.CGInclude;
+                            currentPass = cgIncludePragmas;
                         }
                         else if (line == "CGPROGRAM")
                         {
                             state = ParseState.CGProgram;
+                            currentPass = new ParsedShader.Pass();
+                            currentPass.vertex = cgIncludePragmas.vertex;
+                            currentPass.hull = cgIncludePragmas.hull;
+                            currentPass.domain = cgIncludePragmas.domain;
+                            currentPass.geometry = cgIncludePragmas.geometry;
+                            currentPass.fragment = cgIncludePragmas.fragment;
+                            parsedShader.passes.Add(currentPass);
                         }
                         else
                         {
@@ -401,6 +446,7 @@ namespace d4rkpl4y3r
                         {
                             state = ParseState.ShaderLab;
                         }
+                        ParsePragma(line, currentPass);
                         break;
                 }
             }

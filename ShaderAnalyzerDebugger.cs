@@ -55,9 +55,20 @@ public class ShaderAnalyzerDebugger : EditorWindow
         if (parsedShader == null)
             return;
 
-        for (int i = 0; i < maxLines && i < parsedShader.lines.Count; i++)
+        for (int i = 0; i < parsedShader.passes.Count; i++)
         {
-            GUILayout.Label(parsedShader.lines[i]);
+            var pass = parsedShader.passes[i];
+            GUILayout.Space(10);
+            if (pass.vertex != null)
+                GUILayout.Label("#pragma vertex " + pass.vertex);
+            if (pass.hull != null)
+                GUILayout.Label("#pragma hull " + pass.hull);
+            if (pass.domain != null)
+                GUILayout.Label("#pragma domain " + pass.domain);
+            if (pass.geometry != null)
+                GUILayout.Label("#pragma geometry " + pass.geometry);
+            if (pass.fragment != null)
+                GUILayout.Label("#pragma fragment " + pass.fragment);
         }
 
         GUILayout.Space(20);
@@ -65,8 +76,15 @@ public class ShaderAnalyzerDebugger : EditorWindow
         for (int i = 0; i < maxProperties && i < parsedShader.properties.Count; i++)
         {
             var prop = parsedShader.properties[i];
-            EditorGUILayout.LabelField(prop.name, "" + prop.type + 
+            EditorGUILayout.LabelField(prop.name, "" + prop.type +
                 (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : ""));
+        }
+
+        GUILayout.Space(20);
+
+        for (int i = 0; i < maxLines && i < parsedShader.lines.Count; i++)
+        {
+            GUILayout.Label(parsedShader.lines[i]);
         }
     }
 }
