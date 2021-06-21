@@ -30,6 +30,7 @@ namespace d4rkpl4y3r
             }
             public string name;
             public Type type = Type.Unknown;
+            public List<string> shaderLabParams = new List<string>();
         }
         public string name;
         public List<string> lines = new List<string>();
@@ -248,11 +249,11 @@ namespace d4rkpl4y3r
             return null;
         }
 
-        private enum ReplacePropertysState
+        private enum ParseState
         {
             Init,
             PropertyBlock,
-            ScanForCG,
+            ShaderLab,
             CGInclude,
             CGProgram
         }
@@ -278,20 +279,20 @@ namespace d4rkpl4y3r
             var output = new ParsedShader();
             var cgInclude = new List<string>();
             int propertyBlockBraceDepth = 0;
-            var state = ReplacePropertysState.Init;
+            var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < source.lines.Count; lineIndex++)
             {
                 string line = source.lines[lineIndex];
                 switch(state)
                 {
-                    case ReplacePropertysState.Init:
+                    case ParseState.Init:
                         output.lines.Add(line);
                         if (line == "Properties")
                         {
-                            state = ReplacePropertysState.PropertyBlock;
+                            state = ParseState.PropertyBlock;
                         }
                         break;
-                    case ReplacePropertysState.PropertyBlock:
+                    case ParseState.PropertyBlock:
                         if (line == "{")
                         {
                             propertyBlockBraceDepth++;
@@ -301,7 +302,7 @@ namespace d4rkpl4y3r
                         {
                             if (--propertyBlockBraceDepth == 0)
                             {
-                                state = ReplacePropertysState.ScanForCG;
+                                state = ParseState.ShaderLab;
                             }
                             output.lines.Add(line);
                         }
@@ -316,10 +317,10 @@ namespace d4rkpl4y3r
                             output.lines.Add(line);
                         }
                         break;
-                    case ReplacePropertysState.ScanForCG:
+                    case ParseState.ShaderLab:
                         if (line == "CGINCLUDE")
                         {
-                            state = ReplacePropertysState.CGInclude;
+                            state = ParseState.CGInclude;
                         }
                         else if (line == "CGPROGRAM")
                         {
@@ -328,27 +329,27 @@ namespace d4rkpl4y3r
                             {
                                 output.lines.Add(ReplacePropertyDefinition(includeLine, properyValues));
                             }
-                            state = ReplacePropertysState.CGProgram;
+                            state = ParseState.CGProgram;
                         }
                         else
                         {
                             output.lines.Add(line);
                         }
                         break;
-                    case ReplacePropertysState.CGInclude:
+                    case ParseState.CGInclude:
                         if (line == "ENDCG")
                         {
-                            state = ReplacePropertysState.ScanForCG;
+                            state = ParseState.ShaderLab;
                         }
                         else
                         {
                             cgInclude.Add(line);
                         }
                         break;
-                    case ReplacePropertysState.CGProgram:
+                    case ParseState.CGProgram:
                         if (line == "ENDCG")
                         {
-                            state = ReplacePropertysState.ScanForCG;
+                            state = ParseState.ShaderLab;
                         }
                         output.lines.Add(ReplacePropertyDefinition(line, properyValues));
                         break;
@@ -362,39 +363,76 @@ namespace d4rkpl4y3r
 
         private static void ParsePropertyBlock(ParsedShader parsedShader)
         {
-            bool isInPropertyBlock = false;
             int propertyBlockBraceDepth = -1;
-            int braceDepth = 0;
+            var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < parsedShader.lines.Count; lineIndex++)
             {
                 string line = parsedShader.lines[lineIndex];
-                if (line == "{")
+                switch (state)
                 {
-                    braceDepth++;
-                }
-                else if (line == "}")
-                {
-                    braceDepth--;
-                    if (isInPropertyBlock && braceDepth == propertyBlockBraceDepth)
-                    {
-                        isInPropertyBlock = false;
-                        return;
-                    }
-                }
-                else if (line == "Properties" && parsedShader.lines[lineIndex + 1] == "{")
-                {
-                    isInPropertyBlock = true;
-                    propertyBlockBraceDepth = braceDepth;
-                    braceDepth++;
-                    lineIndex++;
-                }
-                else if (isInPropertyBlock)
-                {
-                    var property = ParseProperty(line);
-                    if (property != null)
-                    {
-                        parsedShader.properties.Add(property);
-                    }
+                    case ParseState.Init:
+                        if (line == "Properties")
+                        {
+                            state = ParseState.PropertyBlock;
+                        }
+                        break;
+                    case ParseState.PropertyBlock:
+                        if (line == "{")
+                        {
+                            propertyBlockBraceDepth++;
+                        }
+                        else if (line == "}")
+                        {
+                            if (--propertyBlockBraceDepth == 0)
+                            {
+                                state = ParseState.ShaderLab;
+                            }
+                        }
+                        else
+                        {
+                            var property = ParseProperty(line);
+                            if (property != null)
+                            {
+                                parsedShader.properties.Add(property);
+                            }
+                        }
+                        break;
+                    case ParseState.ShaderLab:
+                        if (line == "CGINCLUDE")
+                        {
+                            state = ParseState.CGInclude;
+                        }
+                        else if (line == "CGPROGRAM")
+                        {
+                            state = ParseState.CGProgram;
+                        }
+                        else
+                        {
+                            var matches = Regex.Matches(line, @"\[[_a-zA-Z0-9]+\]");
+                            if (matches.Count > 0)
+                            {
+                                string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Captures[0].Value;
+                                foreach (Match match in matches)
+                                {
+                                    string propName = match.Value.Substring(1, match.Value.Length - 2);
+                                    foreach (var prop in parsedShader.properties)
+                                    {
+                                        if (propName == prop.name)
+                                        {
+                                            prop.shaderLabParams.Add(shaderLabParam);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case ParseState.CGInclude:
+                    case ParseState.CGProgram:
+                        if (line == "ENDCG")
+                        {
+                            state = ParseState.ShaderLab;
+                        }
+                        break;
                 }
             }
         }

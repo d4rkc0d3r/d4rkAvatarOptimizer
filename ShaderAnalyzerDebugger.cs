@@ -60,7 +60,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         for (int i = 0; i < maxProperties && i < parsedShader.properties.Count; i++)
         {
-            EditorGUILayout.LabelField(parsedShader.properties[i].name, "" + parsedShader.properties[i].type);
+            var prop = parsedShader.properties[i];
+            EditorGUILayout.LabelField(prop.name, "" + prop.type + 
+                (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : ""));
         }
     }
 }
