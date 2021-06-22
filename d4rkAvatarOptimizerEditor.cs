@@ -281,6 +281,34 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static Material CreateOptimizedMaterial(Material source, int meshToggleCount)
+    {
+        var parsedShader = d4rkpl4y3r.ShaderAnalyzer.Parse(source.shader);
+        var replace = new Dictionary<string, string>();
+        foreach (var prop in parsedShader.properties)
+        {
+            if (!source.HasProperty(prop.name))
+                continue;
+            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Float)
+                replace[prop.name] = "" + source.GetFloat(prop.name);
+            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Int)
+                replace[prop.name] = "" + source.GetInt(prop.name);
+            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Color)
+                replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
+        }
+        var optimizedShader = d4rkpl4y3r.ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
+        var name = System.IO.Path.GetFileName(source.shader.name);
+        var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
+        name = System.IO.Path.GetFileNameWithoutExtension(path);
+        optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
+        System.IO.File.WriteAllLines(path, optimizedShader.lines);
+        AssetDatabase.Refresh();
+        var mat = GameObject.Instantiate(source);
+        mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+        CreateUniqueAsset(mat, mat.name + ".mat");
+        return mat;
+    }
+
     private static void CombineSkinnedMeshes()
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
@@ -422,24 +450,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                 vertexOffset += mesh.vertexCount;
             }
 
-            string newMeshName = "CombinedSkinnedMesh" + combinedMeshID;
-            foreach (var skinnedMesh in combinableSkinnedMeshes)
-            {
-                if (skinnedMesh.name == "Body")
-                {
-                    newMeshName = "Body";
-                    skinnedMesh.name = "WasFormerlyKnownAsBody";
-                }
-            }
+            string newMeshName = combinableSkinnedMeshes[0].name;
 
             combinedMesh.name = newMeshName;
             CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
             AssetDatabase.SaveAssets();
+            
+            var mats = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
+            for (int i = 0; i < mats.Length; i++)
+            {
+                mats[i] = CreateOptimizedMaterial(mats[i], combinableSkinnedMeshes.Count);
+            }
 
             var combinedMeshRenderer = new GameObject();
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
-            meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
+            meshRenderer.sharedMaterials = mats;
             meshRenderer.bones = targetBones.ToArray();
 
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
@@ -456,10 +482,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                     meshRenderer.probeAnchor = skinnedMesh.probeAnchor;
                 }
                 string oldPath = GetTransformPathToRoot(skinnedMesh.transform);
-                if (oldPath == "WasFormerlyKnownAsBody")
-                {
-                    oldPath = "Body";
-                }
                 if (avDescriptor != null)
                 {
                     if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
@@ -510,6 +532,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
+        d4rkpl4y3r.ShaderAnalyzer.ClearParsedShaderCache();
         ClearTrashBin();
         newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths();
