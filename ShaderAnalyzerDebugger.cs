@@ -46,7 +46,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (prop.type == ParsedShader.Property.Type.Color)
                     replace[prop.name] = mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
             }
-            var shadur = ShaderAnalyzer.ReplacePropertysWithConstants(parsedShader, replace);
+            var shadur = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, 4);
 
         }
 

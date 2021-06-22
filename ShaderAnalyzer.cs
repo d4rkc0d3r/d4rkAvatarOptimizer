@@ -265,6 +265,16 @@ namespace d4rkpl4y3r
             CGProgram
         }
 
+        private static (string name, string returnType) ParseFunctionDefinition(string line)
+        {
+            var match = Regex.Match(line, @"^(inline\s+)?(\w+)\s+(\w+)\s*\(");
+            if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
+            {
+                return (match.Groups[3].Value, match.Groups[2].Value);
+            }
+            return (null, null);
+        }
+
         private static string ReplacePropertyDefinition(string line, Dictionary<string, string> properyValues)
         {
             var match = Regex.Match(line, @"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;");
@@ -281,15 +291,47 @@ namespace d4rkpl4y3r
             return line;
         }
 
-        public static ParsedShader ReplacePropertysWithConstants(ParsedShader source, Dictionary<string, string> properyValues)
+        private static void InjectMeshToggleToVertexShader(List<string> source, ref int sourceLineIndex, List<string> output, (string name, string returnType) func, int meshToggleCount)
+        {
+            string line = source[sourceLineIndex];
+            string funcParams = line.Substring(line.IndexOf('(') + 1);
+            output.Add(func.returnType + " " + func.name + "(");
+            output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0,");
+            output.Add(funcParams);
+            while (line != "{" && sourceLineIndex < source.Count - 1)
+            {
+                line = source[++sourceLineIndex];
+                output.Add(line);
+            }
+            output.Add("if (d4rkAvatarOptimizer_Zero)");
+            output.Add("{");
+            string val = "float val = _IsActiveMesh0";
+            for (int i = 1; i < meshToggleCount; i++)
+            {
+                val += " + _IsActiveMesh" + i;
+            }
+            output.Add(val + ";");
+            output.Add("if (val) return (" + func.returnType + ")0;");
+            output.Add("}");
+            output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_UV0.z])");
+            output.Add("{");
+            output.Add("return (v2f)0;");
+            output.Add("}");
+        }
+
+        public static ParsedShader CreateOptimizedCopy(
+            ParsedShader source,
+            Dictionary<string, string> properyValues,
+            int meshToggleCount)
         {
             var output = new ParsedShader();
+            int passID = -1;
             var cgInclude = new List<string>();
             var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < source.lines.Count; lineIndex++)
             {
                 string line = source.lines[lineIndex];
-                switch(state)
+                switch (state)
                 {
                     case ParseState.Init:
                     case ParseState.PropertyBlock:
@@ -300,10 +342,32 @@ namespace d4rkpl4y3r
                         }
                         else if (line == "CGPROGRAM")
                         {
+                            passID++;
                             output.lines.Add(line);
-                            foreach (string includeLine in cgInclude)
+                            if (meshToggleCount > 0)
                             {
-                                output.lines.Add(ReplacePropertyDefinition(includeLine, properyValues));
+                                output.lines.Add("uniform float d4rkAvatarOptimizer_Zero;");
+                                output.lines.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
+                                output.lines.Add("{");
+                                output.lines.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
+                                for (int i = 0; i < meshToggleCount; i++)
+                                {
+                                    output.lines.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
+                                }
+                                output.lines.Add("};");
+                            }
+                            for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
+                            {
+                                var includeLine = cgInclude[includeLineIndex];
+                                var func = meshToggleCount > 0 ? ParseFunctionDefinition(includeLine) : (null, null);
+                                if (func.name != null && func.name == source.passes[passID].vertex)
+                                {
+                                    InjectMeshToggleToVertexShader(cgInclude, ref includeLineIndex, output.lines, func, meshToggleCount);
+                                }
+                                else
+                                {
+                                    output.lines.Add(ReplacePropertyDefinition(includeLine, properyValues));
+                                }
                             }
                             state = ParseState.CGProgram;
                         }
@@ -326,8 +390,20 @@ namespace d4rkpl4y3r
                         if (line == "ENDCG")
                         {
                             state = ParseState.ShaderLab;
+                            output.lines.Add("ENDCG");
                         }
-                        output.lines.Add(ReplacePropertyDefinition(line, properyValues));
+                        else
+                        {
+                            var func = meshToggleCount > 0 ? ParseFunctionDefinition(line) : (null, null);
+                            if (func.name != null && func.name == source.passes[passID].vertex)
+                            {
+                                InjectMeshToggleToVertexShader(source.lines, ref lineIndex, output.lines, func, meshToggleCount);
+                            }
+                            else
+                            {
+                                output.lines.Add(ReplacePropertyDefinition(line, properyValues));
+                            }
+                        }
                         break;
                 }
             }
