@@ -334,7 +334,26 @@ namespace d4rkpl4y3r
                 switch (state)
                 {
                     case ParseState.Init:
+                        if (line == "Properties")
+                        {
+                            state = ParseState.PropertyBlock;
+                        }
+                        output.lines.Add(line);
+                        break;
                     case ParseState.PropertyBlock:
+                        output.lines.Add(line);
+                        if (line == "}")
+                        {
+                            state = ParseState.ShaderLab;
+                        }
+                        else if (line == "{" && meshToggleCount > 0)
+                        {
+                            for (int i = 0; i < meshToggleCount; i++)
+                            {
+                                output.lines.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i +"\", Float) = 1");
+                            }
+                        }
+                        break;
                     case ParseState.ShaderLab:
                         if (line == "CGINCLUDE")
                         {
@@ -445,7 +464,6 @@ namespace d4rkpl4y3r
         {
             var cgIncludePragmas = new ParsedShader.Pass();
             ParsedShader.Pass currentPass = null;
-            int propertyBlockBraceDepth = -1;
             var state = ParseState.Init;
             for (int lineIndex = 0; lineIndex < parsedShader.lines.Count; lineIndex++)
             {
@@ -459,16 +477,9 @@ namespace d4rkpl4y3r
                         }
                         break;
                     case ParseState.PropertyBlock:
-                        if (line == "{")
+                        if (line == "}")
                         {
-                            propertyBlockBraceDepth++;
-                        }
-                        else if (line == "}")
-                        {
-                            if (--propertyBlockBraceDepth == 0)
-                            {
-                                state = ParseState.ShaderLab;
-                            }
+                            state = ParseState.ShaderLab;
                         }
                         else
                         {
