@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor.Animations;
 using UnityEditor;
+using d4rkpl4y3r;
 
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
@@ -12,6 +13,7 @@ using AnimationPath = System.ValueTuple<string, string, System.Type>;
 public class d4rkAvatarOptimizerEditor : Editor
 {
     private static GameObject root;
+    private static d4rkAvatarOptimizer settings;
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -26,9 +28,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void CreateUniqueAsset(Object asset, string path)
+    private static void CreateUniqueAsset(Object asset, string name)
     {
-        AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + path));
+        AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name));
     }
 
     private static string GetTransformPathToRoot(Transform t)
@@ -283,20 +285,20 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static Material CreateOptimizedMaterial(Material source, int meshToggleCount)
     {
-        var parsedShader = d4rkpl4y3r.ShaderAnalyzer.Parse(source.shader);
+        var parsedShader = ShaderAnalyzer.Parse(source.shader);
         var replace = new Dictionary<string, string>();
         foreach (var prop in parsedShader.properties)
         {
             if (!source.HasProperty(prop.name))
                 continue;
-            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Float)
+            if (prop.type == ParsedShader.Property.Type.Float)
                 replace[prop.name] = "" + source.GetFloat(prop.name);
-            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Int)
+            if (prop.type == ParsedShader.Property.Type.Int)
                 replace[prop.name] = "" + source.GetInt(prop.name);
-            if (prop.type == d4rkpl4y3r.ParsedShader.Property.Type.Color)
+            if (prop.type == ParsedShader.Property.Type.Color)
                 replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
         }
-        var optimizedShader = d4rkpl4y3r.ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
+        var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
         var name = System.IO.Path.GetFileName(source.shader.name);
         var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
         name = System.IO.Path.GetFileNameWithoutExtension(path);
@@ -307,6 +309,210 @@ public class d4rkAvatarOptimizerEditor : Editor
         mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
         CreateUniqueAsset(mat, mat.name + ".mat");
         return mat;
+    }
+
+    private static bool CanCombineWith(List<Material> list, Material candidate)
+    {
+        if (list[0].shader != candidate.shader)
+            return false;
+        var parsedShader = ShaderAnalyzer.Parse(candidate.shader);
+        foreach (var pass in parsedShader.passes)
+        {
+            if (pass.vertex == null)
+                return false;
+            if (pass.hull != null)
+                return false;
+            if (pass.domain != null)
+                return false;
+            if (pass.geometry != null)
+                return false;
+            if (pass.fragment == null)
+                return false;
+        }
+        foreach (var prop in parsedShader.properties)
+        {
+            if (prop.type == ParsedShader.Property.Type.Unknown)
+                return false;
+            foreach (var mat in list)
+            {
+                switch (prop.type)
+                {
+                    case ParsedShader.Property.Type.Color:
+                        if (!mat.GetColor(prop.name).Equals(candidate.GetColor(prop.name)))
+                            return false;
+                        break;
+                    case ParsedShader.Property.Type.Texture2D:
+                        if (mat.GetTexture(prop.name) != candidate.GetTexture(prop.name))
+                            return false;
+                        break;
+                    case ParsedShader.Property.Type.Float:
+                        if (!mat.GetFloat(prop.name).Equals(candidate.GetFloat(prop.name)))
+                            return false;
+                        break;
+                    case ParsedShader.Property.Type.Int:
+                        if (!mat.GetInt(prop.name).Equals(candidate.GetInt(prop.name)))
+                            return false;
+                        break;
+                    default:
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void CombineAndOptimizeMaterials()
+    {
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var meshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = meshRenderer.sharedMesh;
+
+            if (mesh == null)
+                continue;
+
+            var props = new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(props);
+            int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
+
+            var matchedMaterials = new List<List<Material>>();
+            var matchedMaterialsIndex = new List<List<int>>();
+            for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
+            {
+                var material = meshRenderer.sharedMaterials[i];
+                bool foundMatch = false;
+                for (int j = 0; j < matchedMaterials.Count; j++)
+                {
+                    if (CanCombineWith(matchedMaterials[j], material))
+                    {
+                        matchedMaterials[j].Add(material);
+                        matchedMaterialsIndex[j].Add(i);
+                        foundMatch = true;
+                        break;
+                    }
+                }
+                if (!foundMatch)
+                {
+                    matchedMaterials.Add(new List<Material> { material });
+                    matchedMaterialsIndex.Add(new List<int> { i });
+                }
+            }
+
+            var sourceVertices = mesh.vertices;
+            var sourceIndices = mesh.triangles;
+            var sourceUv = new List<Vector3>();
+            mesh.GetUVs(0, sourceUv);
+            var sourceNormals = mesh.normals;
+            var sourceTangents = mesh.tangents;
+            var sourceWeights = mesh.boneWeights;
+
+            var targetUv = new List<Vector4>();
+            var targetVertices = new List<Vector3>();
+            var targetIndices = new List<List<int>>();
+            var targetNormals = new List<Vector3>();
+            var targetTangents = new List<Vector4>();
+            var targetWeights = new List<BoneWeight>();
+
+            var targetOldVertexIndex = new List<int>();
+
+            for (int i = 0; i < matchedMaterials.Count; i++)
+            {
+                var indexList = new List<int>();
+                for (int k = 0; k < matchedMaterials[i].Count; k++)
+                {
+                    var indexMap = new Dictionary<int, int>();
+                    int materialSubMeshId = matchedMaterialsIndex[i][k];
+                    int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
+                    int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
+                    for (int j = startIndex; j < endIndex; j++)
+                    {
+                        int oldIndex = sourceIndices[j];
+                        int newIndex;
+                        if (indexMap.TryGetValue(oldIndex, out newIndex))
+                        {
+                            indexList.Add(newIndex);
+                        }
+                        else
+                        {
+                            newIndex = targetVertices.Count;
+                            indexList.Add(newIndex);
+                            indexMap[oldIndex] = newIndex;
+                            targetUv.Add(new Vector4(sourceUv[oldIndex].x, sourceUv[oldIndex].y, sourceUv[oldIndex].z, k));
+                            targetVertices.Add(sourceVertices[oldIndex]);
+                            targetNormals.Add(sourceNormals[oldIndex]);
+                            targetTangents.Add(sourceTangents[oldIndex]);
+                            targetWeights.Add(sourceWeights[oldIndex]);
+                            targetOldVertexIndex.Add(oldIndex);
+                        }
+                    }
+                }
+                targetIndices.Add(indexList);
+            }
+
+            {
+                Mesh newMesh = new Mesh();
+                newMesh.name = mesh.name;
+                newMesh.indexFormat = targetVertices.Count >= 65536
+                    ? UnityEngine.Rendering.IndexFormat.UInt32
+                    : UnityEngine.Rendering.IndexFormat.UInt16;
+                newMesh.SetVertices(targetVertices);
+                newMesh.bindposes = mesh.bindposes;
+                newMesh.boneWeights = targetWeights.ToArray();
+                newMesh.SetUVs(0, targetUv);
+                newMesh.bounds = mesh.bounds;
+                newMesh.SetNormals(targetNormals);
+                newMesh.SetTangents(targetTangents);
+                newMesh.subMeshCount = matchedMaterials.Count;
+                for (int i = 0; i < matchedMaterials.Count; i++)
+                {
+                    newMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
+                }
+
+                for (int i = 0; i < mesh.blendShapeCount; i++)
+                {
+                    for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
+                    {
+                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
+                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
+                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        mesh.GetBlendShapeFrameVertices(i, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
+                        var targetDeltaVertices = new Vector3[newMesh.vertexCount];
+                        var targetDeltaNormals = new Vector3[newMesh.vertexCount];
+                        var targetDeltaTangents = new Vector3[newMesh.vertexCount];
+                        for (int k = 0; k < newMesh.vertexCount; k++)
+                        {
+                            var oldIndex = targetOldVertexIndex[k];
+                            targetDeltaVertices[k] = sourceDeltaVertices[oldIndex];
+                            targetDeltaNormals[k] = sourceDeltaNormals[oldIndex];
+                            targetDeltaTangents[k] = sourceDeltaTangents[oldIndex];
+                        }
+                        var name = mesh.GetBlendShapeName(i);
+                        var weight = mesh.GetBlendShapeFrameWeight(i, j);
+                        newMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
+                    }
+                }
+
+                CreateUniqueAsset(newMesh, newMesh.name + ".asset");
+                AssetDatabase.SaveAssets();
+
+                meshRenderer.sharedMesh = newMesh;
+            }
+
+            var materialList = new Material[matchedMaterials.Count];
+
+            for (int i = 0; i < matchedMaterials.Count; i++)
+            {
+                if (matchedMaterials[i].Count > 1)
+                {
+                    materialList[i] = CreateOptimizedMaterial(matchedMaterials[i][0], meshCount);
+                }
+                else
+                {
+                    materialList[i] = CreateOptimizedMaterial(matchedMaterials[i][0], meshCount);
+                }
+            }
+            meshRenderer.sharedMaterials = materialList;
+        }
     }
 
     private static void CombineSkinnedMeshes()
@@ -455,17 +661,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMesh.name = newMeshName;
             CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
             AssetDatabase.SaveAssets();
-            
-            var mats = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
-            for (int i = 0; i < mats.Length; i++)
-            {
-                mats[i] = CreateOptimizedMaterial(mats[i], combinableSkinnedMeshes.Count);
-            }
 
             var combinedMeshRenderer = new GameObject();
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
             meshRenderer.sharedMesh = combinedMesh;
-            meshRenderer.sharedMaterials = mats;
+            meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             meshRenderer.bones = targetBones.ToArray();
 
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
@@ -510,6 +710,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     meshRenderer.GetPropertyBlock(properties);
                 }
                 properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
+                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                 meshRenderer.SetPropertyBlock(properties);
                 AddAnimationPathChange(oldPath, "m_IsActive", typeof(GameObject),
                         newMeshName, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer));
@@ -532,47 +733,70 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
-        d4rkpl4y3r.ShaderAnalyzer.ClearParsedShaderCache();
+        ShaderAnalyzer.ClearParsedShaderCache();
         ClearTrashBin();
         newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths();
         CombineSkinnedMeshes();
+        CombineAndOptimizeMaterials();
         FixAllAnimationPaths();
     }
     
     public override void OnInspectorGUI()
     {
-        var t = (d4rkAvatarOptimizer)target;
+        settings = (d4rkAvatarOptimizer)target;
 
-        t.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", t.MergeBackFaceCullingWithCullingOff);
+        settings.MergeBackFaceCullingWithCullingOff =
+            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
         
         if (GUILayout.Button("Create Optimized Copy"))
         {
-            var copy = GameObject.Instantiate(t.gameObject);
+            var copy = GameObject.Instantiate(settings.gameObject);
             Optimize(copy);
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
             var boneCapsule = copy.GetComponentInChildren<BoneCapsule>(true);
             if (boneCapsule != null)
                 DestroyImmediate(boneCapsule);
-            copy.name = t.gameObject.name + "(OptimizedCopy)";
+            copy.name = settings.gameObject.name + "(OptimizedCopy)";
             copy.SetActive(true);
-            t.gameObject.SetActive(false);
+            settings.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
         }
 
-        root = t.gameObject;
+        root = settings.gameObject;
         var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
         {
             EditorGUILayout.Separator();
-            EditorGUILayout.LabelField(mergedMeshes[0].name);
-            foreach (var mesh in mergedMeshes)
+            var matchedMaterials = new List<List<Material>>();
+            var matchedMaterialMeshes = new List<List<Mesh>>();
+            foreach (var meshMat in mergedMeshes.SelectMany(mesh =>
+                mesh.sharedMaterials.Select(mat => (mesh.sharedMesh, mat))))
             {
-                foreach (var material in mesh.sharedMaterials)
+                bool foundMatch = false;
+                for (int i = 0; i < matchedMaterials.Count; i++)
                 {
-                    EditorGUILayout.LabelField("  " + mesh.name + "." + material.name);
+                    if (CanCombineWith(matchedMaterials[i], meshMat.mat))
+                    {
+                        matchedMaterials[i].Add(meshMat.mat);
+                        matchedMaterialMeshes[i].Add(meshMat.sharedMesh);
+                        foundMatch = true;
+                        break;
+                    }
+                }
+                if (!foundMatch)
+                {
+                    matchedMaterials.Add(new List<Material> { meshMat.mat });
+                    matchedMaterialMeshes.Add(new List<Mesh> { meshMat.sharedMesh });
+                }
+            }
+            for (int i = 0; i < matchedMaterials.Count; i++)
+            {
+                for (int j = 0; j < matchedMaterials[i].Count; j++)
+                {
+                    string indent = (i == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
+                    EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
                 }
             }
         }
