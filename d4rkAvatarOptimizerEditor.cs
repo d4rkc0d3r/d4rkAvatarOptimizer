@@ -20,12 +20,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void ClearTrashBin()
     {
-        string[] folderPath = { "Assets/d4rkAvatarOptimizer/TrashBin" };
-        foreach (var asset in AssetDatabase.FindAssets("", folderPath))
-        {
-            var path = AssetDatabase.GUIDToAssetPath(asset);
-            AssetDatabase.DeleteAsset(path);
-        }
+        AssetDatabase.DeleteAsset("Assets/d4rkAvatarOptimizer/TrashBin");
+        AssetDatabase.CreateFolder("Assets/d4rkAvatarOptimizer", "TrashBin");
     }
 
     private static void CreateUniqueAsset(Object asset, string name)
