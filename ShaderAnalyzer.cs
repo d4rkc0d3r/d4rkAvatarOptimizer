@@ -110,7 +110,7 @@ namespace d4rkpl4y3r
             {
                 rawLines = File.ReadAllLines(filePath);
             }
-            catch (FileNotFoundException e)
+            catch (FileNotFoundException)
             {
                 return false; //this is probably a unity include file
             }

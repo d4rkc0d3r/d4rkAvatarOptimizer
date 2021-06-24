@@ -41,7 +41,6 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
     {
-        return true;
         foreach (var material in candidate.sharedMaterials)
         {
             if (material.shader.name == "Standard")
@@ -296,12 +295,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
         var name = System.IO.Path.GetFileName(source.shader.name);
+        name = source.name + " " + name;
         var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
         name = System.IO.Path.GetFileNameWithoutExtension(path);
         optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
         System.IO.File.WriteAllLines(path, optimizedShader.lines);
         AssetDatabase.Refresh();
         var mat = GameObject.Instantiate(source);
+        mat.name = name;
         mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
         CreateUniqueAsset(mat, mat.name + ".mat");
         return mat;
