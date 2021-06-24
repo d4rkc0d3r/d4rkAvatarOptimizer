@@ -65,6 +65,7 @@ namespace d4rkpl4y3r
                 parsedShader.name = shader.name;
                 RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
                 SemanticParseShader(parsedShader);
+                parsedShaderCache[shader.name] = parsedShader;
             }
             return parsedShader;
         }
