@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEditor.Animations;
 using UnityEditor;
 using d4rkpl4y3r;
+using d4rkpl4y3r.Util;
 
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
@@ -20,13 +21,17 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void ClearTrashBin()
     {
+        Profiler.StartSection("ClearTrashBin()");
         AssetDatabase.DeleteAsset("Assets/d4rkAvatarOptimizer/TrashBin");
         AssetDatabase.CreateFolder("Assets/d4rkAvatarOptimizer", "TrashBin");
+        Profiler.EndSection();
     }
 
     private static void CreateUniqueAsset(Object asset, string name)
     {
+        Profiler.StartSection("AssetDatabase.CreateAsset()");
         AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name));
+        Profiler.EndSection();
     }
 
     private static string GetTransformPathToRoot(Transform t)
@@ -293,17 +298,24 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (prop.type == ParsedShader.Property.Type.Color)
                 replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
         }
+
+        Profiler.StartSection("ShaderAnalyzer.CreateOptimizedCopy()");
         var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
+        Profiler.EndSection();
         var name = System.IO.Path.GetFileName(source.shader.name);
         name = source.name + " " + name;
         var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
         name = System.IO.Path.GetFileNameWithoutExtension(path);
         optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
         System.IO.File.WriteAllLines(path, optimizedShader.lines);
+        Profiler.StartSection("AssetDatabase.Refresh()");
         AssetDatabase.Refresh();
+        Profiler.EndSection();
         var mat = GameObject.Instantiate(source);
         mat.name = name;
+        Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>(path)");
         mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+        Profiler.EndSection();
         CreateUniqueAsset(mat, mat.name + ".mat");
         return mat;
     }
@@ -490,7 +502,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
 
                 CreateUniqueAsset(newMesh, newMesh.name + ".asset");
+                Profiler.StartSection("AssetDatabase.SaveAssets()");
                 AssetDatabase.SaveAssets();
+                Profiler.EndSection();
 
                 meshRenderer.sharedMesh = newMesh;
             }
@@ -657,7 +671,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             combinedMesh.name = newMeshName;
             CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
+            Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
+            Profiler.EndSection();
 
             var combinedMeshRenderer = new GameObject();
             var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
@@ -721,7 +737,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMeshRenderer.transform.localScale = Vector3.one;
             combinedMeshRenderer.name = newMeshName;
 
+            Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
+            Profiler.EndSection();
 
             combinedMeshID++;
         }
@@ -745,9 +763,14 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         settings.MergeBackFaceCullingWithCullingOff =
             EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
-        
+
+        settings.ProfileTimeUsed =
+            EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
+
         if (GUILayout.Button("Create Optimized Copy"))
         {
+            Profiler.enabled = settings.ProfileTimeUsed;
+            Profiler.Reset();
             var copy = GameObject.Instantiate(settings.gameObject);
             Optimize(copy);
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
@@ -758,6 +781,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             copy.SetActive(true);
             settings.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
+            Profiler.PrintTimeUsed();
         }
 
         root = settings.gameObject;

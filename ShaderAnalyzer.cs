@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Globalization;
 using System.Linq;
+using d4rkpl4y3r.Util;
 
 namespace d4rkpl4y3r
 {
@@ -63,8 +64,11 @@ namespace d4rkpl4y3r
                 maxIncludes = 50;
                 parsedShader = new ParsedShader();
                 parsedShader.name = shader.name;
+                Profiler.StartSection("ShaderAnalyzer.RecursiveParseFile()");
                 RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
+                Profiler.StartNextSection("ShaderAnalyzer.SemanticParseShader()");
                 SemanticParseShader(parsedShader);
+                Profiler.EndSection();
                 parsedShaderCache[shader.name] = parsedShader;
             }
             return parsedShader;
