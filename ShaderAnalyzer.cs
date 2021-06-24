@@ -65,7 +65,6 @@ namespace d4rkpl4y3r
                 parsedShader.name = shader.name;
                 RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
                 SemanticParseShader(parsedShader);
-                File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastParsedShader.shader", parsedShader.lines);
             }
             return parsedShader;
         }
@@ -426,9 +425,6 @@ namespace d4rkpl4y3r
                         break;
                 }
             }
-            output.name = "d4rkpl4y3r/Optimizer/LastOptimized";
-            output.lines[0] = "Shader \"" + output.name + "\"";
-            File.WriteAllLines("Assets/d4rkAvatarOptimizer/TrashBin/LastOptimizedShader.shader", output.lines);
             return output;
         }
 
