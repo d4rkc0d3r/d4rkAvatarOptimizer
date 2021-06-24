@@ -283,41 +283,52 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static Material CreateOptimizedMaterial(Material source, int meshToggleCount)
+    private static Material[] CreateOptimizedMaterials(IEnumerable<Material> sources, int meshToggleCount)
     {
-        var parsedShader = ShaderAnalyzer.Parse(source.shader);
-        var replace = new Dictionary<string, string>();
-        foreach (var prop in parsedShader.properties)
+        var optimizedShaders = new List<(string name, string path, Material source)>();
+        foreach (var source in sources)
         {
-            if (!source.HasProperty(prop.name))
-                continue;
-            if (prop.type == ParsedShader.Property.Type.Float)
-                replace[prop.name] = "" + source.GetFloat(prop.name);
-            if (prop.type == ParsedShader.Property.Type.Int)
-                replace[prop.name] = "" + source.GetInt(prop.name);
-            if (prop.type == ParsedShader.Property.Type.Color)
-                replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
+            var parsedShader = ShaderAnalyzer.Parse(source.shader);
+            var replace = new Dictionary<string, string>();
+            foreach (var prop in parsedShader.properties)
+            {
+                if (!source.HasProperty(prop.name))
+                    continue;
+                if (prop.type == ParsedShader.Property.Type.Float)
+                    replace[prop.name] = "" + source.GetFloat(prop.name);
+                if (prop.type == ParsedShader.Property.Type.Int)
+                    replace[prop.name] = "" + source.GetInt(prop.name);
+                if (prop.type == ParsedShader.Property.Type.Color)
+                    replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
+            }
+
+            Profiler.StartSection("ShaderAnalyzer.CreateOptimizedCopy()");
+            var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
+            Profiler.EndSection();
+            var name = System.IO.Path.GetFileName(source.shader.name);
+            name = source.name + " " + name;
+            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
+            name = System.IO.Path.GetFileNameWithoutExtension(path);
+            optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
+            System.IO.File.WriteAllLines(path, optimizedShader.lines);
+            optimizedShaders.Add((name, path, source));
         }
 
-        Profiler.StartSection("ShaderAnalyzer.CreateOptimizedCopy()");
-        var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
-        Profiler.EndSection();
-        var name = System.IO.Path.GetFileName(source.shader.name);
-        name = source.name + " " + name;
-        var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
-        name = System.IO.Path.GetFileNameWithoutExtension(path);
-        optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
-        System.IO.File.WriteAllLines(path, optimizedShader.lines);
         Profiler.StartSection("AssetDatabase.Refresh()");
         AssetDatabase.Refresh();
         Profiler.EndSection();
-        var mat = GameObject.Instantiate(source);
-        mat.name = name;
-        Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>(path)");
-        mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
-        Profiler.EndSection();
-        CreateUniqueAsset(mat, mat.name + ".mat");
-        return mat;
+
+        var materials = new Material[optimizedShaders.Count];
+        for (int i = 0; i < optimizedShaders.Count; i++)
+        {
+            var mat = GameObject.Instantiate(optimizedShaders[i].source);
+            mat.name = optimizedShaders[i].name;
+            Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>(path)");
+            mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(optimizedShaders[i].path);
+            CreateUniqueAsset(mat, mat.name + ".mat");
+            materials[i] = mat;
+        }
+        return materials;
     }
 
     private static bool CanCombineWith(List<Material> list, Material candidate)
@@ -509,20 +520,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            var materialList = new Material[matchedMaterials.Count];
-
-            for (int i = 0; i < matchedMaterials.Count; i++)
-            {
-                if (matchedMaterials[i].Count > 1)
-                {
-                    materialList[i] = CreateOptimizedMaterial(matchedMaterials[i][0], meshCount);
-                }
-                else
-                {
-                    materialList[i] = CreateOptimizedMaterial(matchedMaterials[i][0], meshCount);
-                }
-            }
-            meshRenderer.sharedMaterials = materialList;
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(matchedMaterials.Select(m => m[0]), meshCount);
         }
     }
 
