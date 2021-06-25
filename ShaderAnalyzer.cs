@@ -295,39 +295,116 @@ namespace d4rkpl4y3r
             return line;
         }
 
-        private static void InjectMeshToggleToVertexShader(List<string> source, ref int sourceLineIndex, List<string> output, (string name, string returnType) func, int meshToggleCount)
+        private static void InjectArrayPropertyInitialization(
+            List<string> output,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
+        {
+            foreach (var arrayProperty in arrayPropertyValues)
+            {
+                string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
+                output.Add(arrayProperty.Key + " = " + name + "[d4rkAvatarOptimizer_MaterialID];");
+            }
+        }
+
+        private static void InjectVertexShaderCode(
+            List<string> source,
+            ref int sourceLineIndex,
+            List<string> output,
+            (string name, string returnType) func,
+            int meshToggleCount,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
         {
             string line = source[sourceLineIndex];
             string funcParams = line.Substring(line.IndexOf('(') + 1);
             output.Add(func.returnType + " " + func.name + "(");
             output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0,");
+            if (arrayPropertyValues.Count > 0)
+                output.Add("out int d4rkAvatarOptimizer_outMaterialID : MATERIAL_ID,");
             output.Add(funcParams);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
                 line = source[++sourceLineIndex];
                 output.Add(line);
             }
-            output.Add("if (d4rkAvatarOptimizer_Zero)");
-            output.Add("{");
-            string val = "float val = _IsActiveMesh0";
-            for (int i = 1; i < meshToggleCount; i++)
+            if (arrayPropertyValues.Count > 0)
             {
-                val += " + _IsActiveMesh" + i;
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
+                output.Add("d4rkAvatarOptimizer_outMaterialID = d4rkAvatarOptimizer_MaterialID;");
             }
-            output.Add(val + ";");
-            output.Add("if (val) return (" + func.returnType + ")0;");
-            output.Add("}");
-            output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_UV0.z])");
-            output.Add("{");
-            output.Add("return (v2f)0;");
-            output.Add("}");
+            if (meshToggleCount > 0)
+            {
+                output.Add("if (d4rkAvatarOptimizer_Zero)");
+                output.Add("{");
+                string val = "float val = _IsActiveMesh0";
+                for (int i = 1; i < meshToggleCount; i++)
+                {
+                    val += " + _IsActiveMesh" + i;
+                }
+                output.Add(val + ";");
+                output.Add("if (val) return (" + func.returnType + ")0;");
+                output.Add("}");
+                output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_UV0.z])");
+                output.Add("{");
+                output.Add("return (v2f)0;");
+                output.Add("}");
+            }
+            InjectArrayPropertyInitialization(output, arrayPropertyValues);
+        }
+
+        private static void InjectFragmentShaderCode(
+            List<string> source,
+            ref int sourceLineIndex,
+            List<string> output,
+            (string name, string returnType) func,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
+        {
+            string line = source[sourceLineIndex];
+            string funcParams = line.Substring(line.IndexOf('(') + 1);
+            output.Add(func.returnType + " " + func.name + "(");
+            if (arrayPropertyValues.Count > 0)
+                output.Add("in int d4rkAvatarOptimizer_inMaterialID : MATERIAL_ID,");
+            output.Add(funcParams);
+            while (line != "{" && sourceLineIndex < source.Count - 1)
+            {
+                line = source[++sourceLineIndex];
+                output.Add(line);
+            }
+            if (arrayPropertyValues.Count > 0)
+            {
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_inMaterialID;");
+            }
+            InjectArrayPropertyInitialization(output, arrayPropertyValues);
+        }
+
+        private static void InjectPropertyArrays(
+            List<string> output,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
+        {
+            if (arrayPropertyValues.Count == 0)
+                return;
+            output.Add("static int d4rkAvatarOptimizer_MaterialID");
+            foreach (var arrayProperty in arrayPropertyValues)
+            {
+                var array = arrayProperty.Value;
+                string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
+                output.Add("static const " + array.type + " " + name + "[" + array.values.Count + "] = ");
+                output.Add("{");
+                for (int i = 0; i < array.values.Count; i++)
+                {
+                    output.Add(array.values[i] + ",");
+                }
+                output.Add("};");
+            }
         }
 
         public static ParsedShader CreateOptimizedCopy(
             ParsedShader source,
-            Dictionary<string, string> properyValues,
-            int meshToggleCount)
+            Dictionary<string, string> staticPropertyValues,
+            int meshToggleCount,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null)
         {
+            if (arrayPropertyValues == null)
+                arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
             var output = new ParsedShader();
             int passID = -1;
             var cgInclude = new List<string>();
@@ -367,9 +444,10 @@ namespace d4rkpl4y3r
                         {
                             passID++;
                             output.lines.Add(line);
+                            output.lines.Add("uniform float d4rkAvatarOptimizer_Zero;");
+                            InjectPropertyArrays(output.lines, arrayPropertyValues);
                             if (meshToggleCount > 0)
                             {
-                                output.lines.Add("uniform float d4rkAvatarOptimizer_Zero;");
                                 output.lines.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
                                 output.lines.Add("{");
                                 output.lines.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
@@ -385,11 +463,15 @@ namespace d4rkpl4y3r
                                 var func = meshToggleCount > 0 ? ParseFunctionDefinition(includeLine) : (null, null);
                                 if (func.name != null && func.name == source.passes[passID].vertex)
                                 {
-                                    InjectMeshToggleToVertexShader(cgInclude, ref includeLineIndex, output.lines, func, meshToggleCount);
+                                    InjectVertexShaderCode(cgInclude, ref includeLineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
+                                }
+                                else if (func.name != null && func.name == source.passes[passID].fragment)
+                                {
+                                    InjectFragmentShaderCode(cgInclude, ref includeLineIndex, output.lines, func, arrayPropertyValues);
                                 }
                                 else
                                 {
-                                    output.lines.Add(ReplacePropertyDefinition(includeLine, properyValues));
+                                    output.lines.Add(ReplacePropertyDefinition(includeLine, staticPropertyValues));
                                 }
                             }
                             state = ParseState.CGProgram;
@@ -420,11 +502,15 @@ namespace d4rkpl4y3r
                             var func = meshToggleCount > 0 ? ParseFunctionDefinition(line) : (null, null);
                             if (func.name != null && func.name == source.passes[passID].vertex)
                             {
-                                InjectMeshToggleToVertexShader(source.lines, ref lineIndex, output.lines, func, meshToggleCount);
+                                InjectVertexShaderCode(source.lines, ref lineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
+                            }
+                            else if(func.name != null && func.name == source.passes[passID].fragment)
+                            {
+                                InjectFragmentShaderCode(source.lines, ref lineIndex, output.lines, func, arrayPropertyValues);
                             }
                             else
                             {
-                                output.lines.Add(ReplacePropertyDefinition(line, properyValues));
+                                output.lines.Add(ReplacePropertyDefinition(line, staticPropertyValues));
                             }
                         }
                         break;
