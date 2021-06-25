@@ -279,7 +279,10 @@ namespace d4rkpl4y3r
             return (null, null);
         }
 
-        private static string ReplacePropertyDefinition(string line, Dictionary<string, string> properyValues)
+        private static string ReplacePropertyDefinition(
+            string line,
+            Dictionary<string, string> properyValues,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
         {
             var match = Regex.Match(line, @"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;");
             if (match.Success)
@@ -290,6 +293,10 @@ namespace d4rkpl4y3r
                 {
                     var type = match.Groups[2].Value;
                     return "static " + type + " " + name + " = " + value + ";";
+                }
+                if (arrayPropertyValues.ContainsKey(name))
+                {
+                    return "";
                 }
             }
             return line;
@@ -319,7 +326,7 @@ namespace d4rkpl4y3r
             output.Add(func.returnType + " " + func.name + "(");
             output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0,");
             if (arrayPropertyValues.Count > 0)
-                output.Add("out int d4rkAvatarOptimizer_outMaterialID : MATERIAL_ID,");
+                output.Add("out int d4rkAvatarOptimizer_outMaterialID : d4rkAvatarOptimizer_MATERIAL_ID,");
             output.Add(funcParams);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
@@ -362,7 +369,7 @@ namespace d4rkpl4y3r
             string funcParams = line.Substring(line.IndexOf('(') + 1);
             output.Add(func.returnType + " " + func.name + "(");
             if (arrayPropertyValues.Count > 0)
-                output.Add("in int d4rkAvatarOptimizer_inMaterialID : MATERIAL_ID,");
+                output.Add("int d4rkAvatarOptimizer_inMaterialID : d4rkAvatarOptimizer_MATERIAL_ID,");
             output.Add(funcParams);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
@@ -382,7 +389,7 @@ namespace d4rkpl4y3r
         {
             if (arrayPropertyValues.Count == 0)
                 return;
-            output.Add("static int d4rkAvatarOptimizer_MaterialID");
+            output.Add("static int d4rkAvatarOptimizer_MaterialID;");
             foreach (var arrayProperty in arrayPropertyValues)
             {
                 var array = arrayProperty.Value;
@@ -394,6 +401,7 @@ namespace d4rkpl4y3r
                     output.Add(array.values[i] + ",");
                 }
                 output.Add("};");
+                output.Add("static " + array.type + " " + arrayProperty.Key + ";");
             }
         }
 
@@ -471,7 +479,7 @@ namespace d4rkpl4y3r
                                 }
                                 else
                                 {
-                                    output.lines.Add(ReplacePropertyDefinition(includeLine, staticPropertyValues));
+                                    output.lines.Add(ReplacePropertyDefinition(includeLine, staticPropertyValues, arrayPropertyValues));
                                 }
                             }
                             state = ParseState.CGProgram;
@@ -510,7 +518,7 @@ namespace d4rkpl4y3r
                             }
                             else
                             {
-                                output.lines.Add(ReplacePropertyDefinition(line, staticPropertyValues));
+                                output.lines.Add(ReplacePropertyDefinition(line, staticPropertyValues, arrayPropertyValues));
                             }
                         }
                         break;

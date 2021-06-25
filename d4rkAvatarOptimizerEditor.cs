@@ -283,35 +283,75 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static Material[] CreateOptimizedMaterials(IEnumerable<Material> sources, int meshToggleCount)
+    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount)
     {
         var optimizedShaders = new List<(string name, string path, Material source)>();
         foreach (var source in sources)
         {
-            var parsedShader = ShaderAnalyzer.Parse(source.shader);
+            var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
             var replace = new Dictionary<string, string>();
-            foreach (var prop in parsedShader.properties)
+            var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
+            foreach (var mat in source)
             {
-                if (!source.HasProperty(prop.name))
-                    continue;
-                if (prop.type == ParsedShader.Property.Type.Float)
-                    replace[prop.name] = "" + source.GetFloat(prop.name);
-                if (prop.type == ParsedShader.Property.Type.Int)
-                    replace[prop.name] = "" + source.GetInt(prop.name);
-                if (prop.type == ParsedShader.Property.Type.Color)
-                    replace[prop.name] = source.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
+                foreach (var prop in parsedShader.properties)
+                {
+                    if (!mat.HasProperty(prop.name))
+                        continue;
+                    if (prop.type == ParsedShader.Property.Type.Float)
+                    {
+                        (string type, List<string> values) propertyArray;
+                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                        {
+                            propertyArray.type = "float";
+                            propertyArray.values = new List<string>();
+                            arrayPropertyValues[prop.name] = propertyArray;
+                        }
+                        propertyArray.values.Add("" + mat.GetFloat(prop.name));
+                    }
+                    if (prop.type == ParsedShader.Property.Type.Int)
+                    {
+                        (string type, List<string> values) propertyArray;
+                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                        {
+                            propertyArray.type = "int";
+                            propertyArray.values = new List<string>();
+                            arrayPropertyValues[prop.name] = propertyArray;
+                        }
+                        propertyArray.values.Add("" + mat.GetInt(prop.name));
+                    }
+                    if (prop.type == ParsedShader.Property.Type.Color)
+                    {
+                        (string type, List<string> values) propertyArray;
+                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                        {
+                            propertyArray.type = "float4";
+                            propertyArray.values = new List<string>();
+                            arrayPropertyValues[prop.name] = propertyArray;
+                        }
+                        propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
+                    }
+                }
+            }
+
+            foreach (var tuple in arrayPropertyValues.ToList())
+            {
+                if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
+                {
+                    arrayPropertyValues.Remove(tuple.Key);
+                    replace[tuple.Key] = tuple.Value.values[0];
+                }
             }
 
             Profiler.StartSection("ShaderAnalyzer.CreateOptimizedCopy()");
-            var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount);
+            var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount, arrayPropertyValues);
             Profiler.EndSection();
-            var name = System.IO.Path.GetFileName(source.shader.name);
-            name = source.name + " " + name;
+            var name = System.IO.Path.GetFileName(source[0].shader.name);
+            name = source[0].name + " " + name;
             var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
             name = System.IO.Path.GetFileNameWithoutExtension(path);
             optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
             System.IO.File.WriteAllLines(path, optimizedShader.lines);
-            optimizedShaders.Add((name, path, source));
+            optimizedShaders.Add((name, path, source[0]));
         }
 
         Profiler.StartSection("AssetDatabase.Refresh()");
@@ -351,26 +391,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         foreach (var prop in parsedShader.properties)
         {
-            if (prop.type == ParsedShader.Property.Type.Unknown)
-                return false;
             foreach (var mat in list)
             {
                 switch (prop.type)
                 {
                     case ParsedShader.Property.Type.Color:
-                        if (!mat.GetColor(prop.name).Equals(candidate.GetColor(prop.name)))
-                            return false;
+                    case ParsedShader.Property.Type.Float:
+                    case ParsedShader.Property.Type.Int:
                         break;
                     case ParsedShader.Property.Type.Texture2D:
                         if (mat.GetTexture(prop.name) != candidate.GetTexture(prop.name))
-                            return false;
-                        break;
-                    case ParsedShader.Property.Type.Float:
-                        if (!mat.GetFloat(prop.name).Equals(candidate.GetFloat(prop.name)))
-                            return false;
-                        break;
-                    case ParsedShader.Property.Type.Int:
-                        if (!mat.GetInt(prop.name).Equals(candidate.GetInt(prop.name)))
                             return false;
                         break;
                     default:
@@ -520,7 +550,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(matchedMaterials.Select(m => m[0]), meshCount);
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(matchedMaterials, meshCount);
         }
     }
 
