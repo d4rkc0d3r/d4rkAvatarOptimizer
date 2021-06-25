@@ -525,7 +525,7 @@ namespace d4rkpl4y3r
                                     source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
                                     InjectFragmentShaderCode(cgInclude, ref includeLineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
                                 }
-                                else if (meshToggleCount > 0 && includeLine.StartsWith("struct "))
+                                else if (arrayPropertyValues.Count > 0 && includeLine.StartsWith("struct "))
                                 {
                                     output.lines.Add(includeLine);
                                     var match = Regex.Match(includeLine, @"struct\s+(\w+)");
@@ -583,7 +583,7 @@ namespace d4rkpl4y3r
                                 source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
                                 InjectFragmentShaderCode(source.lines, ref lineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
                             }
-                            else if (meshToggleCount > 0 && line.StartsWith("struct "))
+                            else if (arrayPropertyValues.Count > 0 && line.StartsWith("struct "))
                             {
                                 output.lines.Add(line);
                                 var match = Regex.Match(line, @"struct\s+(\w+)");
