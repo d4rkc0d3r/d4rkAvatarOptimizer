@@ -43,6 +43,7 @@ namespace d4rkpl4y3r
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public List<Pass> passes = new List<Pass>();
+        public Dictionary<string, string> functionReturnType = new Dictionary<string, string>();
     }
 
     public static class ShaderAnalyzer
@@ -325,18 +326,11 @@ namespace d4rkpl4y3r
             string funcParams = line.Substring(line.IndexOf('(') + 1);
             output.Add(func.returnType + " " + func.name + "(");
             output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0,");
-            if (arrayPropertyValues.Count > 0)
-                output.Add("out int d4rkAvatarOptimizer_outMaterialID : d4rkAvatarOptimizer_MATERIAL_ID,");
             output.Add(funcParams);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
                 line = source[++sourceLineIndex];
                 output.Add(line);
-            }
-            if (arrayPropertyValues.Count > 0)
-            {
-                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
-                output.Add("d4rkAvatarOptimizer_outMaterialID = d4rkAvatarOptimizer_MaterialID;");
             }
             if (meshToggleCount > 0)
             {
@@ -352,10 +346,59 @@ namespace d4rkpl4y3r
                 output.Add("}");
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_UV0.z])");
                 output.Add("{");
-                output.Add("return (v2f)0;");
+                output.Add("return (" + func.returnType + ")0;");
                 output.Add("}");
             }
+            if (arrayPropertyValues.Count == 0)
+            {
+                return;
+            }
+            sourceLineIndex++;
+            output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
             InjectArrayPropertyInitialization(output, arrayPropertyValues);
+            int braceDepth = 0;
+            for (; sourceLineIndex < source.Count; sourceLineIndex++)
+            {
+                line = source[sourceLineIndex];
+                if (line == "}")
+                {
+                    output.Add(line);
+                    if (braceDepth-- == 0)
+                    {
+                        return;
+                    }
+                }
+                else if (line == "{")
+                {
+                    output.Add(line);
+                    braceDepth++;
+                }
+                else if (line.StartsWith("return "))
+                {
+                    output.Add("{");
+                    output.Add(func.returnType + " d4rkAvatarOptimizer_vertexOutput = " + line.Substring("return ".Length));
+                    output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                    output.Add("return d4rkAvatarOptimizer_vertexOutput;");
+                    output.Add("}");
+                }
+                else
+                {
+                    output.Add(line);
+                }
+            }
+        }
+
+        private static string FindParameterName(string line, string type)
+        {
+            var matches = Regex.Matches(line, @"(\w+)\s+(\w+)");
+            foreach (Match match in matches)
+            {
+                if (match.Groups[1].Value == type)
+                {
+                    return match.Groups[2].Value;
+                }
+            }
+            return null;
         }
 
         private static void InjectFragmentShaderCode(
@@ -363,23 +406,25 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             List<string> output,
             (string name, string returnType) func,
+            string v2fType,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
         {
             string line = source[sourceLineIndex];
             string funcParams = line.Substring(line.IndexOf('(') + 1);
-            output.Add(func.returnType + " " + func.name + "(");
-            if (arrayPropertyValues.Count > 0)
-                output.Add("int d4rkAvatarOptimizer_inMaterialID : d4rkAvatarOptimizer_MATERIAL_ID,");
-            output.Add(funcParams);
+            output.Add(line);
+            string v2fParamName = FindParameterName(funcParams, v2fType);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
                 line = source[++sourceLineIndex];
+                if (v2fParamName == null)
+                    v2fParamName = FindParameterName(line, v2fType);
                 output.Add(line);
             }
-            if (arrayPropertyValues.Count > 0)
+            if (arrayPropertyValues.Count == 0)
             {
-                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_inMaterialID;");
+                return;
             }
+            output.Add("d4rkAvatarOptimizer_MaterialID = " + v2fParamName + ".d4rkAvatarOptimizer_MaterialID;");
             InjectArrayPropertyInitialization(output, arrayPropertyValues);
         }
 
@@ -389,7 +434,7 @@ namespace d4rkpl4y3r
         {
             if (arrayPropertyValues.Count == 0)
                 return;
-            output.Add("static int d4rkAvatarOptimizer_MaterialID;");
+            output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
             foreach (var arrayProperty in arrayPropertyValues)
             {
                 var array = arrayProperty.Value;
@@ -450,7 +495,8 @@ namespace d4rkpl4y3r
                         }
                         else if (line == "CGPROGRAM")
                         {
-                            passID++;
+                            state = ParseState.CGProgram;
+                            var pass = source.passes[++passID];
                             output.lines.Add(line);
                             output.lines.Add("uniform float d4rkAvatarOptimizer_Zero;");
                             InjectPropertyArrays(output.lines, arrayPropertyValues);
@@ -469,20 +515,38 @@ namespace d4rkpl4y3r
                             {
                                 var includeLine = cgInclude[includeLineIndex];
                                 var func = meshToggleCount > 0 ? ParseFunctionDefinition(includeLine) : (null, null);
-                                if (func.name != null && func.name == source.passes[passID].vertex)
+                                if (func.name != null && func.name == pass.vertex)
                                 {
                                     InjectVertexShaderCode(cgInclude, ref includeLineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
                                 }
-                                else if (func.name != null && func.name == source.passes[passID].fragment)
+                                else if (func.name != null && func.name == pass.fragment)
                                 {
-                                    InjectFragmentShaderCode(cgInclude, ref includeLineIndex, output.lines, func, arrayPropertyValues);
+                                    string vertexOutput;
+                                    source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
+                                    InjectFragmentShaderCode(cgInclude, ref includeLineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
+                                }
+                                else if (meshToggleCount > 0 && includeLine.StartsWith("struct "))
+                                {
+                                    output.lines.Add(includeLine);
+                                    var match = Regex.Match(includeLine, @"struct\s+(\w+)");
+                                    string vertexOutput;
+                                    if (match.Success && source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
+                                    {
+                                        if (match.Groups[1].Value == vertexOutput && cgInclude[includeLineIndex + 1] == "{")
+                                        {
+                                            includeLineIndex++;
+                                            output.lines.Add("{");
+                                            output.lines.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                                        }
+                                    }
                                 }
                                 else
                                 {
-                                    output.lines.Add(ReplacePropertyDefinition(includeLine, staticPropertyValues, arrayPropertyValues));
+                                    var l = ReplacePropertyDefinition(includeLine, staticPropertyValues, arrayPropertyValues);
+                                    if (l != "")
+                                        output.lines.Add(l);
                                 }
                             }
-                            state = ParseState.CGProgram;
                         }
                         else
                         {
@@ -507,18 +571,38 @@ namespace d4rkpl4y3r
                         }
                         else
                         {
+                            var pass = source.passes[passID];
                             var func = meshToggleCount > 0 ? ParseFunctionDefinition(line) : (null, null);
-                            if (func.name != null && func.name == source.passes[passID].vertex)
+                            if (func.name != null && func.name == pass.vertex)
                             {
                                 InjectVertexShaderCode(source.lines, ref lineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
                             }
-                            else if(func.name != null && func.name == source.passes[passID].fragment)
+                            else if(func.name != null && func.name == pass.fragment)
                             {
-                                InjectFragmentShaderCode(source.lines, ref lineIndex, output.lines, func, arrayPropertyValues);
+                                string vertexOutput;
+                                source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
+                                InjectFragmentShaderCode(source.lines, ref lineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
+                            }
+                            else if (meshToggleCount > 0 && line.StartsWith("struct "))
+                            {
+                                output.lines.Add(line);
+                                var match = Regex.Match(line, @"struct\s+(\w+)");
+                                string vertexOutput;
+                                if (match.Success && source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
+                                {
+                                    if (match.Groups[1].Value == vertexOutput && cgInclude[lineIndex + 1] == "{")
+                                    {
+                                        lineIndex++;
+                                        output.lines.Add("{");
+                                        output.lines.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                                    }
+                                }
                             }
                             else
                             {
-                                output.lines.Add(ReplacePropertyDefinition(line, staticPropertyValues, arrayPropertyValues));
+                                var l = ReplacePropertyDefinition(line, staticPropertyValues, arrayPropertyValues);
+                                if (l != "")
+                                    output.lines.Add(l);
                             }
                         }
                         break;
@@ -627,6 +711,11 @@ namespace d4rkpl4y3r
                         if (line == "ENDCG")
                         {
                             state = ParseState.ShaderLab;
+                        }
+                        var func = ParseFunctionDefinition(line);
+                        if (func.name != null)
+                        {
+                            parsedShader.functionReturnType[func.name] = func.returnType;
                         }
                         ParsePragma(line, currentPass);
                         break;
