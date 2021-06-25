@@ -447,6 +447,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     matchedMaterialsIndex.Add(new List<int> { i });
                 }
             }
+            
+            var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
 
             var sourceVertices = mesh.vertices;
             var sourceIndices = mesh.triangles;
@@ -471,6 +473,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 for (int k = 0; k < matchedMaterials[i].Count; k++)
                 {
                     var indexMap = new Dictionary<int, int>();
+                    int internalMaterialID = uniqueMatchedMaterials[i].IndexOf(matchedMaterials[i][k]);
                     int materialSubMeshId = matchedMaterialsIndex[i][k];
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
@@ -487,7 +490,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                             newIndex = targetVertices.Count;
                             indexList.Add(newIndex);
                             indexMap[oldIndex] = newIndex;
-                            targetUv.Add(new Vector4(sourceUv[oldIndex].x, sourceUv[oldIndex].y, sourceUv[oldIndex].z, k));
+                            targetUv.Add(new Vector4(sourceUv[oldIndex].x, sourceUv[oldIndex].y, sourceUv[oldIndex].z, internalMaterialID));
                             targetVertices.Add(sourceVertices[oldIndex]);
                             targetNormals.Add(sourceNormals[oldIndex]);
                             targetTangents.Add(sourceTangents[oldIndex]);
@@ -550,7 +553,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(matchedMaterials, meshCount);
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount);
         }
     }
 
