@@ -285,11 +285,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount)
     {
-        var optimizedShaders = new List<(string name, string path, Material source)>();
+        var optimizedShaders = new List<(string name, string path, Material source, string cull)>();
         foreach (var source in sources)
         {
             var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
-            var replace = new Dictionary<string, string>();
             var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
             foreach (var mat in source)
             {
@@ -333,6 +332,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
+            string cullReplace = null;
+            var cullProp = parsedShader.properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams[0] == "Cull");
+            if (cullProp != null)
+            {
+                int firstCull = source[0].GetInt(cullProp.name);
+                if (source.Any(m => m.GetInt(cullProp.name) != firstCull))
+                {
+                    cullReplace = cullProp.name;
+                }
+            }
+
+            var replace = new Dictionary<string, string>();
             foreach (var tuple in arrayPropertyValues.ToList())
             {
                 if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
@@ -351,7 +362,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             name = System.IO.Path.GetFileNameWithoutExtension(path);
             optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
             System.IO.File.WriteAllLines(path, optimizedShader.lines);
-            optimizedShaders.Add((name, path, source[0]));
+            optimizedShaders.Add((name, path, source[0], cullReplace));
         }
 
         Profiler.StartSection("AssetDatabase.Refresh()");
@@ -361,9 +372,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         var materials = new Material[optimizedShaders.Count];
         for (int i = 0; i < optimizedShaders.Count; i++)
         {
-            var mat = GameObject.Instantiate(optimizedShaders[i].source);
+            var mat = Instantiate(optimizedShaders[i].source);
+            if (optimizedShaders[i].cull != null)
+            {
+                mat.SetInt(optimizedShaders[i].cull, 0);
+            }
             mat.name = optimizedShaders[i].name;
-            Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>(path)");
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(optimizedShaders[i].path);
             CreateUniqueAsset(mat, mat.name + ".mat");
             materials[i] = mat;
@@ -397,7 +411,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     case ParsedShader.Property.Type.Color:
                     case ParsedShader.Property.Type.Float:
+                        break;
                     case ParsedShader.Property.Type.Int:
+                        if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
+                            && mat.GetInt(prop.name) != candidate.GetInt(prop.name))
+                            return false;
                         break;
                     case ParsedShader.Property.Type.Texture2D:
                         if (mat.GetTexture(prop.name) != candidate.GetTexture(prop.name))
@@ -802,7 +820,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
-            var copy = GameObject.Instantiate(settings.gameObject);
+            var copy = Instantiate(settings.gameObject);
             Optimize(copy);
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
             var boneCapsule = copy.GetComponentInChildren<BoneCapsule>(true);
