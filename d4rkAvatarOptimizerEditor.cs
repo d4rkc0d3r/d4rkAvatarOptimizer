@@ -353,15 +353,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
-            Profiler.StartSection("ShaderAnalyzer.CreateOptimizedCopy()");
-            var optimizedShader = ShaderAnalyzer.CreateOptimizedCopy(parsedShader, replace, meshToggleCount, arrayPropertyValues);
+            Profiler.StartSection("ShaderOptimizer.Run()");
+            var optimizedShader = ShaderOptimizer.Run(parsedShader, replace, meshToggleCount, arrayPropertyValues);
             Profiler.EndSection();
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
             var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
             name = System.IO.Path.GetFileNameWithoutExtension(path);
-            optimizedShader.lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
-            System.IO.File.WriteAllLines(path, optimizedShader.lines);
+            optimizedShader[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
+            System.IO.File.WriteAllLines(path, optimizedShader);
             optimizedShaders.Add((name, path, source[0], cullReplace));
         }
 
