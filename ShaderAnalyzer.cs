@@ -450,6 +450,51 @@ namespace d4rkpl4y3r
             }
         }
 
+        private static void ParseCodeLines(
+            List<string> source,
+            ref int sourceLineIndex,
+            List<string> output,
+            ParsedShader shader,
+            ParsedShader.Pass pass,
+            Dictionary<string, string> staticPropertyValues,
+            int meshToggleCount,
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues)
+        {
+            var line = source[sourceLineIndex];
+            var func = meshToggleCount > 0 ? ParseFunctionDefinition(line) : (null, null);
+            if (func.name != null && func.name == pass.vertex)
+            {
+                InjectVertexShaderCode(source, ref sourceLineIndex, output, func, meshToggleCount, arrayPropertyValues);
+            }
+            else if (func.name != null && func.name == pass.fragment)
+            {
+                string vertexOutput;
+                shader.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
+                InjectFragmentShaderCode(source, ref sourceLineIndex, output, func, vertexOutput, arrayPropertyValues);
+            }
+            else if (arrayPropertyValues.Count > 0 && line.StartsWith("struct "))
+            {
+                output.Add(line);
+                var match = Regex.Match(line, @"struct\s+(\w+)");
+                string vertexOutput;
+                if (match.Success && shader.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
+                {
+                    if (match.Groups[1].Value == vertexOutput && source[sourceLineIndex + 1] == "{")
+                    {
+                        sourceLineIndex++;
+                        output.Add("{");
+                        output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                    }
+                }
+            }
+            else
+            {
+                var l = ReplacePropertyDefinition(line, staticPropertyValues, arrayPropertyValues);
+                if (l != "")
+                    output.Add(l);
+            }
+        }
+
         public static ParsedShader CreateOptimizedCopy(
             ParsedShader source,
             Dictionary<string, string> staticPropertyValues,
@@ -513,39 +558,8 @@ namespace d4rkpl4y3r
                             }
                             for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
                             {
-                                var includeLine = cgInclude[includeLineIndex];
-                                var func = meshToggleCount > 0 ? ParseFunctionDefinition(includeLine) : (null, null);
-                                if (func.name != null && func.name == pass.vertex)
-                                {
-                                    InjectVertexShaderCode(cgInclude, ref includeLineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
-                                }
-                                else if (func.name != null && func.name == pass.fragment)
-                                {
-                                    string vertexOutput;
-                                    source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
-                                    InjectFragmentShaderCode(cgInclude, ref includeLineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
-                                }
-                                else if (arrayPropertyValues.Count > 0 && includeLine.StartsWith("struct "))
-                                {
-                                    output.lines.Add(includeLine);
-                                    var match = Regex.Match(includeLine, @"struct\s+(\w+)");
-                                    string vertexOutput;
-                                    if (match.Success && source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
-                                    {
-                                        if (match.Groups[1].Value == vertexOutput && cgInclude[includeLineIndex + 1] == "{")
-                                        {
-                                            includeLineIndex++;
-                                            output.lines.Add("{");
-                                            output.lines.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    var l = ReplacePropertyDefinition(includeLine, staticPropertyValues, arrayPropertyValues);
-                                    if (l != "")
-                                        output.lines.Add(l);
-                                }
+                                ParseCodeLines(cgInclude, ref includeLineIndex, output.lines, source,
+                                    pass, staticPropertyValues, meshToggleCount, arrayPropertyValues);
                             }
                         }
                         else
@@ -571,39 +585,8 @@ namespace d4rkpl4y3r
                         }
                         else
                         {
-                            var pass = source.passes[passID];
-                            var func = meshToggleCount > 0 ? ParseFunctionDefinition(line) : (null, null);
-                            if (func.name != null && func.name == pass.vertex)
-                            {
-                                InjectVertexShaderCode(source.lines, ref lineIndex, output.lines, func, meshToggleCount, arrayPropertyValues);
-                            }
-                            else if(func.name != null && func.name == pass.fragment)
-                            {
-                                string vertexOutput;
-                                source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
-                                InjectFragmentShaderCode(source.lines, ref lineIndex, output.lines, func, vertexOutput, arrayPropertyValues);
-                            }
-                            else if (arrayPropertyValues.Count > 0 && line.StartsWith("struct "))
-                            {
-                                output.lines.Add(line);
-                                var match = Regex.Match(line, @"struct\s+(\w+)");
-                                string vertexOutput;
-                                if (match.Success && source.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
-                                {
-                                    if (match.Groups[1].Value == vertexOutput && cgInclude[lineIndex + 1] == "{")
-                                    {
-                                        lineIndex++;
-                                        output.lines.Add("{");
-                                        output.lines.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                var l = ReplacePropertyDefinition(line, staticPropertyValues, arrayPropertyValues);
-                                if (l != "")
-                                    output.lines.Add(l);
-                            }
+                            ParseCodeLines(source.lines, ref lineIndex, output.lines, source,
+                                source.passes[passID], staticPropertyValues, meshToggleCount, arrayPropertyValues);
                         }
                         break;
                 }
