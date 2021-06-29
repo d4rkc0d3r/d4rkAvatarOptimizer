@@ -99,6 +99,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 matchedSkinnedMeshes.Add(new List<SkinnedMeshRenderer> { skinnedMeshRenderer });
             }
         }
+        foreach (var subList in matchedSkinnedMeshes)
+        {
+            if (subList.Count == 1)
+                continue;
+            int max = subList.Max(smr => smr.sharedMesh.blendShapeCount);
+            int index = subList.FindIndex(smr => smr.sharedMesh.blendShapeCount == max);
+            var oldFirst = subList[0];
+            subList[0] = subList[index];
+            subList[index] = oldFirst;
+        }
         return matchedSkinnedMeshes;
     }
     
