@@ -659,18 +659,41 @@ namespace d4rkpl4y3r
                 var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
                 InjectFragmentShaderCode(source, ref sourceLineIndex, func, vertOut.type);
             }
-            else if (arrayPropertyValues.Count > 0 && line.StartsWith("struct "))
+            else if ((arrayPropertyValues.Count > 0 || meshToggleCount > 1) && line.StartsWith("struct "))
             {
                 output.Add(line);
                 var match = Regex.Match(line, @"struct\s+(\w+)");
                 if (match.Success)
                 {
                     var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
-                    if (match.Groups[1].Value == vertOut.type && source[sourceLineIndex + 1] == "{")
+                    if (match.Groups[1].Value == vertOut.type && source[sourceLineIndex + 1] == "{" && arrayPropertyValues.Count > 0)
                     {
                         sourceLineIndex++;
                         output.Add("{");
                         output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                    }
+                    var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+                    if (match.Groups[1].Value == vertIn.type)
+                    {
+                        while (++sourceLineIndex < source.Count)
+                        {
+                            line = source[sourceLineIndex];
+                            match = Regex.Match(line, @"^(\w+\s+)*(\w+)\s+(\w+)\s*:\s*(\w+)\s*;");
+                            if (match.Success)
+                            {
+                                var semantic = match.Groups[4].Value.ToLowerInvariant();
+                                var type = match.Groups[2].Value;
+                                if (semantic == "texcoord" || semantic == "texcoord0")
+                                {
+                                    line = line.Replace(type, "float4");
+                                }
+                            }
+                            output.Add(line);
+                            if (line.StartsWith("}"))
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
             }
