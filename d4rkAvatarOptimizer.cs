@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class d4rkAvatarOptimizer : MonoBehaviour
 {
-    public bool MergeBackFaceCullingWithCullingOff = true;
-    public bool ProfileTimeUsed = true;
+    public bool MergeBackFaceCullingWithCullingOff = false;
+    public bool MergeSameDimensionTextures = false;
+    public bool ProfileTimeUsed = false;
 }

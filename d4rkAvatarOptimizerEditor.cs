@@ -428,8 +428,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                             return false;
                         break;
                     case ParsedShader.Property.Type.Texture2D:
-                        if (mat.GetTexture(prop.name) != candidate.GetTexture(prop.name))
-                            return false;
+                        {
+                            var mTex = mat.GetTexture(prop.name);
+                            var cTex = candidate.GetTexture(prop.name);
+                            if (settings.MergeSameDimensionTextures && cTex != null && mTex != null
+                                && (mTex.height != cTex.height || mTex.width != cTex.width))
+                                return false;
+                            if (!settings.MergeSameDimensionTextures && cTex != mTex)
+                                return false;
+                        }
                         break;
                     default:
                         return false;
@@ -823,6 +830,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         settings.MergeBackFaceCullingWithCullingOff =
             EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
 
+        settings.MergeSameDimensionTextures =
+            EditorGUILayout.Toggle("Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
+
         settings.ProfileTimeUsed =
             EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
 
@@ -844,6 +854,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         root = settings.gameObject;
+        ShaderAnalyzer.ClearParsedShaderCache();
         var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
@@ -875,7 +886,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 for (int j = 0; j < matchedMaterials[i].Count; j++)
                 {
-                    string indent = (i == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
+                    string indent = (i == 0  && j == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
                     EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
                 }
             }
