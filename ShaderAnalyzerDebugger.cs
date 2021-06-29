@@ -59,15 +59,15 @@ public class ShaderAnalyzerDebugger : EditorWindow
             var pass = parsedShader.passes[i];
             GUILayout.Space(10);
             if (pass.vertex != null)
-                GUILayout.Label("#pragma vertex " + pass.vertex);
+                GUILayout.Label("#pragma vertex " + pass.vertex.name);
             if (pass.hull != null)
-                GUILayout.Label("#pragma hull " + pass.hull);
+                GUILayout.Label("#pragma hull " + pass.hull.name);
             if (pass.domain != null)
-                GUILayout.Label("#pragma domain " + pass.domain);
+                GUILayout.Label("#pragma domain " + pass.domain.name);
             if (pass.geometry != null)
-                GUILayout.Label("#pragma geometry " + pass.geometry);
+                GUILayout.Label("#pragma geometry " + pass.geometry.name);
             if (pass.fragment != null)
-                GUILayout.Label("#pragma fragment " + pass.fragment);
+                GUILayout.Label("#pragma fragment " + pass.fragment.name);
         }
 
         GUILayout.Space(20);

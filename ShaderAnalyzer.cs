@@ -31,19 +31,32 @@ namespace d4rkpl4y3r
             public Type type = Type.Unknown;
             public List<string> shaderLabParams = new List<string>();
         }
+        public class Function
+        {
+            public class Parameter
+            {
+                public string type;
+                public string name;
+                public string semantic;
+                public bool isOutput = false;
+                public bool isInput = false;
+            }
+            public string name;
+            public List<Parameter> parameters = new List<Parameter>();
+        }
         public class Pass
         {
-            public string vertex;
-            public string hull;
-            public string domain;
-            public string geometry;
-            public string fragment;
+            public Function vertex;
+            public Function hull;
+            public Function domain;
+            public Function geometry;
+            public Function fragment;
         }
         public string name;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public List<Pass> passes = new List<Pass>();
-        public Dictionary<string, string> functionReturnType = new Dictionary<string, string>();
+        public Dictionary<string, Function> functions = new Dictionary<string, Function>();
     }
 
     public static class ShaderAnalyzer
@@ -280,7 +293,56 @@ namespace d4rkpl4y3r
             return (null, null);
         }
 
-        private static void ParsePragma(string line, ParsedShader.Pass pass)
+        public static ParsedShader.Function ParseFunctionDefinition(List<string> source, ref int lineIndex)
+        {
+            var match = Regex.Match(source[lineIndex], @"^(inline\s+)?(\w+)\s+(\w+)\s*\(");
+            if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
+            {
+                var func = new ParsedShader.Function();
+                func.name = match.Groups[3].Value;
+                var returnParam = new ParsedShader.Function.Parameter();
+                returnParam.isOutput = true;
+                returnParam.name = "return";
+                returnParam.type = match.Groups[2].Value;
+                func.parameters.Add(returnParam);
+                return func;
+            }
+            return null;
+        }
+
+        private static void UpdateFunctionDefinition(ParsedShader.Function func, ParsedShader.Pass pass, string shaderStage = null)
+        {
+            switch (shaderStage)
+            {
+                case "vertex":
+                    pass.vertex = func;
+                    return;
+                case "hull":
+                    pass.hull = func;
+                    return;
+                case "domain":
+                    pass.domain = func;
+                    return;
+                case "geometry":
+                    pass.geometry = func;
+                    return;
+                case "fragment":
+                    pass.fragment = func;
+                    return;
+            }
+            if (func.name == pass.vertex?.name)
+                pass.vertex = func;
+            if (func.name == pass.hull?.name)
+                pass.hull = func;
+            if (func.name == pass.domain?.name)
+                pass.domain = func;
+            if (func.name == pass.geometry?.name)
+                pass.geometry = func;
+            if (func.name == pass.fragment?.name)
+                pass.fragment = func;
+        }
+
+        private static void ParsePragma(string line, ParsedShader.Pass pass, ParsedShader parsedShader)
         {
             if (!line.StartsWith("#pragma "))
                 return;
@@ -288,24 +350,10 @@ namespace d4rkpl4y3r
             var match = Regex.Match(line, @"(vertex|hull|domain|geometry|fragment)\s+(\w+)");
             if (!match.Success)
                 return;
-            switch (match.Groups[1].Value)
-            {
-                case "vertex":
-                    pass.vertex = match.Groups[2].Value;
-                    break;
-                case "hull":
-                    pass.hull = match.Groups[2].Value;
-                    break;
-                case "domain":
-                    pass.domain = match.Groups[2].Value;
-                    break;
-                case "geometry":
-                    pass.geometry = match.Groups[2].Value;
-                    break;
-                case "fragment":
-                    pass.fragment = match.Groups[2].Value;
-                    break;
-            }
+            var funcName = match.Groups[2].Value;
+            parsedShader.functions.TryGetValue(funcName, out ParsedShader.Function func);
+            func = func ?? new ParsedShader.Function() { name = funcName };
+            UpdateFunctionDefinition(func, pass, match.Groups[1].Value);
         }
 
         private static void SemanticParseShader(ParsedShader parsedShader)
@@ -381,12 +429,13 @@ namespace d4rkpl4y3r
                         {
                             state = ParseState.ShaderLab;
                         }
-                        var func = ParseFunctionDefinition(line);
-                        if (func.name != null)
+                        ParsePragma(line, currentPass, parsedShader);
+                        var func = ParseFunctionDefinition(parsedShader.lines, ref lineIndex);
+                        if (func != null)
                         {
-                            parsedShader.functionReturnType[func.name] = func.returnType;
+                            parsedShader.functions[func.name] = func;
+                            UpdateFunctionDefinition(func, currentPass);
                         }
-                        ParsePragma(line, currentPass);
                         break;
                 }
             }
@@ -569,24 +618,23 @@ namespace d4rkpl4y3r
         {
             var line = source[sourceLineIndex];
             var func = meshToggleCount > 0 ? ShaderAnalyzer.ParseFunctionDefinition(line) : (null, null);
-            if (func.name != null && func.name == pass.vertex)
+            if (pass.vertex != null && func.name == pass.vertex.name)
             {
                 InjectVertexShaderCode(source, ref sourceLineIndex, func);
             }
-            else if (func.name != null && func.name == pass.fragment)
+            else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
             {
-                string vertexOutput;
-                parsedShader.functionReturnType.TryGetValue(pass.vertex, out vertexOutput);
-                InjectFragmentShaderCode(source, ref sourceLineIndex, func, vertexOutput);
+                var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+                InjectFragmentShaderCode(source, ref sourceLineIndex, func, vertOut.type);
             }
             else if (arrayPropertyValues.Count > 0 && line.StartsWith("struct "))
             {
                 output.Add(line);
                 var match = Regex.Match(line, @"struct\s+(\w+)");
-                string vertexOutput;
-                if (match.Success && parsedShader.functionReturnType.TryGetValue(pass.vertex, out vertexOutput))
+                if (match.Success)
                 {
-                    if (match.Groups[1].Value == vertexOutput && source[sourceLineIndex + 1] == "{")
+                    var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+                    if (match.Groups[1].Value == vertOut.type && source[sourceLineIndex + 1] == "{")
                     {
                         sourceLineIndex++;
                         output.Add("{");
