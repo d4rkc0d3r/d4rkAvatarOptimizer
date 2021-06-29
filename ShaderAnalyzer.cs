@@ -231,7 +231,7 @@ namespace d4rkpl4y3r
             return true;
         }
 
-        private static ParsedShader.Property ParseProperty(string line)
+        public static ParsedShader.Property ParseProperty(string line)
         {
             string modifiedLine = line;
             int openBracketIndex = line.IndexOf('[');
@@ -490,21 +490,30 @@ namespace d4rkpl4y3r
         private int meshToggleCount;
         private Dictionary<string, string> staticPropertyValues;
         private Dictionary<string, (string type, List<string> values)> arrayPropertyValues;
+        private Dictionary<string, string> texturesToNullCheck;
+        private HashSet<string> texturesToMerge;
+        private HashSet<string> texturesToReplaceCalls;
 
         private ShaderOptimizer() {}
 
         public static List<string> Run(ParsedShader source,
             Dictionary<string, string> staticPropertyValues = null,
             int meshToggleCount = 0,
-            Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null)
+            Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
+            Dictionary<string, string> texturesToNullCheck = null,
+            HashSet<string> texturesToMerge = null)
         {
             var optimizer = new ShaderOptimizer
             {
                 meshToggleCount = meshToggleCount,
                 staticPropertyValues = staticPropertyValues ?? new Dictionary<string, string>(),
                 arrayPropertyValues = arrayPropertyValues ?? new Dictionary<string, (string type, List<string> values)>(),
-                parsedShader = source
+                parsedShader = source,
+                texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
+                texturesToMerge = texturesToMerge ?? new HashSet<string>()
             };
+            optimizer.texturesToReplaceCalls = new HashSet<string>(
+                optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
             return optimizer.Run();
         }
 
@@ -628,21 +637,63 @@ namespace d4rkpl4y3r
 
         private void InjectPropertyArrays()
         {
-            if (arrayPropertyValues.Count == 0)
-                return;
-            output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
-            foreach (var arrayProperty in arrayPropertyValues)
+            output.Add("uniform float d4rkAvatarOptimizer_Zero;");
+            if (arrayPropertyValues.Count > 0)
             {
-                var array = arrayProperty.Value;
-                string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
-                output.Add("static const " + array.type + " " + name + "[" + array.values.Count + "] = ");
-                output.Add("{");
-                for (int i = 0; i < array.values.Count; i++)
+                output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
+                foreach (var arrayProperty in arrayPropertyValues)
                 {
-                    output.Add(array.values[i] + ",");
+                    var array = arrayProperty.Value;
+                    string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
+                    output.Add("static const " + array.type + " " + name + "[" + array.values.Count + "] = ");
+                    output.Add("{");
+                    for (int i = 0; i < array.values.Count; i++)
+                    {
+                        output.Add(array.values[i] + ",");
+                    }
+                    output.Add("};");
+                    output.Add("static " + array.type + " " + arrayProperty.Key + ";");
+                }
+            }
+            if (meshToggleCount > 0)
+            {
+                output.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
+                output.Add("{");
+                output.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
+                for (int i = 0; i < meshToggleCount; i++)
+                {
+                    output.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
                 }
                 output.Add("};");
-                output.Add("static " + array.type + " " + arrayProperty.Key + ";");
+            }
+            foreach (var texture in texturesToMerge)
+            {
+                if (texturesToNullCheck.TryGetValue(texture, out string nullCheck))
+                {
+                    nullCheck = "if (!shouldSample" + texture + ") return " + nullCheck + ";";
+                }
+                output.Add("uniform Texture2DArray " + texture + ";");
+                output.Add("uniform SamplerState sampler" + texture + ";");
+                output.Add("float4 tex2D" + texture + "(float2 uv) {");
+                if (nullCheck != null) output.Add(nullCheck);
+                output.Add("return " + texture + ".Sample(sampler" + texture + ", float3(uv, arrayIndex" + texture + "));}");
+                output.Add("float4 " + texture + "Sample(SamplerState sampl, float2 uv) {");
+                if (nullCheck != null) output.Add(nullCheck);
+                output.Add("return " + texture + ".Sample(sampl, float3(uv, arrayIndex" + texture + "));}");
+            }
+            foreach (var texture in texturesToNullCheck)
+            {
+                if (texturesToMerge.Contains(texture.Key))
+                    continue;
+                var nullCheck = "if (!shouldSample" + texture.Key + ") return " + texture.Value + ";";
+                output.Add("uniform Texture2D " + texture.Key + ";");
+                output.Add("uniform SamplerState sampler" + texture.Key + ";");
+                output.Add("float4 tex2D" + texture.Key + "(float2 uv) {");
+                output.Add(nullCheck);
+                output.Add("return " + texture.Key + ".Sample(sampler" + texture.Key + ", uv);}");
+                output.Add("float4 " + texture.Key + "Sample(SamplerState sampl, float2 uv) {");
+                output.Add(nullCheck);
+                output.Add("return " + texture.Key + ".Sample(sampl, uv);}");
             }
         }
 
@@ -703,19 +754,24 @@ namespace d4rkpl4y3r
                 if (match.Success)
                 {
                     var name = match.Groups[3].Value;
-                    string value;
-                    if (staticPropertyValues.TryGetValue(name, out value))
+                    var type = match.Groups[2].Value;
+                    if (staticPropertyValues.TryGetValue(name, out string value))
                     {
-                        var type = match.Groups[2].Value;
                         output.Add("static " + type + " " + name + " = " + value + ";");
                     }
-                    else if (!arrayPropertyValues.ContainsKey(name))
+                    else if (!arrayPropertyValues.ContainsKey(name) && !texturesToReplaceCalls.Contains(name)
+                        && !(type == "SamplerState" && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
                     {
                         output.Add(line);
                     }
                 }
                 else
                 {
+                    foreach (var texture in texturesToReplaceCalls)
+                    {
+                        line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
+                        line = line.Replace(texture + ".Sample(", texture + "Sample(");
+                    }
                     output.Add(line);
                 }
             }
@@ -740,17 +796,32 @@ namespace d4rkpl4y3r
                         output.Add(line);
                         break;
                     case ParseState.PropertyBlock:
-                        output.Add(line);
                         if (line == "}")
                         {
+                            output.Add(line);
                             state = ParseState.ShaderLab;
                         }
                         else if (line == "{" && meshToggleCount > 0)
                         {
+                            output.Add(line);
                             for (int i = 0; i < meshToggleCount; i++)
                             {
                                 output.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
                             }
+                        }
+                        else if (texturesToMerge.Count > 0)
+                        {
+                            var prop = ShaderAnalyzer.ParseProperty(line);
+                            if (texturesToMerge.Contains(prop.name))
+                            {
+                                int index = line.LastIndexOf("2D");
+                                line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                            }
+                            output.Add(line);
+                        }
+                        else
+                        {
+                            output.Add(line);
                         }
                         break;
                     case ParseState.ShaderLab:
@@ -763,19 +834,7 @@ namespace d4rkpl4y3r
                             state = ParseState.CGProgram;
                             var pass = parsedShader.passes[++passID];
                             output.Add(line);
-                            output.Add("uniform float d4rkAvatarOptimizer_Zero;");
                             InjectPropertyArrays();
-                            if (meshToggleCount > 0)
-                            {
-                                output.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
-                                output.Add("{");
-                                output.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
-                                for (int i = 0; i < meshToggleCount; i++)
-                                {
-                                    output.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
-                                }
-                                output.Add("};");
-                            }
                             for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
                             {
                                 ParseCodeLines(cgInclude, ref includeLineIndex, pass);

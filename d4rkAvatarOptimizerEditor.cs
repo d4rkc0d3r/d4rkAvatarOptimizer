@@ -18,6 +18,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
+    private static List<Material> optimizedMaterials = new List<Material>();
 
     private static void ClearTrashBin()
     {
@@ -293,13 +294,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static Texture2DArray CombineTextures(List<Texture2D> textures)
+    {
+        Profiler.StartSection("CombineTextures()");
+        var texArray = new Texture2DArray(textures[0].width, textures[0].height,
+            textures.Count, textures[0].format, true);
+        texArray.anisoLevel = textures[0].anisoLevel;
+        texArray.wrapMode = textures[0].wrapMode;
+        for (int i = 0; i < textures.Count; i++)
+        {
+            Graphics.CopyTexture(textures[i], 0, texArray, i);
+        }
+        Profiler.EndSection();
+        CreateUniqueAsset(texArray, "texArray.asset");
+        return texArray;
+    }
+
     private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount)
     {
-        var optimizedShaders = new List<(string name, string path, Material source, string cull)>();
+        var materials = new Material[sources.Count];
+        int matIndex = 0;
         foreach (var source in sources)
         {
             var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
             var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
+            var textureArrays = new Dictionary<string, List<Texture2D>>();
             foreach (var mat in source)
             {
                 foreach (var prop in parsedShader.properties)
@@ -339,6 +358,27 @@ public class d4rkAvatarOptimizerEditor : Editor
                         }
                         propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
                     }
+                    if (prop.type == ParsedShader.Property.Type.Texture2D)
+                    {
+                        List<Texture2D> textureArray;
+                        if (!textureArrays.TryGetValue(prop.name, out textureArray))
+                        {
+                            textureArray = new List<Texture2D>();
+                            textureArrays[prop.name] = textureArray;
+                            arrayPropertyValues["arrayIndex" + prop.name] = ("int", new List<string>());
+                            arrayPropertyValues["shouldSample" + prop.name] = ("bool", new List<string>());
+                        }
+                        var tex = mat.GetTexture(prop.name);
+                        var tex2D = tex as Texture2D;
+                        int index = textureArray.IndexOf(tex2D);
+                        if (index == -1 && tex != null)
+                        {
+                            index = textureArray.Count;
+                            textureArray.Add(tex2D);
+                        }
+                        arrayPropertyValues["arrayIndex" + prop.name].values.Add("" + index);
+                        arrayPropertyValues["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
+                    }
                 }
             }
 
@@ -363,8 +403,24 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
+            var texturesToMerge = new HashSet<string>(
+                textureArrays.Where(a => a.Value.Count > 1).Select(a => a.Key));
+
+            var texturesToCheckNull = new Dictionary<string, string>();
+            foreach (var prop in parsedShader.properties)
+            {
+                if (prop.type == ParsedShader.Property.Type.Texture2D)
+                {
+                    if (arrayPropertyValues.ContainsKey("shouldSample" + prop.name))
+                    {
+                        texturesToCheckNull[prop.name] = "float4(1,1,1,1)";
+                    }
+                }
+            }
+
             Profiler.StartSection("ShaderOptimizer.Run()");
-            var optimizedShader = ShaderOptimizer.Run(parsedShader, replace, meshToggleCount, arrayPropertyValues);
+            var optimizedShader = ShaderOptimizer.Run(parsedShader, replace, meshToggleCount,
+                arrayPropertyValues, texturesToCheckNull, texturesToMerge);
             Profiler.EndSection();
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
@@ -372,27 +428,50 @@ public class d4rkAvatarOptimizerEditor : Editor
             name = System.IO.Path.GetFileNameWithoutExtension(path);
             optimizedShader[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
             System.IO.File.WriteAllLines(path, optimizedShader);
-            optimizedShaders.Add((name, path, source[0], cullReplace));
+            var optimizedMaterial = Instantiate(source[0]);
+            if (cullReplace != null)
+            {
+                optimizedMaterial.SetInt(cullReplace, 0);
+            }
+            optimizedMaterial.name = name;
+            materials[matIndex++] = optimizedMaterial;
+            optimizedMaterials.Add(optimizedMaterial);
+            optimizedMaterial.shader = null;
+            foreach (var texArray in textureArrays.Where(t => t.Value.Count > 1))
+            {
+                optimizedMaterial.SetTexture(texArray.Key, CombineTextures(texArray.Value));
+            }
         }
 
+        return materials;
+    }
+
+    private static void SaveOptimizedMaterials()
+    {
         Profiler.StartSection("AssetDatabase.Refresh()");
         AssetDatabase.Refresh();
         Profiler.EndSection();
 
-        var materials = new Material[optimizedShaders.Count];
-        for (int i = 0; i < optimizedShaders.Count; i++)
+        foreach(var mat in optimizedMaterials)
         {
-            var mat = Instantiate(optimizedShaders[i].source);
-            if (optimizedShaders[i].cull != null)
-            {
-                mat.SetInt(optimizedShaders[i].cull, 0);
-            }
-            mat.name = optimizedShaders[i].name;
-            mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(optimizedShaders[i].path);
+            mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
             CreateUniqueAsset(mat, mat.name + ".mat");
-            materials[i] = mat;
         }
-        return materials;
+    }
+
+    private static bool CanCombineTextures(Texture a, Texture b)
+    {
+        if (a == null || b == null)
+            return true;
+        if (a.texelSize != b.texelSize)
+            return false;
+        if (!(a is Texture2D) || !(b is Texture2D))
+            return false;
+        var a2D = a as Texture2D;
+        var b2D = b as Texture2D;
+        if (a2D.format != b2D.format)
+            return false;
+        return true;
     }
 
     private static bool CanCombineWith(List<Material> list, Material candidate)
@@ -431,8 +510,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             var mTex = mat.GetTexture(prop.name);
                             var cTex = candidate.GetTexture(prop.name);
-                            if (settings.MergeSameDimensionTextures && cTex != null && mTex != null
-                                && (mTex.height != cTex.height || mTex.width != cTex.width))
+                            if (settings.MergeSameDimensionTextures && !CanCombineTextures(mTex, cTex))
                                 return false;
                             if (!settings.MergeSameDimensionTextures && cTex != mTex)
                                 return false;
@@ -816,10 +894,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         root = toOptimize;
         ShaderAnalyzer.ClearParsedShaderCache();
         ClearTrashBin();
+        optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths();
         CombineSkinnedMeshes();
         CombineAndOptimizeMaterials();
+        SaveOptimizedMaterials();
         FixAllAnimationPaths();
     }
     
@@ -854,7 +934,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         root = settings.gameObject;
-        ShaderAnalyzer.ClearParsedShaderCache();
         var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
