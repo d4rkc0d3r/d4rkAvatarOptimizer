@@ -343,26 +343,8 @@ namespace d4rkpl4y3r
             return null;
         }
 
-        private static void UpdateFunctionDefinition(ParsedShader.Function func, ParsedShader.Pass pass, string shaderStage = null)
+        private static void UpdateFunctionDefinition(ParsedShader.Function func, ParsedShader.Pass pass)
         {
-            switch (shaderStage)
-            {
-                case "vertex":
-                    pass.vertex = func;
-                    return;
-                case "hull":
-                    pass.hull = func;
-                    return;
-                case "domain":
-                    pass.domain = func;
-                    return;
-                case "geometry":
-                    pass.geometry = func;
-                    return;
-                case "fragment":
-                    pass.fragment = func;
-                    return;
-            }
             if (func.name == pass.vertex?.name)
                 pass.vertex = func;
             if (func.name == pass.hull?.name)
@@ -386,7 +368,24 @@ namespace d4rkpl4y3r
             var funcName = match.Groups[2].Value;
             parsedShader.functions.TryGetValue(funcName, out ParsedShader.Function func);
             func = func ?? new ParsedShader.Function() { name = funcName };
-            UpdateFunctionDefinition(func, pass, match.Groups[1].Value);
+            switch (match.Groups[1].Value)
+            {
+                case "vertex":
+                    pass.vertex = func;
+                    return;
+                case "hull":
+                    pass.hull = func;
+                    return;
+                case "domain":
+                    pass.domain = func;
+                    return;
+                case "geometry":
+                    pass.geometry = func;
+                    return;
+                case "fragment":
+                    pass.fragment = func;
+                    return;
+            }
         }
 
         private static void SemanticParseShader(ParsedShader parsedShader)
