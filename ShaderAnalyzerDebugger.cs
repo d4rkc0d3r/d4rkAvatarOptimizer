@@ -18,6 +18,27 @@ public class ShaderAnalyzerDebugger : EditorWindow
         GetWindow(typeof(ShaderAnalyzerDebugger));
     }
 
+    private static string FuncToString(ParsedShader.Function func)
+    {
+        string s = "";
+        s += func.parameters[0].type + " ";
+        s += func.name + "(";
+        for (int i = 1; i < func.parameters.Count; i++)
+        {
+            var param = func.parameters[i];
+            s += i > 1 ? ", " : "";
+            s += param.type;
+            s += " ";
+            s += param.name;
+            s += param.arraySize > 0 ? "[" + param.arraySize + "]" : "";
+            s += param.semantic == null ? "" : " : " + param.semantic;
+        }
+        s += ")";
+        s += func.parameters[0].semantic == null ? "" : " : " + func.parameters[0].semantic;
+        s += ";";
+        return s;
+    }
+
     public void OnGUI()
     {
         mat = EditorGUILayout.ObjectField("Material", mat, typeof(Material), false) as Material;
@@ -59,15 +80,15 @@ public class ShaderAnalyzerDebugger : EditorWindow
             var pass = parsedShader.passes[i];
             GUILayout.Space(10);
             if (pass.vertex != null)
-                GUILayout.Label("#pragma vertex " + pass.vertex.name);
+                GUILayout.Label("vertex: " + FuncToString(pass.vertex));
             if (pass.hull != null)
-                GUILayout.Label("#pragma hull " + pass.hull.name);
+                GUILayout.Label("hull: " + FuncToString(pass.hull));
             if (pass.domain != null)
-                GUILayout.Label("#pragma domain " + pass.domain.name);
+                GUILayout.Label("domain: " + FuncToString(pass.domain));
             if (pass.geometry != null)
-                GUILayout.Label("#pragma geometry " + pass.geometry.name);
+                GUILayout.Label("geometry: " + FuncToString(pass.geometry));
             if (pass.fragment != null)
-                GUILayout.Label("#pragma fragment " + pass.fragment.name);
+                GUILayout.Label("fragment: " + FuncToString(pass.fragment));
         }
 
         GUILayout.Space(20);

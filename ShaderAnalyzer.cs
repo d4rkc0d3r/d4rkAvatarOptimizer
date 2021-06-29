@@ -40,6 +40,7 @@ namespace d4rkpl4y3r
                 public string semantic;
                 public bool isOutput = false;
                 public bool isInput = false;
+                public int arraySize = 0;
             }
             public string name;
             public List<Parameter> parameters = new List<Parameter>();
@@ -305,6 +306,38 @@ namespace d4rkpl4y3r
                 returnParam.name = "return";
                 returnParam.type = match.Groups[2].Value;
                 func.parameters.Add(returnParam);
+                string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
+                while (lineIndex < source.Count)
+                {
+                    var matches = Regex.Matches(line, @"((in|out|inout)\s+)?((point|line|triangle)\s+)?([\w<>]+)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?");
+                    foreach (Match m in matches)
+                    {
+                        var inout = m.Groups[2].Value;
+                        var geomType = m.Groups[4].Value;
+                        var param = new ParsedShader.Function.Parameter();
+                        param.type = m.Groups[5].Value;
+                        param.name = m.Groups[7].Value;
+                        param.arraySize = m.Groups[9].Value != "" ? int.Parse(m.Groups[9].Value) : 0;
+                        param.semantic = m.Groups[11].Value != "" ? m.Groups[11].Value : null;
+                        param.isInput = inout != "out";
+                        param.isOutput = inout == "out" || inout == "inout";
+                        func.parameters.Add(param);
+                    }
+                    while (source[lineIndex + 1].StartsWith("#"))
+                    {
+                        lineIndex++;
+                    }
+                    if (source[lineIndex + 1] == "{" || line.EndsWith(";"))
+                    {
+                        var m = Regex.Match(line, @"\)\s*:\s*(\w+)");
+                        if (m.Success)
+                        {
+                            returnParam.semantic = m.Groups[1].Value;
+                        }
+                        break;
+                    }
+                    line = source[++lineIndex];
+                }
                 return func;
             }
             return null;
