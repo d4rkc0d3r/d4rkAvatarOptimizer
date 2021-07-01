@@ -526,6 +526,18 @@ namespace d4rkpl4y3r
             }
         }
 
+        private string ReplaceTextureSamples(string line)
+        {
+            foreach (var texture in texturesToReplaceCalls)
+            {
+                line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
+                line = line.Replace("tex2Dlod(" + texture + ",", "tex2Dlod" + texture + "(");
+                line = line.Replace(texture + ".Sample(", texture + "Sample(");
+                line = line.Replace(texture + ".SampleLevel(", texture + "SampleLevel(");
+            }
+            return line;
+        }
+
         private void InjectVertexShaderCode(
             List<string> source,
             ref int sourceLineIndex,
@@ -563,13 +575,12 @@ namespace d4rkpl4y3r
                     : "return (" + outParam.type + ")0;");
                 output.Add("}");
             }
-            if (arrayPropertyValues.Count == 0)
-            {
-                return;
-            }
             sourceLineIndex++;
-            output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
-            InjectArrayPropertyInitialization();
+            if (arrayPropertyValues.Count > 0)
+            {
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
+                InjectArrayPropertyInitialization();
+            }
             int braceDepth = 0;
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
@@ -592,16 +603,18 @@ namespace d4rkpl4y3r
                     output.Add("{");
                     if (isVoidReturn)
                     {
-                        output.Add(outParam.name + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                        if (pass.geometry != null)
+                        if (arrayPropertyValues.Count > 0)
+                            output.Add(outParam.name + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                        if (pass.geometry != null && meshToggleCount > 1)
                             output.Add(outParam.name + ".d4rkAvatarOptimizer_NotCullVert = true;");
                         output.Add("return;");
                     }
                     else
                     {
                         output.Add(outParam.type + " d4rkAvatarOptimizer_vertexOutput = " + line.Substring("return ".Length));
-                        output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                        if (pass.geometry != null)
+                        if (arrayPropertyValues.Count > 0)
+                            output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                        if (pass.geometry != null && meshToggleCount > 1)
                             output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_NotCullVert = true;");
                         output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                     }
@@ -609,7 +622,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(line);
+                    output.Add(ReplaceTextureSamples(line));
                 }
             }
         }
@@ -671,14 +684,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    foreach (var texture in texturesToReplaceCalls)
-                    {
-                        line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
-                        line = line.Replace("tex2Dlod(" + texture + ",", "tex2Dlod" + texture + "(");
-                        line = line.Replace(texture + ".Sample(", texture + "Sample(");
-                        line = line.Replace(texture + ".SampleLevel(", texture + "SampleLevel(");
-                    }
-                    output.Add(line);
+                    output.Add(ReplaceTextureSamples(line));
                 }
             }
         }
@@ -802,20 +808,19 @@ namespace d4rkpl4y3r
                 if (match.Success)
                 {
                     var structName = match.Groups[1].Value;
-                    if (source[sourceLineIndex + 1] == "{" && arrayPropertyValues.Count > 0)
+                    if (source[sourceLineIndex + 1] == "{")
                     {
                         var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
                         if (structName == vertOut.type)
                         {
                             sourceLineIndex++;
                             output.Add("{");
-                            output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
-                            if (pass.geometry != null)
-                            {
+                            if (arrayPropertyValues.Count > 0)
+                                output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                            if (pass.geometry != null && meshToggleCount > 1)
                                 output.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
-                            }
                         }
-                        if (pass.geometry != null)
+                        else if (pass.geometry != null)
                         {
                             var gsOut = pass.geometry.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
                             var gsOutType = gsOut.type.Substring(gsOut.type.IndexOf('<') + 1);
@@ -824,7 +829,8 @@ namespace d4rkpl4y3r
                             {
                                 sourceLineIndex++;
                                 output.Add("{");
-                                output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
+                                if (arrayPropertyValues.Count > 0)
+                                    output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
                             }
                         }
                     }
@@ -872,14 +878,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    foreach (var texture in texturesToReplaceCalls)
-                    {
-                        line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
-                        line = line.Replace("tex2Dlod(" + texture + ",", "tex2Dlod" + texture + "(");
-                        line = line.Replace(texture + ".Sample(", texture + "Sample(");
-                        line = line.Replace(texture + ".SampleLevel(", texture + "SampleLevel(");
-                    }
-                    output.Add(line);
+                    output.Add(ReplaceTextureSamples(line));
                 }
             }
         }
