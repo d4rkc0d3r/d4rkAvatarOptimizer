@@ -487,8 +487,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 return false;
             if (pass.domain != null)
                 return false;
-            if (pass.geometry != null)
-                return false;
             if (pass.fragment == null)
                 return false;
         }
