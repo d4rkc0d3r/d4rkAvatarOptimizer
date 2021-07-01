@@ -666,34 +666,47 @@ namespace d4rkpl4y3r
                 }
                 output.Add("};");
             }
-            foreach (var texture in texturesToMerge)
+            foreach (var texName in texturesToMerge)
             {
-                if (texturesToNullCheck.TryGetValue(texture, out string nullCheck))
+                if (texturesToNullCheck.TryGetValue(texName, out string nullCheck))
                 {
-                    nullCheck = "if (!shouldSample" + texture + ") return " + nullCheck + ";";
+                    nullCheck = "if (!shouldSample" + texName + ") return " + nullCheck + ";";
                 }
-                output.Add("uniform Texture2DArray " + texture + ";");
-                output.Add("uniform SamplerState sampler" + texture + ";");
-                output.Add("float4 tex2D" + texture + "(float2 uv) {");
+                output.Add("uniform Texture2DArray " + texName + ";");
+                output.Add("uniform SamplerState sampler" + texName + ";");
+                output.Add("float4 tex2D" + texName + "(float2 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texture + ".Sample(sampler" + texture + ", float3(uv, arrayIndex" + texture + "));}");
-                output.Add("float4 " + texture + "Sample(SamplerState sampl, float2 uv) {");
+                output.Add("return " + texName + ".Sample(sampler" + texName + ", float3(uv, arrayIndex" + texName + "));}");
+                output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texture + ".Sample(sampl, float3(uv, arrayIndex" + texture + "));}");
+                output.Add("return " + texName + ".Sample(sampler" + texName + ", float3(uv.xy, arrayIndex" + texName + "), uv.w);}");
+                output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
+                if (nullCheck != null) output.Add(nullCheck);
+                output.Add("return " + texName + ".Sample(sampl, float3(uv, arrayIndex" + texName + "));}");
+                output.Add("float4 " + texName + "SampleLevel(SamplerState sampl, float2 uv, int mipLevel) {");
+                if (nullCheck != null) output.Add(nullCheck);
+                output.Add("return " + texName + ".SampleLevel(sampl, float3(uv, arrayIndex" + texName + "), mipLevel);}");
             }
             foreach (var texture in texturesToNullCheck)
             {
+                var texName = texture.Key;
                 if (texturesToMerge.Contains(texture.Key))
                     continue;
-                var nullCheck = "if (!shouldSample" + texture.Key + ") return " + texture.Value + ";";
-                output.Add("uniform Texture2D " + texture.Key + ";");
-                output.Add("uniform SamplerState sampler" + texture.Key + ";");
-                output.Add("float4 tex2D" + texture.Key + "(float2 uv) {");
+                var nullCheck = "if (!shouldSample" + texName + ") return " + texture.Value + ";";
+                output.Add("uniform Texture2D " + texName + ";");
+                output.Add("uniform SamplerState sampler" + texName + ";");
+                output.Add("float4 tex2D" + texName + "(float2 uv) {");
                 output.Add(nullCheck);
-                output.Add("return " + texture.Key + ".Sample(sampler" + texture.Key + ", uv);}");
-                output.Add("float4 " + texture.Key + "Sample(SamplerState sampl, float2 uv) {");
+                output.Add("return " + texName + ".Sample(sampler" + texName + ", uv);}");
+                output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
                 output.Add(nullCheck);
-                output.Add("return " + texture.Key + ".Sample(sampl, uv);}");
+                output.Add("return " + texName + ".Sample(sampler" + texName + ", uv.xy, uv.w);}");
+                output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
+                output.Add(nullCheck);
+                output.Add("return " + texName + ".Sample(sampl, uv);}");
+                output.Add("float4 " + texName + "SampleLevel(SamplerState sampl, float2 uv, int mipLevel) {");
+                output.Add(nullCheck);
+                output.Add("return " + texName + ".SampleLevel(sampl, uv, mipLevel);}");
             }
         }
 
@@ -770,7 +783,9 @@ namespace d4rkpl4y3r
                     foreach (var texture in texturesToReplaceCalls)
                     {
                         line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
+                        line = line.Replace("tex2Dlod(" + texture + ",", "tex2Dlod" + texture + "(");
                         line = line.Replace(texture + ".Sample(", texture + "Sample(");
+                        line = line.Replace(texture + ".SampleLevel(", texture + "SampleLevel(");
                     }
                     output.Add(line);
                 }
