@@ -436,7 +436,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             optimizedMaterial.name = name;
             materials[matIndex++] = optimizedMaterial;
             optimizedMaterials.Add(optimizedMaterial);
+            int renderQueue = optimizedMaterial.renderQueue;
             optimizedMaterial.shader = null;
+            optimizedMaterial.renderQueue = renderQueue;
             foreach (var prop in parsedShader.properties)
             {
                 if (prop.type != ParsedShader.Property.Type.Texture2D)
@@ -460,7 +462,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         foreach(var mat in optimizedMaterials)
         {
+            int renderQueue = mat.renderQueue;
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
+            mat.renderQueue = renderQueue;
             CreateUniqueAsset(mat, mat.name + ".mat");
         }
     }
