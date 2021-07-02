@@ -528,6 +528,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
+    private static void OptimizeMaterialsOnNonSkinnedMeshes()
+    {
+        var meshRenderers = root.GetComponentsInChildren<MeshRenderer>(true);
+        foreach (var meshRenderer in meshRenderers)
+        {
+            var mats = meshRenderer.sharedMaterials.Select(m => new List<Material>() { m }).ToList();
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(mats, 0);
+        }
+    }
+
     private static void CombineAndOptimizeMaterials()
     {
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -903,6 +913,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         CalculateUsedBlendShapePaths();
         CombineSkinnedMeshes();
         CombineAndOptimizeMaterials();
+        OptimizeMaterialsOnNonSkinnedMeshes();
         SaveOptimizedMaterials();
         FixAllAnimationPaths();
     }

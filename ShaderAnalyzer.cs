@@ -307,7 +307,7 @@ namespace d4rkpl4y3r
                 returnParam.type = match.Groups[2].Value;
                 func.parameters.Add(returnParam);
                 string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
-                while (lineIndex < source.Count)
+                while (lineIndex < source.Count - 1)
                 {
                     var matches = Regex.Matches(line, @"((in|out|inout)\s+)?((point|line|triangle)\s+)?([\w<>]+)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?");
                     foreach (Match m in matches)
