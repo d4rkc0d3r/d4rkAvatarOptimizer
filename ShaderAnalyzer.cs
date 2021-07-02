@@ -309,16 +309,16 @@ namespace d4rkpl4y3r
                 string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
                 while (lineIndex < source.Count - 1)
                 {
-                    var matches = Regex.Matches(line, @"((in|out|inout)\s+)?((point|line|triangle)\s+)?([\w<>]+)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?");
+                    var matches = Regex.Matches(line, @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+(<[\w,\s]+>)?)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?");
                     foreach (Match m in matches)
                     {
                         var inout = m.Groups[2].Value;
                         var geomType = m.Groups[4].Value;
                         var param = new ParsedShader.Function.Parameter();
                         param.type = m.Groups[5].Value;
-                        param.name = m.Groups[7].Value;
-                        param.arraySize = m.Groups[9].Value != "" ? int.Parse(m.Groups[9].Value) : 0;
-                        param.semantic = m.Groups[11].Value != "" ? m.Groups[11].Value : null;
+                        param.name = m.Groups[8].Value;
+                        param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : 0;
+                        param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
                         param.isInput = inout != "out";
                         param.isOutput = inout == "out" || inout == "inout";
                         func.parameters.Add(param);
