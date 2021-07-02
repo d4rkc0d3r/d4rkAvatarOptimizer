@@ -754,7 +754,7 @@ namespace d4rkpl4y3r
                 output.Add("return " + texName + ".Sample(sampler" + texName + ", float3(uv, arrayIndex" + texName + "));}");
                 output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texName + ".Sample(sampler" + texName + ", float3(uv.xy, arrayIndex" + texName + "), uv.w);}");
+                output.Add("return " + texName + ".SampleLevel(sampler" + texName + ", float3(uv.xy, arrayIndex" + texName + "), uv.w);}");
                 output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
                 output.Add("return " + texName + ".Sample(sampl, float3(uv, arrayIndex" + texName + "));}");
@@ -775,7 +775,7 @@ namespace d4rkpl4y3r
                 output.Add("return " + texName + ".Sample(sampler" + texName + ", uv);}");
                 output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
                 output.Add(nullCheck);
-                output.Add("return " + texName + ".Sample(sampler" + texName + ", uv.xy, uv.w);}");
+                output.Add("return " + texName + ".SampleLevel(sampler" + texName + ", uv.xy, uv.w);}");
                 output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
                 output.Add(nullCheck);
                 output.Add("return " + texName + ".Sample(sampl, uv);}");
