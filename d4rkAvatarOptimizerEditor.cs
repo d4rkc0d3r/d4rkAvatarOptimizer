@@ -437,12 +437,18 @@ public class d4rkAvatarOptimizerEditor : Editor
             materials[matIndex++] = optimizedMaterial;
             optimizedMaterials.Add(optimizedMaterial);
             optimizedMaterial.shader = null;
+            foreach (var prop in parsedShader.properties)
+            {
+                if (prop.type != ParsedShader.Property.Type.Texture2D)
+                    continue;
+                var tex = source.Select(m => m.GetTexture(prop.name)).FirstOrDefault(t => t != null);
+                optimizedMaterial.SetTexture(prop.name, tex);
+            }
             foreach (var texArray in textureArrays.Where(t => t.Value.Count > 1))
             {
                 optimizedMaterial.SetTexture(texArray.Key, CombineTextures(texArray.Value));
             }
         }
-
         return materials;
     }
 
