@@ -68,10 +68,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
-    private static void AddAnimationPathChange(string pathSource, string nameSource, System.Type typeSource, string pathTarget, string nameTarget, System.Type typeTarget)
+    private static void AddAnimationPathChange((string path, string name, System.Type type) source, (string path, string name, System.Type type) target)
     {
-        AnimationPath source = (pathSource, nameSource, typeSource);
-        AnimationPath target = (pathTarget, nameTarget, typeTarget);
         if (source == target)
             return;
         newAnimationPaths[source] = target;
@@ -686,7 +684,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount);
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0);
         }
     }
 
@@ -801,7 +799,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 Matrix4x4 toWorld = skinnedMesh.bones[0].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[0];
                 var mesh = skinnedMesh.sharedMesh;
-                var t = skinnedMesh.transform;
                 string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
@@ -834,33 +831,36 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             string newMeshName = combinableSkinnedMeshes[0].name;
+            string newPath = GetTransformPathToRoot(combinableSkinnedMeshes[0].transform);
 
             combinedMesh.name = newMeshName;
             CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
-
-            var combinedMeshRenderer = new GameObject();
-            var meshRenderer = combinedMeshRenderer.AddComponent<SkinnedMeshRenderer>();
-            meshRenderer.sharedMesh = combinedMesh;
-            meshRenderer.sharedMaterials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
-            meshRenderer.bones = targetBones.ToArray();
-
+            
+            var meshRenderer = combinableSkinnedMeshes[0];
+            var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+            var blendShapeWeights = new Dictionary<string, float>();
             
             meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                if (meshRenderer.rootBone == null)
-                {
-                    meshRenderer.rootBone = skinnedMesh.rootBone;
-                }
-                if (meshRenderer.probeAnchor == null)
-                {
-                    meshRenderer.probeAnchor = skinnedMesh.probeAnchor;
-                }
                 string oldPath = GetTransformPathToRoot(skinnedMesh.transform);
+                if (combinableSkinnedMeshes.Count > 1)
+                {
+                    var properties = new MaterialPropertyBlock();
+                    if (meshRenderer.HasPropertyBlock())
+                    {
+                        meshRenderer.GetPropertyBlock(properties);
+                    }
+                    properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
+                    properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
+                    meshRenderer.SetPropertyBlock(properties);
+                    AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
+                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                }
                 if (avDescriptor != null)
                 {
                     if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
@@ -870,38 +870,36 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 for (int i = 0; i < skinnedMesh.sharedMesh.blendShapeCount; i++)
                 {
-                    var blendShapeName = skinnedMesh.sharedMesh.GetBlendShapeName(i);
-                    var blendShapeWeight = skinnedMesh.GetBlendShapeWeight(i);
-                    for (int j = 0; j < combinedMesh.blendShapeCount; j++)
-                    {
-                        if (blendShapeName == combinedMesh.GetBlendShapeName(j))
-                        {
-                            meshRenderer.SetBlendShapeWeight(j, blendShapeWeight);
-                            break;
-                        }
-                    }
-                    AddAnimationPathChange(oldPath, "blendShape." + blendShapeName, typeof(SkinnedMeshRenderer),
-                        newMeshName, "blendShape." + blendShapeName, typeof(SkinnedMeshRenderer));
+                    var name = skinnedMesh.sharedMesh.GetBlendShapeName(i);
+                    var weight = skinnedMesh.GetBlendShapeWeight(i);
+                    blendShapeWeights[name] = weight;
+                    AddAnimationPathChange((oldPath, "blendShape." + name, typeof(SkinnedMeshRenderer)),
+                        (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                 }
-                var properties = new MaterialPropertyBlock();
-                if (meshRenderer.HasPropertyBlock())
+                if (meshID++ > 0)
                 {
-                    meshRenderer.GetPropertyBlock(properties);
+                    var obj = skinnedMesh.gameObject;
+                    DestroyImmediate(skinnedMesh);
+                    if (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0)
+                        DestroyImmediate(obj);
                 }
-                properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
-                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
-                meshRenderer.SetPropertyBlock(properties);
-                AddAnimationPathChange(oldPath, "m_IsActive", typeof(GameObject),
-                        newMeshName, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer));
-                DestroyImmediate(skinnedMesh.gameObject);
-                meshID++;
             }
 
-            combinedMeshRenderer.transform.SetParent(root.transform);
-            combinedMeshRenderer.transform.localPosition = Vector3.zero;
-            combinedMeshRenderer.transform.localRotation = Quaternion.identity;
-            combinedMeshRenderer.transform.localScale = Vector3.one;
-            combinedMeshRenderer.name = newMeshName;
+            meshRenderer.sharedMesh = combinedMesh;
+            meshRenderer.sharedMaterials = materials;
+            meshRenderer.bones = targetBones.ToArray();
+
+            foreach (var blendShape in blendShapeWeights)
+            {
+                for (int j = 0; j < combinedMesh.blendShapeCount; j++)
+                {
+                    if (blendShape.Key == combinedMesh.GetBlendShapeName(j))
+                    {
+                        meshRenderer.SetBlendShapeWeight(j, blendShape.Value);
+                        break;
+                    }
+                }
+            }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
@@ -944,11 +942,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
             var copy = Instantiate(settings.gameObject);
+            VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
             Optimize(copy);
-            DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
-            var boneCapsule = copy.GetComponentInChildren<BoneCapsule>(true);
-            if (boneCapsule != null)
-                DestroyImmediate(boneCapsule);
             copy.name = settings.gameObject.name + "(OptimizedCopy)";
             copy.SetActive(true);
             settings.gameObject.SetActive(false);
