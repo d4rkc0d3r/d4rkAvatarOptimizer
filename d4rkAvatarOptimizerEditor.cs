@@ -145,7 +145,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (bone == toMatch)
             {
                 bones.Add(bone);
-                bindPoses.Add(bone.worldToLocalMatrix * root.transform.localToWorldMatrix);
+                bindPoses.Add(bone.worldToLocalMatrix);
                 return bones.Count - 1;
             }
         }
@@ -708,8 +708,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                Matrix4x4 toRoot = root.transform.worldToLocalMatrix
-                    * skinnedMesh.transform.localToWorldMatrix;
+                Matrix4x4 toWorld = skinnedMesh.bones[0].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[0];
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
@@ -721,12 +720,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var sourceWeights = mesh.boneWeights;
                 var sourceBones = skinnedMesh.bones;
 
+                sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
+                sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
+                sourceTangents = sourceTangents.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceTangents;
+
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
                     targetUv.Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
-                    targetVertices.Add(toRoot.MultiplyPoint3x4(sourceVertices[vertIndex]));
-                    targetNormals.Add(toRoot.MultiplyVector(sourceNormals[vertIndex]).normalized);
-                    var t = toRoot.MultiplyVector((Vector3)sourceTangents[vertIndex]);
+                    targetVertices.Add(toWorld.MultiplyPoint3x4(sourceVertices[vertIndex]));
+                    targetNormals.Add(toWorld.MultiplyVector(sourceNormals[vertIndex]).normalized);
+                    var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]);
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
                     var boneWeight = sourceWeights[vertIndex];
                     int newIndex;
@@ -796,8 +799,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int vertexOffset = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                Matrix4x4 toRoot = root.transform.worldToLocalMatrix
-                    * skinnedMesh.transform.localToWorldMatrix;
+                Matrix4x4 toWorld = skinnedMesh.bones[0].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[0];
                 var mesh = skinnedMesh.sharedMesh;
                 var t = skinnedMesh.transform;
                 string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
@@ -818,11 +820,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                         for (int k = 0; k < mesh.vertexCount; k++)
                         {
                             targetDeltaVertices[k + vertexOffset] =
-                                toRoot.MultiplyVector(sourceDeltaVertices[k]);
+                                toWorld.MultiplyVector(sourceDeltaVertices[k]);
                             targetDeltaNormals[k + vertexOffset] =
-                                toRoot.MultiplyVector(sourceDeltaNormals[k]);
+                                toWorld.MultiplyVector(sourceDeltaNormals[k]);
                             targetDeltaTangents[k + vertexOffset] =
-                                toRoot.MultiplyVector(sourceDeltaTangents[k]);
+                                toWorld.MultiplyVector(sourceDeltaTangents[k]);
                         }
                         var weight = mesh.GetBlendShapeFrameWeight(i, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
