@@ -647,16 +647,19 @@ namespace d4rkpl4y3r
                 output.Add("return;");
                 output.Add("}");
             }
-            if (arrayPropertyValues.Count == 0)
-            {
-                return;
-            }
             var outParam = pass.geometry.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
             var outParamType = outParam.type.Substring(outParam.type.IndexOf('<') + 1);
             outParamType = outParamType.Substring(0, outParamType.Length - 1);
+            if (arrayPropertyValues.Count == 0 && (meshToggleCount <= 1 || outParamType != inParam.type))
+            {
+                return;
+            }
             sourceLineIndex++;
-            output.Add("d4rkAvatarOptimizer_MaterialID = " + inParam.name + "[0].d4rkAvatarOptimizer_MaterialID;");
-            InjectArrayPropertyInitialization();
+            if (arrayPropertyValues.Count > 1)
+            {
+                output.Add("d4rkAvatarOptimizer_MaterialID = " + inParam.name + "[0].d4rkAvatarOptimizer_MaterialID;");
+                InjectArrayPropertyInitialization();
+            }
             int braceDepth = 0;
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
@@ -678,7 +681,10 @@ namespace d4rkpl4y3r
                 {
                     output.Add("{");
                     output.Add(outParamType + " d4rkAvatarOptimizer_geomOutput = " + line.Substring(line.IndexOf(".Append(") + 7));
-                    output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                    if (arrayPropertyValues.Count > 1)
+                        output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                    if (meshToggleCount > 1 && outParamType == inParam.type)
+                        output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_NotCullVert = 1;");
                     output.Add(outParam.name + ".Append(d4rkAvatarOptimizer_geomOutput);");
                     output.Add("}");
                 }
@@ -718,16 +724,16 @@ namespace d4rkpl4y3r
                 output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
                 foreach (var arrayProperty in arrayPropertyValues)
                 {
-                    var array = arrayProperty.Value;
+                    var (type, values) = arrayProperty.Value;
                     string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
-                    output.Add("static const " + array.type + " " + name + "[" + array.values.Count + "] = ");
+                    output.Add("static const " + type + " " + name + "[" + values.Count + "] = ");
                     output.Add("{");
-                    for (int i = 0; i < array.values.Count; i++)
+                    for (int i = 0; i < values.Count; i++)
                     {
-                        output.Add(array.values[i] + ",");
+                        output.Add(values[i] + ",");
                     }
                     output.Add("};");
-                    output.Add("static " + array.type + " " + arrayProperty.Key + ";");
+                    output.Add("static " + type + " " + arrayProperty.Key + ";");
                 }
             }
             if (meshToggleCount > 0)
