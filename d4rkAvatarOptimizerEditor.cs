@@ -63,6 +63,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         if (!IsCombinableSkinnedMesh(candidate))
             return false;
+        if (list[0].gameObject.layer != candidate.gameObject.layer)
+            return false;
         return true;
     }
 
