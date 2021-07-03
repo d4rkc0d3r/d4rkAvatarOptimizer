@@ -19,6 +19,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
+    private static HashSet<(string path, int slot)> materialSlotsWithMaterialSwapAnimations = new HashSet<(string, int)>();
+    private static Dictionary<Material, Material> optimizedMaterialSwapMaterial = new Dictionary<Material, Material>();
 
     private static void ClearTrashBin()
     {
@@ -182,10 +184,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         bool changed = false;
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
-            var currentPath = new AnimationPath(binding.path, binding.propertyName, binding.type);
-            AnimationPath modifiedPath;
+            var currentPath = (binding.path, binding.propertyName, binding.type);
             var newBinding = binding;
-            if (newAnimationPaths.TryGetValue(currentPath, out modifiedPath))
+            if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
             {
                 newBinding.path = modifiedPath.Item1;
                 newBinding.propertyName = modifiedPath.Item2;
@@ -194,6 +195,22 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             AnimationUtility.SetEditorCurve(newClip, newBinding,
                 AnimationUtility.GetEditorCurve(clip, binding));
+        }
+        foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+        {
+            var curve = AnimationUtility.GetObjectReferenceCurve(clip, binding);
+            for (int i = 0; i < curve.Length; i++)
+            {
+                var oldMat = curve[i].value as Material;
+                if (oldMat == null)
+                    continue;
+                if (optimizedMaterialSwapMaterial.TryGetValue(oldMat, out var newMat))
+                {
+                    curve[i].value = newMat;
+                    changed = true;
+                }
+            }
+            AnimationUtility.SetObjectReferenceCurve(newClip, binding, curve);
         }
         if (changed)
         {
@@ -242,12 +259,44 @@ public class d4rkAvatarOptimizerEditor : Editor
         AssetDatabase.SaveAssets();
     }
 
+    private static void OptimizeMaterialSwapMaterials()
+    {
+        materialSlotsWithMaterialSwapAnimations.Clear();
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        if (fxLayer == null)
+            return;
+        foreach (var clip in fxLayer.animationClips)
+        {
+            foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+            {
+                if (binding.type != typeof(MeshRenderer)
+                    || !binding.propertyName.StartsWith("m_Materials.Array.data["))
+                    continue;
+                int start = binding.propertyName.IndexOf('[') + 1;
+                int end = binding.propertyName.IndexOf(']') - start;
+                int slot = int.Parse(binding.propertyName.Substring(start, end));
+                materialSlotsWithMaterialSwapAnimations.Add((binding.path, slot));
+                var curve = AnimationUtility.GetObjectReferenceCurve(clip, binding);
+                foreach (var mat in curve.Select(c => c.value as Material).Where(m => m != null))
+                {
+                    if (!optimizedMaterialSwapMaterial.TryGetValue(mat, out var optimizedMaterial))
+                    {
+                        var matWrapper = new List<List<Material>>() { new List<Material>() { mat } };
+                        optimizedMaterialSwapMaterial[mat] = CreateOptimizedMaterials(matWrapper, 0)[0];
+                    }
+                }
+            }
+        }
+    }
+
     private static void CalculateUsedBlendShapePaths()
     {
         usedBlendShapes.Clear();
+        materialSlotsWithMaterialSwapAnimations.Clear();
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
         var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
-        if (avDescriptor == null || fxLayer == null)
+        if (avDescriptor == null)
             return;
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
@@ -917,6 +966,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths();
+        OptimizeMaterialSwapMaterials();
         CombineSkinnedMeshes();
         CombineAndOptimizeMaterials();
         OptimizeMaterialsOnNonSkinnedMeshes();
