@@ -21,6 +21,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<Material> optimizedMaterials = new List<Material>();
     private static Dictionary<(string path, int slot), List<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), List<Material>>();
     private static Dictionary<Material, Material> optimizedMaterialSwapMaterial = new Dictionary<Material, Material>();
+    private static Dictionary<string, HashSet<string>> usedMaterialProperties = new Dictionary<string, HashSet<string>>();
 
     private static void ClearTrashBin()
     {
@@ -294,7 +295,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     if (!optimizedMaterialSwapMaterial.TryGetValue(mat, out var optimizedMaterial))
                     {
                         var matWrapper = new List<List<Material>>() { new List<Material>() { mat } };
-                        optimizedMaterialSwapMaterial[mat] = CreateOptimizedMaterials(matWrapper, 0)[0];
+                        optimizedMaterialSwapMaterial[mat] = CreateOptimizedMaterials(matWrapper, 0, binding.path)[0];
                     }
                 }
             }
@@ -354,6 +355,26 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void CalculateUsedMaterialProperties()
+    {
+        usedMaterialProperties.Clear();
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        if (fxLayer == null)
+            return;
+        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        {
+            if (!binding.propertyName.StartsWith("material.") ||
+                (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
+                continue;
+            if (!usedMaterialProperties.TryGetValue(binding.path, out var props))
+            {
+                usedMaterialProperties[binding.path] = (props = new HashSet<string>());
+            }
+            props.Add(binding.propertyName.Substring("material.".Length));
+        }
+    }
+
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
     {
         Profiler.StartSection("CombineTextures()");
@@ -370,8 +391,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         return texArray;
     }
 
-    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount)
+    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path)
     {
+        if (!usedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
+            usedMaterialProps = new HashSet<string>();
         var materials = new Material[sources.Count];
         int matIndex = 0;
         foreach (var source in sources)
@@ -420,8 +443,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     if (prop.type == ParsedShader.Property.Type.Texture2D)
                     {
-                        List<Texture2D> textureArray;
-                        if (!textureArrays.TryGetValue(prop.name, out textureArray))
+                        if (!textureArrays.TryGetValue(prop.name, out var textureArray))
                         {
                             textureArray = new List<Texture2D>();
                             textureArrays[prop.name] = textureArray;
@@ -456,7 +478,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             var replace = new Dictionary<string, string>();
             foreach (var tuple in arrayPropertyValues.ToList())
             {
-                if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
+                if (usedMaterialProps.Contains(tuple.Key))
+                {
+                    arrayPropertyValues.Remove(tuple.Key);
+                }
+                else if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                     replace[tuple.Key] = tuple.Value.values[0];
@@ -484,10 +510,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.EndSection();
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
-            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
-            name = System.IO.Path.GetFileNameWithoutExtension(path);
+            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
+            name = System.IO.Path.GetFileNameWithoutExtension(shaderFilePath);
             optimizedShader[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
-            System.IO.File.WriteAllLines(path, optimizedShader);
+            System.IO.File.WriteAllLines(shaderFilePath, optimizedShader);
             var optimizedMaterial = Instantiate(source[0]);
             if (cullReplace != null)
             {
@@ -609,7 +635,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             var toOptimize = mats.Select(t => t.material).Where(m => !alreadyOptimizedMaterials.Contains(m)).Distinct().ToList();
             var optimizeMaterialWrapper = toOptimize.Select(m => new List<Material>() { m }).ToList();
-            var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0);
+            var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0, GetTransformPathToRoot(meshRenderer.transform));
             var optimizedMaterials = toOptimize.Select((mat, index) => (mat, index))
                 .ToDictionary(t => t.mat, t => optimizedMaterialsList[t.index]);
             var finalMaterials = new Material[meshRenderer.sharedMaterials.Length];
@@ -770,7 +796,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0);
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, GetTransformPathToRoot(meshRenderer.transform));
         }
     }
 
@@ -1003,6 +1029,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         CalculateUsedBlendShapePaths();
+        CalculateUsedMaterialProperties();
         OptimizeMaterialSwapMaterials();
         CombineSkinnedMeshes();
         CombineAndOptimizeMaterials();
