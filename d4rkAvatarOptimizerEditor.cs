@@ -391,6 +391,17 @@ public class d4rkAvatarOptimizerEditor : Editor
         return texArray;
     }
 
+    private static Matrix4x4 AddWeighted(Matrix4x4 a, Matrix4x4 b, float weight)
+    {
+        if (weight == 0)
+            return a;
+        a.SetRow(0, a.GetRow(0) + b.GetRow(0) * weight);
+        a.SetRow(1, a.GetRow(1) + b.GetRow(1) * weight);
+        a.SetRow(2, a.GetRow(2) + b.GetRow(2) * weight);
+        a.SetRow(3, a.GetRow(3) + b.GetRow(3) * weight);
+        return a;
+    }
+
     private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path)
     {
         if (!usedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
@@ -818,7 +829,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                Matrix4x4 toWorld = skinnedMesh.bones[0].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[0];
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
@@ -829,6 +839,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var sourceTangents = mesh.tangents;
                 var sourceWeights = mesh.boneWeights;
                 var sourceBones = skinnedMesh.bones;
+                var toWorldArray = Enumerable.Range(0, skinnedMesh.bones.Length).Select(i =>
+                    skinnedMesh.bones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
+                    ).ToArray();
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
@@ -837,11 +850,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
                     targetUv.Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
+                    var boneWeight = sourceWeights[vertIndex];
+                    Matrix4x4 toWorld = Matrix4x4.zero;
+                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0);
+                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
+                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
+                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
                     targetVertices.Add(toWorld.MultiplyPoint3x4(sourceVertices[vertIndex]));
                     targetNormals.Add(toWorld.MultiplyVector(sourceNormals[vertIndex]).normalized);
                     var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]);
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
-                    var boneWeight = sourceWeights[vertIndex];
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
                     {
