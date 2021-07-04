@@ -19,7 +19,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
-    private static HashSet<(string path, int slot)> materialSlotsWithMaterialSwapAnimations = new HashSet<(string, int)>();
+    private static Dictionary<(string path, int slot), List<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), List<Material>>();
     private static Dictionary<Material, Material> optimizedMaterialSwapMaterial = new Dictionary<Material, Material>();
 
     private static void ClearTrashBin()
@@ -156,11 +156,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static IEnumerable<AnimatorState> EnumerateAllStates(AnimatorController controller)
     {
+        var queue = new Queue<AnimatorStateMachine>();
         foreach (var layer in controller.layers)
         {
-            var queue = new Queue<AnimatorStateMachine>();
             queue.Enqueue(layer.stateMachine);
-
             while (queue.Count > 0)
             {
                 var stateMachine = queue.Dequeue();
@@ -282,9 +281,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 int start = binding.propertyName.IndexOf('[') + 1;
                 int end = binding.propertyName.IndexOf(']') - start;
                 int slot = int.Parse(binding.propertyName.Substring(start, end));
-                materialSlotsWithMaterialSwapAnimations.Add((binding.path, slot));
+                var index = (binding.path, slot);
                 var curve = AnimationUtility.GetObjectReferenceCurve(clip, binding);
-                foreach (var mat in curve.Select(c => c.value as Material).Where(m => m != null))
+                var materials = curve.Select(c => c.value as Material).Where(m => m != null).Distinct().ToList();
+                if (!materialSlotsWithMaterialSwapAnimations.TryGetValue(index, out var oldMats))
+                {
+                    oldMats = new List<Material>();
+                }
+                materialSlotsWithMaterialSwapAnimations[index] = materials.Union(oldMats).Distinct().ToList();
+                foreach (var mat in materials)
                 {
                     if (!optimizedMaterialSwapMaterial.TryGetValue(mat, out var optimizedMaterial))
                     {
@@ -592,8 +597,34 @@ public class d4rkAvatarOptimizerEditor : Editor
         var meshRenderers = root.GetComponentsInChildren<MeshRenderer>(true);
         foreach (var meshRenderer in meshRenderers)
         {
-            var mats = meshRenderer.sharedMaterials.Select(m => new List<Material>() { m }).ToList();
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(mats, 0);
+            var path = GetTransformPathToRoot(meshRenderer.transform);
+            var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
+            var alreadyOptimizedMaterials = new HashSet<Material>();
+            foreach (var (material, index) in mats)
+            {
+                if (materialSlotsWithMaterialSwapAnimations.TryGetValue((path, index), out var matList))
+                {
+                    alreadyOptimizedMaterials.UnionWith(matList);
+                }
+            }
+            var toOptimize = mats.Select(t => t.material).Where(m => !alreadyOptimizedMaterials.Contains(m)).Distinct().ToList();
+            var optimizeMaterialWrapper = toOptimize.Select(m => new List<Material>() { m }).ToList();
+            var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0);
+            var optimizedMaterials = toOptimize.Select((mat, index) => (mat, index))
+                .ToDictionary(t => t.mat, t => optimizedMaterialsList[t.index]);
+            var finalMaterials = new Material[meshRenderer.sharedMaterials.Length];
+            foreach (var (material, index) in mats)
+            {
+                if (!optimizedMaterials.TryGetValue(material, out var optimized))
+                {
+                    if (!optimizedMaterialSwapMaterial.TryGetValue((Material)material, out optimized))
+                    {
+                        optimized = material;
+                    }
+                }
+                finalMaterials[index] = optimized;
+            }
+            meshRenderer.sharedMaterials = finalMaterials;
         }
     }
 
