@@ -232,6 +232,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         var newFxLayer = (AnimatorController)
             AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
 
+        var optimizedAnims = new Dictionary<AnimationClip, AnimationClip>();
+        foreach (var clip in fxLayer.animationClips.Distinct())
+        {
+            optimizedAnims[clip] = FixAnimationClipPaths(clip);
+        }
+
         foreach (var state in EnumerateAllStates(newFxLayer))
         {
             var clip = state.motion as AnimationClip;
@@ -244,14 +250,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = FixAnimationClipPaths(clip);
+                        childNodes[i].motion = optimizedAnims[clip];
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = FixAnimationClipPaths(clip);
+                state.motion = optimizedAnims[clip];
             }
         }
 
