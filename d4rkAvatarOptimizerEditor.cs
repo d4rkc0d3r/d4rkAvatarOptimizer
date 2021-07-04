@@ -1056,6 +1056,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
             var copy = Instantiate(settings.gameObject);
+            DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
             VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
             Optimize(copy);
             copy.name = settings.gameObject.name + "(OptimizedCopy)";
