@@ -54,6 +54,7 @@ namespace d4rkpl4y3r
             public Function fragment;
         }
         public string name;
+        public bool couldParse = true;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public List<Pass> passes = new List<Pass>();
@@ -82,16 +83,30 @@ namespace d4rkpl4y3r
         {
             if (shader == null)
                 return null;
-            ParsedShader parsedShader;
-            if (!parsedShaderCache.TryGetValue(shader.name, out parsedShader))
+            if (!parsedShaderCache.TryGetValue(shader.name, out var parsedShader))
             {
                 maxIncludes = 50;
                 parsedShader = new ParsedShader();
                 parsedShader.name = shader.name;
                 Profiler.StartSection("ShaderAnalyzer.RecursiveParseFile()");
-                RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
+                try
+                {
+                    RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
+                }
+                catch (IOException)
+                {
+                    parsedShader.couldParse = false;
+                }
                 Profiler.StartNextSection("ShaderAnalyzer.SemanticParseShader()");
-                SemanticParseShader(parsedShader);
+                try
+                {
+                    SemanticParseShader(parsedShader);
+                }
+                catch (System.Exception e)
+                {
+                    parsedShader.couldParse = false;
+                    Debug.LogWarning(e);
+                }
                 Profiler.EndSection();
                 parsedShaderCache[shader.name] = parsedShader;
             }
@@ -142,11 +157,6 @@ namespace d4rkpl4y3r
             catch (FileNotFoundException)
             {
                 return false; //this is probably a unity include file
-            }
-            catch (IOException e)
-            {
-                Debug.LogError("Error reading shader file.  " + e.ToString());
-                return false;
             }
 
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)

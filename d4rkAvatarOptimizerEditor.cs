@@ -52,7 +52,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         foreach (var material in candidate.sharedMaterials)
         {
-            if (material.shader.name == "Standard")
+            if (!ShaderAnalyzer.Parse(material.shader).couldParse)
             {
                 return false;
             }
@@ -411,6 +411,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var source in sources)
         {
             var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
+            if (!parsedShader.couldParse)
+            {
+                materials[matIndex++] = source[0];
+                continue;
+            }
             var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
             var textureArrays = new Dictionary<string, List<Texture2D>>();
             foreach (var mat in source)
@@ -586,6 +591,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (list[0].shader != candidate.shader)
             return false;
         var parsedShader = ShaderAnalyzer.Parse(candidate.shader);
+        if (parsedShader.couldParse == false)
+            return false;
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
