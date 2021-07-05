@@ -103,12 +103,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                 matchedSkinnedMeshes.Add(new List<SkinnedMeshRenderer> { skinnedMeshRenderer });
             }
         }
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
         foreach (var subList in matchedSkinnedMeshes)
         {
             if (subList.Count == 1)
                 continue;
-            int max = subList.Max(smr => smr.sharedMesh.blendShapeCount);
-            int index = subList.FindIndex(smr => smr.sharedMesh.blendShapeCount == max);
+            int index = subList.FindIndex(smr => smr == avDescriptor.VisemeSkinnedMesh);
+            if (index == -1)
+                continue;
             var oldFirst = subList[0];
             subList[0] = subList[index];
             subList[index] = oldFirst;
