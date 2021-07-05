@@ -457,6 +457,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static string GenerateUniqueName(string name, HashSet<string> usedNames)
+    {
+        if (usedNames.Add(name))
+        {
+            return name;
+        }
+        int count = 1;
+        while (!usedNames.Add(name + " " + count))
+        {
+            count++;
+        }
+        return name + " " + count;
+    }
+
     private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path)
     {
         if (!usedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
@@ -1039,6 +1053,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             Profiler.EndSection();
 
+            string newMeshName = combinableSkinnedMeshes[0].name;
+            string newPath = GetTransformPathToRoot(combinableSkinnedMeshes[0].transform);
+            var blendShapeWeights = new Dictionary<string, float>();
+
             var combinedMesh = new Mesh();
             combinedMesh.indexFormat = targetVertices.Count >= 65536
                 ? UnityEngine.Rendering.IndexFormat.UInt32
@@ -1051,6 +1069,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMesh.SetNormals(targetNormals);
             combinedMesh.SetTangents(targetTangents);
             combinedMesh.subMeshCount = targetIndices.Count;
+            combinedMesh.name = newMeshName;
             for (int i = 0; i < targetIndices.Count; i++)
             {
                 combinedMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
@@ -1058,15 +1077,21 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
             int vertexOffset = 0;
+            var usedBlendShapeNames = new HashSet<string>();
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var mesh = skinnedMesh.sharedMesh;
                 string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
-                    var name = mesh.GetBlendShapeName(i);
-                    if (!usedBlendShapes.Contains(path + name))
+                    var oldName = mesh.GetBlendShapeName(i);
+                    if (!usedBlendShapes.Contains(path + oldName))
                         continue;
+                    var name = GenerateUniqueName(oldName, usedBlendShapeNames);
+                    blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(i);
+                    AddAnimationPathChange(
+                        (GetTransformPathToRoot(skinnedMesh.transform), "blendShape." + name, typeof(SkinnedMeshRenderer)),
+                        (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
                     {
                         var sourceDeltaVertices = new Vector3[mesh.vertexCount];
@@ -1092,10 +1117,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             Profiler.EndSection();
 
-            string newMeshName = combinableSkinnedMeshes[0].name;
-            string newPath = GetTransformPathToRoot(combinableSkinnedMeshes[0].transform);
-
-            combinedMesh.name = newMeshName;
             CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
@@ -1104,7 +1125,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = combinableSkinnedMeshes[0];
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-            var blendShapeWeights = new Dictionary<string, float>();
             
             meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
@@ -1129,14 +1149,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                     {
                         avDescriptor.VisemeSkinnedMesh = meshRenderer;
                     }
-                }
-                for (int i = 0; i < skinnedMesh.sharedMesh.blendShapeCount; i++)
-                {
-                    var name = skinnedMesh.sharedMesh.GetBlendShapeName(i);
-                    var weight = skinnedMesh.GetBlendShapeWeight(i);
-                    blendShapeWeights[name] = weight;
-                    AddAnimationPathChange((oldPath, "blendShape." + name, typeof(SkinnedMeshRenderer)),
-                        (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                 }
                 if (meshID++ > 0)
                 {
