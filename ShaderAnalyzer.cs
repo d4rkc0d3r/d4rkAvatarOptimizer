@@ -564,7 +564,7 @@ namespace d4rkpl4y3r
                 line = source[++sourceLineIndex];
                 output.Add(line);
             }
-            if (meshToggleCount > 0)
+            if (meshToggleCount > 1)
             {
                 output.Add("if (d4rkAvatarOptimizer_Zero)");
                 output.Add("{");
@@ -746,7 +746,14 @@ namespace d4rkpl4y3r
                     output.Add("static " + type + " " + arrayProperty.Key + ";");
                 }
             }
-            if (meshToggleCount > 0)
+            foreach (var property in staticPropertyValues)
+            {
+                if (property.Key.StartsWith("arrayIndex") && texturesToMerge.Contains(property.Key.Substring(10)))
+                {
+                    output.Add("static int " + property.Key + " = " + property.Value + ";");
+                }
+            }
+            if (meshToggleCount > 1)
             {
                 output.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
                 output.Add("{");
@@ -923,7 +930,7 @@ namespace d4rkpl4y3r
                             output.Add(line);
                             state = ParseState.ShaderLab;
                         }
-                        else if (line == "{" && meshToggleCount > 0)
+                        else if (line == "{" && meshToggleCount > 1)
                         {
                             output.Add(line);
                             for (int i = 0; i < meshToggleCount; i++)
@@ -934,7 +941,7 @@ namespace d4rkpl4y3r
                         else if (texturesToMerge.Count > 0)
                         {
                             var prop = ShaderAnalyzer.ParseProperty(line);
-                            if (texturesToMerge.Contains(prop.name))
+                            if (texturesToMerge.Contains(prop?.name))
                             {
                                 int index = line.LastIndexOf("2D");
                                 line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);

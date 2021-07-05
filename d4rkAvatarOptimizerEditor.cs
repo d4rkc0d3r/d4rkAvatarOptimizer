@@ -22,7 +22,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<(string path, int slot), List<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), List<Material>>();
     private static Dictionary<Material, Material> optimizedMaterialSwapMaterial = new Dictionary<Material, Material>();
     private static Dictionary<string, HashSet<string>> usedMaterialProperties = new Dictionary<string, HashSet<string>>();
-
+    private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
+    private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
+ 
     private static void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
@@ -389,7 +391,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Graphics.CopyTexture(textures[i], 0, texArray, i);
         }
         Profiler.EndSection();
-        CreateUniqueAsset(texArray, "texArray.asset");
+        CreateUniqueAsset(texArray, textures[0].width + "x" + textures[0].height + "_" + textures[0].format + "_2DArray.asset");
         return texArray;
     }
 
@@ -402,6 +404,57 @@ public class d4rkAvatarOptimizerEditor : Editor
         a.SetRow(2, a.GetRow(2) + b.GetRow(2) * weight);
         a.SetRow(3, a.GetRow(3) + b.GetRow(3) * weight);
         return a;
+    }
+
+    private static void SearchForTextureArrayCreation(List<List<Material>> sources)
+    {
+        foreach (var source in sources)
+        {
+            var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
+            if (!parsedShader.couldParse)
+            {
+                continue;
+            }
+            var propertyTextureLists = new Dictionary<string, List<Texture2D>>();
+            foreach (var mat in source)
+            {
+                foreach (var prop in parsedShader.properties)
+                {
+                    if (!mat.HasProperty(prop.name))
+                        continue;
+                    if (prop.type != ParsedShader.Property.Type.Texture2D)
+                        continue;
+                    if (!propertyTextureLists.TryGetValue(prop.name, out var textureArray))
+                    {
+                        textureArray = new List<Texture2D>();
+                        propertyTextureLists[prop.name] = textureArray;
+                    }
+                    var tex = mat.GetTexture(prop.name);
+                    var tex2D = tex as Texture2D;
+                    int index = textureArray.IndexOf(tex2D);
+                    if (index == -1 && tex2D != null)
+                    {
+                        textureArray.Add(tex2D);
+                    }
+                }
+            }
+            foreach (var texArray in propertyTextureLists.Values.Where(a => a.Count > 1))
+            {
+                List<Texture2D> list = null;
+                foreach (var subList in textureArrayLists)
+                {
+                    if (subList[0].texelSize == texArray[0].texelSize && subList[0].format == texArray[0].format)
+                    {
+                        list = subList;
+                    }
+                }
+                if (list == null)
+                {
+                    textureArrayLists.Add(list = new List<Texture2D>());
+                }
+                list.AddRange(texArray.Except(list));
+            }
+        }
     }
 
     private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path)
@@ -418,8 +471,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 materials[matIndex++] = source[0];
                 continue;
             }
+            var texturesToMerge = new HashSet<string>();
+            var propertyTextureArrayIndex = new Dictionary<string, int>();
             var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
-            var textureArrays = new Dictionary<string, List<Texture2D>>();
             foreach (var mat in source)
             {
                 foreach (var prop in parsedShader.properties)
@@ -461,20 +515,23 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     if (prop.type == ParsedShader.Property.Type.Texture2D)
                     {
-                        if (!textureArrays.TryGetValue(prop.name, out var textureArray))
+                        if (!arrayPropertyValues.TryGetValue("arrayIndex" + prop.name, out var textureArray))
                         {
-                            textureArray = new List<Texture2D>();
-                            textureArrays[prop.name] = textureArray;
                             arrayPropertyValues["arrayIndex" + prop.name] = ("int", new List<string>());
                             arrayPropertyValues["shouldSample" + prop.name] = ("bool", new List<string>());
                         }
                         var tex = mat.GetTexture(prop.name);
                         var tex2D = tex as Texture2D;
-                        int index = textureArray.IndexOf(tex2D);
-                        if (index == -1 && tex != null)
+                        int index = 0;
+                        if (tex2D != null)
                         {
-                            index = textureArray.Count;
-                            textureArray.Add(tex2D);
+                            int texArrayIndex = textureArrayLists.FindIndex(l => l.Contains(tex2D));
+                            if (texArrayIndex != -1)
+                            {
+                                index = textureArrayLists[texArrayIndex].IndexOf(tex2D);
+                                texturesToMerge.Add(prop.name);
+                                propertyTextureArrayIndex[prop.name] = texArrayIndex;
+                            }
                         }
                         arrayPropertyValues["arrayIndex" + prop.name].values.Add("" + index);
                         arrayPropertyValues["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
@@ -506,9 +563,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                     replace[tuple.Key] = tuple.Value.values[0];
                 }
             }
-
-            var texturesToMerge = new HashSet<string>(
-                textureArrays.Where(a => a.Value.Count > 1).Select(a => a.Key));
 
             var texturesToCheckNull = new Dictionary<string, string>();
             foreach (var prop in parsedShader.properties)
@@ -550,9 +604,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var tex = source.Select(m => m.GetTexture(prop.name)).FirstOrDefault(t => t != null);
                 optimizedMaterial.SetTexture(prop.name, tex);
             }
-            foreach (var texArray in textureArrays.Where(t => t.Value.Count > 1))
+            foreach (var texArray in propertyTextureArrayIndex)
             {
-                optimizedMaterial.SetTexture(texArray.Key, CombineTextures(texArray.Value));
+                optimizedMaterial.SetTexture(texArray.Key, textureArrays[texArray.Value]);
             }
         }
         return materials;
@@ -674,6 +728,51 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void CreateTextureArrays()
+    {
+        textureArrayLists.Clear();
+        textureArrays.Clear();
+
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var meshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = meshRenderer.sharedMesh;
+
+            if (mesh == null)
+                continue;
+
+            var matchedMaterials = new List<List<Material>>();
+            var matchedMaterialsIndex = new List<List<int>>();
+            for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
+            {
+                var material = meshRenderer.sharedMaterials[i];
+                bool foundMatch = false;
+                for (int j = 0; j < matchedMaterials.Count; j++)
+                {
+                    if (CanCombineWith(matchedMaterials[j], material))
+                    {
+                        matchedMaterials[j].Add(material);
+                        matchedMaterialsIndex[j].Add(i);
+                        foundMatch = true;
+                        break;
+                    }
+                }
+                if (!foundMatch)
+                {
+                    matchedMaterials.Add(new List<Material> { material });
+                    matchedMaterialsIndex.Add(new List<int> { i });
+                }
+            }
+
+            SearchForTextureArrayCreation(matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList());
+        }
+
+        foreach (var textureList in textureArrayLists)
+        {
+            textureArrays.Add(CombineTextures(textureList));
+        }
+    }
+    
     private static void CombineAndOptimizeMaterials()
     {
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -1084,6 +1183,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         CalculateUsedMaterialProperties();
         OptimizeMaterialSwapMaterials();
         CombineSkinnedMeshes();
+        CreateTextureArrays();
         CombineAndOptimizeMaterials();
         OptimizeMaterialsOnNonSkinnedMeshes();
         SaveOptimizedMaterials();
