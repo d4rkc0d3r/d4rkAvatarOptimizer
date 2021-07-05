@@ -654,7 +654,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (!optimizedMaterials.TryGetValue(material, out var optimized))
                 {
-                    if (!optimizedMaterialSwapMaterial.TryGetValue((Material)material, out optimized))
+                    if (!optimizedMaterialSwapMaterial.TryGetValue(material, out optimized))
                     {
                         optimized = material;
                     }
@@ -825,7 +825,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             var targetTangents = new List<Vector4>();
             var targetWeights = new List<BoneWeight>();
             var targetBindPoses = new List<Matrix4x4>();
+            var sourceToWorld = new List<Matrix4x4>();
 
+            Profiler.StartSection("CombineMeshData");
             int meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
@@ -856,6 +858,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
+                    sourceToWorld.Add(toWorld);
                     targetVertices.Add(toWorld.MultiplyPoint3x4(sourceVertices[vertIndex]));
                     targetNormals.Add(toWorld.MultiplyVector(sourceNormals[vertIndex]).normalized);
                     var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]);
@@ -906,6 +909,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
                 meshID++;
             }
+            Profiler.EndSection();
 
             var combinedMesh = new Mesh();
             combinedMesh.indexFormat = targetVertices.Count >= 65536
@@ -924,10 +928,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 combinedMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
             }
 
+            Profiler.StartSection("CopyCombinedMeshBlendShapes");
             int vertexOffset = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                Matrix4x4 toWorld = skinnedMesh.bones[0].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[0];
                 var mesh = skinnedMesh.sharedMesh;
                 string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
@@ -946,12 +950,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                         var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
                         for (int k = 0; k < mesh.vertexCount; k++)
                         {
-                            targetDeltaVertices[k + vertexOffset] =
-                                toWorld.MultiplyVector(sourceDeltaVertices[k]);
-                            targetDeltaNormals[k + vertexOffset] =
-                                toWorld.MultiplyVector(sourceDeltaNormals[k]);
-                            targetDeltaTangents[k + vertexOffset] =
-                                toWorld.MultiplyVector(sourceDeltaTangents[k]);
+                            int vertIndex = k + vertexOffset;
+                            var toWorld = sourceToWorld[vertIndex];
+                            targetDeltaVertices[vertIndex] = toWorld.MultiplyVector(sourceDeltaVertices[k]);
+                            targetDeltaNormals[vertIndex] = toWorld.MultiplyVector(sourceDeltaNormals[k]);
+                            targetDeltaTangents[vertIndex] = toWorld.MultiplyVector(sourceDeltaTangents[k]);
                         }
                         var weight = mesh.GetBlendShapeFrameWeight(i, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
@@ -959,6 +962,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 vertexOffset += mesh.vertexCount;
             }
+            Profiler.EndSection();
 
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetTransformPathToRoot(combinableSkinnedMeshes[0].transform);
