@@ -820,6 +820,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static Vector3 ComponentMultiply(Vector3 vec, float x, float y, float z)
+    {
+        vec.x *= x;
+        vec.y *= y;
+        vec.z *= z;
+        return vec;
+    }
+
     private static void CombineSkinnedMeshes()
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
@@ -835,6 +843,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             var targetWeights = new List<BoneWeight>();
             var targetBindPoses = new List<Matrix4x4>();
             var sourceToWorld = new List<Matrix4x4>();
+            var targetBounds = combinableSkinnedMeshes[0].localBounds;
+            var toLocal = combinableSkinnedMeshes[0].rootBone.worldToLocalMatrix;
 
             Profiler.StartSection("CombineMeshData");
             int meshID = 0;
@@ -853,6 +863,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var toWorldArray = Enumerable.Range(0, skinnedMesh.bones.Length).Select(i =>
                     skinnedMesh.bones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
                     ).ToArray();
+                var aabb = skinnedMesh.localBounds;
+                var m = toLocal * skinnedMesh.rootBone.localToWorldMatrix;
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, -1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, -1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, 1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, 1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, -1) + aabb.center));
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
@@ -1031,6 +1051,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.sharedMesh = combinedMesh;
             meshRenderer.sharedMaterials = materials;
             meshRenderer.bones = targetBones.ToArray();
+            meshRenderer.localBounds = targetBounds;
 
             foreach (var blendShape in blendShapeWeights)
             {
