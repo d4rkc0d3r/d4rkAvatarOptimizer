@@ -539,18 +539,16 @@ namespace d4rkpl4y3r
 
         private string ReplaceTextureSamples(string line)
         {
-            foreach (var texture in texturesToReplaceCalls)
-            {
-                line = line.Replace("tex2D(" + texture + ",", "tex2D" + texture + "(");
-                line = line.Replace("tex2Dlod(" + texture + ",", "tex2Dlod" + texture + "(");
-                line = line.Replace("tex2Dgrad(" + texture + ",", "tex2Dgrad" + texture + "(");
-                line = line.Replace("tex2Dbias(" + texture + ",", "tex2Dbias" + texture + "(");
-                line = line.Replace("tex2Dproj(" + texture + ",", "tex2Dproj" + texture + "(");
-                line = line.Replace(texture + ".Sample(", texture + "Sample(");
-                line = line.Replace(texture + ".SampleLevel(", texture + "SampleLevel(");
-                line = line.Replace(texture + ".SampleGrad(", texture + "SampleGrad(");
-                line = line.Replace(texture + ".SampleBias(", texture + "SampleBias(");
-            }
+            if (texturesToReplaceCalls.Count == 0)
+                return line;
+            line = Regex.Replace(line, @"tex2D(\w*)\s*\(\s*(\w+)\s*,", match => 
+                texturesToReplaceCalls.Contains(match.Groups[2].Value)
+                ? "tex2D" + match.Groups[1].Value + match.Groups[2].Value + "("
+                : match.Value);
+            line = Regex.Replace(line, @"(\w+)\s*\.\s*Sample(\w*)\s*\(", match => 
+                texturesToReplaceCalls.Contains(match.Groups[1].Value)
+                ? match.Groups[1].Value + "Sample" + match.Groups[2].Value + "("
+                : match.Value);
             return line;
         }
 
@@ -779,7 +777,7 @@ namespace d4rkpl4y3r
                 }
                 output.Add("};");
             }
-            foreach (var texName in texturesToMerge.Union(texturesToNullCheck.Keys).Distinct())
+            foreach (var texName in texturesToReplaceCalls)
             {
                 if (texturesToNullCheck.TryGetValue(texName, out string nullCheck))
                 {
