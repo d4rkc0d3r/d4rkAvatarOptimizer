@@ -503,6 +503,7 @@ namespace d4rkpl4y3r
         private Dictionary<string, string> texturesToNullCheck;
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
+        private string vertexInUv0Member;
 
         private ShaderOptimizer() {}
 
@@ -555,9 +556,18 @@ namespace d4rkpl4y3r
         {
             string line = source[sourceLineIndex];
             var outParam = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+            var inParam = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
             var isVoidReturn = pass.vertex.parameters[0].type == "void";
             output.Add(line.Substring(0, line.IndexOf('(') + 1));
-            output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0,");
+            string uv0Name = "d4rkAvatarOptimizer_UV0";
+            if (inParam == null)
+            {
+                output.Add("float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0" + (pass.vertex.parameters.Count > 1 ? "," : ""));
+            }
+            else
+            {
+                uv0Name = inParam.name + "." + vertexInUv0Member;
+            }
             output.Add(line.Substring(line.IndexOf('(') + 1));
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
@@ -578,7 +588,7 @@ namespace d4rkpl4y3r
                     ? "if (val) { " + outParam.name + " = (" + outParam.type + ")0; return; }"
                     : "if (val) return (" + outParam.type + ")0;");
                 output.Add("}");
-                output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_UV0.z])");
+                output.Add("if (!_IsActiveMesh[" + uv0Name + ".z])");
                 output.Add("{");
                 output.Add(isVoidReturn
                     ? outParam.name + " = (" + outParam.type + ")0;return;"
@@ -588,7 +598,7 @@ namespace d4rkpl4y3r
             sourceLineIndex++;
             if (arrayPropertyValues.Count > 0)
             {
-                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_UV0.w;");
+                output.Add("d4rkAvatarOptimizer_MaterialID = " + uv0Name + ".w;");
                 InjectArrayPropertyInitialization();
             }
             int braceDepth = 0;
@@ -600,7 +610,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     if (braceDepth-- == 0)
                     {
-                        return;
+                        break;
                     }
                 }
                 else if (line == "{")
@@ -858,8 +868,9 @@ namespace d4rkpl4y3r
                         }
                     }
                     var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-                    if (structName == vertIn.type)
+                    if (structName == vertIn?.type)
                     {
+                        bool hasUv0 = false;
                         while (++sourceLineIndex < source.Count)
                         {
                             line = source[sourceLineIndex];
@@ -871,13 +882,20 @@ namespace d4rkpl4y3r
                                 if (semantic == "texcoord" || semantic == "texcoord0")
                                 {
                                     line = line.Replace(type, "float4");
+                                    vertexInUv0Member = match.Groups[3].Value;
+                                    hasUv0 = true;
                                 }
                             }
-                            output.Add(line);
                             if (line.StartsWith("}"))
                             {
+                                if (!hasUv0)
+                                {
+                                    output.Add("float4 texcoord : TEXCOORD0;");
+                                }
+                                output.Add(line);
                                 break;
                             }
+                            output.Add(line);
                         }
                     }
                 }
@@ -963,6 +981,7 @@ namespace d4rkpl4y3r
                             state = ParseState.CGProgram;
                             var pass = parsedShader.passes[++passID];
                             output.Add(line);
+                            vertexInUv0Member = "texcoord";
                             InjectPropertyArrays();
                             for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
                             {
