@@ -1212,6 +1212,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         ClearTrashBin();
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
+        texArrayPropertiesToSet.Clear();
         CalculateUsedBlendShapePaths();
         CalculateUsedMaterialProperties();
         OptimizeMaterialSwapMaterials();

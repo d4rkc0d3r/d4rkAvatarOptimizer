@@ -164,9 +164,21 @@ namespace d4rkpl4y3r
                 string trimmedLine = rawLines[lineIndex].Trim();
                 if (trimmedLine == "")
                     continue;
+                bool isPreprocessor = trimmedLine.StartsWith("#");
+                while (trimmedLine.EndsWith("\\"))
+                {
+                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd() + " " + rawLines[++lineIndex].Trim();
+                }
                 for (int i = 0; i < trimmedLine.Length - 1; i++)
                 {
-                    if (trimmedLine[i] == '"')
+                    if (!isPreprocessor && trimmedLine[i] == ';')
+                    {
+                        processedLines.Add(trimmedLine.Substring(0, i + 1));
+                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart();
+                        i = -1;
+                        continue;
+                    }
+                    else if (trimmedLine[i] == '"')
                     {
                         int end = FindEndOfStringLiteral(trimmedLine, i + 1);
                         i = (end == -1) ? trimmedLine.Length : end;
@@ -504,6 +516,7 @@ namespace d4rkpl4y3r
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
         private string vertexInUv0Member;
+        private HashSet<string> texturesToCallSoTheSamplerDoesntDissapear;
 
         private ShaderOptimizer() {}
 
@@ -521,7 +534,8 @@ namespace d4rkpl4y3r
                 arrayPropertyValues = arrayPropertyValues ?? new Dictionary<string, (string type, List<string> values)>(),
                 parsedShader = source,
                 texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
-                texturesToMerge = texturesToMerge ?? new HashSet<string>()
+                texturesToMerge = texturesToMerge ?? new HashSet<string>(),
+                texturesToCallSoTheSamplerDoesntDissapear = new HashSet<string>()
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -730,12 +744,27 @@ namespace d4rkpl4y3r
                 line = source[++sourceLineIndex];
                 output.Add(line);
             }
+            var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+            if (texturesToCallSoTheSamplerDoesntDissapear.Count > 0)
+            {
+                output.Add("if (d4rkAvatarOptimizer_Zero)");
+                output.Add("{");
+                output.Add("float d4rkAvatarOptimizer_sum = 0;");
+                foreach (var tex in texturesToCallSoTheSamplerDoesntDissapear)
+                {
+                    output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Load(0);");
+                }
+                output.Add(pass.vertex.parameters[0].type == "void"
+                    ? "if (d4rkAvatarOptimizer_sum) { " + outParam.name + " = (" + outParam.type + ")0; return; }"
+                    : "if (d4rkAvatarOptimizer_sum) return (" + outParam.type + ")0;");
+                output.Add("}");
+            }
             if (arrayPropertyValues.Count == 0)
             {
                 return;
             }
-            var fragIn = pass.fragment.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-            output.Add("d4rkAvatarOptimizer_MaterialID = " + fragIn.name + ".d4rkAvatarOptimizer_MaterialID;");
+            var inParam = pass.fragment.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+            output.Add("d4rkAvatarOptimizer_MaterialID = " + inParam.name + ".d4rkAvatarOptimizer_MaterialID;");
             InjectArrayPropertyInitialization();
         }
 
@@ -793,7 +822,10 @@ namespace d4rkpl4y3r
                 {
                     newTexName = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                     output.Add("#define _MainTex_ST _MainTexButNotQuiteSoThatUnityDoesntCry_ST");
+                    output.Add("#define sampler_MainTex sampler_MainTexButNotQuiteSoThatUnityDoesntCry");
                 }
+
+                texturesToCallSoTheSamplerDoesntDissapear.Add(newTexName);
 
                 output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
                 output.Add("uniform SamplerState sampler" + newTexName + ";");
@@ -923,7 +955,13 @@ namespace d4rkpl4y3r
                 {
                     var name = match.Groups[3].Value;
                     var type = match.Groups[2].Value;
-                    if (staticPropertyValues.TryGetValue(name, out string value))
+                    if (type == "SamplerState" && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                    {
+                        if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
+                            texturesToCallSoTheSamplerDoesntDissapear.Add(name.Substring("sampler".Length));
+                        output.Add(line);
+                    }
+                    else if (staticPropertyValues.TryGetValue(name, out string value))
                     {
                         output.Add("static " + type + " " + name + " = " + value + ";");
                     }
@@ -1000,6 +1038,7 @@ namespace d4rkpl4y3r
                             var pass = parsedShader.passes[++passID];
                             output.Add(line);
                             vertexInUv0Member = "texcoord";
+                            texturesToCallSoTheSamplerDoesntDissapear.Clear();
                             InjectPropertyArrays();
                             for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
                             {
