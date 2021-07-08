@@ -784,9 +784,10 @@ namespace d4rkpl4y3r
                     nullCheck = "if (!shouldSample" + texName + ") return " + nullCheck + ";";
                 }
 
-                string uv = texturesToMerge.Contains(texName) ? "float3(uv, arrayIndex" + texName + ")" : "uv";
+                bool isArray = texturesToMerge.Contains(texName);
+                string uv = isArray ? "float3(uv, arrayIndex" + texName + ")" : "uv";
 
-                output.Add("uniform Texture2DArray " + texName + ";");
+                output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + texName + ";");
                 output.Add("uniform SamplerState sampler" + texName + ";");
 
                 output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
