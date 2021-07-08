@@ -787,42 +787,50 @@ namespace d4rkpl4y3r
                 bool isArray = texturesToMerge.Contains(texName);
                 string uv = isArray ? "float3(uv, arrayIndex" + texName + ")" : "uv";
 
-                output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + texName + ";");
-                output.Add("uniform SamplerState sampler" + texName + ";");
+                string newTexName = texName;
+
+                if (isArray && texName == "_MainTex")
+                {
+                    newTexName = "_MainTexButNotQuiteSoThatUnityDoesntCry";
+                    output.Add("#define _MainTex_ST _MainTexButNotQuiteSoThatUnityDoesntCry_ST");
+                }
+
+                output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
+                output.Add("uniform SamplerState sampler" + newTexName + ";");
 
                 output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texName + ".Sample(sampl, " + uv + ");}");
+                output.Add("return " + newTexName + ".Sample(sampl, " + uv + ");}");
 
                 output.Add("float4 " + texName + "SampleGrad(SamplerState sampl, float2 uv, float2 ddxuv, float2 ddyuv) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texName + ".SampleGrad(sampl, " + uv + ", ddxuv, ddyuv);}");
+                output.Add("return " + newTexName + ".SampleGrad(sampl, " + uv + ", ddxuv, ddyuv);}");
 
                 output.Add("float4 " + texName + "SampleLevel(SamplerState sampl, float2 uv, int mipLevel) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texName + ".SampleLevel(sampl, " + uv + ", mipLevel);}");
+                output.Add("return " + newTexName + ".SampleLevel(sampl, " + uv + ", mipLevel);}");
 
                 output.Add("float4 " + texName + "SampleBias(SamplerState sampl, float2 uv, float bias) {");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + texName + ".SampleBias(sampl, " + uv + ", bias);}");
+                output.Add("return " + newTexName + ".SampleBias(sampl, " + uv + ", bias);}");
 
                 output.Add("float4 tex2D" + texName + "(float2 uv) {");
-                output.Add("return " + texName + "Sample(sampler" + texName + ", uv);}");
+                output.Add("return " + texName + "Sample(sampler" + newTexName + ", uv);}");
 
                 output.Add("float4 tex2Dproj" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "Sample(sampler" + texName + ", uv.xy / uv.w);}");
+                output.Add("return " + texName + "Sample(sampler" + newTexName + ", uv.xy / uv.w);}");
 
                 output.Add("float4 tex2D" + texName + "(float2 uv, float2 ddxuv, float2 ddyuv) {");
-                output.Add("return " + texName + "SampleGrad(sampler" + texName + ", uv, ddxuv, ddyuv);}");
+                output.Add("return " + texName + "SampleGrad(sampler" + newTexName + ", uv, ddxuv, ddyuv);}");
 
                 output.Add("float4 tex2Dgrad" + texName + "(float2 uv, float2 ddxuv, float2 ddyuv) {");
-                output.Add("return " + texName + "SampleGrad(sampler" + texName + ", uv, ddxuv, ddyuv);}");
+                output.Add("return " + texName + "SampleGrad(sampler" + newTexName + ", uv, ddxuv, ddyuv);}");
 
                 output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "SampleLevel(sampler" + texName + ", uv.xy, uv.w);}");
+                output.Add("return " + texName + "SampleLevel(sampler" + newTexName + ", uv.xy, uv.w);}");
 
                 output.Add("float4 tex2Dbias" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "SampleBias(sampler" + texName + ", uv.xy, uv.w);}");
+                output.Add("return " + texName + "SampleBias(sampler" + newTexName + ", uv.xy, uv.w);}");
             }
         }
 
@@ -971,6 +979,8 @@ namespace d4rkpl4y3r
                             {
                                 int index = line.LastIndexOf("2D");
                                 line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                                if (prop.name == "_MainTex")
+                                    line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
                             }
                             output.Add(line);
                         }

@@ -24,6 +24,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<string, HashSet<string>> usedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
+    private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
  
     private static void ClearTrashBin()
     {
@@ -618,9 +619,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var tex = source.Select(m => m.GetTexture(prop.name)).FirstOrDefault(t => t != null);
                 optimizedMaterial.SetTexture(prop.name, tex);
             }
+            var arrayList = new List<(string name, Texture2DArray array)>();
             foreach (var texArray in propertyTextureArrayIndex)
             {
-                optimizedMaterial.SetTexture(texArray.Key, textureArrays[texArray.Value]);
+                optimizedMaterial.SetTexture(texArray.Key, null);
+                arrayList.Add((texArray.Key, textureArrays[texArray.Value]));
+            }
+            if (arrayList.Count > 0)
+            {
+                texArrayPropertiesToSet[optimizedMaterial] = arrayList;
             }
         }
         return materials;
@@ -637,6 +644,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             int renderQueue = mat.renderQueue;
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
             mat.renderQueue = renderQueue;
+            if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
+            {
+                foreach (var texArray in texArrays)
+                {
+                    string texArrayName = texArray.name;
+                    if (texArrayName == "_MainTex")
+                    {
+                        texArrayName = "_MainTexButNotQuiteSoThatUnityDoesntCry";
+                    }
+                    mat.SetTexture(texArrayName, texArray.array);
+                    mat.SetTextureOffset(texArrayName, mat.GetTextureOffset(texArray.name));
+                    mat.SetTextureScale(texArrayName, mat.GetTextureScale(texArray.name));
+                }
+            }
             CreateUniqueAsset(mat, mat.name + ".mat");
         }
     }
