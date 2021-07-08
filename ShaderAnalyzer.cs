@@ -21,7 +21,7 @@ namespace d4rkpl4y3r
                 Unknown,
                 Color,
                 Float,
-                Float4,
+                Vector,
                 Int,
                 Int4,
                 Texture2D,
@@ -169,11 +169,20 @@ namespace d4rkpl4y3r
                 {
                     trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd() + " " + rawLines[++lineIndex].Trim();
                 }
-                for (int i = 0; i < trimmedLine.Length - 1; i++)
+                for (int i = 0; i < trimmedLine.Length; i++)
                 {
                     if (!isPreprocessor && trimmedLine[i] == ';')
                     {
                         processedLines.Add(trimmedLine.Substring(0, i + 1));
+                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart();
+                        i = -1;
+                        continue;
+                    }
+                    else if (!isPreprocessor && (trimmedLine[i] == '{' || trimmedLine[i] == '}'))
+                    {
+                        if (i != 0)
+                            processedLines.Add(trimmedLine.Substring(0, i).TrimEnd());
+                        processedLines.Add(trimmedLine[i].ToString());
                         trimmedLine = trimmedLine.Substring(i + 1).TrimStart();
                         i = -1;
                         continue;
@@ -184,7 +193,7 @@ namespace d4rkpl4y3r
                         i = (end == -1) ? trimmedLine.Length : end;
                         continue;
                     }
-                    else if (trimmedLine[i] != '/')
+                    else if (trimmedLine[i] != '/' || i == trimmedLine.Length - 1)
                     {
                         continue;
                     }
@@ -240,14 +249,6 @@ namespace d4rkpl4y3r
                     }
                     continue;
                 }
-                if (trimmedLine.EndsWith("{"))
-                {
-                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd();
-                    if (trimmedLine != "")
-                        processedLines.Add(trimmedLine);
-                    processedLines.Add("{");
-                    continue;
-                }
                 processedLines.Add(trimmedLine);
             }
             return true;
@@ -280,24 +281,28 @@ namespace d4rkpl4y3r
                 int quoteIndex = modifiedLine.IndexOf('"', parentheses);
                 quoteIndex = FindEndOfStringLiteral(modifiedLine, quoteIndex + 1);
                 int colonIndex = modifiedLine.IndexOf(',', quoteIndex + 1);
-                modifiedLine = modifiedLine.Substring(colonIndex + 1).TrimStart();
-                if (modifiedLine.StartsWith("Range") || modifiedLine.StartsWith("Float"))
+                modifiedLine = modifiedLine.Substring(colonIndex + 1).TrimStart().ToLowerInvariant();
+                if (modifiedLine.StartsWith("range") || modifiedLine.StartsWith("float"))
                 {
                     output.type = ParsedShader.Property.Type.Float;
                 }
-                else if (modifiedLine.StartsWith("Int"))
+                else if (modifiedLine.StartsWith("vector"))
+                {
+                    output.type = ParsedShader.Property.Type.Vector;
+                }
+                else if (modifiedLine.StartsWith("int"))
                 {
                     output.type = ParsedShader.Property.Type.Int;
                 }
-                else if (modifiedLine.StartsWith("Color"))
+                else if (modifiedLine.StartsWith("color"))
                 {
                     output.type = ParsedShader.Property.Type.Color;
                 }
-                else if (modifiedLine.StartsWith("2DArray"))
+                else if (modifiedLine.StartsWith("2darray"))
                 {
                     output.type = ParsedShader.Property.Type.Texture2DArray;
                 }
-                else if (modifiedLine.StartsWith("2D"))
+                else if (modifiedLine.StartsWith("2d"))
                 {
                     output.type = ParsedShader.Property.Type.Texture2D;
                 }
@@ -427,7 +432,11 @@ namespace d4rkpl4y3r
                         }
                         break;
                     case ParseState.PropertyBlock:
-                        if (line == "}")
+                        if (line == "{" && parsedShader.lines[lineIndex + 1] == "}")
+                        {
+                            lineIndex++;
+                        }
+                        else if (line == "}")
                         {
                             state = ParseState.ShaderLab;
                         }
@@ -997,7 +1006,12 @@ namespace d4rkpl4y3r
                         output.Add(line);
                         break;
                     case ParseState.PropertyBlock:
-                        if (line == "}")
+                        if (line == "{" && parsedShader.lines[lineIndex + 1] == "}")
+                        {
+                            lineIndex++;
+                            output.Add("{}");
+                        }
+                        else if (line == "}")
                         {
                             output.Add(line);
                             state = ParseState.ShaderLab;

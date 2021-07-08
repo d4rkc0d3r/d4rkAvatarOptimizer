@@ -506,6 +506,17 @@ public class d4rkAvatarOptimizerEditor : Editor
                         }
                         propertyArray.values.Add("" + mat.GetFloat(prop.name));
                     }
+                    if (prop.type == ParsedShader.Property.Type.Vector)
+                    {
+                        (string type, List<string> values) propertyArray;
+                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                        {
+                            propertyArray.type = "float4";
+                            propertyArray.values = new List<string>();
+                            arrayPropertyValues[prop.name] = propertyArray;
+                        }
+                        propertyArray.values.Add("float4" + mat.GetVector(prop.name));
+                    }
                     if (prop.type == ParsedShader.Property.Type.Int)
                     {
                         (string type, List<string> values) propertyArray;
@@ -703,6 +714,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     case ParsedShader.Property.Type.Color:
                     case ParsedShader.Property.Type.Float:
+                    case ParsedShader.Property.Type.Vector:
                         break;
                     case ParsedShader.Property.Type.Int:
                         if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
@@ -719,8 +731,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 return false;
                         }
                         break;
-                    default:
-                        return false;
                 }
             }
         }

@@ -49,11 +49,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         if (GUILayout.Button("Analyze"))
         {
+            ShaderAnalyzer.ClearParsedShaderCache();
             parsedShader = ShaderAnalyzer.Parse(mat.shader);
         }
 
         if (GUILayout.Button("Optimize"))
         {
+            ShaderAnalyzer.ClearParsedShaderCache();
             parsedShader = ShaderAnalyzer.Parse(mat.shader);
             var replace = new Dictionary<string, string>();
             foreach (var prop in parsedShader.properties)
