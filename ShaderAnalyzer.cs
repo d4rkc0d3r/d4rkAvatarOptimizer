@@ -588,24 +588,6 @@ namespace d4rkpl4y3r
             }
         }
 
-        private static Regex tex2DFunctionCalls = new Regex(@"tex2D(\w*)\s*\(\s*(\w+)\s*,", RegexOptions.Compiled);
-        private static Regex textureSampleFunctionCalls = new Regex(@"(\w+)\s*\.\s*Sample(\w*)\s*\(", RegexOptions.Compiled);
-
-        private string ReplaceTextureSamples(string line)
-        {
-            if (texturesToReplaceCalls.Count == 0)
-                return line;
-            line = tex2DFunctionCalls.Replace(line, match => 
-                texturesToReplaceCalls.Contains(match.Groups[2].Value)
-                ? "tex2D" + match.Groups[1].Value + match.Groups[2].Value + "("
-                : match.Value);
-            line = textureSampleFunctionCalls.Replace(line, match => 
-                texturesToReplaceCalls.Contains(match.Groups[1].Value)
-                ? match.Groups[1].Value + "Sample" + match.Groups[2].Value + "("
-                : match.Value);
-            return line;
-        }
-
         private void InjectVertexShaderCode(
             List<string> source,
             ref int sourceLineIndex,
@@ -870,6 +852,9 @@ namespace d4rkpl4y3r
                 output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
                 output.Add("uniform SamplerState sampler" + newTexName + ";");
 
+                output.Add("#define UNITY_SAMPLE_TEX2D" + texName + "(uv) tex2D" + texName + "(uv)");
+                output.Add("#define UNITY_SAMPLE_TEX2D_SAMPLER" + texName + "(sampl, uv) " + texName + "Sample(sampler##sampl, (uv))");
+
                 output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
                 if (nullCheck != null) output.Add(nullCheck);
                 output.Add("return " + newTexName + ".Sample(sampl, " + uv + ");}");
@@ -904,6 +889,24 @@ namespace d4rkpl4y3r
                 output.Add("float4 tex2Dbias" + texName + "(float4 uv) {");
                 output.Add("return " + texName + "SampleBias(sampler" + newTexName + ", uv.xy, uv.w);}");
             }
+        }
+
+        private static Regex tex2DAndUnityMacroCalls = new Regex(@"(tex2D\w*|UNITY_SAMPLE_TEX2D\w*)\s*\(\s*(\w+)\s*,", RegexOptions.Compiled);
+        private static Regex textureSampleFunctionCalls = new Regex(@"(\w+)\s*\.\s*(Sample\w*)\s*\(", RegexOptions.Compiled);
+        
+        private string ReplaceTextureSamples(string line)
+        {
+            if (texturesToReplaceCalls.Count == 0)
+                return line;
+            line = tex2DAndUnityMacroCalls.Replace(line, match =>
+                texturesToReplaceCalls.Contains(match.Groups[2].Value)
+                ? match.Groups[1].Value + match.Groups[2].Value + "("
+                : match.Value);
+            line = textureSampleFunctionCalls.Replace(line, match =>
+                texturesToReplaceCalls.Contains(match.Groups[1].Value)
+                ? match.Groups[1].Value + match.Groups[2].Value + "("
+                : match.Value);
+            return line;
         }
 
         private static Regex variableDeclaration = new Regex(@"(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
