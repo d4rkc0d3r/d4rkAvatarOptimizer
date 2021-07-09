@@ -990,6 +990,15 @@ namespace d4rkpl4y3r
                         output.Add(line);
                     }
                 }
+                else if (line.StartsWith("UNITY_DECLARE_TEX2D"))
+                {
+                    var texName = line.Split('(')[1].Split(')')[0].Trim();
+                    bool hasSampler = !line.Contains("_NOSAMPLER");
+                    if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
+                        texturesToCallSoTheSamplerDoesntDissapear.Add(texName);
+                    if (!texturesToReplaceCalls.Contains(texName))
+                        output.Add(line);
+                }
                 else
                 {
                     output.Add(ReplaceTextureSamples(line));
