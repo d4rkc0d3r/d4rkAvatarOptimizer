@@ -311,9 +311,14 @@ namespace d4rkpl4y3r
             return null;
         }
 
+        private static Regex functionDefinition = new Regex(@"^(inline\s+)?(\w+)\s+(\w+)\s*\(", RegexOptions.Compiled);
+        private static Regex functionParameter = new Regex(
+            @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+(<[\w,\s]+>)?)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?",
+            RegexOptions.Compiled);
+
         public static (string name, string returnType) ParseFunctionDefinition(string line)
         {
-            var match = Regex.Match(line, @"^(inline\s+)?(\w+)\s+(\w+)\s*\(");
+            var match = functionDefinition.Match(line);
             if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
             {
                 return (match.Groups[3].Value, match.Groups[2].Value);
@@ -323,7 +328,7 @@ namespace d4rkpl4y3r
 
         public static ParsedShader.Function ParseFunctionDefinition(List<string> source, ref int lineIndex)
         {
-            var match = Regex.Match(source[lineIndex], @"^(inline\s+)?(\w+)\s+(\w+)\s*\(");
+            var match = functionDefinition.Match(source[lineIndex]);
             if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
             {
                 var func = new ParsedShader.Function();
@@ -336,7 +341,7 @@ namespace d4rkpl4y3r
                 string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
                 while (lineIndex < source.Count - 1)
                 {
-                    var matches = Regex.Matches(line, @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+(<[\w,\s]+>)?)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?");
+                    var matches = functionParameter.Matches(line);
                     foreach (Match m in matches)
                     {
                         var inout = m.Groups[2].Value;
@@ -560,15 +565,18 @@ namespace d4rkpl4y3r
             }
         }
 
+        private static Regex tex2DFunctionCalls = new Regex(@"tex2D(\w*)\s*\(\s*(\w+)\s*,", RegexOptions.Compiled);
+        private static Regex textureSampleFunctionCalls = new Regex(@"(\w+)\s*\.\s*Sample(\w*)\s*\(", RegexOptions.Compiled);
+
         private string ReplaceTextureSamples(string line)
         {
             if (texturesToReplaceCalls.Count == 0)
                 return line;
-            line = Regex.Replace(line, @"tex2D(\w*)\s*\(\s*(\w+)\s*,", match => 
+            line = tex2DFunctionCalls.Replace(line, match => 
                 texturesToReplaceCalls.Contains(match.Groups[2].Value)
                 ? "tex2D" + match.Groups[1].Value + match.Groups[2].Value + "("
                 : match.Value);
-            line = Regex.Replace(line, @"(\w+)\s*\.\s*Sample(\w*)\s*\(", match => 
+            line = textureSampleFunctionCalls.Replace(line, match => 
                 texturesToReplaceCalls.Contains(match.Groups[1].Value)
                 ? match.Groups[1].Value + "Sample" + match.Groups[2].Value + "("
                 : match.Value);
@@ -875,6 +883,8 @@ namespace d4rkpl4y3r
             }
         }
 
+        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;", RegexOptions.Compiled);
+
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
             var line = source[sourceLineIndex];
@@ -959,7 +969,7 @@ namespace d4rkpl4y3r
             }
             else
             {
-                var match = Regex.Match(line, @"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;");
+                var match = variableDeclaration.Match(line);
                 if (match.Success)
                 {
                     var name = match.Groups[3].Value;
