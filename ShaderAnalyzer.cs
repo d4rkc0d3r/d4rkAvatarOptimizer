@@ -883,7 +883,7 @@ namespace d4rkpl4y3r
             }
         }
 
-        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?([a-zA-Z0-9_]+)\s+([a-zA-Z0-9_]+)\s*;", RegexOptions.Compiled);
+        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?(\w+)\s+(\w+)\s*;", RegexOptions.Compiled);
 
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
@@ -1006,6 +1006,28 @@ namespace d4rkpl4y3r
             }
         }
 
+        private List<string> PreprocessCodeLines(List<string> lines, ref int lineIndex)
+        {
+            var output = new List<string>();
+            string line;
+            while (lineIndex < lines.Count - 1 && (line = lines[++lineIndex]) != "ENDCG")
+            {
+                while (!line.EndsWith(";")
+                    && !line.StartsWith("#")
+                    && !line.StartsWith("{")
+                    && !line.StartsWith("}")
+                    && lineIndex < lines.Count - 1
+                    && lines[lineIndex + 1] != "{"
+                    && lines[lineIndex + 1] != "}"
+                    && !lines[lineIndex + 1].StartsWith("#"))
+                {
+                    line = line + " " + lines[++lineIndex];
+                }
+                output.Add(line);
+            }
+            return output;
+        }
+
         private List<string> Run()
         {
             output = new List<string>();
@@ -1063,45 +1085,29 @@ namespace d4rkpl4y3r
                     case ParseState.ShaderLab:
                         if (line == "CGINCLUDE")
                         {
-                            state = ParseState.CGInclude;
+                            cgInclude = PreprocessCodeLines(parsedShader.lines, ref lineIndex);
                         }
                         else if (line == "CGPROGRAM")
                         {
-                            state = ParseState.CGProgram;
                             var pass = parsedShader.passes[++passID];
-                            output.Add(line);
                             vertexInUv0Member = "texcoord";
                             texturesToCallSoTheSamplerDoesntDissapear.Clear();
+                            output.Add("CGPROGRAM");
                             InjectPropertyArrays();
                             for (int includeLineIndex = 0; includeLineIndex < cgInclude.Count; includeLineIndex++)
                             {
                                 ParseCodeLines(cgInclude, ref includeLineIndex, pass);
                             }
-                        }
-                        else
-                        {
-                            output.Add(line);
-                        }
-                        break;
-                    case ParseState.CGInclude:
-                        if (line == "ENDCG")
-                        {
-                            state = ParseState.ShaderLab;
-                        }
-                        else
-                        {
-                            cgInclude.Add(line);
-                        }
-                        break;
-                    case ParseState.CGProgram:
-                        if (line == "ENDCG")
-                        {
-                            state = ParseState.ShaderLab;
+                            var cgProgram = PreprocessCodeLines(parsedShader.lines, ref lineIndex);
+                            for (int programLineIndex = 0; programLineIndex < cgProgram.Count; programLineIndex++)
+                            {
+                                ParseCodeLines(cgProgram, ref programLineIndex, pass);
+                            }
                             output.Add("ENDCG");
                         }
                         else
                         {
-                            ParseCodeLines(parsedShader.lines, ref lineIndex, parsedShader.passes[passID]);
+                            output.Add(line);
                         }
                         break;
                 }
