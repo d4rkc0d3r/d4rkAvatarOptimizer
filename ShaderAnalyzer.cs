@@ -906,7 +906,7 @@ namespace d4rkpl4y3r
             }
         }
 
-        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?(\w+)\s+(\w+)\s*;", RegexOptions.Compiled);
+        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
 
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
@@ -995,29 +995,33 @@ namespace d4rkpl4y3r
                 var match = variableDeclaration.Match(line);
                 if (match.Success)
                 {
-                    var name = match.Groups[3].Value;
                     var type = match.Groups[2].Value;
-                    if (type == "SamplerState" && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                    var names = match.Groups[5].Captures.Cast<Capture>().Select(c => c.Value).ToList();
+                    names.Add(match.Groups[3].Value);
+                    foreach (var name in names)
                     {
-                        if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
-                            texturesToCallSoTheSamplerDoesntDissapear.Add(name.Substring("sampler".Length));
-                        output.Add(line);
-                    }
-                    else if (staticPropertyValues.TryGetValue(name, out string value))
-                    {
-                        output.Add("static " + type + " " + name + " = " + value + ";");
-                    }
-                    else if (!arrayPropertyValues.ContainsKey(name) && !texturesToReplaceCalls.Contains(name)
-                        && !(type == "SamplerState" && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
-                    {
-                        output.Add(line);
+                        if (type == "SamplerState" && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                        {
+                            if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
+                                texturesToCallSoTheSamplerDoesntDissapear.Add(name.Substring("sampler".Length));
+                            output.Add(type + " " + name + ";");
+                        }
+                        else if (staticPropertyValues.TryGetValue(name, out string value))
+                        {
+                            output.Add("static " + type + " " + name + " = " + value + ";");
+                        }
+                        else if (!arrayPropertyValues.ContainsKey(name) && !texturesToReplaceCalls.Contains(name)
+                            && !(type == "SamplerState" && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
+                        {
+                            output.Add(type + " " + name + ";");
+                        }
                     }
                 }
                 else if (line.StartsWith("UNITY_DECLARE_TEX2D"))
                 {
                     var texName = line.Split('(')[1].Split(')')[0].Trim();
                     bool hasSampler = !line.Contains("_NOSAMPLER");
-                    if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
+                    if (hasSampler && !texturesToReplaceCalls.Contains(texName) && parsedShader.properties.Any(p => p.name == texName))
                         texturesToCallSoTheSamplerDoesntDissapear.Add(texName);
                     if (!texturesToReplaceCalls.Contains(texName))
                         output.Add(line);
