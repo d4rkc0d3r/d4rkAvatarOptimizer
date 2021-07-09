@@ -27,6 +27,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             var param = func.parameters[i];
             s += i > 1 ? ", " : "";
+            s += (param.isInput ? "in" : "") + (param.isOutput ? "out " : " ");
             s += param.type;
             s += " ";
             s += param.name;
