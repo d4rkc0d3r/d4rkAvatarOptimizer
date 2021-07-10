@@ -617,20 +617,20 @@ namespace d4rkpl4y3r
             {
                 output.Add("if (d4rkAvatarOptimizer_Zero)");
                 output.Add("{");
-                string val = "float val = _IsActiveMesh0";
+                string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh0";
                 for (int i = 1; i < meshToggleCount; i++)
                 {
                     val += " + _IsActiveMesh" + i;
                 }
                 output.Add(val + ";");
                 output.Add(isVoidReturn
-                    ? "if (val) { " + outParam.name + " = (" + outParam.type + ")0; return; }"
-                    : "if (val) return (" + outParam.type + ")0;");
+                    ? "if (d4rkAvatarOptimizer_val) return;"
+                    : "if (d4rkAvatarOptimizer_val) return (" + outParam.type + ")0;");
                 output.Add("}");
                 output.Add("if (!_IsActiveMesh[" + uv0Name + ".z])");
                 output.Add("{");
                 output.Add(isVoidReturn
-                    ? outParam.name + " = (" + outParam.type + ")0;return;"
+                    ? "return;"
                     : "return (" + outParam.type + ")0;");
                 output.Add("}");
             }
@@ -774,10 +774,12 @@ namespace d4rkpl4y3r
                 output.Add("float d4rkAvatarOptimizer_sum = 0;");
                 foreach (var tex in texturesToCallSoTheSamplerDoesntDissapear)
                 {
+                    output.Add("#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + tex);
                     output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Load(0);");
+                    output.Add("#endif");
                 }
                 output.Add(pass.fragment.parameters[0].type == "void"
-                    ? "if (d4rkAvatarOptimizer_sum) { " + outParam.name + " = (" + outParam.type + ")0; return; }"
+                    ? "if (d4rkAvatarOptimizer_sum) return;"
                     : "if (d4rkAvatarOptimizer_sum) return (" + outParam.type + ")0;");
                 output.Add("}");
             }
@@ -848,6 +850,7 @@ namespace d4rkpl4y3r
                 }
 
                 texturesToCallSoTheSamplerDoesntDissapear.Add(newTexName);
+                output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + newTexName);
 
                 output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
                 output.Add("uniform SamplerState sampler" + newTexName + ";");
@@ -1006,7 +1009,10 @@ namespace d4rkpl4y3r
                         if (type == "SamplerState" && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
                         {
                             if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
+                            {
                                 texturesToCallSoTheSamplerDoesntDissapear.Add(name.Substring("sampler".Length));
+                                output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + name.Substring("sampler".Length));
+                            }
                             output.Add(type + " " + name + ";");
                         }
                         else if (staticPropertyValues.TryGetValue(name, out string value))
@@ -1024,10 +1030,15 @@ namespace d4rkpl4y3r
                 {
                     var texName = line.Split('(')[1].Split(')')[0].Trim();
                     bool hasSampler = !line.Contains("_NOSAMPLER");
-                    if (hasSampler && !texturesToReplaceCalls.Contains(texName) && parsedShader.properties.Any(p => p.name == texName))
-                        texturesToCallSoTheSamplerDoesntDissapear.Add(texName);
                     if (!texturesToReplaceCalls.Contains(texName))
+                    {
+                        if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
+                        {
+                            texturesToCallSoTheSamplerDoesntDissapear.Add(texName);
+                            output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + texName);
+                        }
                         output.Add(line);
+                    }
                 }
                 else
                 {
