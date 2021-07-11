@@ -724,7 +724,7 @@ namespace d4rkpl4y3r
                     funcParams = funcParams.Prepend("out " + returnParam.type + " returnWrappedStruct"
                         + (returnParam.semantic != null ? " : " + returnParam.semantic : "")).ToList();
                 AddParameterStructWrapper(funcParams, output, "vertexOutput", arrayPropertyValues.Count > 0, needToPassOnMeshToggle, false);
-                AddParameterStructWrapper(funcParams, output, "vertexInput", false, needToPassOnMeshToggle, true);
+                AddParameterStructWrapper(funcParams, output, "vertexInput", false, false, true);
                 output.Add("vertexOutputWrapper " + func.name + "(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
@@ -840,33 +840,68 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
+            var func = pass.geometry;
+            var outParam = func.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
+            var outParamType = outParam.type.Substring(outParam.type.IndexOf('<') + 1);
+            outParamType = outParamType.Substring(0, outParamType.Length - 1);
+            var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.arraySize > 0);
+            var wrapperStructs = new List<string>();
+            bool usesInputWrapper = arrayPropertyValues.Count > 0 || meshToggleCount > 1;
+            bool usesOuputWrapper = arrayPropertyValues.Count > 0;
+            if (usesInputWrapper)
+            {
+                wrapperStructs.Add("struct geometryInputWrapper");
+                wrapperStructs.Add("{");
+                if (arrayPropertyValues.Count > 0)
+                    wrapperStructs.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
+                if (meshToggleCount > 1)
+                    wrapperStructs.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
+                wrapperStructs.Add(inParam.type + " d4rkAvatarOptimizer_geometryInput;");
+                wrapperStructs.Add("};");
+            }
+            if (usesOuputWrapper)
+            {
+                wrapperStructs.Add("struct geometryOutputWrapper");
+                wrapperStructs.Add("{");
+                wrapperStructs.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
+                wrapperStructs.Add(outParamType + " d4rkAvatarOptimizer_geometryOutput;");
+                wrapperStructs.Add("};");
+            }
+            int insertIndex = output.FindLastIndex(s => !s.StartsWith("#") && !s.StartsWith("[")) + 1;
+            output.InsertRange(insertIndex, wrapperStructs);
             string line = source[sourceLineIndex];
-            output.Add(line);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
                 line = source[++sourceLineIndex];
-                output.Add(line);
             }
-            var inParam = pass.geometry.parameters.FirstOrDefault(p => p.isInput && p.arraySize > 0);
+            output.Add("void " + func.name + "(triangle "
+                + (usesInputWrapper ? "geometryInputWrapper d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
+                + "[" + inParam.arraySize + "], inout "
+                + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
+                + (usesOuputWrapper ? "geometryOutputWrapper" : outParamType)
+                + "> " + outParam.name + ")");
+            output.Add("{");
+            sourceLineIndex++;
+            if (usesInputWrapper)
+            {
+                output.Add(inParam.type + " " + inParam.name + "[" + inParam.arraySize + "];");
+                for (int i = 0; i < inParam.arraySize; i++)
+                {
+                    output.Add(inParam.name + "[" + i + "] = d4rkAvatarOptimizer_inputWrapper[" + i + "].d4rkAvatarOptimizer_geometryInput;");
+                }
+            }
             if (meshToggleCount > 1)
             {
-                output.Add("if (!" + inParam.name + "[0].d4rkAvatarOptimizer_NotCullVert)");
-                output.Add("{");
-                output.Add("return;");
-                output.Add("}");
+                output.Add("if (!d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_NotCullVert) return;");
             }
-            var outParam = pass.geometry.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
-            var outParamType = outParam.type.Substring(outParam.type.IndexOf('<') + 1);
-            outParamType = outParamType.Substring(0, outParamType.Length - 1);
-            if (arrayPropertyValues.Count == 0 && (meshToggleCount <= 1 || outParamType != inParam.type))
+            if (arrayPropertyValues.Count > 0)
+            {
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_MaterialID;");
+                InjectArrayPropertyInitialization();
+            }
+            if (!usesOuputWrapper)
             {
                 return;
-            }
-            sourceLineIndex++;
-            if (arrayPropertyValues.Count > 1)
-            {
-                output.Add("d4rkAvatarOptimizer_MaterialID = " + inParam.name + "[0].d4rkAvatarOptimizer_MaterialID;");
-                InjectArrayPropertyInitialization();
             }
             int braceDepth = 0;
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
@@ -874,11 +909,11 @@ namespace d4rkpl4y3r
                 line = source[sourceLineIndex];
                 if (line == "}")
                 {
-                    output.Add(line);
                     if (braceDepth-- == 0)
                     {
-                        return;
+                        break;
                     }
+                    output.Add(line);
                 }
                 else if (line == "{")
                 {
@@ -888,11 +923,10 @@ namespace d4rkpl4y3r
                 else if (line.Contains(outParam.name + ".Append("))
                 {
                     output.Add("{");
-                    output.Add(outParamType + " d4rkAvatarOptimizer_geomOutput = " + line.Substring(line.IndexOf(".Append(") + 7));
+                    output.Add("geometryOutputWrapper d4rkAvatarOptimizer_geomOutput;");
+                    output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_geometryOutput = " + line.Substring(line.IndexOf(".Append(") + 7));
                     if (arrayPropertyValues.Count > 1)
                         output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                    if (meshToggleCount > 1 && outParamType == inParam.type)
-                        output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_NotCullVert = 1;");
                     output.Add(outParam.name + ".Append(d4rkAvatarOptimizer_geomOutput);");
                     output.Add("}");
                 }
@@ -901,6 +935,7 @@ namespace d4rkpl4y3r
                     output.Add(ReplaceTextureSamples(line));
                 }
             }
+            output.Add("}");
         }
 
         private void InjectFragmentShaderCode(
