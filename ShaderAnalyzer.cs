@@ -41,6 +41,11 @@ namespace d4rkpl4y3r
                 public bool isOutput = false;
                 public bool isInput = false;
                 public int arraySize = 0;
+                public override string ToString()
+                {
+                    return (isOutput ? (isInput ? "inout " : "out ") : "") + type + " " + name
+                        + (arraySize > 0 ? "[" + arraySize + "]" : "") + (semantic != null ? " : " + semantic : "");
+                }
             }
             public string name;
             public List<Parameter> parameters = new List<Parameter>();
@@ -426,6 +431,7 @@ namespace d4rkpl4y3r
             while (lineIndex < lines.Count - 1 && (line = lines[++lineIndex]) != "ENDCG")
             {
                 while (!line.EndsWith(";")
+                    && !line.EndsWith("]")
                     && !line.StartsWith("#")
                     && !line.StartsWith("{")
                     && !line.StartsWith("}")
@@ -588,31 +594,158 @@ namespace d4rkpl4y3r
             }
         }
 
+        private List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
+        {
+            var output = new List<string>();
+            string line = source[sourceLineIndex].Split('(')[1];
+            while (line != "{" && sourceLineIndex < source.Count - 1)
+            {
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                }
+                else
+                {
+                    output.AddRange(line.Split(',').Select(s => s.Trim()).Where(s => s != ""));
+                }
+                line = source[++sourceLineIndex];
+            }
+            output[output.Count - 1] = output[output.Count - 1].Split(')')[0];
+            if (output[output.Count - 1].Length == 0)
+                output.RemoveAt(output.Count - 1);
+            return output;
+        }
+
+        private void AddParameterStructWrapper(List<string> funcParams, List<string> output, string name, bool addMaterialID, bool addMeshToggle, bool isInput)
+        {
+            output.Add("struct " + name + "Wrapper");
+            output.Add("{");
+            if (addMaterialID)
+                output.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
+            if (addMeshToggle)
+                output.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
+            foreach (var line in funcParams)
+            {
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                    continue;
+                }
+                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+)?)");
+                if (match.Success)
+                {
+                    if (isInput ^ match.Groups[2].Value != "out")
+                        continue;
+                    output.Add(match.Groups[3].Value + ";");
+                }
+                else
+                {
+                    output.Add("// Uh oh: " + line);
+                }
+            }
+            output.Add("};");
+        }
+        
+        private void InitializeParameterFromWrapper(List<string> funcParams, List<string> output, string wrapperName, bool isInput)
+        {
+            foreach (var line in funcParams)
+            {
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                    continue;
+                }
+                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                if (match.Success)
+                {
+                    if (isInput && match.Groups[2].Value != "out")
+                    {
+                        var type = match.Groups[3].Value;
+                        var name = match.Groups[4].Value;
+                        output.Add(type + " " + name + " = " + wrapperName + "." + name + ";");
+                    }
+                    else if (!isInput && match.Groups[2].Value == "out")
+                    {
+                        var type = match.Groups[3].Value;
+                        var name = match.Groups[4].Value;
+                        output.Add(wrapperName + "." + name + " = " + name + ";");
+                    }
+                }
+                else
+                {
+                    output.Add("// Uh oh: " + line);
+                }
+            }
+        }
+
+        private void InitializeOutputParameter(List<string> funcParams, List<string> output)
+        {
+            foreach (var line in funcParams)
+            {
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                    continue;
+                }
+                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                if (match.Success)
+                {
+                    if (match.Groups[2].Value == "out")
+                    {
+                        var type = match.Groups[3].Value;
+                        var name = match.Groups[4].Value;
+                        output.Add(type + " " + name + " = (" + type + ")0;");
+                    }
+                }
+                else
+                {
+                    output.Add("// Uh oh: " + line);
+                }
+            }
+        }
+
         private void InjectVertexShaderCode(
             List<string> source,
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
             string line = source[sourceLineIndex];
-            var outParam = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
-            var inParam = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-            var isVoidReturn = pass.vertex.parameters[0].type == "void";
-            string defLine = line.Substring(0, line.IndexOf('(') + 1);
-            string uv0Name = "d4rkAvatarOptimizer_UV0";
-            if (inParam == null)
+            var func = pass.vertex;
+            var outParam = func.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+            var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+            var returnParam = func.parameters[0];
+            var isVoidReturn = returnParam.type == "void";
+            List<string> funcParams = null;
+            bool needToPassOnMeshToggle = pass.geometry != null && meshToggleCount > 1;
+            if (arrayPropertyValues.Count > 0 || needToPassOnMeshToggle)
             {
-                defLine += "float4 d4rkAvatarOptimizer_UV0 : TEXCOORD0" + (pass.vertex.parameters.Count > 1 ? ", " : "");
+                funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+                if (returnParam.type != "void")
+                    funcParams = funcParams.Prepend("out " + returnParam.type + " returnWrappedStruct"
+                        + (returnParam.semantic != null ? " : " + returnParam.semantic : "")).ToList();
+                AddParameterStructWrapper(funcParams, output, "vertexOutput", arrayPropertyValues.Count > 0, needToPassOnMeshToggle, false);
+                AddParameterStructWrapper(funcParams, output, "vertexInput", false, needToPassOnMeshToggle, true);
+                output.Add("vertexOutputWrapper " + func.name + "(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
+                output.Add("{");
+                InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
             }
             else
             {
-                uv0Name = inParam.name + "." + vertexInUv0Member;
-            }
-            output.Add(defLine + line.Substring(line.IndexOf('(') + 1));
-            while (line != "{" && sourceLineIndex < source.Count - 1)
-            {
-                line = source[++sourceLineIndex];
+                line = source[sourceLineIndex];
                 output.Add(line);
+                while (line != "{" && sourceLineIndex < source.Count - 1)
+                {
+                    line = source[++sourceLineIndex];
+                    output.Add(line);
+                }
             }
+            string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
+            if (funcParams != null)
+            {
+                InitializeOutputParameter(funcParams, output);
+                nullReturn = "return (vertexOutputWrapper)0;";
+            }
+            string uv0Name = inParam.name + "." + vertexInUv0Member;
             if (meshToggleCount > 1)
             {
                 output.Add("if (d4rkAvatarOptimizer_Zero)");
@@ -623,16 +756,9 @@ namespace d4rkpl4y3r
                     val += " + _IsActiveMesh" + i;
                 }
                 output.Add(val + ";");
-                output.Add(isVoidReturn
-                    ? "if (d4rkAvatarOptimizer_val) return;"
-                    : "if (d4rkAvatarOptimizer_val) return (" + outParam.type + ")0;");
+                output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
                 output.Add("}");
-                output.Add("if (!_IsActiveMesh[" + uv0Name + ".z])");
-                output.Add("{");
-                output.Add(isVoidReturn
-                    ? "return;"
-                    : "return (" + outParam.type + ")0;");
-                output.Add("}");
+                output.Add("if (!_IsActiveMesh[" + uv0Name + ".z]) " + nullReturn);
             }
             sourceLineIndex++;
             if (arrayPropertyValues.Count > 0)
@@ -646,11 +772,29 @@ namespace d4rkpl4y3r
                 line = source[sourceLineIndex];
                 if (line == "}")
                 {
-                    output.Add(line);
                     if (braceDepth-- == 0)
                     {
+                        if (isVoidReturn)
+                        {
+                            output.Add("{");
+                            var outParamName = outParam.name;
+                            if (funcParams != null)
+                            {
+                                outParamName = "d4rkAvatarOptimizer_vertexOutput";
+                                output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
+                                InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
+                            }
+                            if (arrayPropertyValues.Count > 0)
+                                output.Add(outParamName + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                            if (needToPassOnMeshToggle)
+                                output.Add(outParamName + ".d4rkAvatarOptimizer_NotCullVert = true;");
+                            if (funcParams != null)
+                                output.Add("return d4rkAvatarOptimizer_vertexOutput;");
+                            output.Add("}");
+                        }
                         break;
                     }
+                    output.Add(line);
                 }
                 else if (line == "{")
                 {
@@ -660,23 +804,27 @@ namespace d4rkpl4y3r
                 else if (line.StartsWith("return"))
                 {
                     output.Add("{");
-                    if (isVoidReturn)
+                    var outParamName = "d4rkAvatarOptimizer_vertexOutput";
+                    if (funcParams == null && isVoidReturn)
                     {
-                        if (arrayPropertyValues.Count > 0)
-                            output.Add(outParam.name + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                        if (pass.geometry != null && meshToggleCount > 1)
-                            output.Add(outParam.name + ".d4rkAvatarOptimizer_NotCullVert = true;");
-                        output.Add("return;");
+                        outParamName = outParam.name;
                     }
-                    else
+                    else if (funcParams != null)
+                    {
+                        output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
+                        if (!isVoidReturn)
+                            output.Add("returnWrappedStruct = " + line.Substring("return ".Length));
+                        InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
+                    }
+                    else if (!isVoidReturn)
                     {
                         output.Add(outParam.type + " d4rkAvatarOptimizer_vertexOutput = " + line.Substring("return ".Length));
-                        if (arrayPropertyValues.Count > 0)
-                            output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                        if (pass.geometry != null && meshToggleCount > 1)
-                            output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_NotCullVert = true;");
-                        output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                     }
+                    if (arrayPropertyValues.Count > 0)
+                        output.Add(outParamName + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                    if (needToPassOnMeshToggle)
+                        output.Add(outParamName + ".d4rkAvatarOptimizer_NotCullVert = true;");
+                    output.Add((funcParams == null && isVoidReturn) ? "return;" : "return d4rkAvatarOptimizer_vertexOutput;");
                     output.Add("}");
                 }
                 else
@@ -684,6 +832,7 @@ namespace d4rkpl4y3r
                     output.Add(ReplaceTextureSamples(line));
                 }
             }
+            output.Add("}");
         }
 
         private void InjectGeometryShaderCode(
@@ -759,12 +908,30 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
-            string line = source[sourceLineIndex];
-            output.Add(line);
-            while (line != "{" && sourceLineIndex < source.Count - 1)
+            if (arrayPropertyValues.Count > 0)
             {
-                line = source[++sourceLineIndex];
+                var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+                AddParameterStructWrapper(funcParams, output, "fragmentInput", true, false, true);
+                output.Add(pass.fragment.parameters[0].type + " " + pass.fragment.name + "(");
+                output.Add("fragmentInputWrapper d4rkAvatarOptimizer_fragmentInput");
+                if (pass.fragment.parameters[0].semantic != null)
+                    output.Add(") : " + pass.fragment.parameters[0].semantic);
+                else
+                    output.Add(")");
+                output.Add("{");
+                InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_fragmentInput", true);
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MaterialID;");
+                InjectArrayPropertyInitialization();
+            }
+            else
+            {
+                string line = source[sourceLineIndex];
                 output.Add(line);
+                while (line != "{" && sourceLineIndex < source.Count - 1)
+                {
+                    line = source[++sourceLineIndex];
+                    output.Add(line);
+                }
             }
             var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             if (texturesToCallSoTheSamplerDoesntDissapear.Count > 0)
@@ -783,13 +950,6 @@ namespace d4rkpl4y3r
                     : "if (d4rkAvatarOptimizer_sum) return (" + outParam.type + ")0;");
                 output.Add("}");
             }
-            if (arrayPropertyValues.Count == 0)
-            {
-                return;
-            }
-            var inParam = pass.fragment.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-            output.Add("d4rkAvatarOptimizer_MaterialID = " + inParam.name + ".d4rkAvatarOptimizer_MaterialID;");
-            InjectArrayPropertyInitialization();
         }
 
         private void InjectPropertyArrays()
@@ -937,32 +1097,6 @@ namespace d4rkpl4y3r
                 if (match.Success)
                 {
                     var structName = match.Groups[1].Value;
-                    if (source[sourceLineIndex + 1] == "{")
-                    {
-                        var vertOut = pass.vertex.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
-                        if (structName == vertOut.type)
-                        {
-                            sourceLineIndex++;
-                            output.Add("{");
-                            if (arrayPropertyValues.Count > 0)
-                                output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
-                            if (pass.geometry != null && meshToggleCount > 1)
-                                output.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
-                        }
-                        else if (pass.geometry != null)
-                        {
-                            var gsOut = pass.geometry.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
-                            var gsOutType = gsOut.type.Substring(gsOut.type.IndexOf('<') + 1);
-                            gsOutType = gsOutType.Substring(0, gsOutType.Length - 1);
-                            if (structName == gsOutType)
-                            {
-                                sourceLineIndex++;
-                                output.Add("{");
-                                if (arrayPropertyValues.Count > 0)
-                                    output.Add("uint d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MATERIAL_ID;");
-                            }
-                        }
-                    }
                     var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
                     if (structName == vertIn?.type)
                     {
