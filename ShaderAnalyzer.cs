@@ -709,29 +709,31 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
-            string line = source[sourceLineIndex];
             var func = pass.vertex;
             var outParam = func.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
             var returnParam = func.parameters[0];
             var isVoidReturn = returnParam.type == "void";
             List<string> funcParams = null;
+            List<string> originalVertexShader = null;
             bool needToPassOnMeshToggle = pass.geometry != null && meshToggleCount > 1;
             if (arrayPropertyValues.Count > 0 || needToPassOnMeshToggle)
             {
+                int startLineIndex = sourceLineIndex;
                 funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+                originalVertexShader = new List<string>(source.GetRange(startLineIndex, sourceLineIndex - startLineIndex + 1));
                 if (returnParam.type != "void")
                     funcParams = funcParams.Prepend("out " + returnParam.type + " returnWrappedStruct"
                         + (returnParam.semantic != null ? " : " + returnParam.semantic : "")).ToList();
                 AddParameterStructWrapper(funcParams, output, "vertexOutput", arrayPropertyValues.Count > 0, needToPassOnMeshToggle, false);
                 AddParameterStructWrapper(funcParams, output, "vertexInput", false, false, true);
-                output.Add("vertexOutputWrapper " + func.name + "(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
+                output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexWithWrapper(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
             }
             else
             {
-                line = source[sourceLineIndex];
+                string line = source[sourceLineIndex];
                 output.Add(line);
                 while (line != "{" && sourceLineIndex < source.Count - 1)
                 {
@@ -769,7 +771,8 @@ namespace d4rkpl4y3r
             int braceDepth = 0;
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
-                line = source[sourceLineIndex];
+                string line = source[sourceLineIndex];
+                originalVertexShader?.Add(line);
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
@@ -833,6 +836,10 @@ namespace d4rkpl4y3r
                 }
             }
             output.Add("}");
+            if (originalVertexShader != null)
+            {
+                output.AddRange(originalVertexShader);
+            }
         }
 
         private void InjectGeometryShaderCode(
@@ -1211,7 +1218,15 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(ReplaceTextureSamples(line));
+                    if (Regex.IsMatch(line, @"#pragma\s+vertex\s+\w+")
+                        && ((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0))
+                    {
+                        output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                    }
+                    else
+                    {
+                        output.Add(ReplaceTextureSamples(line));
+                    }
                 }
             }
         }
