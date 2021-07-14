@@ -1114,7 +1114,7 @@ namespace d4rkpl4y3r
             return line;
         }
 
-        private static Regex variableDeclaration = new Regex(@"(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
+        private static Regex variableDeclaration = new Regex(@"^(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
 
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
