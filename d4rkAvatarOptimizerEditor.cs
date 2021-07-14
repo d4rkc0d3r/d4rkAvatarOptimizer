@@ -568,7 +568,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             string cullReplace = null;
-            var cullProp = parsedShader.properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams[0] == "Cull");
+            var cullProp = parsedShader.properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams.First() == "Cull");
             if (cullProp != null)
             {
                 int firstCull = source[0].GetInt(cullProp.name);

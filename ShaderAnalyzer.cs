@@ -29,7 +29,7 @@ namespace d4rkpl4y3r
             }
             public string name;
             public Type type = Type.Unknown;
-            public List<string> shaderLabParams = new List<string>();
+            public HashSet<string> shaderLabParams = new HashSet<string>();
         }
         public class Function
         {
