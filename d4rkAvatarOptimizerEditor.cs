@@ -228,8 +228,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void FixAllAnimationPaths()
     {
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
-        if (avDescriptor == null || fxLayer == null)
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        if (fxLayer == null)
             return;
 
         string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + fxLayer.name + ".controller");
@@ -274,7 +274,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         materialSlotsWithMaterialSwapAnimations.Clear();
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
             return;
         foreach (var clip in fxLayer.animationClips)
@@ -311,17 +311,25 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         usedBlendShapes.Clear();
         materialSlotsWithMaterialSwapAnimations.Clear();
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
+        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = skinnedMeshRenderer.sharedMesh;
+            if (mesh == null)
+                continue;
+            string path = GetTransformPathToRoot(skinnedMeshRenderer.transform) + "/blendShape.";
+            for (int i = 0; i < mesh.blendShapeCount; i++)
+            {
+                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
+                {
+                    usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
+                }
+            }
+        }
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
         if (avDescriptor == null)
             return;
-        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
-        {
-            if (binding.type != typeof(SkinnedMeshRenderer)
-                || !binding.propertyName.StartsWith("blendShape."))
-                continue;
-            usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-        }
         if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
             && avDescriptor.VisemeSkinnedMesh != null)
         {
@@ -342,21 +350,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
             }
         }
-        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
-        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        if (fxLayer == null)
+            return;
+        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
-            var mesh = skinnedMeshRenderer.sharedMesh;
-            if (mesh == null)
+            if (binding.type != typeof(SkinnedMeshRenderer)
+                || !binding.propertyName.StartsWith("blendShape."))
                 continue;
-            string path = GetTransformPathToRoot(skinnedMeshRenderer.transform) + "/blendShape.";
-            for (int i = 0; i < mesh.blendShapeCount; i++)
-            {
-                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
-                {
-                    usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
-                }
-            }
+            usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
         }
     }
 
@@ -364,7 +366,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         usedMaterialProperties.Clear();
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-        var fxLayer = (AnimatorController)avDescriptor?.baseAnimationLayers[4].animatorController;
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
             return;
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
@@ -1253,7 +1255,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.Reset();
             var copy = Instantiate(settings.gameObject);
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
-            VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
+            if (copy.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>() != null)
+                VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
             Optimize(copy);
             copy.name = settings.gameObject.name + "(OptimizedCopy)";
             copy.SetActive(true);
