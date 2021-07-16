@@ -15,6 +15,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static GameObject root;
     private static d4rkAvatarOptimizer settings;
+    private static string scriptPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -29,8 +30,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
-        AssetDatabase.DeleteAsset("Assets/d4rkAvatarOptimizer/TrashBin");
-        AssetDatabase.CreateFolder("Assets/d4rkAvatarOptimizer", "TrashBin");
+        trashBinPath = scriptPath + "/TrashBin/";
+        AssetDatabase.DeleteAsset(scriptPath + "/TrashBin");
+        AssetDatabase.CreateFolder(scriptPath, "TrashBin");
         Profiler.EndSection();
     }
 
@@ -1239,6 +1241,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     public override void OnInspectorGUI()
     {
         settings = (d4rkAvatarOptimizer)target;
+
+        var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
+        scriptPath = path.Substring(0, path.LastIndexOf('/'));
 
         settings.MergeBackFaceCullingWithCullingOff =
             EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
