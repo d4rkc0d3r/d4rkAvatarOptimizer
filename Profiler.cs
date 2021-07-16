@@ -10,24 +10,22 @@ namespace d4rkpl4y3r.Util
     static class Profiler
     {
         private static Dictionary<string, long> timeUsed = new Dictionary<string, long>();
-        private static string name = "";
-        private static long start;
-        private static long unknownStart = DateTime.Now.Ticks;
+        private static long lastReset = DateTime.Now.Ticks;
+        private static Stack<(string name, long start)> stack = new Stack<(string name, long start)>();
         public static bool enabled = true;
 
         public static void Reset()
         {
             timeUsed.Clear();
-            unknownStart = DateTime.Now.Ticks;
-            name = "";
+            stack.Clear();
+            lastReset = DateTime.Now.Ticks;
         }
 
         public static void StartNextSection(string name)
         {
             if (!enabled)
                 return;
-            if (name != "")
-                EndSection();
+            EndSection();
             StartSection(name);
         }
 
@@ -35,25 +33,35 @@ namespace d4rkpl4y3r.Util
         {
             if (!enabled)
                 return;
-            Profiler.name = name;
-            start = DateTime.Now.Ticks;
+            var now = DateTime.Now.Ticks;
+            if (stack.Count > 0)
+            {
+                var currentSection = stack.Peek();
+                timeUsed.TryGetValue(currentSection.name, out long v);
+                timeUsed[currentSection.name] = v + now - currentSection.start;
+            }
+            stack.Push((name, now));
         }
 
         public static void EndSection()
         {
-            if (!enabled)
+            if (!enabled || stack.Count == 0)
                 return;
-            long end = DateTime.Now.Ticks;
-            long v = 0;
-            timeUsed.TryGetValue(name, out v);
-            timeUsed[name] = v + end - start;
+            var now = DateTime.Now.Ticks;
+            var currentSection = stack.Pop();
+            timeUsed.TryGetValue(currentSection.name, out long v);
+            timeUsed[currentSection.name] = v + now - currentSection.start;
+            if (stack.Count > 0)
+            {
+                stack.Push((stack.Pop().name, now));
+            }
         }
 
         public static void PrintTimeUsed()
         {
             if (!enabled)
                 return;
-            long totalTime = DateTime.Now.Ticks - unknownStart;
+            long totalTime = DateTime.Now.Ticks - lastReset;
             Debug.Log(string.Format("Total Time: {0:N3}s", new TimeSpan(totalTime).TotalSeconds));
             long unknownTime = totalTime - timeUsed.Values.Sum();
             timeUsed["unknown"] = unknownTime;

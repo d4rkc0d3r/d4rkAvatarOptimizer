@@ -657,10 +657,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach(var mat in optimizedMaterials)
         {
             int renderQueue = mat.renderQueue;
+            Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
+            Profiler.EndSection();
             mat.renderQueue = renderQueue;
             if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
             {
+                Profiler.StartSection("SetTextureArrayProperties");
                 foreach (var texArray in texArrays)
                 {
                     string texArrayName = texArray.name;
@@ -672,6 +675,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     mat.SetTextureOffset(texArrayName, mat.GetTextureOffset(texArray.name));
                     mat.SetTextureScale(texArrayName, mat.GetTextureScale(texArray.name));
                 }
+                Profiler.EndSection();
             }
             CreateUniqueAsset(mat, mat.name + ".mat");
         }
@@ -1227,15 +1231,25 @@ public class d4rkAvatarOptimizerEditor : Editor
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
+        Profiler.StartSection("CalculateUsedBlendShapePaths()");
         CalculateUsedBlendShapePaths();
+        Profiler.StartNextSection("CalculateUsedMaterialProperties()");
         CalculateUsedMaterialProperties();
+        Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
         OptimizeMaterialSwapMaterials();
+        Profiler.StartNextSection("CombineSkinnedMeshes()");
         CombineSkinnedMeshes();
+        Profiler.StartNextSection("CreateTextureArrays()");
         CreateTextureArrays();
+        Profiler.StartNextSection("CombineAndOptimizeMaterials()");
         CombineAndOptimizeMaterials();
+        Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
         OptimizeMaterialsOnNonSkinnedMeshes();
+        Profiler.StartNextSection("SaveOptimizedMaterials()");
         SaveOptimizedMaterials();
+        Profiler.StartNextSection("FixAllAnimationPaths()");
         FixAllAnimationPaths();
+        Profiler.EndSection();
     }
     
     public override void OnInspectorGUI()
