@@ -23,9 +23,11 @@ namespace d4rkpl4y3r
                 Float,
                 Vector,
                 Int,
-                Int4,
                 Texture2D,
-                Texture2DArray
+                Texture2DArray,
+                Texture3D,
+                TextureCube,
+                TextureCubeArray
             }
             public string name;
             public Type type = Type.Unknown;
@@ -330,6 +332,21 @@ namespace d4rkpl4y3r
                         case "bump": output.defaultValue = "float4(0.5,0.5,1,.5)"; break;
                         case "grey": default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
                     }
+                }
+                else if (modifiedLine.StartsWith("3d"))
+                {
+                    output.type = ParsedShader.Property.Type.Texture3D;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                }
+                else if (modifiedLine.StartsWith("cube"))
+                {
+                    output.type = ParsedShader.Property.Type.TextureCube;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                }
+                else if (modifiedLine.StartsWith("cubearray"))
+                {
+                    output.type = ParsedShader.Property.Type.TextureCubeArray;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
                 }
                 return output;
             }

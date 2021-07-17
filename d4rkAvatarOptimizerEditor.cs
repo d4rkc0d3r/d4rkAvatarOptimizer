@@ -734,12 +734,20 @@ public class d4rkAvatarOptimizerEditor : Editor
                             return false;
                         break;
                     case ParsedShader.Property.Type.Texture2D:
+                    case ParsedShader.Property.Type.Texture2DArray:
+                    case ParsedShader.Property.Type.Texture3D:
+                    case ParsedShader.Property.Type.TextureCube:
+                    case ParsedShader.Property.Type.TextureCubeArray:
                         {
                             var mTex = mat.GetTexture(prop.name);
                             var cTex = candidate.GetTexture(prop.name);
-                            if (settings.MergeSameDimensionTextures && !CanCombineTextures(mTex, cTex))
+                            if (settings.MergeSameDimensionTextures && (!CanCombineTextures(mTex, cTex) ||
+                                mat.GetTextureOffset(prop.name) != candidate.GetTextureOffset(prop.name) ||
+                                mat.GetTextureScale(prop.name) != candidate.GetTextureScale(prop.name)))
                                 return false;
-                            if (!settings.MergeSameDimensionTextures && cTex != mTex)
+                            if (!settings.MergeSameDimensionTextures && (cTex != mTex || (cTex != null && (
+                                mat.GetTextureOffset(prop.name) != candidate.GetTextureOffset(prop.name) ||
+                                mat.GetTextureScale(prop.name) != candidate.GetTextureScale(prop.name)))))
                                 return false;
                         }
                         break;
