@@ -553,13 +553,13 @@ namespace d4rkpl4y3r
                         else
                         {
                             output.Add(line);
-                            var matches = Regex.Matches(line, @"\[[_a-zA-Z0-9]+\]");
+                            var matches = Regex.Matches(line, @"\[(\w+)\]");
                             if (matches.Count > 0)
                             {
-                                string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Captures[0].Value;
+                                string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Value;
                                 foreach (Match match in matches)
                                 {
-                                    string propName = match.Value.Substring(1, match.Value.Length - 2);
+                                    string propName = match.Groups[1].Value;
                                     foreach (var prop in parsedShader.properties)
                                     {
                                         if (propName == prop.name)
@@ -668,7 +668,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+)?)");
+                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+)?)");
                 if (match.Success)
                 {
                     if (isInput ^ match.Groups[2].Value != "out")
@@ -677,7 +677,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add("// Uh oh: " + line);
+                    output.Add(line + " // raw line");
                 }
             }
             output.Add("};");
@@ -692,7 +692,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (match.Success)
                 {
                     if (isInput && match.Groups[2].Value != "out")
@@ -710,7 +710,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add("// Uh oh: " + line);
+                    output.Add(line + " // raw line");
                 }
             }
         }
@@ -724,7 +724,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (match.Success)
                 {
                     if (match.Groups[2].Value == "out")
@@ -736,7 +736,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add("// Uh oh: " + line);
+                    output.Add(line + " // raw line");
                 }
             }
         }
@@ -1255,8 +1255,8 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    if (Regex.IsMatch(line, @"#pragma\s+vertex\s+\w+")
-                        && ((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0))
+                    if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0)
+                        && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
                     {
                         output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                     }
