@@ -30,6 +30,7 @@ namespace d4rkpl4y3r
             public string name;
             public Type type = Type.Unknown;
             public HashSet<string> shaderLabParams = new HashSet<string>();
+            public string defaultValue;
         }
         public class Function
         {
@@ -287,6 +288,7 @@ namespace d4rkpl4y3r
                 quoteIndex = FindEndOfStringLiteral(modifiedLine, quoteIndex + 1);
                 int colonIndex = modifiedLine.IndexOf(',', quoteIndex + 1);
                 modifiedLine = modifiedLine.Substring(colonIndex + 1).TrimStart().ToLowerInvariant();
+                output.defaultValue = modifiedLine.Substring(modifiedLine.IndexOf('=') + 1).TrimStart();
                 if (modifiedLine.StartsWith("range") || modifiedLine.StartsWith("float"))
                 {
                     output.type = ParsedShader.Property.Type.Float;
@@ -294,6 +296,7 @@ namespace d4rkpl4y3r
                 else if (modifiedLine.StartsWith("vector"))
                 {
                     output.type = ParsedShader.Property.Type.Vector;
+                    output.defaultValue = "float4" + output.defaultValue;
                 }
                 else if (modifiedLine.StartsWith("int"))
                 {
@@ -302,6 +305,7 @@ namespace d4rkpl4y3r
                 else if (modifiedLine.StartsWith("color"))
                 {
                     output.type = ParsedShader.Property.Type.Color;
+                    output.defaultValue = "float4" + output.defaultValue;
                 }
                 else if (modifiedLine.StartsWith("2darray"))
                 {
@@ -310,6 +314,17 @@ namespace d4rkpl4y3r
                 else if (modifiedLine.StartsWith("2d"))
                 {
                     output.type = ParsedShader.Property.Type.Texture2D;
+                    var d = output.defaultValue.Substring(1);
+                    d = d.Substring(0, d.IndexOf('"'));
+                    switch (d)
+                    {
+                        case "white": output.defaultValue = "float4(1,1,1,1)"; break;
+                        case "black": output.defaultValue = "float4(0,0,0,1)"; break;
+                        case "red": output.defaultValue = "float4(1,0,0,1)"; break;
+                        case "lineargrey": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
+                        case "bump": output.defaultValue = "float4(0.5,0.5,1,.5)"; break;
+                        case "grey": default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
+                    }
                 }
                 return output;
             }

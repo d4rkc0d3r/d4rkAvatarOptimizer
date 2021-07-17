@@ -107,7 +107,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 continue;
             shownProperties++;
             EditorGUILayout.LabelField(prop.name, "" + prop.type +
-                (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : ""));
+                (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : "")
+                + " = " + prop.defaultValue);
         }
 
         GUILayout.Space(20);

@@ -601,7 +601,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     if (arrayPropertyValues.ContainsKey("shouldSample" + prop.name))
                     {
-                        texturesToCheckNull[prop.name] = "float4(1,1,1,1)";
+                        texturesToCheckNull[prop.name] = prop.defaultValue;
                     }
                 }
             }
