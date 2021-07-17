@@ -578,15 +578,6 @@ namespace d4rkpl4y3r
 
     public class ShaderOptimizer
     {
-        private enum ParseState
-        {
-            Init,
-            PropertyBlock,
-            ShaderLab,
-            CGInclude,
-            CGProgram
-        }
-
         private List<string> output;
         private ParsedShader parsedShader;
         private int meshToggleCount;
@@ -1271,71 +1262,65 @@ namespace d4rkpl4y3r
         private List<string> Run()
         {
             output = new List<string>();
+            int lineIndex = 0;
+            while (lineIndex < parsedShader.lines.Count)
+            {
+                string line = parsedShader.lines[lineIndex++];
+                output.Add(line);
+                if (line == "Properties")
+                {
+                    break;
+                }
+            }
+            while (lineIndex < parsedShader.lines.Count)
+            {
+                string line = parsedShader.lines[lineIndex++];
+                if (line == "}")
+                {
+                    output.Add(line);
+                    break;
+                }
+                else if (line == "{" && meshToggleCount > 1)
+                {
+                    output.Add(line);
+                    for (int i = 0; i < meshToggleCount; i++)
+                    {
+                        output.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
+                    }
+                }
+                else if (texturesToMerge.Count > 0)
+                {
+                    var prop = ShaderAnalyzer.ParseProperty(line);
+                    if (texturesToMerge.Contains(prop?.name))
+                    {
+                        int index = line.LastIndexOf("2D");
+                        line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                        if (prop.name == "_MainTex")
+                            line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
+                    }
+                    output.Add(line);
+                }
+                else
+                {
+                    output.Add(line);
+                }
+            }
             int passID = -1;
-            var cgInclude = new List<string>();
-            var state = ParseState.Init;
-            for (int lineIndex = 0; lineIndex < parsedShader.lines.Count; lineIndex++)
+            for (; lineIndex < parsedShader.lines.Count; lineIndex++)
             {
                 string line = parsedShader.lines[lineIndex];
-                switch (state)
+                output.Add(line);
+                if (line == "CGPROGRAM")
                 {
-                    case ParseState.Init:
-                        if (line == "Properties")
-                        {
-                            state = ParseState.PropertyBlock;
-                        }
-                        output.Add(line);
-                        break;
-                    case ParseState.PropertyBlock:
-                        if (line == "}")
-                        {
-                            output.Add(line);
-                            state = ParseState.ShaderLab;
-                        }
-                        else if (line == "{" && meshToggleCount > 1)
-                        {
-                            output.Add(line);
-                            for (int i = 0; i < meshToggleCount; i++)
-                            {
-                                output.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
-                            }
-                        }
-                        else if (texturesToMerge.Count > 0)
-                        {
-                            var prop = ShaderAnalyzer.ParseProperty(line);
-                            if (texturesToMerge.Contains(prop?.name))
-                            {
-                                int index = line.LastIndexOf("2D");
-                                line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
-                                if (prop.name == "_MainTex")
-                                    line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
-                            }
-                            output.Add(line);
-                        }
-                        else
-                        {
-                            output.Add(line);
-                        }
-                        break;
-                    case ParseState.ShaderLab:
-                        if (line == "CGPROGRAM")
-                        {
-                            var pass = parsedShader.passes[++passID];
-                            vertexInUv0Member = "texcoord";
-                            texturesToCallSoTheSamplerDoesntDissapear.Clear();
-                            output.Add("CGPROGRAM");
-                            InjectPropertyArrays();
-                            while (parsedShader.lines[++lineIndex] != "ENDCG")
-                            {
-                                ParseCodeLines(parsedShader.lines, ref lineIndex, pass);
-                            }
-                            output.Add("ENDCG");
-                        }
-                        else
-                        {
-                            output.Add(line);
-                        }
-                        break;
+                    var pass = parsedShader.passes[++passID];
+                    vertexInUv0Member = "texcoord";
+                    texturesToCallSoTheSamplerDoesntDissapear.Clear();
+                    InjectPropertyArrays();
+                    while (parsedShader.lines[++lineIndex] != "ENDCG")
+                    {
+                        ParseCodeLines(parsedShader.lines, ref lineIndex, pass);
+                    }
+                    output.Add("ENDCG");
                 }
             }
             return output;
