@@ -9,8 +9,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
 {
     private Material mat = null;
     private ParsedShader parsedShader;
-    private int maxLines = 5;
-    private int maxProperties = 20;
+    private int maxLines = 20;
+    private int maxProperties = 50;
+    private bool showShaderLabParamsOnly = false;
 
     [MenuItem("Window/Shader Analyzer Debugger")]
     static void Init()
@@ -45,13 +46,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
         mat = EditorGUILayout.ObjectField("Material", mat, typeof(Material), false) as Material;
         maxLines = EditorGUILayout.IntField("Max Lines", maxLines);
         maxProperties = EditorGUILayout.IntField("Max Properties", maxProperties);
+        showShaderLabParamsOnly = EditorGUILayout.Toggle("Shader Lab Properties Only", showShaderLabParamsOnly);
 
         GUI.enabled = mat != null && mat.shader != null;
 
-        if (GUILayout.Button("Analyze"))
+        if (GUILayout.Button("Clear Shader Cache"))
         {
             ShaderAnalyzer.ClearParsedShaderCache();
-            parsedShader = ShaderAnalyzer.Parse(mat.shader);
         }
 
         if (GUILayout.Button("Optimize"))
@@ -75,6 +76,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         GUI.enabled = true;
 
+        parsedShader = ShaderAnalyzer.Parse(mat?.shader);
+
         if (parsedShader == null)
             return;
 
@@ -96,9 +99,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         GUILayout.Space(20);
 
-        for (int i = 0; i < maxProperties && i < parsedShader.properties.Count; i++)
+        int shownProperties = 0;
+        for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
         {
             var prop = parsedShader.properties[i];
+            if (showShaderLabParamsOnly && prop.shaderLabParams.Count == 0)
+                continue;
+            shownProperties++;
             EditorGUILayout.LabelField(prop.name, "" + prop.type +
                 (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : ""));
         }
