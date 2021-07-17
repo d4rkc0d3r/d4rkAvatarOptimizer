@@ -292,6 +292,11 @@ namespace d4rkpl4y3r
                 if (modifiedLine.StartsWith("range") || modifiedLine.StartsWith("float"))
                 {
                     output.type = ParsedShader.Property.Type.Float;
+                    if (output.defaultValue.StartsWith("("))
+                    {
+                        output.type = ParsedShader.Property.Type.Vector;
+                        output.defaultValue = "float4" + output.defaultValue;
+                    }
                 }
                 else if (modifiedLine.StartsWith("vector"))
                 {
