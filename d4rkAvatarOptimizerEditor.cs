@@ -721,8 +721,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                 switch (prop.type)
                 {
                     case ParsedShader.Property.Type.Color:
-                    case ParsedShader.Property.Type.Float:
                     case ParsedShader.Property.Type.Vector:
+                        break;
+                    case ParsedShader.Property.Type.Float:
+                        if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
+                            && mat.GetFloat(prop.name) != candidate.GetFloat(prop.name))
+                            return false;
                         break;
                     case ParsedShader.Property.Type.Int:
                         if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
