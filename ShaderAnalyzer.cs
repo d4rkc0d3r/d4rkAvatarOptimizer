@@ -1032,6 +1032,9 @@ namespace d4rkpl4y3r
                 {
                     var (type, values) = arrayProperty.Value;
                     string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
+                    output.Add("static " + type + " " +
+                        (arrayProperty.Key == "_MainTex_ST" && texturesToMerge.Contains("_MainTex")
+                        ? "_MainTexButNotQuiteSoThatUnityDoesntCry_ST;" : arrayProperty.Key + ";"));
                     output.Add("static const " + type + " " + name + "[" + values.Count + "] = ");
                     output.Add("{");
                     for (int i = 0; i < values.Count; i++)
@@ -1039,7 +1042,6 @@ namespace d4rkpl4y3r
                         output.Add(values[i] + ",");
                     }
                     output.Add("};");
-                    output.Add("static " + type + " " + arrayProperty.Key + ";");
                 }
             }
             foreach (var property in staticPropertyValues)

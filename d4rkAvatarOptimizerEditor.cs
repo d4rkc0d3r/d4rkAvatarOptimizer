@@ -499,72 +499,76 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     if (!mat.HasProperty(prop.name))
                         continue;
-                    if (prop.type == ParsedShader.Property.Type.Float)
+                    switch (prop.type)
                     {
-                        (string type, List<string> values) propertyArray;
-                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
-                        {
-                            propertyArray.type = "float";
-                            propertyArray.values = new List<string>();
-                            arrayPropertyValues[prop.name] = propertyArray;
-                        }
-                        propertyArray.values.Add("" + mat.GetFloat(prop.name));
-                    }
-                    if (prop.type == ParsedShader.Property.Type.Vector)
-                    {
-                        (string type, List<string> values) propertyArray;
-                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
-                        {
-                            propertyArray.type = "float4";
-                            propertyArray.values = new List<string>();
-                            arrayPropertyValues[prop.name] = propertyArray;
-                        }
-                        propertyArray.values.Add("float4" + mat.GetVector(prop.name));
-                    }
-                    if (prop.type == ParsedShader.Property.Type.Int)
-                    {
-                        (string type, List<string> values) propertyArray;
-                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
-                        {
-                            propertyArray.type = "int";
-                            propertyArray.values = new List<string>();
-                            arrayPropertyValues[prop.name] = propertyArray;
-                        }
-                        propertyArray.values.Add("" + mat.GetInt(prop.name));
-                    }
-                    if (prop.type == ParsedShader.Property.Type.Color)
-                    {
-                        (string type, List<string> values) propertyArray;
-                        if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
-                        {
-                            propertyArray.type = "float4";
-                            propertyArray.values = new List<string>();
-                            arrayPropertyValues[prop.name] = propertyArray;
-                        }
-                        propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
-                    }
-                    if (prop.type == ParsedShader.Property.Type.Texture2D)
-                    {
-                        if (!arrayPropertyValues.TryGetValue("arrayIndex" + prop.name, out var textureArray))
-                        {
-                            arrayPropertyValues["arrayIndex" + prop.name] = ("int", new List<string>());
-                            arrayPropertyValues["shouldSample" + prop.name] = ("bool", new List<string>());
-                        }
-                        var tex = mat.GetTexture(prop.name);
-                        var tex2D = tex as Texture2D;
-                        int index = 0;
-                        if (tex2D != null)
-                        {
-                            int texArrayIndex = textureArrayLists.FindIndex(l => l.Contains(tex2D));
-                            if (texArrayIndex != -1)
+                        case ParsedShader.Property.Type.Float:
+                            (string type, List<string> values) propertyArray;
+                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
                             {
-                                index = textureArrayLists[texArrayIndex].IndexOf(tex2D);
-                                texturesToMerge.Add(prop.name);
-                                propertyTextureArrayIndex[prop.name] = texArrayIndex;
+                                propertyArray.type = "float";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name] = propertyArray;
                             }
-                        }
-                        arrayPropertyValues["arrayIndex" + prop.name].values.Add("" + index);
-                        arrayPropertyValues["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
+                            propertyArray.values.Add("" + mat.GetFloat(prop.name));
+                        break;
+                        case ParsedShader.Property.Type.Vector:
+                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            {
+                                propertyArray.type = "float4";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name] = propertyArray;
+                            }
+                            propertyArray.values.Add("float4" + mat.GetVector(prop.name));
+                        break;
+                        case ParsedShader.Property.Type.Int:
+                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            {
+                                propertyArray.type = "int";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name] = propertyArray;
+                            }
+                            propertyArray.values.Add("" + mat.GetInt(prop.name));
+                        break;
+                        case ParsedShader.Property.Type.Color:
+                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            {
+                                propertyArray.type = "float4";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name] = propertyArray;
+                            }
+                            propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
+                            break;
+                        case ParsedShader.Property.Type.Texture2D:
+                            if (!arrayPropertyValues.TryGetValue("arrayIndex" + prop.name, out var textureArray))
+                            {
+                                arrayPropertyValues["arrayIndex" + prop.name] = ("int", new List<string>());
+                                arrayPropertyValues["shouldSample" + prop.name] = ("bool", new List<string>());
+                            }
+                            var tex = mat.GetTexture(prop.name);
+                            var tex2D = tex as Texture2D;
+                            int index = 0;
+                            if (tex2D != null)
+                            {
+                                int texArrayIndex = textureArrayLists.FindIndex(l => l.Contains(tex2D));
+                                if (texArrayIndex != -1)
+                                {
+                                    index = textureArrayLists[texArrayIndex].IndexOf(tex2D);
+                                    texturesToMerge.Add(prop.name);
+                                    propertyTextureArrayIndex[prop.name] = texArrayIndex;
+                                }
+                            }
+                            arrayPropertyValues["arrayIndex" + prop.name].values.Add("" + index);
+                            arrayPropertyValues["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
+                            if (!arrayPropertyValues.TryGetValue(prop.name + "_ST", out propertyArray))
+                            {
+                                propertyArray.type = "float4";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name + "_ST"] = propertyArray;
+                            }
+                            var scale = mat.GetTextureScale(prop.name);
+                            var offset = mat.GetTextureOffset(prop.name);
+                            propertyArray.values.Add("float4(" + scale.x + "," + scale.y + "," + offset.x + "," + offset.y + ")");
+                            break;
                     }
                 }
             }
@@ -741,13 +745,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             var mTex = mat.GetTexture(prop.name);
                             var cTex = candidate.GetTexture(prop.name);
-                            if (settings.MergeSameDimensionTextures && (!CanCombineTextures(mTex, cTex) ||
-                                mat.GetTextureOffset(prop.name) != candidate.GetTextureOffset(prop.name) ||
-                                mat.GetTextureScale(prop.name) != candidate.GetTextureScale(prop.name)))
+                            if (settings.MergeSameDimensionTextures && !CanCombineTextures(mTex, cTex))
                                 return false;
-                            if (!settings.MergeSameDimensionTextures && (cTex != mTex || (cTex != null && (
-                                mat.GetTextureOffset(prop.name) != candidate.GetTextureOffset(prop.name) ||
-                                mat.GetTextureScale(prop.name) != candidate.GetTextureScale(prop.name)))))
+                            if (!settings.MergeSameDimensionTextures && cTex != mTex)
                                 return false;
                         }
                         break;
