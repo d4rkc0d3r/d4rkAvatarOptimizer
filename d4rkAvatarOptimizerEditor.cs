@@ -57,10 +57,11 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         foreach (var material in candidate.sharedMaterials)
         {
-            if (!ShaderAnalyzer.Parse(material.shader).couldParse)
-            {
+            var parsedShader = ShaderAnalyzer.Parse(material.shader);
+            if (!parsedShader.couldParse)
                 return false;
-            }
+            if (!parsedShader.passes.All(pass => pass.vertex != null))
+                return false;
         }
         return true;
     }
