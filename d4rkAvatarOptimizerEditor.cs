@@ -26,7 +26,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
- 
+    private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
+
     private static void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
@@ -45,6 +46,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static string GetTransformPathToRoot(Transform t)
     {
+        if (t == root.transform)
+            return "";
         string path = t.name;
         while ((t = t.parent) != root.transform)
         {
@@ -74,6 +77,14 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
             return false;
+        var paths = list.Select(smr => GetTransformPathToRoot(smr.transform.parent)).ToList();
+        var t = candidate.transform;
+        while ((t = t.parent) != root.transform)
+        {
+            var path = GetTransformPathToRoot(t);
+            if (gameObjectTogglePaths.Contains(path) && paths.Any(p => !p.StartsWith(path)))
+                return false;
+        }
         return true;
     }
 
@@ -86,6 +97,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges()
     {
+        FindAllGameObjectTogglePaths();
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
@@ -382,6 +394,20 @@ public class d4rkAvatarOptimizerEditor : Editor
                 usedMaterialProperties[binding.path] = (props = new HashSet<string>());
             }
             props.Add(binding.propertyName.Substring("material.".Length));
+        }
+    }
+
+    private static void FindAllGameObjectTogglePaths()
+    {
+        gameObjectTogglePaths.Clear();
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        if (fxLayer == null)
+            return;
+        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        {
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+                gameObjectTogglePaths.Add(binding.path);
         }
     }
 
