@@ -920,7 +920,6 @@ namespace d4rkpl4y3r
                 + (usesOuputWrapper ? "geometryOutputWrapper" : outParamType)
                 + "> " + outParam.name + ")");
             output.Add("{");
-            sourceLineIndex++;
             if (usesInputWrapper)
             {
                 output.Add(inParam.type + " " + inParam.name + "[" + inParam.arraySize + "];");
@@ -943,7 +942,7 @@ namespace d4rkpl4y3r
                 return;
             }
             int braceDepth = 0;
-            for (; sourceLineIndex < source.Count; sourceLineIndex++)
+            while (++sourceLineIndex < source.Count)
             {
                 line = source[sourceLineIndex];
                 if (line == "}")
