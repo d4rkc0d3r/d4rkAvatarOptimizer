@@ -1,6 +1,7 @@
 ﻿#if UNITY_EDITOR
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using d4rkpl4y3r;
@@ -95,6 +96,17 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 GUILayout.Label("geometry: " + FuncToString(pass.geometry));
             if (pass.fragment != null)
                 GUILayout.Label("fragment: " + FuncToString(pass.fragment));
+        }
+
+        if (parsedShader.hasFunctionsWithTextureParameters)
+        {
+            GUILayout.Space(20);
+            foreach (var func in parsedShader.functions.Values)
+            {
+                if (!func.parameters.Any(p => p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"))
+                    continue;
+                GUILayout.Label(FuncToString(func));
+            }
         }
 
         GUILayout.Space(20);

@@ -718,6 +718,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (pass.fragment == null)
                 return false;
         }
+        bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.hasFunctionsWithTextureParameters;
         foreach (var prop in parsedShader.properties)
         {
             foreach (var mat in list)
@@ -745,9 +746,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             var mTex = mat.GetTexture(prop.name);
                             var cTex = candidate.GetTexture(prop.name);
-                            if (settings.MergeSameDimensionTextures && !CanCombineTextures(mTex, cTex))
+                            if (mergeTextures && !CanCombineTextures(mTex, cTex))
                                 return false;
-                            if (!settings.MergeSameDimensionTextures && cTex != mTex)
+                            if (!mergeTextures && cTex != mTex)
                                 return false;
                         }
                         break;

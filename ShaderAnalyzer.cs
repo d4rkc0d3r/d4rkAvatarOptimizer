@@ -63,6 +63,7 @@ namespace d4rkpl4y3r
         }
         public string name;
         public bool couldParse = true;
+        public bool hasFunctionsWithTextureParameters;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public List<Pass> passes = new List<Pass>();
@@ -573,6 +574,9 @@ namespace d4rkpl4y3r
                         break;
                 }
             }
+            parsedShader.hasFunctionsWithTextureParameters =
+                parsedShader.functions.Values.Any(f => f.parameters.Any(p =>
+                p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"));
         }
     }
 
