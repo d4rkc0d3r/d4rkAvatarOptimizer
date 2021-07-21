@@ -71,6 +71,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static bool CanCombineWith(List<SkinnedMeshRenderer> list, SkinnedMeshRenderer candidate)
     {
+        if (!settings.MergeSkinnedMeshes)
+            return false;
         if (!IsCombinableSkinnedMesh(list[0]))
             return false;
         if (!IsCombinableSkinnedMesh(candidate))
@@ -624,6 +626,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                     replace[tuple.Key] = tuple.Value.values[0];
                 }
             }
+            if (!settings.WritePropertiesAsStaticValues)
+            {
+                replace = null;
+            }
 
             var texturesToCheckNull = new Dictionary<string, string>();
             foreach (var prop in parsedShader.properties)
@@ -734,6 +740,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var parsedShader = ShaderAnalyzer.Parse(candidate.shader);
         if (parsedShader.couldParse == false)
             return false;
+        if (!settings.MergeDifferentPropertyMaterials)
+            return list.All(m => m == candidate);
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
@@ -1299,12 +1307,17 @@ public class d4rkAvatarOptimizerEditor : Editor
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         scriptPath = path.Substring(0, path.LastIndexOf('/'));
 
-        settings.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
-
+        settings.WritePropertiesAsStaticValues =
+            EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
+        settings.MergeSkinnedMeshes =
+            EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        GUI.enabled = settings.MergeDifferentPropertyMaterials =
+            EditorGUILayout.Toggle("Merge Different Property Materials", settings.MergeDifferentPropertyMaterials);
         settings.MergeSameDimensionTextures =
             EditorGUILayout.Toggle("Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
-
+        settings.MergeBackFaceCullingWithCullingOff =
+            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
+        GUI.enabled = true;
         settings.ProfileTimeUsed =
             EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
 
