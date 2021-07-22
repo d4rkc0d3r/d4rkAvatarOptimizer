@@ -249,6 +249,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (fxLayer == null)
             return;
 
+        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "/DummyAnimationToFillEmptyStates.anim");
         string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + fxLayer.name + ".controller");
         AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(fxLayer), path);
         var newFxLayer = (AnimatorController)
@@ -280,6 +281,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             else if (clip != null)
             {
                 state.motion = optimizedAnims[clip];
+            }
+            else
+            {
+                state.motion = dummyAnimationToFillEmptyStates;
             }
         }
 
