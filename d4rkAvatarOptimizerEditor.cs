@@ -13,6 +13,7 @@ using AnimationPath = System.ValueTuple<string, string, System.Type>;
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
+    private static bool disableMaterialPropertyArrayAnimations = true;
     private static GameObject root;
     private static d4rkAvatarOptimizer settings;
     private static string scriptPath = "Assets/d4rkAvatarOptimizer";
@@ -649,7 +650,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             var animatedPropertyValues = new Dictionary<string, string>();
-            if (meshToggleCount > 1)
+            if (meshToggleCount > 1 && !disableMaterialPropertyArrayAnimations)
             {
                 foreach (var propName in usedMaterialProps)
                 {
@@ -1251,7 +1252,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     var animatedMaterialPropertiesToAdd = new List<string>();
-                    if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
+                    if (!disableMaterialPropertyArrayAnimations && animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                     {
                         foreach (var propName in animatedProperties)
                         {
@@ -1287,11 +1288,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                             animatedMaterialPropertiesToAdd.Add(propName);
                         }
                     }
-                    if (!animatedMaterialProperties.TryGetValue(newPath, out animatedProperties))
+                    if (animatedMaterialPropertiesToAdd.Count > 0)
                     {
-                        animatedMaterialProperties[newPath] = animatedProperties = new HashSet<string>();
+                        if (!animatedMaterialProperties.TryGetValue(newPath, out animatedProperties))
+                        {
+                            animatedMaterialProperties[newPath] = animatedProperties = new HashSet<string>();
+                        }
+                        animatedProperties.UnionWith(animatedMaterialPropertiesToAdd);
                     }
-                    animatedProperties.UnionWith(animatedMaterialPropertiesToAdd);
                     meshRenderer.SetPropertyBlock(properties);
                 }
                 if (avDescriptor != null)
