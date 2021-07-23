@@ -587,6 +587,7 @@ namespace d4rkpl4y3r
         private int meshToggleCount;
         private Dictionary<string, string> staticPropertyValues;
         private Dictionary<string, (string type, List<string> values)> arrayPropertyValues;
+        private Dictionary<string, string> animatedPropertyValues;
         private Dictionary<string, string> texturesToNullCheck;
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
@@ -600,7 +601,8 @@ namespace d4rkpl4y3r
             int meshToggleCount = 0,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
             Dictionary<string, string> texturesToNullCheck = null,
-            HashSet<string> texturesToMerge = null)
+            HashSet<string> texturesToMerge = null,
+            Dictionary<string, string> animatedPropertyValues = null)
         {
             var optimizer = new ShaderOptimizer
             {
@@ -610,7 +612,8 @@ namespace d4rkpl4y3r
                 parsedShader = source,
                 texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
                 texturesToMerge = texturesToMerge ?? new HashSet<string>(),
-                texturesToCallSoTheSamplerDoesntDissapear = new HashSet<string>()
+                texturesToCallSoTheSamplerDoesntDissapear = new HashSet<string>(),
+                animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>()
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -648,14 +651,12 @@ namespace d4rkpl4y3r
             return output;
         }
 
-        private void AddParameterStructWrapper(List<string> funcParams, List<string> output, string name, bool addMaterialID, bool addMeshToggle, bool isInput)
+        private void AddParameterStructWrapper(List<string> funcParams, List<string> output, string name, bool addMeshMaterialID, bool isInput)
         {
             output.Add("struct " + name + "Wrapper");
             output.Add("{");
-            if (addMaterialID)
-                output.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
-            if (addMeshToggle)
-                output.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
+            if (addMeshMaterialID)
+                output.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
             foreach (var line in funcParams)
             {
                 if (line.StartsWith("#"))
@@ -748,8 +749,11 @@ namespace d4rkpl4y3r
             var isVoidReturn = returnParam.type == "void";
             List<string> funcParams = null;
             List<string> originalVertexShader = null;
-            bool needToPassOnMeshToggle = pass.geometry != null && meshToggleCount > 1;
-            if (arrayPropertyValues.Count > 0 || needToPassOnMeshToggle)
+            bool needToPassOnMeshOrMaterialID =
+                arrayPropertyValues.Count > 0
+                || (pass.geometry != null && meshToggleCount > 1)
+                || animatedPropertyValues.Count > 0;
+            if (needToPassOnMeshOrMaterialID)
             {
                 int startLineIndex = sourceLineIndex;
                 funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
@@ -757,8 +761,8 @@ namespace d4rkpl4y3r
                 if (returnParam.type != "void")
                     funcParams = funcParams.Prepend("out " + returnParam.type + " returnWrappedStruct"
                         + (returnParam.semantic != null ? " : " + returnParam.semantic : "")).ToList();
-                AddParameterStructWrapper(funcParams, output, "vertexOutput", arrayPropertyValues.Count > 0, needToPassOnMeshToggle, false);
-                AddParameterStructWrapper(funcParams, output, "vertexInput", false, false, true);
+                AddParameterStructWrapper(funcParams, output, "vertexOutput", true, false);
+                AddParameterStructWrapper(funcParams, output, "vertexInput", false, true);
                 output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexWithWrapper(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
@@ -790,18 +794,31 @@ namespace d4rkpl4y3r
                     val += " + _IsActiveMesh" + i;
                 }
                 output.Add(val + ";");
+                foreach (var animatedProperty in animatedPropertyValues.Keys)
+                {
+                    val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
+                    for (int i = 1; i < meshToggleCount; i++)
+                    {
+                        val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
+                    }
+                    output.Add(val + ";");
+                }
                 output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
                 output.Add("}");
-                output.Add("if (!_IsActiveMesh[" + uv0Name + ".z]) " + nullReturn);
+                output.Add("d4rkAvatarOptimizer_MeshID = " + uv0Name + ".z;");
+                output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) " + nullReturn);
+                foreach (var animatedProperty in animatedPropertyValues.Keys)
+                {
+                    output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
+                }
             }
-            sourceLineIndex++;
             if (arrayPropertyValues.Count > 0)
             {
                 output.Add("d4rkAvatarOptimizer_MaterialID = " + uv0Name + ".w;");
                 InjectArrayPropertyInitialization();
             }
             int braceDepth = 0;
-            for (; sourceLineIndex < source.Count; sourceLineIndex++)
+            while (++sourceLineIndex < source.Count)
             {
                 string line = source[sourceLineIndex];
                 originalVertexShader?.Add(line);
@@ -819,10 +836,11 @@ namespace d4rkpl4y3r
                                 output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
                                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
                             }
-                            if (arrayPropertyValues.Count > 0)
-                                output.Add(outParamName + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                            if (needToPassOnMeshToggle)
-                                output.Add(outParamName + ".d4rkAvatarOptimizer_NotCullVert = true;");
+                            if (needToPassOnMeshOrMaterialID)
+                            {
+                                output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
+                                    + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
+                            }
                             if (funcParams != null)
                                 output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                             output.Add("}");
@@ -855,10 +873,11 @@ namespace d4rkpl4y3r
                     {
                         output.Add(outParam.type + " d4rkAvatarOptimizer_vertexOutput = " + line.Substring("return ".Length));
                     }
-                    if (arrayPropertyValues.Count > 0)
-                        output.Add(outParamName + ".d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
-                    if (needToPassOnMeshToggle)
-                        output.Add(outParamName + ".d4rkAvatarOptimizer_NotCullVert = true;");
+                    if (needToPassOnMeshOrMaterialID)
+                    {
+                        output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
+                            + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
+                    }
                     output.Add((funcParams == null && isVoidReturn) ? "return;" : "return d4rkAvatarOptimizer_vertexOutput;");
                     output.Add("}");
                 }
@@ -885,16 +904,13 @@ namespace d4rkpl4y3r
             outParamType = outParamType.Substring(0, outParamType.Length - 1);
             var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.arraySize > 0);
             var wrapperStructs = new List<string>();
-            bool usesInputWrapper = arrayPropertyValues.Count > 0 || meshToggleCount > 1;
-            bool usesOuputWrapper = arrayPropertyValues.Count > 0;
+            bool usesOuputWrapper = animatedPropertyValues.Count > 0 || arrayPropertyValues.Count > 0;
+            bool usesInputWrapper = usesOuputWrapper || meshToggleCount > 1;
             if (usesInputWrapper)
             {
                 wrapperStructs.Add("struct geometryInputWrapper");
                 wrapperStructs.Add("{");
-                if (arrayPropertyValues.Count > 0)
-                    wrapperStructs.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
-                if (meshToggleCount > 1)
-                    wrapperStructs.Add("bool d4rkAvatarOptimizer_NotCullVert : d4rkAvatarOptimizer_NotCullVert;");
+                wrapperStructs.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
                 wrapperStructs.Add(inParam.type + " d4rkAvatarOptimizer_geometryInput;");
                 wrapperStructs.Add("};");
             }
@@ -902,7 +918,7 @@ namespace d4rkpl4y3r
             {
                 wrapperStructs.Add("struct geometryOutputWrapper");
                 wrapperStructs.Add("{");
-                wrapperStructs.Add("int d4rkAvatarOptimizer_MaterialID : d4rkAvatarOptimizer_MaterialID;");
+                wrapperStructs.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
                 wrapperStructs.Add(outParamType + " d4rkAvatarOptimizer_geometryOutput;");
                 wrapperStructs.Add("};");
             }
@@ -922,6 +938,8 @@ namespace d4rkpl4y3r
             output.Add("{");
             if (usesInputWrapper)
             {
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
+                output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_MeshMaterialID >> 16;");
                 output.Add(inParam.type + " " + inParam.name + "[" + inParam.arraySize + "];");
                 for (int i = 0; i < inParam.arraySize; i++)
                 {
@@ -930,11 +948,33 @@ namespace d4rkpl4y3r
             }
             if (meshToggleCount > 1)
             {
-                output.Add("if (!d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_NotCullVert) return;");
+                output.Add("if (d4rkAvatarOptimizer_Zero)");
+                output.Add("{");
+                string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh0";
+                for (int i = 1; i < meshToggleCount; i++)
+                {
+                    val += " + _IsActiveMesh" + i;
+                }
+                output.Add(val + ";");
+                foreach (var animatedProperty in animatedPropertyValues.Keys)
+                {
+                    val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
+                    for (int i = 1; i < meshToggleCount; i++)
+                    {
+                        val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
+                    }
+                    output.Add(val + ";");
+                }
+                output.Add("if (d4rkAvatarOptimizer_val) return;");
+                output.Add("}");
+                output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) return;");
+                foreach (var animatedProperty in animatedPropertyValues.Keys)
+                {
+                    output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
+                }
             }
             if (arrayPropertyValues.Count > 0)
             {
-                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_inputWrapper[0].d4rkAvatarOptimizer_MaterialID;");
                 InjectArrayPropertyInitialization();
             }
             if (!usesOuputWrapper)
@@ -963,8 +1003,8 @@ namespace d4rkpl4y3r
                     output.Add("{");
                     output.Add("geometryOutputWrapper d4rkAvatarOptimizer_geomOutput;");
                     output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_geometryOutput = " + line.Substring(line.IndexOf(".Append(") + 7));
-                    if (arrayPropertyValues.Count > 1)
-                        output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_MaterialID;");
+                    output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MeshMaterialID = "
+                        + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
                     output.Add(outParam.name + ".Append(d4rkAvatarOptimizer_geomOutput);");
                     output.Add("}");
                 }
@@ -981,10 +1021,12 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
-            if (arrayPropertyValues.Count > 0)
+            var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
+            var isVoidReturn = pass.fragment.parameters[0].type == "void";
+            if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
             {
                 var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
-                AddParameterStructWrapper(funcParams, output, "fragmentInput", true, false, true);
+                AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
                 output.Add(pass.fragment.parameters[0].type + " " + pass.fragment.name + "(");
                 output.Add("fragmentInputWrapper d4rkAvatarOptimizer_fragmentInput");
                 if (pass.fragment.parameters[0].semantic != null)
@@ -993,7 +1035,30 @@ namespace d4rkpl4y3r
                     output.Add(")");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_fragmentInput", true);
-                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MaterialID;");
+                output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
+                output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID >> 16;");
+                string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
+                if (animatedPropertyValues.Count > 0)
+                {
+                    output.Add("if (d4rkAvatarOptimizer_Zero)");
+                    output.Add("{");
+                    string val = "float d4rkAvatarOptimizer_val = 0";
+                    foreach (var animatedProperty in animatedPropertyValues.Keys)
+                    {
+                        val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
+                        for (int i = 1; i < meshToggleCount; i++)
+                        {
+                            val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
+                        }
+                        output.Add(val + ";");
+                    }
+                    output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
+                    output.Add("}");
+                    foreach(var animatedProperty in animatedPropertyValues.Keys)
+                    {
+                        output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
+                    }
+                }
                 InjectArrayPropertyInitialization();
             }
             else
@@ -1006,7 +1071,6 @@ namespace d4rkpl4y3r
                     output.Add(line);
                 }
             }
-            var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             if (texturesToCallSoTheSamplerDoesntDissapear.Count > 0)
             {
                 output.Add("if (d4rkAvatarOptimizer_Zero)");
@@ -1028,9 +1092,10 @@ namespace d4rkpl4y3r
         private void InjectPropertyArrays()
         {
             output.Add("uniform float d4rkAvatarOptimizer_Zero;");
+            output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
+            output.Add("static uint d4rkAvatarOptimizer_MeshID = 0;");
             if (arrayPropertyValues.Count > 0)
             {
-                output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
                 foreach (var arrayProperty in arrayPropertyValues)
                 {
                     var (type, values) = arrayProperty.Value;
@@ -1056,12 +1121,26 @@ namespace d4rkpl4y3r
             }
             if (meshToggleCount > 1)
             {
-                output.Add("cbuffer d4rkAvatarOptimizer_MeshToggles");
+                output.Add("cbuffer CBd4rkAvatarOptimizer_IsActiveMesh");
                 output.Add("{");
                 output.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
                 for (int i = 0; i < meshToggleCount; i++)
                 {
                     output.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
+                }
+                output.Add("};");
+            }
+            foreach (var animatedProperty in animatedPropertyValues)
+            {
+                string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
+                string type = animatedProperty.Value;
+                output.Add("static " + type + " " + animatedProperty.Key + " = 0;");
+                output.Add("cbuffer CB" + name);
+                output.Add("{");
+                output.Add(type + " " + name + "[" + meshToggleCount + "] : packoffset(c0);");
+                for (int i = 0; i < meshToggleCount; i++)
+                {
+                    output.Add(type + " " + name + i + " : packoffset(c" + i + ");");
                 }
                 output.Add("};");
             }
@@ -1228,7 +1307,9 @@ namespace d4rkpl4y3r
                         {
                             output.Add("static " + type + " " + name + " = " + value + ";");
                         }
-                        else if (!arrayPropertyValues.ContainsKey(name) && !texturesToReplaceCalls.Contains(name)
+                        else if (!arrayPropertyValues.ContainsKey(name)
+                            && !animatedPropertyValues.ContainsKey(name)
+                            && !texturesToReplaceCalls.Contains(name)
                             && !(type == "SamplerState" && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
                         {
                             output.Add(type + " " + name + ";");
@@ -1291,6 +1372,17 @@ namespace d4rkpl4y3r
                     for (int i = 0; i < meshToggleCount; i++)
                     {
                         output.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
+                    }
+                    foreach (var animatedProperty in animatedPropertyValues)
+                    {
+                        var prop = parsedShader.properties.FirstOrDefault(p => p.name == animatedProperty.Key);
+                        string defaultValue = "0";
+                        if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.Vector)
+                            defaultValue = "(0,0,0,0)";
+                        for (int i = 0; i < meshToggleCount; i++)
+                        {
+                            output.Add("d4rkAvatarOptimizer" + prop.name + i + "(\"" + prop.name + " " + i + "\", " + prop.type + ") = " + defaultValue);
+                        }
                     }
                 }
                 else if (texturesToMerge.Count > 0)
