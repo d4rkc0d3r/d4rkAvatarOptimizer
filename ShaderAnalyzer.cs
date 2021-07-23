@@ -66,6 +66,7 @@ namespace d4rkpl4y3r
         public bool hasFunctionsWithTextureParameters;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
+        public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
     }
@@ -577,6 +578,10 @@ namespace d4rkpl4y3r
             parsedShader.hasFunctionsWithTextureParameters =
                 parsedShader.functions.Values.Any(f => f.parameters.Any(p =>
                 p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"));
+            foreach (var prop in parsedShader.properties)
+            {
+                parsedShader.propertyTable[prop.name] = prop;
+            }
         }
     }
 
@@ -1042,10 +1047,10 @@ namespace d4rkpl4y3r
                 {
                     output.Add("if (d4rkAvatarOptimizer_Zero)");
                     output.Add("{");
-                    string val = "float d4rkAvatarOptimizer_val = 0";
+                    output.Add("float d4rkAvatarOptimizer_val = 0;");
                     foreach (var animatedProperty in animatedPropertyValues.Keys)
                     {
-                        val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
+                        string val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
                         for (int i = 1; i < meshToggleCount; i++)
                         {
                             val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
@@ -1091,6 +1096,33 @@ namespace d4rkpl4y3r
 
         private void InjectPropertyArrays()
         {
+            if (meshToggleCount > 1)
+            {
+                output.Add("cbuffer CBd4rkAvatarOptimizer");
+                output.Add("{");
+                output.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
+                for (int i = 0; i < meshToggleCount; i++)
+                {
+                    output.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
+                }
+                int currentPackOffset = meshToggleCount;
+                foreach (var animatedProperty in animatedPropertyValues)
+                {
+                    string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
+                    string type = animatedProperty.Value;
+                    output.Add(type + " " + name + "[" + meshToggleCount + "] : packoffset(c" + currentPackOffset + ");");
+                    for (int i = 0; i < meshToggleCount; i++)
+                    {
+                        output.Add(type + " " + name + i + " : packoffset(c" + (currentPackOffset + i) + ");");
+                    }
+                    currentPackOffset += meshToggleCount;
+                }
+                output.Add("};");
+                foreach (var animatedProperty in animatedPropertyValues)
+                {
+                    output.Add("static " + animatedProperty.Value + " " + animatedProperty.Key + " = 0;");
+                }
+            }
             output.Add("uniform float d4rkAvatarOptimizer_Zero;");
             output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
             output.Add("static uint d4rkAvatarOptimizer_MeshID = 0;");
@@ -1118,31 +1150,6 @@ namespace d4rkpl4y3r
                 {
                     output.Add("static int " + property.Key + " = " + property.Value + ";");
                 }
-            }
-            if (meshToggleCount > 1)
-            {
-                output.Add("cbuffer CBd4rkAvatarOptimizer_IsActiveMesh");
-                output.Add("{");
-                output.Add("float _IsActiveMesh[" + meshToggleCount + "] : packoffset(c0);");
-                for (int i = 0; i < meshToggleCount; i++)
-                {
-                    output.Add("float _IsActiveMesh" + i + " : packoffset(c" + i + ");");
-                }
-                output.Add("};");
-            }
-            foreach (var animatedProperty in animatedPropertyValues)
-            {
-                string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
-                string type = animatedProperty.Value;
-                output.Add("static " + type + " " + animatedProperty.Key + " = 0;");
-                output.Add("cbuffer CB" + name);
-                output.Add("{");
-                output.Add(type + " " + name + "[" + meshToggleCount + "] : packoffset(c0);");
-                for (int i = 0; i < meshToggleCount; i++)
-                {
-                    output.Add(type + " " + name + i + " : packoffset(c" + i + ");");
-                }
-                output.Add("};");
             }
             foreach (var texName in texturesToReplaceCalls)
             {
