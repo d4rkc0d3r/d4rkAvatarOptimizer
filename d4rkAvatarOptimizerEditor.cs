@@ -13,7 +13,6 @@ using AnimationPath = System.ValueTuple<string, string, System.Type>;
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
-    private static bool disableMaterialPropertyArrayAnimations = true;
     private static GameObject root;
     private static d4rkAvatarOptimizer settings;
     private static string scriptPath = "Assets/d4rkAvatarOptimizer";
@@ -650,7 +649,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             var animatedPropertyValues = new Dictionary<string, string>();
-            if (meshToggleCount > 1 && !disableMaterialPropertyArrayAnimations)
+            if (meshToggleCount > 1 && settings.KeepMaterialPropertyAnimationsSeparate)
             {
                 foreach (var propName in usedMaterialProps)
                 {
@@ -1235,8 +1234,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = combinableSkinnedMeshes[0];
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-
-            meshID = 0;
+            
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var oldPath = GetTransformPathToRoot(skinnedMesh.transform);
@@ -1252,39 +1250,45 @@ public class d4rkAvatarOptimizerEditor : Editor
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     var animatedMaterialPropertiesToAdd = new List<string>();
-                    if (!disableMaterialPropertyArrayAnimations && animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
+                    if (settings.KeepMaterialPropertyAnimationsSeparate
+                        && animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                     {
                         foreach (var propName in animatedProperties)
                         {
-                            foreach (var mat in skinnedMesh.sharedMaterials)
+                            for (int mID = 0; mID < combinableSkinnedMeshes.Count; mID++)
                             {
-                                var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
-                                if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
+                                foreach (var mat in combinableSkinnedMeshes[mID].sharedMaterials)
                                 {
-                                    if (prop.type == ParsedShader.Property.Type.Int)
+                                    var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
+                                    if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
                                     {
-                                        properties.SetInt("d4rkAvatarOptimizer" + propName + meshID, mat.GetInt(propName));
-                                        break;
-                                    }
-                                    else if (prop.type == ParsedShader.Property.Type.Float)
-                                    {
-                                        properties.SetFloat("d4rkAvatarOptimizer" + propName + meshID, mat.GetFloat(propName));
-                                        break;
-                                    }
-                                    else if (prop.type == ParsedShader.Property.Type.Color)
-                                    {
-                                        properties.SetColor("d4rkAvatarOptimizer" + propName + meshID, mat.GetColor(propName));
-                                        break;
-                                    }
-                                    else if (prop.type == ParsedShader.Property.Type.Vector)
-                                    {
-                                        properties.SetVector("d4rkAvatarOptimizer" + propName + meshID, mat.GetVector(propName));
-                                        break;
+                                        if (prop.type == ParsedShader.Property.Type.Int)
+                                        {
+                                            properties.SetInt("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
+                                            break;
+                                        }
+                                        else if (prop.type == ParsedShader.Property.Type.Float)
+                                        {
+                                            properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetFloat(propName));
+                                            break;
+                                        }
+                                        else if (prop.type == ParsedShader.Property.Type.Color)
+                                        {
+                                            properties.SetColor("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
+                                            break;
+                                        }
+                                        else if (prop.type == ParsedShader.Property.Type.Vector)
+                                        {
+                                            properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetVector(propName));
+                                            break;
+                                        }
                                     }
                                 }
+                                string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
+                                AddAnimationPathChange(
+                                    (path, "material." + propName, typeof(SkinnedMeshRenderer)),
+                                    (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
                             }
-                            AddAnimationPathChange((oldPath, "material." + propName, typeof(SkinnedMeshRenderer)),
-                                    (newPath, "material.d4rkAvatarOptimizer" + propName + meshID, typeof(SkinnedMeshRenderer)));
                             animatedMaterialPropertiesToAdd.Add(propName);
                         }
                     }
@@ -1305,13 +1309,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                         avDescriptor.VisemeSkinnedMesh = meshRenderer;
                     }
                 }
-                if (meshID++ > 0)
-                {
-                    var obj = skinnedMesh.gameObject;
-                    DestroyImmediate(skinnedMesh);
-                    if (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0)
-                        DestroyImmediate(obj);
-                }
+            }
+            for (meshID = 1; meshID < combinableSkinnedMeshes.Count; meshID++)
+            {
+                var obj = combinableSkinnedMeshes[meshID].gameObject;
+                DestroyImmediate(combinableSkinnedMeshes[meshID]);
+                if (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0)
+                    DestroyImmediate(obj);
             }
 
             meshRenderer.sharedMesh = combinedMesh;
@@ -1377,8 +1381,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         settings.WritePropertiesAsStaticValues =
             EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
-        settings.MergeSkinnedMeshes =
+        GUI.enabled = settings.MergeSkinnedMeshes =
             EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        settings.KeepMaterialPropertyAnimationsSeparate =
+            EditorGUILayout.Toggle("Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
+        GUI.enabled = true;
         GUI.enabled = settings.MergeDifferentPropertyMaterials =
             EditorGUILayout.Toggle("Merge Different Property Materials", settings.MergeDifferentPropertyMaterials);
         settings.MergeSameDimensionTextures =

@@ -992,7 +992,7 @@ namespace d4rkpl4y3r
         {
             var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             var isVoidReturn = pass.fragment.parameters[0].type == "void";
-            if (arrayPropertyValues.Count > 0 || meshToggleCount > 1)
+            if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
             {
                 var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
@@ -1007,7 +1007,7 @@ namespace d4rkpl4y3r
                 output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
                 output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID >> 16;");
                 string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
-                if (meshToggleCount > 1)
+                if (animatedPropertyValues.Count > 0)
                 {
                     InjectDummyCBufferUsage(nullReturn);
                     foreach(var animatedProperty in animatedPropertyValues.Keys)
@@ -1313,7 +1313,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0)
+                    if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
                         && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
                     {
                         output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
