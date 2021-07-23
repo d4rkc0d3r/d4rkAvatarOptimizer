@@ -791,26 +791,8 @@ namespace d4rkpl4y3r
             string uv0Name = inParam.name + "." + vertexInUv0Member;
             if (meshToggleCount > 1)
             {
-                output.Add("if (d4rkAvatarOptimizer_Zero)");
-                output.Add("{");
-                string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh0";
-                for (int i = 1; i < meshToggleCount; i++)
-                {
-                    val += " + _IsActiveMesh" + i;
-                }
-                output.Add(val + ";");
-                foreach (var animatedProperty in animatedPropertyValues.Keys)
-                {
-                    val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
-                    for (int i = 1; i < meshToggleCount; i++)
-                    {
-                        val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
-                    }
-                    output.Add(val + ";");
-                }
-                output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
-                output.Add("}");
                 output.Add("d4rkAvatarOptimizer_MeshID = " + uv0Name + ".z;");
+                InjectDummyCBufferUsage(nullReturn);
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) " + nullReturn);
                 foreach (var animatedProperty in animatedPropertyValues.Keys)
                 {
@@ -953,25 +935,7 @@ namespace d4rkpl4y3r
             }
             if (meshToggleCount > 1)
             {
-                output.Add("if (d4rkAvatarOptimizer_Zero)");
-                output.Add("{");
-                string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh0";
-                for (int i = 1; i < meshToggleCount; i++)
-                {
-                    val += " + _IsActiveMesh" + i;
-                }
-                output.Add(val + ";");
-                foreach (var animatedProperty in animatedPropertyValues.Keys)
-                {
-                    val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
-                    for (int i = 1; i < meshToggleCount; i++)
-                    {
-                        val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
-                    }
-                    output.Add(val + ";");
-                }
-                output.Add("if (d4rkAvatarOptimizer_val) return;");
-                output.Add("}");
+                InjectDummyCBufferUsage("return;");
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) return;");
                 foreach (var animatedProperty in animatedPropertyValues.Keys)
                 {
@@ -1028,7 +992,7 @@ namespace d4rkpl4y3r
         {
             var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             var isVoidReturn = pass.fragment.parameters[0].type == "void";
-            if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
+            if (arrayPropertyValues.Count > 0 || meshToggleCount > 1)
             {
                 var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
@@ -1043,22 +1007,9 @@ namespace d4rkpl4y3r
                 output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
                 output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID >> 16;");
                 string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
-                if (animatedPropertyValues.Count > 0)
+                if (meshToggleCount > 1)
                 {
-                    output.Add("if (d4rkAvatarOptimizer_Zero)");
-                    output.Add("{");
-                    output.Add("float d4rkAvatarOptimizer_val = 0;");
-                    foreach (var animatedProperty in animatedPropertyValues.Keys)
-                    {
-                        string val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "0.x";
-                        for (int i = 1; i < meshToggleCount; i++)
-                        {
-                            val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
-                        }
-                        output.Add(val + ";");
-                    }
-                    output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
-                    output.Add("}");
+                    InjectDummyCBufferUsage(nullReturn);
                     foreach(var animatedProperty in animatedPropertyValues.Keys)
                     {
                         output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
@@ -1092,6 +1043,29 @@ namespace d4rkpl4y3r
                     : "if (d4rkAvatarOptimizer_sum) return (" + outParam.type + ")0;");
                 output.Add("}");
             }
+        }
+
+        private void InjectDummyCBufferUsage(string nullReturn)
+        {
+            output.Add("if (d4rkAvatarOptimizer_Zero)");
+            output.Add("{");
+            string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh[d4rkAvatarOptimizer_MeshID]";
+            for (int i = 0; i < meshToggleCount; i++)
+            {
+                val += " + _IsActiveMesh" + i;
+            }
+            output.Add(val + ";");
+            foreach (var animatedProperty in animatedPropertyValues.Keys)
+            {
+                val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID].x";
+                for (int i = 0; i < meshToggleCount; i++)
+                {
+                    val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
+                }
+                output.Add(val + ";");
+            }
+            output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
+            output.Add("}");
         }
 
         private void InjectPropertyArrays()
