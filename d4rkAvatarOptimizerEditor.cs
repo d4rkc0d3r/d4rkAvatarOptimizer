@@ -369,7 +369,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             string path = GetTransformPathToRoot(meshRenderer.transform) + "/blendShape.";
             foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
             {
-                usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                if (blendShapeID >= 0)
+                    usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
             }
         }
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
@@ -1187,6 +1188,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
             int vertexOffset = 0;
             var usedBlendShapeNames = new HashSet<string>();
+            var blendShapeMeshIDtoNewName = new Dictionary<(int meshID, int blendShapeID), string>();
+            meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var mesh = skinnedMesh.sharedMesh;
@@ -1197,6 +1200,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     if (!usedBlendShapes.Contains(path + oldName))
                         continue;
                     var name = GenerateUniqueName(oldName, usedBlendShapeNames);
+                    blendShapeMeshIDtoNewName[(meshID, i)] = name;
                     blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(i);
                     AddAnimationPathChange(
                         (GetTransformPathToRoot(skinnedMesh.transform), "blendShape." + name, typeof(SkinnedMeshRenderer)),
@@ -1223,6 +1227,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
                 vertexOffset += mesh.vertexCount;
+                meshID++;
             }
             Profiler.EndSection();
 
@@ -1234,7 +1239,29 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = combinableSkinnedMeshes[0];
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
             var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
-            
+
+            if (avDescriptor?.customEyeLookSettings.eyelidType
+                == VRC.SDK3.Avatars.Components.VRCAvatarDescriptor.EyelidType.Blendshapes
+                && avDescriptor?.customEyeLookSettings.eyelidsSkinnedMesh != null)
+            {
+                var eyeLookMeshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+                var ids = avDescriptor.customEyeLookSettings.eyelidsBlendshapes;
+                for (int i = 0; i < ids.Length; i++)
+                {
+                    if (ids[i] < 0)
+                        continue;
+                    for (meshID = 0; meshID < combinableSkinnedMeshes.Count; meshID++)
+                    {
+                        if (combinableSkinnedMeshes[meshID] == eyeLookMeshRenderer)
+                        {
+                            avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh = meshRenderer;
+                            ids[i] = combinedMesh.GetBlendShapeIndex(blendShapeMeshIDtoNewName[(meshID, ids[i])]);
+                        }
+                    }
+                }
+                avDescriptor.customEyeLookSettings.eyelidsBlendshapes = ids;
+            }
+
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var oldPath = GetTransformPathToRoot(skinnedMesh.transform);
