@@ -200,7 +200,12 @@ namespace d4rkpl4y3r
                     else if (trimmedLine[i] == '"')
                     {
                         int end = FindEndOfStringLiteral(trimmedLine, i + 1);
-                        i = (end == -1) ? trimmedLine.Length : end;
+                        while (end == -1 && ++lineIndex < rawLines.Length)
+                        {
+                            trimmedLine += "\n" + rawLines[lineIndex].Trim();
+                            end = FindEndOfStringLiteral(trimmedLine, i + 1);
+                        }
+                        i = end;
                         continue;
                     }
                     else if (trimmedLine[i] != '/' || i == trimmedLine.Length - 1)
@@ -215,23 +220,14 @@ namespace d4rkpl4y3r
                     else if (trimmedLine[i + 1] == '*')
                     {
                         int endCommentBlock = trimmedLine.IndexOf("*/", i + 2);
-                        bool isMultiLineCommentBlock = endCommentBlock == -1;
                         while (endCommentBlock == -1 && ++lineIndex < rawLines.Length)
                         {
                             endCommentBlock = rawLines[lineIndex].IndexOf("*/");
                         }
                         if (endCommentBlock != -1)
                         {
-                            if (isMultiLineCommentBlock)
-                            {
-                                trimmedLine = trimmedLine.Substring(0, i)
-                                    + rawLines[lineIndex].Substring(endCommentBlock + 2);
-                            }
-                            else
-                            {
-                                trimmedLine = trimmedLine.Substring(0, i)
-                                    + trimmedLine.Substring(endCommentBlock + 2);
-                            }
+                            trimmedLine = trimmedLine.Substring(0, i)
+                                + rawLines[lineIndex].Substring(endCommentBlock + 2);
                             i -= 1;
                         }
                         else

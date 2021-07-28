@@ -1,5 +1,5 @@
 # d4rkAvatarOptimizer
-d4rkpl4y3rs VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
+d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
 ## How To Use
 Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.  
 You should then see something like this:
@@ -9,7 +9,7 @@ You should then see something like this:
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
 This enables the shader compiler to do more [constant folding](https://en.wikipedia.org/wiki/Constant_folding) and thus making the shader run faster.  
-Unfortunately the shader compiler is allowed to ignore NaN's while doing that so if a shader is not made with that in mind this might cause some issues.
+Unfortunately the shader compiler is allowed to ignore NaNs while doing that so if a shader is not made with that in mind this might cause some issues.
 ### Merge skinned meshes
 The optimizer tries to merge different skinned meshes together.
 If some of those skinned mesh game objects get toggled with animations in the fxlayer it will add logic to the shader to toggle those sub meshes in shader instead.
