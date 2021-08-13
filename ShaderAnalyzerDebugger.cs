@@ -12,6 +12,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private ParsedShader parsedShader;
     private int maxLines = 20;
     private int maxProperties = 50;
+    private int maxKeywords = 10;
     private bool showShaderLabParamsOnly = false;
 
     [MenuItem("Window/Shader Analyzer Debugger")]
@@ -47,6 +48,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
         mat = EditorGUILayout.ObjectField("Material", mat, typeof(Material), false) as Material;
         maxLines = EditorGUILayout.IntField("Max Lines", maxLines);
         maxProperties = EditorGUILayout.IntField("Max Properties", maxProperties);
+        maxKeywords = EditorGUILayout.IntField("Max Keywords", maxKeywords);
         showShaderLabParamsOnly = EditorGUILayout.Toggle("Shader Lab Properties Only", showShaderLabParamsOnly);
 
         GUI.enabled = mat != null && mat.shader != null;
@@ -106,6 +108,16 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (!func.parameters.Any(p => p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"))
                     continue;
                 GUILayout.Label(FuncToString(func));
+            }
+        }
+
+        if (parsedShader.shaderFeatureKeyWords.Count > 0)
+        {
+            GUILayout.Space(20);
+            GUILayout.Label("Possible shader keywords(" + parsedShader.shaderFeatureKeyWords.Count + "):");
+            foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
+            {
+                GUILayout.Label(keyword);
             }
         }
 

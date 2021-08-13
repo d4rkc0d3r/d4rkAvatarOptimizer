@@ -666,9 +666,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
+            var setShaderKeywords = parsedShader.shaderFeatureKeyWords.Where(k => source[0].IsKeywordEnabled(k)).ToList();
+
             Profiler.StartSection("ShaderOptimizer.Run()");
             var optimizedShader = ShaderOptimizer.Run(parsedShader, replace, meshToggleCount,
-                arrayPropertyValues, texturesToCheckNull, texturesToMerge, animatedPropertyValues);
+                arrayPropertyValues, texturesToCheckNull, texturesToMerge, animatedPropertyValues, setShaderKeywords);
             Profiler.EndSection();
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
@@ -677,6 +679,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             optimizedShader[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
             System.IO.File.WriteAllLines(shaderFilePath, optimizedShader);
             var optimizedMaterial = Instantiate(source[0]);
+            foreach (var keyword in setShaderKeywords)
+            {
+                optimizedMaterial.DisableKeyword(keyword);
+            }
             if (cullReplace != null)
             {
                 optimizedMaterial.SetInt(cullReplace, 0);
@@ -774,6 +780,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (pass.domain != null)
                 return false;
             if (pass.fragment == null)
+                return false;
+        }
+        foreach (var keyword in parsedShader.shaderFeatureKeyWords)
+        {
+            if (list[0].IsKeywordEnabled(keyword) ^ candidate.IsKeywordEnabled(keyword))
                 return false;
         }
         bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.hasFunctionsWithTextureParameters;

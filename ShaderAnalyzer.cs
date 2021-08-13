@@ -69,6 +69,7 @@ namespace d4rkpl4y3r
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
+        public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
     }
 
     public static class ShaderAnalyzer
@@ -434,29 +435,36 @@ namespace d4rkpl4y3r
             if (!line.StartsWith("#pragma "))
                 return;
             line = line.Substring("#pragma ".Length);
-            var match = Regex.Match(line, @"(vertex|hull|domain|geometry|fragment)\s+(\w+)");
-            if (!match.Success)
-                return;
-            var funcName = match.Groups[2].Value;
-            parsedShader.functions.TryGetValue(funcName, out ParsedShader.Function func);
-            func = func ?? new ParsedShader.Function() { name = funcName };
-            switch (match.Groups[1].Value)
+            var match = Regex.Match(line, @"^\s*(vertex|hull|domain|geometry|fragment)\s+(\w+)");
+            if (match.Success)
             {
-                case "vertex":
-                    pass.vertex = func;
-                    return;
-                case "hull":
-                    pass.hull = func;
-                    return;
-                case "domain":
-                    pass.domain = func;
-                    return;
-                case "geometry":
-                    pass.geometry = func;
-                    return;
-                case "fragment":
-                    pass.fragment = func;
-                    return;
+                var funcName = match.Groups[2].Value;
+                parsedShader.functions.TryGetValue(funcName, out ParsedShader.Function func);
+                func = func ?? new ParsedShader.Function() { name = funcName };
+                switch (match.Groups[1].Value)
+                {
+                    case "vertex":
+                        pass.vertex = func;
+                        break;
+                    case "hull":
+                        pass.hull = func;
+                        break;
+                    case "domain":
+                        pass.domain = func;
+                        break;
+                    case "geometry":
+                        pass.geometry = func;
+                        break;
+                    case "fragment":
+                        pass.fragment = func;
+                        break;
+                }
+            }
+            match = Regex.Match(line, @"^\s*shader_feature(?:_local)?(?:\s+(\w+))+");
+            if (match.Success)
+            {
+                parsedShader.shaderFeatureKeyWords.UnionWith(
+                    match.Groups[1].Captures.Cast<Capture>().Select(c => c.Value));
             }
         }
 
@@ -594,6 +602,7 @@ namespace d4rkpl4y3r
         private HashSet<string> texturesToReplaceCalls;
         private string vertexInUv0Member;
         private HashSet<string> texturesToCallSoTheSamplerDoesntDissapear;
+        private List<string> setKeywords;
 
         private ShaderOptimizer() {}
 
@@ -603,7 +612,8 @@ namespace d4rkpl4y3r
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
             Dictionary<string, string> texturesToNullCheck = null,
             HashSet<string> texturesToMerge = null,
-            Dictionary<string, string> animatedPropertyValues = null)
+            Dictionary<string, string> animatedPropertyValues = null,
+            List<string> setKeywords = null)
         {
             var optimizer = new ShaderOptimizer
             {
@@ -614,7 +624,8 @@ namespace d4rkpl4y3r
                 texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
                 texturesToMerge = texturesToMerge ?? new HashSet<string>(),
                 texturesToCallSoTheSamplerDoesntDissapear = new HashSet<string>(),
-                animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>()
+                animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
+                setKeywords = setKeywords ?? new List<string>()
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -1093,6 +1104,10 @@ namespace d4rkpl4y3r
                     output.Add("static " + animatedProperty.Value + " " + animatedProperty.Key + " = 0;");
                 }
             }
+            foreach(var keyword in setKeywords)
+            {
+                output.Add("#define " + keyword);
+            }
             output.Add("uniform float d4rkAvatarOptimizer_Zero;");
             output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
             output.Add("static uint d4rkAvatarOptimizer_MeshID = 0;");
@@ -1307,17 +1322,14 @@ namespace d4rkpl4y3r
                         output.Add(line);
                     }
                 }
-                else
-                {
-                    if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
+                else if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
                         && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
-                    {
-                        output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
-                    }
-                    else
-                    {
-                        output.Add(ReplaceTextureSamples(line));
-                    }
+                {
+                    output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                }
+                else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
+                {
+                    output.Add(ReplaceTextureSamples(line));
                 }
             }
         }
@@ -1362,20 +1374,21 @@ namespace d4rkpl4y3r
                         }
                     }
                 }
-                else if (texturesToMerge.Count > 0)
-                {
-                    var prop = ShaderAnalyzer.ParseProperty(line);
-                    if (texturesToMerge.Contains(prop?.name))
-                    {
-                        int index = line.LastIndexOf("2D");
-                        line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
-                        if (prop.name == "_MainTex")
-                            line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
-                    }
-                    output.Add(line);
-                }
                 else
                 {
+                    if (texturesToMerge.Count > 0)
+                    {
+                        var prop = ShaderAnalyzer.ParseProperty(line);
+                        if (texturesToMerge.Contains(prop?.name))
+                        {
+                            int index = line.LastIndexOf("2D");
+                            line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                            if (prop.name == "_MainTex")
+                                line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
+                        }
+                    }
+                    line = Regex.Replace(line, @"\[Toggle(?:Off)?(?:\(\w+\))?\]", "[ToggleUI()]");
+                    line = Regex.Replace(line, @"\[KeywordEnum\([^)]\)\]", "");
                     output.Add(line);
                 }
             }
