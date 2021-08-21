@@ -949,13 +949,21 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var sourceVertices = mesh.vertices;
             var sourceIndices = mesh.triangles;
-            var sourceUv = new List<Vector3>();
-            mesh.GetUVs(0, sourceUv);
+            var sourceUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
+            for(int i = 0; i < 8; i++)
+            {
+                mesh.GetUVs(i, sourceUv[i]);
+                sourceUv[i] = sourceUv[i].Count != sourceVertices.Length ? Enumerable.Range(0, sourceVertices.Length).Select(r => Vector4.zero).ToList() : sourceUv[i];
+            }
+            var sourceColor = mesh.colors;
             var sourceNormals = mesh.normals;
             var sourceTangents = mesh.tangents;
             var sourceWeights = mesh.boneWeights;
 
-            var targetUv = new List<Vector4>();
+            var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
+            var targetColor = new List<Color>();
+            if (sourceColor.Length != sourceVertices.Length)
+                targetColor = null;
             var targetVertices = new List<Vector3>();
             var targetIndices = new List<List<int>>();
             var targetNormals = new List<Vector3>();
@@ -987,7 +995,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                             newIndex = targetVertices.Count;
                             indexList.Add(newIndex);
                             indexMap[oldIndex] = newIndex;
-                            targetUv.Add(new Vector4(sourceUv[oldIndex].x, sourceUv[oldIndex].y, sourceUv[oldIndex].z, internalMaterialID));
+                            targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z, internalMaterialID));
+                            for (int a = 1; a < 8; a++)
+                            {
+                                targetUv[a].Add(sourceUv[a][oldIndex]);
+                            }
+                            targetColor?.Add(sourceColor[oldIndex]);
                             targetVertices.Add(sourceVertices[oldIndex]);
                             targetNormals.Add(sourceNormals[oldIndex]);
                             targetTangents.Add(sourceTangents[oldIndex]);
@@ -1008,7 +1021,25 @@ public class d4rkAvatarOptimizerEditor : Editor
                 newMesh.SetVertices(targetVertices);
                 newMesh.bindposes = mesh.bindposes;
                 newMesh.boneWeights = targetWeights.ToArray();
-                newMesh.SetUVs(0, targetUv);
+                if (targetColor != null && targetColor.Any(c => !c.Equals(new Color())))
+                {
+                    newMesh.colors = targetColor.ToArray();
+                }
+                for (int i = 0; i < 1; i++)
+                {
+                    if (targetUv[i].Any(uv => uv.w != 0))
+                    {
+                        newMesh.SetUVs(i, targetUv[i]);
+                    }
+                    else if (targetUv[i].Any(uv => uv.z != 0))
+                    {
+                        newMesh.SetUVs(i, targetUv[i].Cast<Vector3>().ToArray());
+                    }
+                    else if (targetUv[i].Any(uv => uv.x != 0 || uv.y != 0))
+                    {
+                        newMesh.SetUVs(i, targetUv[i].Cast<Vector2>().ToArray());
+                    }
+                }
                 newMesh.bounds = mesh.bounds;
                 newMesh.SetNormals(targetNormals);
                 newMesh.SetTangents(targetTangents);
@@ -1069,7 +1100,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var combinableSkinnedMeshes in combinableSkinnedMeshList)
         {
             var targetBones = new List<Transform>();
-            var targetUv = new List<Vector4>();
+            var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
+            var targetColor = new List<Color>();
             var targetVertices = new List<Vector3>();
             var targetIndices = new List<List<int>>();
             var targetNormals = new List<Vector3>();
@@ -1107,6 +1139,29 @@ public class d4rkAvatarOptimizerEditor : Editor
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, 1, -1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, -1) + aabb.center));
+                
+                for (int i = 1; i < 8; i++)
+                {
+                    var uvs = new List<Vector4>();
+                    mesh.GetUVs(i, uvs);
+                    if (uvs.Count == sourceVertices.Length)
+                    {
+                        targetUv[i].AddRange(uvs);
+                    }
+                    else
+                    {
+                        targetUv[i].AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Vector4.zero));
+                    }
+                }
+                var sourceColor = mesh.colors;
+                if (sourceColor.Length == sourceVertices.Length)
+                {
+                    targetColor.AddRange(mesh.colors);
+                }
+                else
+                {
+                    targetColor.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => new Color()));
+                }
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
@@ -1114,7 +1169,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
-                    targetUv.Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
                     var boneWeight = sourceWeights[vertIndex];
                     Matrix4x4 toWorld = Matrix4x4.zero;
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0);
@@ -1185,7 +1240,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMesh.SetVertices(targetVertices);
             combinedMesh.bindposes = targetBindPoses.ToArray();
             combinedMesh.boneWeights = targetWeights.ToArray();
-            combinedMesh.SetUVs(0, targetUv);
+            if (targetColor.Any(c => !c.Equals(new Color())))
+            {
+                combinedMesh.colors = targetColor.ToArray();
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                if (targetUv[i].Any(uv => !uv.Equals(Vector4.zero)))
+                {
+                    combinedMesh.SetUVs(i, targetUv[i]);
+                }
+            }
             combinedMesh.bounds = combinableSkinnedMeshes[0].sharedMesh.bounds;
             combinedMesh.SetNormals(targetNormals);
             combinedMesh.SetTangents(targetTangents);
