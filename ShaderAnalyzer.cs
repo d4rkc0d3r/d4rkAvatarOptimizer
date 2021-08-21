@@ -43,11 +43,11 @@ namespace d4rkpl4y3r
                 public string semantic;
                 public bool isOutput = false;
                 public bool isInput = false;
-                public int arraySize = 0;
+                public int arraySize = -1;
                 public override string ToString()
                 {
                     return (isOutput ? (isInput ? "inout " : "out ") : "") + type + " " + name
-                        + (arraySize > 0 ? "[" + arraySize + "]" : "") + (semantic != null ? " : " + semantic : "");
+                        + (arraySize > -1 ? "[" + arraySize + "]" : "") + (semantic != null ? " : " + semantic : "");
                 }
             }
             public string name;
@@ -390,7 +390,7 @@ namespace d4rkpl4y3r
                         var param = new ParsedShader.Function.Parameter();
                         param.type = m.Groups[5].Value;
                         param.name = m.Groups[8].Value;
-                        param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : 0;
+                        param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : -1;
                         param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
                         param.isInput = inout != "out";
                         param.isOutput = inout == "out" || inout == "inout";
@@ -896,7 +896,7 @@ namespace d4rkpl4y3r
             var outParam = func.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
             var outParamType = outParam.type.Substring(outParam.type.IndexOf('<') + 1);
             outParamType = outParamType.Substring(0, outParamType.Length - 1);
-            var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.arraySize > 0);
+            var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.arraySize >= 0);
             var wrapperStructs = new List<string>();
             bool usesOuputWrapper = animatedPropertyValues.Count > 0 || arrayPropertyValues.Count > 0;
             bool usesInputWrapper = usesOuputWrapper || meshToggleCount > 1;
@@ -928,7 +928,9 @@ namespace d4rkpl4y3r
                 + "[" + inParam.arraySize + "], inout "
                 + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
                 + (usesOuputWrapper ? "geometryOutputWrapper" : outParamType)
-                + "> " + outParam.name + ")");
+                + "> " + outParam.name
+                + string.Join("", func.parameters.Where(p => p.isInput && p != inParam && p != outParam).Select(p => ", " + p))
+                + ")");
             output.Add("{");
             if (usesInputWrapper)
             {
