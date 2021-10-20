@@ -1042,7 +1042,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 newMesh.bounds = mesh.bounds;
                 newMesh.SetNormals(targetNormals);
-                newMesh.SetTangents(targetTangents);
+                if (targetTangents.Any(t => t != Vector4.zero))
+                    newMesh.SetTangents(targetTangents);
                 newMesh.subMeshCount = matchedMaterials.Count;
                 for (int i = 0; i < matchedMaterials.Count; i++)
                 {
@@ -1179,7 +1180,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     sourceToWorld.Add(toWorld);
                     targetVertices.Add(toWorld.MultiplyPoint3x4(sourceVertices[vertIndex]));
                     targetNormals.Add(toWorld.MultiplyVector(sourceNormals[vertIndex]).normalized);
-                    var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]);
+                    var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]).normalized;
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
