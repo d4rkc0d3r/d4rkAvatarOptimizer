@@ -128,7 +128,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             if (subList.Count == 1)
                 continue;
-            int index = subList.FindIndex(smr => smr == avDescriptor.VisemeSkinnedMesh);
+            int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
             if (index == -1)
                 continue;
             var oldFirst = subList[0];
@@ -1033,11 +1033,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     else if (targetUv[i].Any(uv => uv.z != 0))
                     {
-                        newMesh.SetUVs(i, targetUv[i].Cast<Vector3>().ToArray());
+                        newMesh.SetUVs(i, targetUv[i].Select(uv => new Vector3(uv.x, uv.y, uv.z)).ToArray());
                     }
                     else if (targetUv[i].Any(uv => uv.x != 0 || uv.y != 0))
                     {
-                        newMesh.SetUVs(i, targetUv[i].Cast<Vector2>().ToArray());
+                        newMesh.SetUVs(i, targetUv[i].Select(uv => new Vector2(uv.x, uv.y)).ToArray());
                     }
                 }
                 newMesh.bounds = mesh.bounds;
