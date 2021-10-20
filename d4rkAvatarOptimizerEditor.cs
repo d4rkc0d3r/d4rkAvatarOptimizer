@@ -1025,7 +1025,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     newMesh.colors = targetColor.ToArray();
                 }
-                for (int i = 0; i < 1; i++)
+                for (int i = 0; i < 8; i++)
                 {
                     if (targetUv[i].Any(uv => uv.w != 0))
                     {
