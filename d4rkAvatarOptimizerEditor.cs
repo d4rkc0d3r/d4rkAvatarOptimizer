@@ -1339,6 +1339,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 avDescriptor.customEyeLookSettings.eyelidsBlendshapes = ids;
             }
 
+            meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var oldPath = GetTransformPathToRoot(skinnedMesh.transform);
@@ -1405,6 +1406,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                         animatedProperties.UnionWith(animatedMaterialPropertiesToAdd);
                     }
                     meshRenderer.SetPropertyBlock(properties);
+                    meshID++;
                 }
                 if (avDescriptor != null)
                 {
