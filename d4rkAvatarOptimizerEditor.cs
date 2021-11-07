@@ -58,6 +58,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
     {
+        if (candidate.TryGetComponent(out Cloth cloth))
+        {
+            return false;
+        }
         foreach (var material in candidate.sharedMaterials)
         {
             var parsedShader = ShaderAnalyzer.Parse(material.shader);
