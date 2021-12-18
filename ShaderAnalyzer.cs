@@ -1281,7 +1281,7 @@ namespace d4rkpl4y3r
             else
             {
                 var match = variableDeclaration.Match(line);
-                if (match.Success)
+                if (match.Success && match.Groups[2].Value != "return")
                 {
                     var type = match.Groups[2].Value;
                     var names = match.Groups[5].Captures.Cast<Capture>().Select(c => c.Value).ToList();
