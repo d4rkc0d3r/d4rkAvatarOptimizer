@@ -751,6 +751,54 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             CreateUniqueAsset(mat, mat.name + ".mat");
         }
+
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var meshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = meshRenderer.sharedMesh;
+            if (mesh == null)
+                continue;
+
+            var props = new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(props);
+            int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
+
+            if (settings.KeepMaterialPropertyAnimationsSeparate
+                && animatedMaterialProperties.TryGetValue(GetTransformPathToRoot(meshRenderer.transform), out var animatedProperties))
+            {
+                foreach (var mat in meshRenderer.sharedMaterials)
+                {
+                    foreach (var animPropName in animatedProperties)
+                    {
+                        var propName = "d4rkAvatarOptimizer" + animPropName;
+                        bool isVector = false;
+                        if (propName.EndsWith(".x"))
+                        {
+                            propName = propName.Substring(0, propName.Length - 2);
+                            isVector = true;
+                        }
+                        else if (propName[propName.Length - 2] == '.')
+                        {
+                            continue;
+                        }
+                        for (int mID = 0; mID < meshCount; mID++)
+                        {
+                            if (isVector)
+                            {
+                                mat.SetVector(propName, props.GetVector(propName + mID));
+                            }
+                            else
+                            {
+                                mat.SetFloat(propName + mID, props.GetFloat(propName + mID));
+                            }
+                        }
+                    }
+                }
+            }
+            Profiler.StartSection("AssetDatabase.SaveAssets()");
+            AssetDatabase.SaveAssets();
+            Profiler.EndSection();
+        }
     }
 
     private static bool CanCombineTextures(Texture a, Texture b)
@@ -920,7 +968,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var meshRenderer in skinnedMeshRenderers)
         {
             var mesh = meshRenderer.sharedMesh;
-
             if (mesh == null)
                 continue;
 
@@ -1383,8 +1430,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                     if (settings.KeepMaterialPropertyAnimationsSeparate
                         && animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                     {
-                        foreach (var propName in animatedProperties)
+                        foreach (var animPropName in animatedProperties)
                         {
+                            var propName = animPropName;
+                            bool isVector = false;
+                            if (propName.EndsWith(".x"))
+                            {
+                                propName = propName.Substring(0, propName.Length - 2);
+                                isVector = true;
+                            }
+                            else if (propName[propName.Length - 2] == '.')
+                            {
+                                continue;
+                            }
                             for (int mID = 0; mID < combinableSkinnedMeshes.Count; mID++)
                             {
                                 foreach (var mat in combinableSkinnedMeshes[mID].sharedMaterials)
@@ -1394,7 +1452,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                     {
                                         if (prop.type == ParsedShader.Property.Type.Int)
                                         {
-                                            properties.SetInt("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
+                                            properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
                                             break;
                                         }
                                         else if (prop.type == ParsedShader.Property.Type.Float)
@@ -1404,7 +1462,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                         }
                                         else if (prop.type == ParsedShader.Property.Type.Color)
                                         {
-                                            properties.SetColor("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
+                                            properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
                                             break;
                                         }
                                         else if (prop.type == ParsedShader.Property.Type.Vector)
@@ -1415,11 +1473,23 @@ public class d4rkAvatarOptimizerEditor : Editor
                                     }
                                 }
                                 string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
-                                AddAnimationPathChange(
-                                    (path, "material." + propName, typeof(SkinnedMeshRenderer)),
-                                    (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
+                                if (isVector)
+                                {
+                                    foreach (var component in new string[] { ".x" , ".y", ".z", ".w" })
+                                    {
+                                        AddAnimationPathChange(
+                                            (path, "material." + propName + component, typeof(SkinnedMeshRenderer)),
+                                            (newPath, "material.d4rkAvatarOptimizer" + propName + mID + component, typeof(SkinnedMeshRenderer)));
+                                    }
+                                }
+                                else
+                                {
+                                    AddAnimationPathChange(
+                                        (path, "material." + propName, typeof(SkinnedMeshRenderer)),
+                                        (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
+                                }
                             }
-                            animatedMaterialPropertiesToAdd.Add(propName);
+                            animatedMaterialPropertiesToAdd.Add(animPropName);
                         }
                     }
                     if (animatedMaterialPropertiesToAdd.Count > 0)
