@@ -27,6 +27,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
+    private static Material nullMaterial = null;
+    private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     
     private static void ClearTrashBin()
     {
@@ -64,6 +66,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         foreach (var material in candidate.sharedMaterials)
         {
+            if (material == null)
+                return false;
             var parsedShader = ShaderAnalyzer.Parse(material.shader);
             if (!parsedShader.couldParse)
                 return false;
@@ -454,11 +458,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         foreach (var source in sources)
         {
-            var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
-            if (!parsedShader.couldParse)
-            {
+            var parsedShader = ShaderAnalyzer.Parse(source[0]?.shader);
+            if (parsedShader == null || !parsedShader.couldParse)
                 continue;
-            }
             var propertyTextureLists = new Dictionary<string, List<Texture2D>>();
             foreach (var mat in source)
             {
@@ -523,8 +525,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         int matIndex = 0;
         foreach (var source in sources)
         {
-            var parsedShader = ShaderAnalyzer.Parse(source[0].shader);
-            if (!parsedShader.couldParse)
+            var parsedShader = ShaderAnalyzer.Parse(source[0]?.shader);
+            if (parsedShader == null || !parsedShader.couldParse)
             {
                 materials[matIndex++] = source[0];
                 continue;
@@ -1115,7 +1117,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var targetBindPoses = new List<Matrix4x4>();
             var sourceToWorld = new List<Matrix4x4>();
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
-            var toLocal = combinableSkinnedMeshes[0].rootBone.worldToLocalMatrix;
+            var toLocal = (combinableSkinnedMeshes[0].rootBone ?? combinableSkinnedMeshes[0].transform).worldToLocalMatrix;
 
             Profiler.StartSection("CombineMeshData");
             int meshID = 0;
@@ -1135,7 +1137,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     skinnedMesh.bones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
                     ).ToArray();
                 var aabb = skinnedMesh.localBounds;
-                var m = toLocal * skinnedMesh.rootBone.localToWorldMatrix;
+                var m = toLocal * (skinnedMesh.rootBone ?? skinnedMesh.transform).localToWorldMatrix;
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, -1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, -1, 1) + aabb.center));
@@ -1145,6 +1147,25 @@ public class d4rkAvatarOptimizerEditor : Editor
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, -1, -1, -1) + aabb.center));
                 
+                if (sourceWeights.Length != sourceVertices.Length)
+                {
+                    var defaultWeight = new BoneWeight
+                    {
+                        boneIndex0 = 0,
+                        boneIndex1 = 0,
+                        boneIndex2 = 0,
+                        boneIndex3 = 0,
+                        weight0 = 1,
+                        weight1 = 0,
+                        weight2 = 0,
+                        weight3 = 0
+                    };
+                    sourceWeights = Enumerable.Range(0, sourceVertices.Length).Select(s => defaultWeight).ToArray();
+                    sourceBones = new Transform[1] { skinnedMesh.transform };
+                    toWorldArray = new Matrix4x4[1] { skinnedMesh.transform.localToWorldMatrix };
+                    keepTransforms.Add(skinnedMesh.transform);
+                }
+
                 for (int i = 1; i < 8; i++)
                 {
                     var uvs = new List<Vector4>();
@@ -1424,7 +1445,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
-                if (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0)
+                if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0))
                     DestroyImmediate(obj);
             }
 
@@ -1461,6 +1482,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
+        keepTransforms.Clear();
         Profiler.StartSection("CalculateUsedBlendShapePaths()");
         CalculateUsedBlendShapePaths();
         Profiler.StartNextSection("CalculateUsedMaterialProperties()");
@@ -1485,6 +1507,11 @@ public class d4rkAvatarOptimizerEditor : Editor
     public override void OnInspectorGUI()
     {
         settings = (d4rkAvatarOptimizer)target;
+        if (nullMaterial == null)
+        {
+            nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            nullMaterial.name = "(null material slot)";
+        }
 
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         scriptPath = path.Substring(0, path.LastIndexOf('/'));
@@ -1511,6 +1538,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
             var copy = Instantiate(settings.gameObject);
+            copy.name = settings.gameObject.name + "(BrokenCopy)";
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
             if (copy.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>() != null)
                 VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
@@ -1546,7 +1574,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 if (!foundMatch)
                 {
-                    matchedMaterials.Add(new List<Material> { meshMat.mat });
+                    matchedMaterials.Add(new List<Material> { meshMat.mat ?? nullMaterial });
                     matchedMaterialMeshes.Add(new List<Mesh> { meshMat.sharedMesh });
                 }
             }
