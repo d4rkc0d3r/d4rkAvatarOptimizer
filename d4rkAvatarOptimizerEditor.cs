@@ -113,7 +113,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
             var mesh = skinnedMeshRenderer.sharedMesh;
-            if (mesh == null)
+            if (mesh == null || skinnedMeshRenderer.gameObject.CompareTag("EditorOnly"))
                 continue;
 
             bool foundMatch = false;
@@ -1474,6 +1474,25 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void NukeEditorOnlyGameObjects()
+    {
+        var stack = new Stack<Transform>();
+        stack.Push(root.transform);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (current.gameObject.CompareTag("EditorOnly"))
+            {
+                DestroyImmediate(current.gameObject);
+                continue;
+            }
+            foreach (var child in current.Cast<Transform>())
+            {
+                stack.Push(child);
+            }
+        }
+    }
+
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
@@ -1483,7 +1502,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
-        Profiler.StartSection("CalculateUsedBlendShapePaths()");
+        Profiler.StartSection("NukeEditorOnlyGameObjects()");
+        NukeEditorOnlyGameObjects();
+        Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
         CalculateUsedBlendShapePaths();
         Profiler.StartNextSection("CalculateUsedMaterialProperties()");
         CalculateUsedMaterialProperties();
