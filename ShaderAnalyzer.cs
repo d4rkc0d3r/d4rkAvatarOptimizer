@@ -221,20 +221,29 @@ namespace d4rkpl4y3r
                     else if (trimmedLine[i + 1] == '*')
                     {
                         int endCommentBlock = trimmedLine.IndexOf("*/", i + 2);
-                        while (endCommentBlock == -1 && ++lineIndex < rawLines.Length)
+                        if (endCommentBlock == -1)
                         {
-                            endCommentBlock = rawLines[lineIndex].IndexOf("*/");
-                        }
-                        if (endCommentBlock != -1)
-                        {
-                            trimmedLine = trimmedLine.Substring(0, i)
-                                + rawLines[lineIndex].Substring(endCommentBlock + 2);
-                            i -= 1;
+                            while (endCommentBlock == -1 && ++lineIndex < rawLines.Length)
+                            {
+                                endCommentBlock = rawLines[lineIndex].IndexOf("*/");
+                            }
+                            if (endCommentBlock != -1)
+                            {
+                                trimmedLine = trimmedLine.Substring(0, i)
+                                    + rawLines[lineIndex].Substring(endCommentBlock + 2);
+                                i -= 1;
+                            }
+                            else
+                            {
+                                trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
+                                break;
+                            }
                         }
                         else
                         {
-                            trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
-                            break;
+                            trimmedLine = trimmedLine.Substring(0, i)
+                                    + trimmedLine.Substring(endCommentBlock + 2);
+                            i -= 1;
                         }
                     }
                 }
