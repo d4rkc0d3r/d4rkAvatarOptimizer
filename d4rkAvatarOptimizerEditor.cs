@@ -59,9 +59,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
     {
         if (candidate.TryGetComponent(out Cloth cloth))
-        {
             return false;
-        }
+        if (candidate.gameObject.CompareTag("EditorOnly"))
+            return false;
         foreach (var material in candidate.sharedMaterials)
         {
             var parsedShader = ShaderAnalyzer.Parse(material.shader);
@@ -108,6 +108,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
+            if (skinnedMeshRenderer.gameObject.CompareTag("EditorOnly"))
+                continue;
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
@@ -341,6 +343,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
+            if (skinnedMeshRenderer.gameObject.CompareTag("EditorOnly"))
+                continue;
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
@@ -836,6 +840,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var meshRenderers = root.GetComponentsInChildren<MeshRenderer>(true);
         foreach (var meshRenderer in meshRenderers)
         {
+            if (meshRenderer.gameObject.CompareTag("EditorOnly"))
+                continue;
             var path = GetTransformPathToRoot(meshRenderer.transform);
             var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
             var alreadyOptimizedMaterials = new HashSet<Material>();
@@ -875,6 +881,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         foreach (var meshRenderer in skinnedMeshRenderers)
         {
+            if (meshRenderer.gameObject.CompareTag("EditorOnly"))
+                continue;
             var mesh = meshRenderer.sharedMesh;
 
             if (mesh == null)
@@ -917,6 +925,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         foreach (var meshRenderer in skinnedMeshRenderers)
         {
+            if (meshRenderer.gameObject.CompareTag("EditorOnly"))
+                continue;
             var mesh = meshRenderer.sharedMesh;
 
             if (mesh == null)
@@ -1135,7 +1145,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     skinnedMesh.bones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
                     ).ToArray();
                 var aabb = skinnedMesh.localBounds;
-                var m = toLocal * skinnedMesh.rootBone.localToWorldMatrix;
+                var m = skinnedMesh.rootBone == null ? toLocal * skinnedMesh.rootBone.localToWorldMatrix : toLocal * skinnedMesh.localToWorldMatrix;
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, 1, -1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(ComponentMultiply(aabb.extents, 1, -1, 1) + aabb.center));
