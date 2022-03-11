@@ -1514,7 +1514,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
-                if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 || obj.GetComponents<Component>().Length == 0))
+                if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetComponents<Component>().Length == 1))
                     DestroyImmediate(obj);
             }
 
