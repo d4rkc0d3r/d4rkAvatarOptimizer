@@ -1032,14 +1032,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedMaterials[i].IndexOf(matchedMaterials[i][k]);
-                    int materialSubMeshId = matchedMaterialsIndex[i][k];
+                    int materialSubMeshId = System.Math.Min(mesh.subMeshCount - 1, matchedMaterialsIndex[i][k]);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
                     for (int j = startIndex; j < endIndex; j++)
                     {
                         int oldIndex = sourceIndices[j];
-                        int newIndex;
-                        if (indexMap.TryGetValue(oldIndex, out newIndex))
+                        if (indexMap.TryGetValue(oldIndex, out int newIndex))
                         {
                             indexList.Add(newIndex);
                         }
