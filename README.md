@@ -31,7 +31,7 @@ Can't merge materials if:
 * Shader is surface shader or has tessellation
 * A property that differs is used in shader lab code (eg `ZWrite [_ZWrite]`)
 ### Merge same dimension textures
-Merges materials if they use different textures if their with, height & compression format match.
+Merges materials if they use different textures if their width, height & compression format match.
 Creates a Texture2DArray from the original textures.
 
 Can't merge materials if:
