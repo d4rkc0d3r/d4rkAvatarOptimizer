@@ -29,6 +29,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
     private static Material nullMaterial = null;
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
+    private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
     
     private static void ClearTrashBin()
     {
@@ -56,6 +57,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             path = t.name + "/" + path;
         }
         return path;
+    }
+
+    private static Transform GetTransformFromPath(string path)
+    {
+        if (path == "")
+            return root.transform;
+        string[] pathParts = path.Split('/');
+        Transform t = root.transform;
+        for (int i = 0; i < pathParts.Length; i++)
+        {
+            t = t.Find(pathParts[i]);
+            if (t == null)
+                return null;
+        }
+        return t;
     }
 
     private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
@@ -86,6 +102,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (!IsCombinableSkinnedMesh(candidate))
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
+            return false;
+        if (!settings.ForceMergeBlendShapeMissMatch && (hasUsedBlendShapes.Contains(list[0]) ^ hasUsedBlendShapes.Contains(candidate)))
             return false;
         var paths = list.Select(smr => GetTransformPathToRoot(smr.transform.parent)).ToList();
         var t = candidate.transform;
@@ -340,6 +358,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void CalculateUsedBlendShapePaths()
     {
         usedBlendShapes.Clear();
+        hasUsedBlendShapes.Clear();
         materialSlotsWithMaterialSwapAnimations.Clear();
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
@@ -354,6 +373,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
                 {
                     usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
+                    hasUsedBlendShapes.Add(skinnedMeshRenderer);
                 }
             }
         }
@@ -378,7 +398,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
             {
                 if (blendShapeID >= 0)
+                {
                     usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                    hasUsedBlendShapes.Add(meshRenderer);
+                }
             }
         }
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
@@ -390,6 +413,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 || !binding.propertyName.StartsWith("blendShape."))
                 continue;
             usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
+            var t = GetTransformFromPath(binding.path);
+            if (t != null)
+            {
+                hasUsedBlendShapes.Add(t.GetComponent<SkinnedMeshRenderer>());
+            }
         }
     }
 
@@ -1610,15 +1638,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
         GUI.enabled = settings.MergeSkinnedMeshes =
             EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        settings.ForceMergeBlendShapeMissMatch =
+            EditorGUILayout.Toggle("  Force Merge Blend Shape Miss Match", settings.ForceMergeBlendShapeMissMatch);
         settings.KeepMaterialPropertyAnimationsSeparate =
-            EditorGUILayout.Toggle("Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
+            EditorGUILayout.Toggle("  Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
         GUI.enabled = true;
         GUI.enabled = settings.MergeDifferentPropertyMaterials =
             EditorGUILayout.Toggle("Merge Different Property Materials", settings.MergeDifferentPropertyMaterials);
         settings.MergeSameDimensionTextures =
-            EditorGUILayout.Toggle("Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
+            EditorGUILayout.Toggle("  Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
         settings.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
+            EditorGUILayout.Toggle("  Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
         GUI.enabled = true;
         settings.ProfileTimeUsed =
             EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
@@ -1641,6 +1671,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         root = settings.gameObject;
+        CalculateUsedBlendShapePaths();
         var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
         foreach (var mergedMeshes in matchedSkinnedMeshes)
