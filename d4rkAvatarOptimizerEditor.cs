@@ -823,6 +823,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
             }
+
+            if (meshCount > 1)
+            {
+                for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
+                {
+                    var mat = meshRenderer.sharedMaterials[i];
+                    for (int mID = 0; mID < meshCount; mID++)
+                    {
+                        mat.SetFloat("_IsActiveMesh" + mID, props.GetFloat("_IsActiveMesh" + mID));
+                    }
+                }
+            }
+
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
