@@ -14,11 +14,14 @@ Unfortunately the shader compiler is allowed to ignore NaNs while doing that so 
 The optimizer tries to merge different skinned meshes together.
 If some of those skinned mesh game objects get toggled with animations in the fxlayer it will add logic to the shader to toggle those sub meshes in shader instead.
 Skinned meshes that are on different layers (eg UIMenu) from each other will not get merged.  
+Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
 Can't merge meshes that have any tessellation or surface shaders.  
-**Will break material swap animations.**
+**Will break material swap animations!**
+### Force Merge Blend Shape Miss Match
+With this setting active the optimizer will merge meshes that have blend shapes with meshes that don't. Only use this if you have a small model since skinning with blend shapes is much more expensive than without.
 ### Keep material animations separate
 This makes sure that animated properties from one mesh don't animate the property on materials from a different mesh if their meshes got merged.
-Can break since it creats a lot of constant buffer variables.
+Can break since it creates a lot of constant buffer variables.
 ### Merge different property materials
 Merges materials with the same shader where properties can have different values.
 If they do have different values the values will get written to a constant buffer.
@@ -45,7 +48,7 @@ Disables the original avatar so only the copy is active.
 None of the original assets will be changed so even if the optimizer fails your avatar is still safe!
 
 In addition to the selected optimizations there are some optimizations that are always performed:
-* Remove unused shape keys. Unused here means not visemes nor referenced in any animation in the fx layer.
+* Remove unused shape keys. Unused here means not a viseme nor referenced in any animation in the fx layer.
 * Merge identical material slots on skinned meshes.
 * Add dummy animation to animator states that have no animation specified.
 * Remove illegal avatar components.

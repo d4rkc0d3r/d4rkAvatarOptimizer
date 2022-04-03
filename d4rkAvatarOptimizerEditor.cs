@@ -30,6 +30,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Material nullMaterial = null;
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
+    private static HashSet<SkinnedMeshRenderer> unusedSkinnedMeshRenderers = new HashSet<SkinnedMeshRenderer>();
     
     private static void ClearTrashBin()
     {
@@ -123,15 +124,42 @@ public class d4rkAvatarOptimizerEditor : Editor
         newAnimationPaths[source] = target;
     }
 
-    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges()
+    private static void FindAllUnusedSkinnedMeshRenderers()
     {
         FindAllGameObjectTogglePaths();
+        unusedSkinnedMeshRenderers.Clear();
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        {
+            if (skinnedMeshRenderer.gameObject.activeSelf)
+                continue;
+            if (gameObjectTogglePaths.Contains(GetTransformPathToRoot(skinnedMeshRenderer.transform)))
+                continue;
+            unusedSkinnedMeshRenderers.Add(skinnedMeshRenderer);
+        }
+    }
+
+    private static void DeleteAllUnusedSkinnedMeshRenderers()
+    {
+        FindAllUnusedSkinnedMeshRenderers();
+        foreach (var skinnedMeshRenderer in unusedSkinnedMeshRenderers)
+        {
+            var obj = skinnedMeshRenderer.gameObject;
+            DestroyImmediate(skinnedMeshRenderer);
+            if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetComponents<Component>().Length == 1))
+                DestroyImmediate(obj);
+        }
+    }
+
+    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges()
+    {
+        FindAllUnusedSkinnedMeshRenderers();
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
             var mesh = skinnedMeshRenderer.sharedMesh;
-            if (mesh == null || skinnedMeshRenderer.gameObject.CompareTag("EditorOnly"))
+            if (mesh == null || skinnedMeshRenderer.gameObject.CompareTag("EditorOnly") || unusedSkinnedMeshRenderers.Contains(skinnedMeshRenderer))
                 continue;
 
             bool foundMatch = false;
@@ -820,18 +848,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 mat.SetFloat(propName + mID, props.GetFloat(propName + mID));
                             }
                         }
-                    }
-                }
-            }
-
-            if (meshCount > 1)
-            {
-                for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
-                {
-                    var mat = meshRenderer.sharedMaterials[i];
-                    for (int mID = 0; mID < meshCount; mID++)
-                    {
-                        mat.SetFloat("_IsActiveMesh" + mID, props.GetFloat("_IsActiveMesh" + mID));
                     }
                 }
             }
@@ -1616,6 +1632,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         NukeEditorOnlyGameObjects();
         Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
         CalculateUsedBlendShapePaths();
+        Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
+        DeleteAllUnusedSkinnedMeshRenderers();
         Profiler.StartNextSection("CalculateUsedMaterialProperties()");
         CalculateUsedMaterialProperties();
         Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
