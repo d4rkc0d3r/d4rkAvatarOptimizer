@@ -114,10 +114,10 @@ public class ShaderAnalyzerDebugger : EditorWindow
         if (parsedShader.shaderFeatureKeyWords.Count > 0)
         {
             GUILayout.Space(20);
-            GUILayout.Label("Possible shader keywords(" + parsedShader.shaderFeatureKeyWords.Count + "):");
+            GUILayout.Label("Shader keywords(" + parsedShader.shaderFeatureKeyWords.Count + "):");
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
-                GUILayout.Label(keyword);
+                EditorGUILayout.LabelField(mat.IsKeywordEnabled(keyword) ? "enabled" : "disabled", keyword);
             }
         }
 
