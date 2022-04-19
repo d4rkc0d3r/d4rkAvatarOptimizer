@@ -1399,7 +1399,7 @@ namespace d4rkpl4y3r
                         }
                     }
                     line = Regex.Replace(line, @"\[Toggle(?:Off)?(?:\(\w+\))?\]", "[ToggleUI()]");
-                    line = Regex.Replace(line, @"\[KeywordEnum\([^)]\)\]", "");
+                    line = Regex.Replace(line, @"\[KeywordEnum\([^)]+\)\]", "");
                     output.Add(line);
                 }
             }
