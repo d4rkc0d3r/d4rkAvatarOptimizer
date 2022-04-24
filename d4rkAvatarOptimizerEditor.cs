@@ -184,7 +184,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 continue;
             int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
             if (index == -1)
-                continue;
+            {
+                var obj = subList.OrderBy(smr => GetTransformPathToRoot(smr.transform).Count(c => c == '/')).First();
+                index = subList.IndexOf(obj);
+            }
             var oldFirst = subList[0];
             subList[0] = subList[index];
             subList[index] = oldFirst;
@@ -1619,6 +1622,26 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void ConvertStaticMeshesToSkinnedMeshes()
+    {
+        if (!settings.MergeStaticMeshesAsSkinned)
+            return;
+        var staticMeshes = root.gameObject.GetComponentsInChildren<MeshFilter>(true)
+            .Where(f => f.sharedMesh != null && f.gameObject.GetComponent<MeshRenderer>() != null)
+            .Select(f => f.gameObject).Distinct().ToList();
+        foreach (var obj in staticMeshes)
+        {
+            var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
+            var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
+            var mesh = obj.GetComponent<MeshFilter>().sharedMesh;
+            DestroyImmediate(obj.GetComponent<MeshFilter>());
+            var skinnedMeshRenderer = obj.AddComponent<SkinnedMeshRenderer>();
+            skinnedMeshRenderer.sharedMesh = mesh;
+            skinnedMeshRenderer.sharedMaterials = mats;
+            skinnedMeshRenderer.probeAnchor = lightAnchor;
+        }
+    }
+
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
@@ -1630,6 +1653,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         keepTransforms.Clear();
         Profiler.StartSection("NukeEditorOnlyGameObjects()");
         NukeEditorOnlyGameObjects();
+        Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
+        ConvertStaticMeshesToSkinnedMeshes();
         Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
         CalculateUsedBlendShapePaths();
         Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
@@ -1669,6 +1694,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
         GUI.enabled = settings.MergeSkinnedMeshes =
             EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        settings.MergeStaticMeshesAsSkinned =
+            EditorGUILayout.Toggle("  Merge Static Meshes As Skinned", settings.MergeStaticMeshesAsSkinned);
         settings.ForceMergeBlendShapeMissMatch =
             EditorGUILayout.Toggle("  Force Merge Blend Shape Miss Match", settings.ForceMergeBlendShapeMissMatch);
         settings.KeepMaterialPropertyAnimationsSeparate =
