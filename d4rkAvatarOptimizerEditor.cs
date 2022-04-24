@@ -113,7 +113,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             var parsedShader = ShaderAnalyzer.Parse(material.shader);
             if (!parsedShader.couldParse)
                 return false;
-            if (!parsedShader.passes.All(pass => pass.vertex != null))
+            if (parsedShader.passes.Any(pass => pass.vertex == null))
+                return false;
+            if (gameObjectTogglePaths.Contains(GetTransformPathToRoot(candidate.transform))
+                && parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
                 return false;
         }
         return true;
