@@ -8,6 +8,7 @@ using UnityEditor;
 using d4rkpl4y3r;
 using d4rkpl4y3r.Util;
 
+using Math = System.Math;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
 public static class RendererExtensions
@@ -50,6 +51,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<SkinnedMeshRenderer> unusedSkinnedMeshRenderers = new HashSet<SkinnedMeshRenderer>();
+    private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     
     private static void ClearTrashBin()
     {
@@ -287,6 +289,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var currentPath = (binding.path, binding.propertyName, binding.type);
+            if (convertedMeshRendererPaths.Contains(currentPath.path))
+            {
+                currentPath.type = typeof(MeshRenderer);
+            }
             var newBinding = binding;
             if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
             {
@@ -335,10 +341,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         var newFxLayer = (AnimatorController)
             AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
 
-        var optimizedAnims = new Dictionary<AnimationClip, AnimationClip>();
+        var optimizedAnimations = new Dictionary<AnimationClip, AnimationClip>();
         foreach (var clip in fxLayer.animationClips.Distinct())
         {
-            optimizedAnims[clip] = FixAnimationClipPaths(clip);
+            optimizedAnimations[clip] = FixAnimationClipPaths(clip);
         }
 
         foreach (var state in EnumerateAllStates(newFxLayer))
@@ -353,14 +359,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                     clip = childNodes[i].motion as AnimationClip;
                     if (clip != null)
                     {
-                        childNodes[i].motion = optimizedAnims[clip];
+                        childNodes[i].motion = optimizedAnimations[clip];
                     }
                 }
                 blendTree.children = childNodes;
             }
             else if (clip != null)
             {
-                state.motion = optimizedAnims[clip];
+                state.motion = optimizedAnimations[clip];
             }
             else
             {
@@ -1630,7 +1636,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void NukeEditorOnlyGameObjects()
+    private static void DestroyEditorOnlyGameObjects()
     {
         var stack = new Stack<Transform>();
         stack.Push(root.transform);
@@ -1666,6 +1672,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             skinnedMeshRenderer.sharedMesh = mesh;
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
+            convertedMeshRendererPaths.Add(GetTransformPathToRoot(obj.transform));
         }
     }
 
@@ -1678,8 +1685,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
-        Profiler.StartSection("NukeEditorOnlyGameObjects()");
-        NukeEditorOnlyGameObjects();
+        convertedMeshRendererPaths.Clear();
+        Profiler.StartSection("DestroyEditorOnlyGameObjects()");
+        DestroyEditorOnlyGameObjects();
         Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
         ConvertStaticMeshesToSkinnedMeshes();
         Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
