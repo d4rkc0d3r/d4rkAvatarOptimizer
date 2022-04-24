@@ -1121,7 +1121,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedMaterials[i].IndexOf(matchedMaterials[i][k]);
-                    int materialSubMeshId = System.Math.Min(mesh.subMeshCount - 1, matchedMaterialsIndex[i][k]);
+                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedMaterialsIndex[i][k]);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
                     for (int j = startIndex; j < endIndex; j++)
@@ -1378,10 +1378,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                     targetWeights.Add(boneWeight);
                 }
                 
-                for (var matID = 0; matID < mesh.subMeshCount; matID++)
+                for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
                 {
-                    uint startIndex = mesh.GetIndexStart(matID);
-                    uint endIndex = mesh.GetIndexCount(matID) + startIndex;
+                    uint startIndex = mesh.GetIndexStart(Math.Min(matID, mesh.subMeshCount - 1));
+                    uint endIndex = mesh.GetIndexCount(Math.Min(matID, mesh.subMeshCount - 1)) + startIndex;
                     var indices = new List<int>();
                     for (uint i = startIndex; i < endIndex; i++)
                     {
