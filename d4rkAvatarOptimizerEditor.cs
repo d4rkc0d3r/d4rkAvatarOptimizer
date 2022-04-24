@@ -1664,6 +1664,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             .Select(f => f.gameObject).Distinct().ToList();
         foreach (var obj in staticMeshes)
         {
+            if (!IsCombinableSkinnedMesh(obj.GetComponent<MeshRenderer>()))
+                continue;
             var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
             var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
             var mesh = obj.GetComponent<MeshFilter>().sharedMesh;
