@@ -10,6 +10,25 @@ using d4rkpl4y3r.Util;
 
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
+public static class RendererExtensions
+{
+    public static Mesh GetSharedMesh(this Renderer renderer)
+    {
+        if (renderer is SkinnedMeshRenderer)
+        {
+            return (renderer as SkinnedMeshRenderer).sharedMesh;
+        }
+        else if (renderer.TryGetComponent<MeshFilter>(out var filter))
+        {
+            return filter.sharedMesh;
+        }
+        else
+        {
+            return null;
+        }
+    }
+}
+
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
@@ -75,9 +94,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         return t;
     }
 
-    private static bool IsCombinableSkinnedMesh(SkinnedMeshRenderer candidate)
+    private static bool IsCombinableSkinnedMesh(Renderer candidate)
     {
         if (candidate.TryGetComponent(out Cloth cloth))
+        {
+            return false;
+        }
+        if (!settings.MergeStaticMeshesAsSkinned && candidate is MeshRenderer)
         {
             return false;
         }
@@ -94,7 +117,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
-    private static bool CanCombineWith(List<SkinnedMeshRenderer> list, SkinnedMeshRenderer candidate)
+    private static bool CanCombineWith(List<Renderer> list, Renderer candidate)
     {
         if (!settings.MergeSkinnedMeshes)
             return false;
@@ -151,30 +174,30 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static List<List<SkinnedMeshRenderer>> FindPossibleSkinnedMeshMerges()
+    private static List<List<Renderer>> FindPossibleSkinnedMeshMerges()
     {
         FindAllUnusedSkinnedMeshRenderers();
-        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
-        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        var renderers = root.GetComponentsInChildren<Renderer>(true);
+        var matchedSkinnedMeshes = new List<List<Renderer>>();
+        foreach (var renderer in renderers)
         {
-            var mesh = skinnedMeshRenderer.sharedMesh;
-            if (mesh == null || skinnedMeshRenderer.gameObject.CompareTag("EditorOnly") || unusedSkinnedMeshRenderers.Contains(skinnedMeshRenderer))
+            var mesh = renderer.GetSharedMesh();
+            if (mesh == null || renderer.gameObject.CompareTag("EditorOnly") || unusedSkinnedMeshRenderers.Contains(renderer))
                 continue;
 
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (CanCombineWith(subList, skinnedMeshRenderer))
+                if (CanCombineWith(subList, renderer))
                 {
-                    subList.Add(skinnedMeshRenderer);
+                    subList.Add(renderer);
                     foundMatch = true;
                     break;
                 }
             }
             if (!foundMatch)
             {
-                matchedSkinnedMeshes.Add(new List<SkinnedMeshRenderer> { skinnedMeshRenderer });
+                matchedSkinnedMeshes.Add(new List<Renderer> { renderer });
             }
         }
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
@@ -1210,8 +1233,12 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
         int combinedMeshID = 0;
-        foreach (var combinableSkinnedMeshes in combinableSkinnedMeshList)
+        foreach (var combinableMeshes in combinableSkinnedMeshList)
         {
+            var combinableSkinnedMeshes = combinableMeshes.Select(m => m as SkinnedMeshRenderer).Where(m => m != null).ToList();
+            if (combinableSkinnedMeshes.Count < 1)
+                continue;
+
             var targetBones = new List<Transform>();
             var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
             var targetColor = new List<Color>();
@@ -1738,7 +1765,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var matchedMaterials = new List<List<Material>>();
             var matchedMaterialMeshes = new List<List<Mesh>>();
             foreach (var meshMat in mergedMeshes.SelectMany(mesh =>
-                mesh.sharedMaterials.Select(mat => (mesh.sharedMesh, mat))))
+                mesh.sharedMaterials.Select(mat => (sharedMesh : mesh.GetSharedMesh(), mat))))
             {
                 bool foundMatch = false;
                 for (int i = 0; i < matchedMaterials.Count; i++)
