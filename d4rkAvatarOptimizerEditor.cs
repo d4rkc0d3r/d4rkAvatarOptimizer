@@ -113,10 +113,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             var parsedShader = ShaderAnalyzer.Parse(material.shader);
             if (!parsedShader.couldParse)
                 return false;
-            if (parsedShader.passes.Any(pass => pass.vertex == null))
+            if (parsedShader.passes.Any(pass => pass.vertex == null || pass.fragment == null))
                 return false;
-            if (gameObjectTogglePaths.Contains(GetTransformPathToRoot(candidate.transform))
-                && parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
+            if (parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
                 return false;
         }
         return true;
@@ -150,6 +149,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (source == target)
             return;
         newAnimationPaths[source] = target;
+        if (settings.MergeStaticMeshesAsSkinned && source.type == typeof(SkinnedMeshRenderer))
+        {
+            source.type = typeof(MeshRenderer);
+            newAnimationPaths[source] = target;
+        }
     }
 
     private static void FindAllUnusedSkinnedMeshRenderers()
@@ -292,10 +296,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var currentPath = (binding.path, binding.propertyName, binding.type);
-            if (convertedMeshRendererPaths.Contains(currentPath.path))
-            {
-                currentPath.type = typeof(MeshRenderer);
-            }
             var newBinding = binding;
             if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
             {
@@ -500,7 +500,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 animatedMaterialProperties[binding.path] = (props = new HashSet<string>());
             }
-            props.Add(binding.propertyName.Substring("material.".Length));
+            var propName = binding.propertyName.Substring(9);
+            if (propName.Length > 2 && propName[propName.Length - 2] == '.')
+            {
+                props.Add(propName.Substring(0, propName.Length - 2));
+            }
+            props.Add(propName);
         }
     }
 
@@ -1522,17 +1527,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     var animatedMaterialPropertiesToAdd = new List<string>();
-                    if (settings.KeepMaterialPropertyAnimationsSeparate
-                        && animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
+                    if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                     {
                         foreach (var animPropName in animatedProperties)
                         {
                             var propName = animPropName;
-                            bool isVector = false;
-                            if (propName.EndsWith(".x"))
+                            bool isVector = propName.EndsWith(".x");
+                            bool isColor = propName.EndsWith(".r");
+                            if (isVector || isColor)
                             {
                                 propName = propName.Substring(0, propName.Length - 2);
-                                isVector = true;
                             }
                             else if (propName[propName.Length - 2] == '.')
                             {
@@ -1540,48 +1544,72 @@ public class d4rkAvatarOptimizerEditor : Editor
                             }
                             for (int mID = 0; mID < combinableSkinnedMeshes.Count; mID++)
                             {
-                                foreach (var mat in combinableSkinnedMeshes[mID].sharedMaterials)
+                                if (settings.KeepMaterialPropertyAnimationsSeparate)
                                 {
-                                    var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
-                                    if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
+                                    foreach (var mat in combinableSkinnedMeshes[mID].sharedMaterials)
                                     {
-                                        if (prop.type == ParsedShader.Property.Type.Int)
+                                        var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
+                                        if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
                                         {
-                                            properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
-                                            break;
-                                        }
-                                        else if (prop.type == ParsedShader.Property.Type.Float)
-                                        {
-                                            properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetFloat(propName));
-                                            break;
-                                        }
-                                        else if (prop.type == ParsedShader.Property.Type.Color)
-                                        {
-                                            properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
-                                            break;
-                                        }
-                                        else if (prop.type == ParsedShader.Property.Type.Vector)
-                                        {
-                                            properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetVector(propName));
-                                            break;
+                                            if (prop.type == ParsedShader.Property.Type.Int)
+                                            {
+                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
+                                                break;
+                                            }
+                                            else if (prop.type == ParsedShader.Property.Type.Float)
+                                            {
+                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetFloat(propName));
+                                                break;
+                                            }
+                                            else if (prop.type == ParsedShader.Property.Type.Color)
+                                            {
+                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
+                                                break;
+                                            }
+                                            else if (prop.type == ParsedShader.Property.Type.Vector)
+                                            {
+                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetVector(propName));
+                                                break;
+                                            }
                                         }
                                     }
-                                }
-                                string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
-                                if (isVector)
-                                {
-                                    foreach (var component in new string[] { ".x" , ".y", ".z", ".w" })
+                                    string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
+                                    if (isVector || isColor)
+                                    {
+                                        var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : new [] { ".r", ".g", ".b", ".a" };
+                                        foreach (var component in vectorEnd)
+                                        {
+                                            AddAnimationPathChange(
+                                                (path, "material." + propName + component, typeof(SkinnedMeshRenderer)),
+                                                (newPath, "material.d4rkAvatarOptimizer" + propName + mID + component, typeof(SkinnedMeshRenderer)));
+                                        }
+                                    }
+                                    else
                                     {
                                         AddAnimationPathChange(
-                                            (path, "material." + propName + component, typeof(SkinnedMeshRenderer)),
-                                            (newPath, "material.d4rkAvatarOptimizer" + propName + mID + component, typeof(SkinnedMeshRenderer)));
+                                            (path, "material." + propName, typeof(SkinnedMeshRenderer)),
+                                            (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
                                     }
                                 }
                                 else
                                 {
-                                    AddAnimationPathChange(
-                                        (path, "material." + propName, typeof(SkinnedMeshRenderer)),
-                                        (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
+                                    string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
+                                    if (isVector || isColor)
+                                    {
+                                        var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : new [] { ".r", ".g", ".b", ".a" };
+                                        foreach (var component in vectorEnd)
+                                        {
+                                            AddAnimationPathChange(
+                                                (path, "material." + propName + component, typeof(SkinnedMeshRenderer)),
+                                                (newPath, "material." + propName + component, typeof(SkinnedMeshRenderer)));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        AddAnimationPathChange(
+                                            (path, "material." + propName, typeof(SkinnedMeshRenderer)),
+                                            (newPath, "material." + propName, typeof(SkinnedMeshRenderer)));
+                                    }
                                 }
                             }
                             animatedMaterialPropertiesToAdd.Add(animPropName);
