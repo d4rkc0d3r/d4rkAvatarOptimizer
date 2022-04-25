@@ -867,11 +867,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                     foreach (var animPropName in animatedProperties)
                     {
                         var propName = "d4rkAvatarOptimizer" + animPropName;
-                        bool isVector = false;
-                        if (propName.EndsWith(".x"))
+                        bool isVector = propName.EndsWith(".x");
+                        bool isColor = propName.EndsWith(".r");
+                        if (isColor || isVector)
                         {
                             propName = propName.Substring(0, propName.Length - 2);
-                            isVector = true;
                         }
                         else if (propName[propName.Length - 2] == '.')
                         {
@@ -881,7 +881,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             if (isVector)
                             {
-                                mat.SetVector(propName, props.GetVector(propName + mID));
+                                mat.SetVector(propName + mID, props.GetVector(propName + mID));
+                            }
+                            else if (isColor)
+                            {
+                                mat.SetColor(propName + mID, props.GetColor(propName + mID));
                             }
                             else
                             {
@@ -1563,7 +1567,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                             }
                                             else if (prop.type == ParsedShader.Property.Type.Color)
                                             {
-                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
+                                                properties.SetColor("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
                                                 break;
                                             }
                                             else if (prop.type == ParsedShader.Property.Type.Vector)
