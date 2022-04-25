@@ -650,6 +650,19 @@ namespace d4rkpl4y3r
             }
         }
 
+        private void InjectAnimatedPropertyInitialization()
+        {
+            foreach (var animatedProperty in animatedPropertyValues)
+            {
+                string name = animatedProperty.Key;
+                string value = "d4rkAvatarOptimizer" + name + "[d4rkAvatarOptimizer_MeshID]";
+                if (animatedProperty.Value.StartsWith("float"))
+                {
+                    output.Add(name + " = asuint(" + value + ".x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? " + name + " : " + value + ";");
+                }
+            }
+        }
+
         private List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
         {
             var output = new List<string>();
@@ -810,16 +823,13 @@ namespace d4rkpl4y3r
                 output.Add("d4rkAvatarOptimizer_MeshID = " + uv0Name + ".z;");
                 InjectDummyCBufferUsage(nullReturn);
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) " + nullReturn);
-                foreach (var animatedProperty in animatedPropertyValues.Keys)
-                {
-                    output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
-                }
             }
             if (arrayPropertyValues.Count > 0)
             {
                 output.Add("d4rkAvatarOptimizer_MaterialID = " + uv0Name + ".w;");
                 InjectArrayPropertyInitialization();
             }
+            InjectAnimatedPropertyInitialization();
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
@@ -955,15 +965,12 @@ namespace d4rkpl4y3r
             {
                 InjectDummyCBufferUsage("return;");
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) return;");
-                foreach (var animatedProperty in animatedPropertyValues.Keys)
-                {
-                    output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
-                }
             }
             if (arrayPropertyValues.Count > 0)
             {
                 InjectArrayPropertyInitialization();
             }
+            InjectAnimatedPropertyInitialization();
             if (!usesOuputWrapper)
             {
                 return;
@@ -1028,12 +1035,9 @@ namespace d4rkpl4y3r
                 if (animatedPropertyValues.Count > 0)
                 {
                     InjectDummyCBufferUsage(nullReturn);
-                    foreach(var animatedProperty in animatedPropertyValues.Keys)
-                    {
-                        output.Add(animatedProperty + " = d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID];");
-                    }
                 }
                 InjectArrayPropertyInitialization();
+                InjectAnimatedPropertyInitialization();
             }
             else
             {
@@ -1110,10 +1114,22 @@ namespace d4rkpl4y3r
                     currentPackOffset += meshToggleCount;
                 }
                 output.Add("};");
-                foreach (var animatedProperty in animatedPropertyValues)
+            }
+            var staticParamDefinitines = new HashSet<(string type, string name)>();
+            staticParamDefinitines.UnionWith(
+                animatedPropertyValues.Select(p => (p.Value, p.Key))
+                .Union(arrayPropertyValues.Select(p => (p.Value.type, p.Key)))
+            );
+            foreach (var (type, name) in staticParamDefinitines)
+            {
+                if (!staticPropertyValues.TryGetValue(name, out var value))
                 {
-                    output.Add("static " + animatedProperty.Value + " " + animatedProperty.Key + " = 0;");
+                    value = "0";
                 }
+                var varName = name;
+                if (name == "_MainTex_ST" && texturesToMerge.Contains("_MainTex"))
+                    varName = "_MainTexButNotQuiteSoThatUnityDoesntCry_ST";
+                output.Add("static " + type + " " + varName + " = " + value + ";");
             }
             foreach(var keyword in setKeywords)
             {
@@ -1128,9 +1144,6 @@ namespace d4rkpl4y3r
                 {
                     var (type, values) = arrayProperty.Value;
                     string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
-                    output.Add("static " + type + " " +
-                        (arrayProperty.Key == "_MainTex_ST" && texturesToMerge.Contains("_MainTex")
-                        ? "_MainTexButNotQuiteSoThatUnityDoesntCry_ST;" : arrayProperty.Key + ";"));
                     output.Add("static const " + type + " " + name + "[" + values.Count + "] = ");
                     output.Add("{");
                     for (int i = 0; i < values.Count; i++)
@@ -1306,7 +1319,9 @@ namespace d4rkpl4y3r
                             }
                             output.Add(type + " " + name + ";");
                         }
-                        else if (staticPropertyValues.TryGetValue(name, out string value))
+                        else if (staticPropertyValues.TryGetValue(name, out string value)
+                            && !animatedPropertyValues.ContainsKey(name)
+                            && !arrayPropertyValues.ContainsKey(name))
                         {
                             output.Add("static " + type + " " + name + " = " + value + ";");
                         }
@@ -1377,11 +1392,15 @@ namespace d4rkpl4y3r
                     {
                         var prop = parsedShader.properties.FirstOrDefault(p => p.name == animatedProperty.Key);
                         string defaultValue = "0";
+                        string type = prop.type.ToString();
                         if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.Vector)
+                        {
                             defaultValue = "(0,0,0,0)";
+                            type = "Vector";
+                        }
                         for (int i = 0; i < meshToggleCount; i++)
                         {
-                            output.Add("d4rkAvatarOptimizer" + prop.name + i + "(\"" + prop.name + " " + i + "\", " + prop.type + ") = " + defaultValue);
+                            output.Add("d4rkAvatarOptimizer" + prop.name + i + "(\"" + prop.name + " " + i + "\", " + type + ") = " + defaultValue);
                         }
                     }
                 }

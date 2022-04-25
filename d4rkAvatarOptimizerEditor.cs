@@ -724,11 +724,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             var replace = new Dictionary<string, string>();
             foreach (var tuple in arrayPropertyValues.ToList())
             {
-                if (usedMaterialProps.Contains(tuple.Key))
+                /*if (usedMaterialProps.Contains(tuple.Key))
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                 }
-                else if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
+                else */if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                     replace[tuple.Key] = tuple.Value.values[0];
@@ -879,13 +879,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                         }
                         for (int mID = 0; mID < meshCount; mID++)
                         {
-                            if (isVector)
+                            if (isVector || isColor)
                             {
                                 mat.SetVector(propName + mID, props.GetVector(propName + mID));
-                            }
-                            else if (isColor)
-                            {
-                                mat.SetColor(propName + mID, props.GetColor(propName + mID));
                             }
                             else
                             {
@@ -1555,6 +1551,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                         var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
                                         if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
                                         {
+                                            float signal = System.BitConverter.ToSingle(new byte[] {0x55, 0x55, 0x55, 0xFF}, 0);
                                             if (prop.type == ParsedShader.Property.Type.Int)
                                             {
                                                 properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
@@ -1562,17 +1559,17 @@ public class d4rkAvatarOptimizerEditor : Editor
                                             }
                                             else if (prop.type == ParsedShader.Property.Type.Float)
                                             {
-                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetFloat(propName));
+                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, signal);
                                                 break;
                                             }
                                             else if (prop.type == ParsedShader.Property.Type.Color)
                                             {
-                                                properties.SetColor("d4rkAvatarOptimizer" + propName + mID, mat.GetColor(propName));
+                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
                                                 break;
                                             }
                                             else if (prop.type == ParsedShader.Property.Type.Vector)
                                             {
-                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, mat.GetVector(propName));
+                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
                                                 break;
                                             }
                                         }
