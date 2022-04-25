@@ -1426,6 +1426,8 @@ namespace d4rkpl4y3r
             for (; lineIndex < parsedShader.lines.Count; lineIndex++)
             {
                 string line = parsedShader.lines[lineIndex];
+                if (line.StartsWith("CustomEditor"))
+                    continue;
                 output.Add(line);
                 if (line == "CGPROGRAM")
                 {
