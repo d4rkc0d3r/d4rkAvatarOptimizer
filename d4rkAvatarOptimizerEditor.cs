@@ -724,11 +724,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             var replace = new Dictionary<string, string>();
             foreach (var tuple in arrayPropertyValues.ToList())
             {
-                /*if (usedMaterialProps.Contains(tuple.Key))
+                if (usedMaterialProps.Contains(tuple.Key) && !settings.KeepMaterialPropertyAnimationsSeparate)
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                 }
-                else */if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
+                else if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                     replace[tuple.Key] = tuple.Value.values[0];
