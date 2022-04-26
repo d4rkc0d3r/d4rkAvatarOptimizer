@@ -506,19 +506,12 @@ namespace d4rkpl4y3r
             List<string> cgInclude = new List<string>();
             List<string> lines = parsedShader.lines;
             parsedShader.lines = output;
-            var state = ParseState.Init;
+            var state = ParseState.ShaderLab;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
             {
                 string line = lines[lineIndex];
                 switch (state)
                 {
-                    case ParseState.Init:
-                        if (line == "Properties")
-                        {
-                            state = ParseState.PropertyBlock;
-                        }
-                        output.Add(line);
-                        break;
                     case ParseState.PropertyBlock:
                         if (line == "{" && lines[lineIndex + 1] == "}")
                         {
@@ -541,7 +534,12 @@ namespace d4rkpl4y3r
                         }
                         break;
                     case ParseState.ShaderLab:
-                        if (line == "CGINCLUDE")
+                        if (line == "Properties")
+                        {
+                            state = ParseState.PropertyBlock;
+                            output.Add(line);
+                        }
+                        else if (line == "CGINCLUDE")
                         {
                             PreprocessCodeLines(lines, ref lineIndex, cgInclude);
                         }
