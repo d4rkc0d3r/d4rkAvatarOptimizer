@@ -1055,7 +1055,16 @@ namespace d4rkpl4y3r
                 foreach (var tex in texturesToCallSoTheSamplerDoesntDissapear)
                 {
                     output.Add("#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + tex);
-                    output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Load(0);");
+                    var texType = parsedShader.properties.Find(p => p.name == tex)?.type;
+                    if (texType == ParsedShader.Property.Type.TextureCube
+                        || texType == ParsedShader.Property.Type.TextureCubeArray)
+                    {
+                        output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Sample(sampler" + tex + ", 0).x;");
+                    }
+                    else
+                    {
+                        output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Load(0).x;");
+                    }
                     output.Add("#endif");
                 }
                 output.Add(pass.fragment.parameters[0].type == "void"
