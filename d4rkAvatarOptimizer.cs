@@ -14,4 +14,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeBackFaceCullingWithCullingOff = false;
     public bool ProfileTimeUsed = false;
     public bool ShowMeshAndMaterialMergePreview = true;
+    public bool ShowDebugInfo = false;
+    public bool DebugShowAlwaysDisabledBehaviours = true;
+    public bool DebugShowAlwaysDisabledGameObjects = true;
+    public bool DebugShowUnparsableMaterials = true;
+    public bool DebugShowGameObjectsWithToggle = true;
 }

@@ -7,8 +7,10 @@ using UnityEditor.Animations;
 using UnityEditor;
 using d4rkpl4y3r;
 using d4rkpl4y3r.Util;
+using VRC.Dynamics;
 
 using Math = System.Math;
+using Type = System.Type;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
 public static class RendererExtensions
@@ -30,6 +32,52 @@ public static class RendererExtensions
     }
 }
 
+public static class TransformExtensions
+{
+    public static IEnumerable<Transform> GetAllDescendants(this Transform transform)
+    {
+        var stack = new Stack<Transform>();
+        foreach (Transform child in transform)
+        {
+            stack.Push(child);
+        }
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            yield return current;
+            foreach (Transform child in current)
+            {
+                stack.Push(child);
+            }
+        }
+    }
+}
+
+public static class AnimationControllerExtensions
+{
+
+    public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
+    {
+        var queue = new Queue<AnimatorStateMachine>();
+        foreach (var layer in controller.layers)
+        {
+            queue.Enqueue(layer.stateMachine);
+            while (queue.Count > 0)
+            {
+                var stateMachine = queue.Dequeue();
+                foreach (var subStateMachine in stateMachine.stateMachines)
+                {
+                    queue.Enqueue(subStateMachine.stateMachine);
+                }
+                foreach (var state in stateMachine.states.Select(s => s.state))
+                {
+                    yield return state;
+                }
+            }
+        }
+    }
+}
+
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
@@ -47,6 +95,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
+    private static HashSet<string> alwaysDisabledGameObjects = new HashSet<string>();
     private static Material nullMaterial = null;
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
@@ -144,7 +193,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
-    private static void AddAnimationPathChange((string path, string name, System.Type type) source, (string path, string name, System.Type type) target)
+    private static void AddAnimationPathChange((string path, string name, Type type) source, (string path, string name, Type type) target)
     {
         if (source == target)
             return;
@@ -227,20 +276,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         return matchedSkinnedMeshes;
     }
     
-    private static IEnumerable<Transform> GetAllChildren(Transform t)
-    {
-        var queue = new Queue<Transform>(t.Cast<Transform>());
-        while (queue.Count > 0)
-        {
-            Transform parent = queue.Dequeue();
-            yield return parent;
-            foreach (var child in parent.Cast<Transform>())
-            {
-                queue.Enqueue(child);
-            }
-        }
-    }
-    
     private static int GetNewBoneIDFromOldID(List<Transform> bones, List<Matrix4x4> bindPoses, Transform toMatch)
     {
         int index = 0;
@@ -252,7 +287,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             index++;
         }
-        foreach (var bone in GetAllChildren(root.transform))
+        foreach (var bone in root.transform.GetAllDescendants())
         {
             if (bone == toMatch)
             {
@@ -264,27 +299,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         bones.Add(root.transform);
         bindPoses.Add(root.transform.localToWorldMatrix);
         return bones.Count - 1;
-    }
-
-    private static IEnumerable<AnimatorState> EnumerateAllStates(AnimatorController controller)
-    {
-        var queue = new Queue<AnimatorStateMachine>();
-        foreach (var layer in controller.layers)
-        {
-            queue.Enqueue(layer.stateMachine);
-            while (queue.Count > 0)
-            {
-                var stateMachine = queue.Dequeue();
-                foreach (var subStateMachine in stateMachine.stateMachines)
-                {
-                    queue.Enqueue(subStateMachine.stateMachine);
-                }
-                foreach (var state in stateMachine.states.Select(s => s.state))
-                {
-                    yield return state;
-                }
-            }
-        }
     }
     
     private static AnimationClip FixAnimationClipPaths(AnimationClip clip)
@@ -350,7 +364,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             optimizedAnimations[clip] = FixAnimationClipPaths(clip);
         }
 
-        foreach (var state in EnumerateAllStates(newFxLayer))
+        foreach (var state in newFxLayer.EnumerateAllStates())
         {
             var clip = state.motion as AnimationClip;
             var blendTree = state.motion as BlendTree;
@@ -521,6 +535,53 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 gameObjectTogglePaths.Add(binding.path);
         }
+    }
+
+    private static void FindAllAlwaysDisabledGameObjects()
+    {
+        FindAllGameObjectTogglePaths();
+        alwaysDisabledGameObjects.Clear();
+        var queue = new Queue<Transform>();
+        queue.Enqueue(root.transform);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current != root.transform && !current.gameObject.activeSelf && !gameObjectTogglePaths.Contains(GetTransformPathToRoot(current)))
+            {
+                alwaysDisabledGameObjects.Add(GetTransformPathToRoot(current));
+                foreach (var child in current.GetAllDescendants())
+                {
+                    alwaysDisabledGameObjects.Add(GetTransformPathToRoot(child));
+                }
+            }
+            else
+            {
+                foreach (Transform child in current)
+                {
+                    queue.Enqueue(child);
+                }
+            }
+        }
+    }
+
+    private static List<Behaviour> FindAllAlwaysDisabledBehaviours()
+    {
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        if (fxLayer == null)
+            return new List<Behaviour>();
+        var behaviourToggles = new HashSet<string>();
+        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        {
+            if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
+            {
+                behaviourToggles.Add(binding.path);
+            }
+        }
+        return root.transform.GetComponentsInChildren<Behaviour>(true)
+            .Where(b => !b.enabled)
+            .Where(b => !behaviourToggles.Contains(GetTransformPathToRoot(b.transform)))
+            .ToList();
     }
 
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
@@ -1837,6 +1898,84 @@ public class d4rkAvatarOptimizerEditor : Editor
                         string indent = (i == 0  && j == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
                         EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
                     }
+                }
+            }
+        }
+
+        EditorGUILayout.Separator();
+
+        if (settings.ShowDebugInfo = EditorGUILayout.Foldout(settings.ShowDebugInfo, "Debug Info"))
+        {
+            if (settings.DebugShowAlwaysDisabledBehaviours = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledBehaviours, "Always Disabled Behaviours"))
+            {
+                var list = FindAllAlwaysDisabledBehaviours();
+                foreach (var behaviour in list)
+                {
+                    EditorGUILayout.ObjectField(behaviour, typeof(Behaviour), true);
+                }
+                if (list.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No Always Disabled Behaviours Found");
+                }
+                else if(GUILayout.Button("Select All"))
+                {
+                    Selection.objects = list.ToArray();
+                }
+            }
+            if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
+            {
+                FindAllAlwaysDisabledGameObjects();
+                var list = alwaysDisabledGameObjects.Select(p => GetTransformFromPath(p).gameObject).ToList();
+                foreach (var gameObject in list)
+                {
+                    EditorGUILayout.ObjectField(gameObject, typeof(GameObject), true);
+                }
+                if (list.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No Always Disabled GameObjects Found");
+                }
+                else if (GUILayout.Button("Select All"))
+                {
+                    Selection.objects = list.ToArray();
+                }
+            }
+            if (settings.DebugShowUnparsableMaterials = EditorGUILayout.Foldout(settings.DebugShowUnparsableMaterials, "Unparsable Materials"))
+            {
+                var list = root.GetComponentsInChildren<Renderer>()
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => !(t.Item2 != null && t.Item2.couldParse && t.Item2.passes.All(p => p.vertex != null && p.fragment != null)))
+                    .Select(t => t.mat).ToList();
+                foreach (var material in list)
+                {
+                    EditorGUILayout.ObjectField(material, typeof(Material), true);
+                }
+                if (list.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No Unparsable Materials Found");
+                }
+                else if (GUILayout.Button("Select All"))
+                {
+                    Selection.objects = list.ToArray();
+                }
+            }
+            if (settings.DebugShowGameObjectsWithToggle = EditorGUILayout.Foldout(settings.DebugShowGameObjectsWithToggle, "GameObjects With Toggle Animation"))
+            {
+                FindAllGameObjectTogglePaths();
+                var list = root.transform.GetAllDescendants()
+                    .Where(t => gameObjectTogglePaths.Contains(GetTransformPathToRoot(t)))
+                    .Select(t => t.gameObject).ToList();
+                foreach (var gameObject in list)
+                {
+                    EditorGUILayout.ObjectField(gameObject, typeof(GameObject), true);
+                }
+                if (list.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No GameObjects With Toggle Found");
+                }
+                else if (GUILayout.Button("Select All"))
+                {
+                    Selection.objects = list.ToArray();
                 }
             }
         }
