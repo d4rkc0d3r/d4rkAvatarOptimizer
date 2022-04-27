@@ -102,6 +102,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<SkinnedMeshRenderer> unusedSkinnedMeshRenderers = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
+    private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     
     private static void ClearTrashBin()
     {
@@ -277,17 +278,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         return matchedSkinnedMeshes;
     }
     
-    private static int GetNewBoneIDFromOldID(List<Transform> bones, List<Matrix4x4> bindPoses, Transform toMatch)
+    private static int GetNewBoneIDFromTransform(List<Transform> bones, Dictionary<Transform, int> boneMap, List<Matrix4x4> bindPoses, Transform toMatch)
     {
-        int index = 0;
-        foreach (var bone in bones)
-        {
-            if (bone == toMatch)
-            {
-                return index;
-            }
-            index++;
-        }
+        if (boneMap.TryGetValue(toMatch, out int index))
+            return index;
+        if (settings.DeleteUnusedGameObjects)
+            toMatch = movingParentMap[toMatch];
         foreach (var bone in root.transform.GetAllDescendants())
         {
             if (bone == toMatch)
@@ -603,7 +599,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             transforms.Remove(avDescriptor.customEyeLookSettings.upperLeftEyelid);
             transforms.Remove(avDescriptor.customEyeLookSettings.upperRightEyelid);
         }
-        
+
         var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
         layers.AddRange(avDescriptor.specialAnimationLayers.Select(a => a.animatorController));
         foreach (var layer in layers.Where(a => a != null))
@@ -1381,9 +1377,26 @@ public class d4rkAvatarOptimizerEditor : Editor
         return vec;
     }
 
+    private static Dictionary<Transform, Transform> FindMovingParent()
+    {
+        var nonMovingTransforms = FindAllUnmovingTransforms();
+        var result = new Dictionary<Transform, Transform>();
+        foreach (var transform in root.transform.GetAllDescendants())
+        {
+            var movingParent = transform;
+            while (nonMovingTransforms.Contains(movingParent))
+            {
+                movingParent = movingParent.parent;
+            }
+            result[transform] = movingParent;
+        }
+        return result;
+    }
+
     private static void CombineSkinnedMeshes()
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
+        movingParentMap = FindMovingParent();
         int combinedMeshID = 0;
         foreach (var combinableMeshes in combinableSkinnedMeshList)
         {
@@ -1392,6 +1405,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 continue;
 
             var targetBones = new List<Transform>();
+            var targetBoneMap = new Dictionary<Transform, int>();
             var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
             var targetColor = new List<Color>();
             var targetVertices = new List<Vector3>();
@@ -1495,28 +1509,28 @@ public class d4rkAvatarOptimizerEditor : Editor
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
                             sourceBones[boneWeight.boneIndex0]);
                         bindPoseIDMap[boneWeight.boneIndex0] = newIndex;
                     }
                     boneWeight.boneIndex0 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex1, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
                             sourceBones[boneWeight.boneIndex1]);
                         bindPoseIDMap[boneWeight.boneIndex1] = newIndex;
                     }
                     boneWeight.boneIndex1 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex2, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
                             sourceBones[boneWeight.boneIndex2]);
                         bindPoseIDMap[boneWeight.boneIndex2] = newIndex;
                     }
                     boneWeight.boneIndex2 = newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex3, out newIndex))
                     {
-                        newIndex = GetNewBoneIDFromOldID(targetBones, targetBindPoses,
+                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
                             sourceBones[boneWeight.boneIndex3]);
                         bindPoseIDMap[boneWeight.boneIndex3] = newIndex;
                     }
@@ -1825,6 +1839,96 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void DestroyUnusedComponents()
+    {
+        if (!settings.DeleteUnusedComponents)
+            return;
+        var list = FindAllAlwaysDisabledBehaviours();
+        foreach (var behaviour in list)
+        {
+            DestroyImmediate(behaviour);
+        }
+    }
+
+    private static void DestroyUnusedGameObjects()
+    {
+        if (!settings.DeleteUnusedGameObjects)
+            return;
+
+        var used = new HashSet<Transform>(
+            root.GetComponentsInChildren<SkinnedMeshRenderer>().SelectMany(s => s.bones));
+        
+        foreach (var constraint in root.GetComponentsInChildren<Behaviour>().OfType<IConstraint>())
+        {
+            for (int i = 0; i < constraint.sourceCount; i++)
+            {
+                used.Add(constraint.GetSource(i).sourceTransform);
+            }
+        }
+
+        used.Add(root.transform);
+        used.UnionWith(root.GetComponentsInChildren<Animator>()
+            .Select(a => a.transform.Find("Armature")).Where(t => t != null));
+
+        foreach (var skinnedRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            used.Add(skinnedRenderer.rootBone);
+        }
+
+        foreach (var renderer in root.GetComponentsInChildren<Renderer>())
+        {
+            used.Add(renderer.probeAnchor);
+        }
+
+        foreach (var physBone in root.GetComponentsInChildren<VRCPhysBoneBase>())
+        {
+            var root = physBone.GetRootTransform();
+            var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
+            var stack = new Stack<Transform>();
+            used.Add(root);
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (exclusions.Contains(current))
+                    continue;
+                used.Add(current);
+                foreach (Transform child in current)
+                {
+                    stack.Push(child);
+                }
+            }
+        }
+
+        foreach (var obj in root.transform.GetAllDescendants())
+        {
+            if (obj.GetComponents<Component>().Length > 1)
+            {
+                used.Add(obj);
+            }
+        }
+
+        var queue = new Queue<Transform>();
+        queue.Enqueue(root.transform);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (Transform child in current)
+            {
+                queue.Enqueue(child);
+            }
+            if (!used.Contains(current))
+            {
+                foreach (var child in current.Cast<Transform>().ToArray())
+                {
+                    child.parent = current.parent;
+                }
+                DestroyImmediate(current.gameObject);
+            }
+        }
+    }
+
     private static void ConvertStaticMeshesToSkinnedMeshes()
     {
         if (!settings.MergeStaticMeshesAsSkinned)
@@ -1860,6 +1964,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         convertedMeshRendererPaths.Clear();
         Profiler.StartSection("DestroyEditorOnlyGameObjects()");
         DestroyEditorOnlyGameObjects();
+        Profiler.StartNextSection("DestroyUnusedComponents()");
+        DestroyUnusedComponents();
         Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
         ConvertStaticMeshesToSkinnedMeshes();
         Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
@@ -1882,7 +1988,25 @@ public class d4rkAvatarOptimizerEditor : Editor
         SaveOptimizedMaterials();
         Profiler.StartNextSection("FixAllAnimationPaths()");
         FixAllAnimationPaths();
+        Profiler.StartNextSection("DestroyUnusedGameObjects()");
+        DestroyUnusedGameObjects();
         Profiler.EndSection();
+    }
+
+    public void DrawDebugList<T>(T[] array, string emptyListMessage) where T : Object
+    {
+        foreach (var obj in array)
+        {
+            EditorGUILayout.ObjectField(obj, typeof(T), true);
+        }
+        if (array.Length == 0)
+        {
+            EditorGUILayout.LabelField(emptyListMessage);
+        }
+        else if (GUILayout.Button("Select All"))
+        {
+            Selection.objects = array;
+        }
     }
     
     public override void OnInspectorGUI()
@@ -1915,6 +2039,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         settings.MergeBackFaceCullingWithCullingOff =
             EditorGUILayout.Toggle("  Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
         GUI.enabled = true;
+        settings.DeleteUnusedComponents =
+            EditorGUILayout.Toggle("Delete Unused Components", settings.DeleteUnusedComponents);
+        settings.DeleteUnusedGameObjects =
+            EditorGUILayout.Toggle("Delete Unused Game Objects", settings.DeleteUnusedGameObjects);
         settings.ProfileTimeUsed =
             EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
 
@@ -1985,36 +2113,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             if (settings.DebugShowAlwaysDisabledBehaviours = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledBehaviours, "Always Disabled Behaviours"))
             {
-                var list = FindAllAlwaysDisabledBehaviours();
-                foreach (var behaviour in list)
-                {
-                    EditorGUILayout.ObjectField(behaviour, typeof(Behaviour), true);
-                }
-                if (list.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No Always Disabled Behaviours Found");
-                }
-                else if(GUILayout.Button("Select All"))
-                {
-                    Selection.objects = list.ToArray();
-                }
+                var list = FindAllAlwaysDisabledBehaviours().ToArray();
+                DrawDebugList(list, "No Always Disabled Behaviours Found");
             }
             if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
             {
                 FindAllAlwaysDisabledGameObjects();
-                var list = alwaysDisabledGameObjects.Select(p => GetTransformFromPath(p).gameObject).ToList();
-                foreach (var gameObject in list)
-                {
-                    EditorGUILayout.ObjectField(gameObject, typeof(GameObject), true);
-                }
-                if (list.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No Always Disabled GameObjects Found");
-                }
-                else if (GUILayout.Button("Select All"))
-                {
-                    Selection.objects = list.ToArray();
-                }
+                var list = alwaysDisabledGameObjects
+                    .Select(p => GetTransformFromPath(p).gameObject).ToArray();
+                DrawDebugList(list, "No Always Disabled GameObjects Found");
             }
             if (settings.DebugShowUnparsableMaterials = EditorGUILayout.Foldout(settings.DebugShowUnparsableMaterials, "Unparsable Materials"))
             {
@@ -2022,54 +2129,20 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => !(t.Item2 != null && t.Item2.couldParse && t.Item2.passes.All(p => p.vertex != null && p.fragment != null)))
-                    .Select(t => t.mat).ToList();
-                foreach (var material in list)
-                {
-                    EditorGUILayout.ObjectField(material, typeof(Material), true);
-                }
-                if (list.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No Unparsable Materials Found");
-                }
-                else if (GUILayout.Button("Select All"))
-                {
-                    Selection.objects = list.ToArray();
-                }
+                    .Select(t => t.mat).ToArray();
+                DrawDebugList(list, "No Unparsable Materials Found");
             }
             if (settings.DebugShowGameObjectsWithToggle = EditorGUILayout.Foldout(settings.DebugShowGameObjectsWithToggle, "GameObjects With Toggle Animation"))
             {
                 FindAllGameObjectTogglePaths();
-                var list = root.transform.GetAllDescendants()
-                    .Where(t => gameObjectTogglePaths.Contains(GetTransformPathToRoot(t)))
-                    .Select(t => t.gameObject).ToList();
-                foreach (var gameObject in list)
-                {
-                    EditorGUILayout.ObjectField(gameObject, typeof(GameObject), true);
-                }
-                if (list.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No GameObjects With Toggle Found");
-                }
-                else if (GUILayout.Button("Select All"))
-                {
-                    Selection.objects = list.ToArray();
-                }
+                var list = gameObjectTogglePaths.Select(p => GetTransformFromPath(p)?.gameObject)
+                    .Where(obj => obj != null).ToArray();
+                DrawDebugList(list, "No GameObjects With Toggle Animation Found");
             }
             if (settings.DebugShowUnmovingTransforms = EditorGUILayout.Foldout(settings.DebugShowUnmovingTransforms, "Unmoving Transforms"))
             {
-                var list = FindAllUnmovingTransforms().Select(t => t.gameObject).ToList();
-                foreach (var obj in list)
-                {
-                    EditorGUILayout.ObjectField(obj.transform, typeof(Transform), true);
-                }
-                if (list.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No Unmoving Transforms Found");
-                }
-                else if (GUILayout.Button("Select All"))
-                {
-                    Selection.objects = list.ToArray();
-                }
+                var list = FindAllUnmovingTransforms().Select(t => t.gameObject).ToArray();
+                DrawDebugList(list, "No Unmoving Transforms Found");
             }
         }
     }
