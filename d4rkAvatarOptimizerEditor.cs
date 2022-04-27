@@ -1901,7 +1901,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
 
         var used = new HashSet<Transform>(
-            root.GetComponentsInChildren<SkinnedMeshRenderer>().SelectMany(s => s.bones));
+            root.GetComponentsInChildren<SkinnedMeshRenderer>(true).SelectMany(s => s.bones));
         
         foreach (var constraint in root.GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
         {
@@ -1912,20 +1912,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         used.Add(root.transform);
-        used.UnionWith(root.GetComponentsInChildren<Animator>()
+        used.UnionWith(root.GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
 
-        foreach (var skinnedRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>())
+        foreach (var skinnedRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
             used.Add(skinnedRenderer.rootBone);
         }
 
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>())
+        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
         {
             used.Add(renderer.probeAnchor);
         }
 
-        foreach (var physBone in root.GetComponentsInChildren<VRCPhysBoneBase>())
+        foreach (var physBone in root.GetComponentsInChildren<VRCPhysBoneBase>(true))
         {
             var root = physBone.GetRootTransform();
             var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
