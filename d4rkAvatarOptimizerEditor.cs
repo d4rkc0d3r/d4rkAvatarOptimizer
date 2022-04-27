@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEditor.Animations;
 using UnityEditor;
 using d4rkpl4y3r;
@@ -564,12 +565,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static List<Behaviour> FindAllAlwaysDisabledBehaviours()
+    private static HashSet<Behaviour> FindAllAlwaysDisabledBehaviours()
     {
         var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
-            return new List<Behaviour>();
+            return new HashSet<Behaviour>();
         var behaviourToggles = new HashSet<string>();
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
@@ -578,10 +579,86 @@ public class d4rkAvatarOptimizerEditor : Editor
                 behaviourToggles.Add(binding.path);
             }
         }
-        return root.transform.GetComponentsInChildren<Behaviour>(true)
+        return new HashSet<Behaviour>(root.transform.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
-            .Where(b => !behaviourToggles.Contains(GetTransformPathToRoot(b.transform)))
-            .ToList();
+            .Where(b => !behaviourToggles.Contains(GetTransformPathToRoot(b.transform))));
+    }
+
+    private static HashSet<Transform> FindAllUnmovingTransforms()
+    {
+        var avDescriptor = root.GetComponent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return new HashSet<Transform>();
+        var transforms = new HashSet<Transform>(root.transform.GetAllDescendants());
+
+        if (avDescriptor.enableEyeLook)
+        {
+            transforms.Remove(avDescriptor.customEyeLookSettings.leftEye);
+            transforms.Remove(avDescriptor.customEyeLookSettings.rightEye);
+        }
+        if (avDescriptor.customEyeLookSettings.eyelidType == VRC.SDK3.Avatars.Components.VRCAvatarDescriptor.EyelidType.Bones)
+        {
+            transforms.Remove(avDescriptor.customEyeLookSettings.lowerLeftEyelid);
+            transforms.Remove(avDescriptor.customEyeLookSettings.lowerRightEyelid);
+            transforms.Remove(avDescriptor.customEyeLookSettings.upperLeftEyelid);
+            transforms.Remove(avDescriptor.customEyeLookSettings.upperRightEyelid);
+        }
+        
+        var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
+        layers.AddRange(avDescriptor.specialAnimationLayers.Select(a => a.animatorController));
+        foreach (var layer in layers.Where(a => a != null))
+        {
+            foreach (var binding in layer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+            {
+                if (binding.type == typeof(Transform))
+                {
+                    transforms.Remove(GetTransformFromPath(binding.path));
+                }
+            }
+        }
+
+        var animator = root.GetComponent<Animator>();
+        if (animator != null)
+        {
+            foreach (var boneId in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
+            {
+                if (boneId < 0 || boneId >= HumanBodyBones.LastBone)
+                    continue;
+                transforms.Remove(animator.GetBoneTransform(boneId));
+            }
+        }
+
+        var alwaysDisabledBehaviours = FindAllAlwaysDisabledBehaviours();
+        var physBones = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
+            .Where(pb => !alwaysDisabledBehaviours.Contains(pb)).ToList();
+        foreach (var physBone in physBones)
+        {
+            var root = physBone.GetRootTransform();
+            var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
+            var stack = new Stack<Transform>();
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (exclusions.Contains(current))
+                    continue;
+                transforms.Remove(current);
+                foreach (Transform child in current)
+                {
+                    stack.Push(child);
+                }
+            }
+        }
+
+        var constraints = root.GetComponentsInChildren<Behaviour>(true)
+            .Where(b => !alwaysDisabledBehaviours.Contains(b))
+            .Where(b => b is IConstraint).ToList();
+        foreach (var constraint in constraints)
+        {
+            transforms.Remove(constraint.transform);
+        }
+
+        return transforms;
     }
 
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
@@ -1972,6 +2049,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (list.Count == 0)
                 {
                     EditorGUILayout.LabelField("No GameObjects With Toggle Found");
+                }
+                else if (GUILayout.Button("Select All"))
+                {
+                    Selection.objects = list.ToArray();
+                }
+            }
+            if (settings.DebugShowUnmovingTransforms = EditorGUILayout.Foldout(settings.DebugShowUnmovingTransforms, "Unmoving Transforms"))
+            {
+                var list = FindAllUnmovingTransforms().Select(t => t.gameObject).ToList();
+                foreach (var obj in list)
+                {
+                    EditorGUILayout.ObjectField(obj.transform, typeof(Transform), true);
+                }
+                if (list.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No Unmoving Transforms Found");
                 }
                 else if (GUILayout.Button("Select All"))
                 {
