@@ -13,4 +13,5 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSameDimensionTextures = false;
     public bool MergeBackFaceCullingWithCullingOff = false;
     public bool ProfileTimeUsed = false;
+    public bool ShowMeshAndMaterialMergePreview = true;
 }

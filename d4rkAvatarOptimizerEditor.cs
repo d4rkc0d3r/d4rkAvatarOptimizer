@@ -1797,41 +1797,46 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.PrintTimeUsed();
         }
 
+        EditorGUILayout.Separator();
         root = settings.gameObject;
-        CalculateUsedBlendShapePaths();
-        var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
 
-        foreach (var mergedMeshes in matchedSkinnedMeshes)
+        if (settings.ShowMeshAndMaterialMergePreview = EditorGUILayout.Foldout(settings.ShowMeshAndMaterialMergePreview, "Show Merge Preview"))
         {
-            EditorGUILayout.Separator();
-            var matchedMaterials = new List<List<Material>>();
-            var matchedMaterialMeshes = new List<List<Mesh>>();
-            foreach (var meshMat in mergedMeshes.SelectMany(mesh =>
-                mesh.sharedMaterials.Select(mat => (sharedMesh : mesh.GetSharedMesh(), mat))))
+            CalculateUsedBlendShapePaths();
+            var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
+
+            foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
-                bool foundMatch = false;
-                for (int i = 0; i < matchedMaterials.Count; i++)
+                EditorGUILayout.Space(6);
+                var matchedMaterials = new List<List<Material>>();
+                var matchedMaterialMeshes = new List<List<Mesh>>();
+                foreach (var meshMat in mergedMeshes.SelectMany(mesh =>
+                    mesh.sharedMaterials.Select(mat => (sharedMesh : mesh.GetSharedMesh(), mat))))
                 {
-                    if (CanCombineWith(matchedMaterials[i], meshMat.mat))
+                    bool foundMatch = false;
+                    for (int i = 0; i < matchedMaterials.Count; i++)
                     {
-                        matchedMaterials[i].Add(meshMat.mat);
-                        matchedMaterialMeshes[i].Add(meshMat.sharedMesh);
-                        foundMatch = true;
-                        break;
+                        if (CanCombineWith(matchedMaterials[i], meshMat.mat))
+                        {
+                            matchedMaterials[i].Add(meshMat.mat);
+                            matchedMaterialMeshes[i].Add(meshMat.sharedMesh);
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+                    if (!foundMatch)
+                    {
+                        matchedMaterials.Add(new List<Material> { meshMat.mat ?? nullMaterial });
+                        matchedMaterialMeshes.Add(new List<Mesh> { meshMat.sharedMesh });
                     }
                 }
-                if (!foundMatch)
+                for (int i = 0; i < matchedMaterials.Count; i++)
                 {
-                    matchedMaterials.Add(new List<Material> { meshMat.mat ?? nullMaterial });
-                    matchedMaterialMeshes.Add(new List<Mesh> { meshMat.sharedMesh });
-                }
-            }
-            for (int i = 0; i < matchedMaterials.Count; i++)
-            {
-                for (int j = 0; j < matchedMaterials[i].Count; j++)
-                {
-                    string indent = (i == 0  && j == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
-                    EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
+                    for (int j = 0; j < matchedMaterials[i].Count; j++)
+                    {
+                        string indent = (i == 0  && j == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
+                        EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
+                    }
                 }
             }
         }
