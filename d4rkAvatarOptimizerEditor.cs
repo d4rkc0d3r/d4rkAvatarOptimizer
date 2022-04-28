@@ -539,7 +539,15 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + mesh.GetBlendShapeName(i)))
                 {
-                    blendShapeIDs.Add(i);
+                    if (mesh.GetBlendShapeFrameCount(i) > 1)
+                    {
+                        usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
+                        hasUsedBlendShapes.Add(skinnedMeshRenderer);
+                    }
+                    else
+                    {
+                        blendShapeIDs.Add(i);
+                    }
                 }
             }
         }
