@@ -15,7 +15,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private int maxKeywords = 10;
     private bool showShaderLabParamsOnly = false;
 
-    [MenuItem("Window/Shader Analyzer Debugger")]
+    [MenuItem("Tools/d4rkpl4y3r/Shader Analyzer Debugger")]
     static void Init()
     {
         GetWindow(typeof(ShaderAnalyzerDebugger));
