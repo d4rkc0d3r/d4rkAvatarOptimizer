@@ -99,6 +99,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static string scriptPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
+    private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
     private static Dictionary<(string path, int slot), List<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), List<Material>>();
@@ -480,64 +481,66 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         usedBlendShapes.Clear();
         hasUsedBlendShapes.Clear();
+        blendShapesToBake.Clear();
         materialSlotsWithMaterialSwapAnimations.Clear();
-        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        var matchedSkinnedMeshes = new List<List<SkinnedMeshRenderer>>();
-        foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor != null)
+        {
+            if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
+                && avDescriptor.VisemeSkinnedMesh != null)
+            {
+                string path = GetTransformPathToRoot(avDescriptor.VisemeSkinnedMesh.transform) + "/blendShape.";
+                foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+                {
+                    usedBlendShapes.Add(path + blendShapeName);
+                }
+            }
+            if (avDescriptor.customEyeLookSettings.eyelidType
+                == VRCAvatarDescriptor.EyelidType.Blendshapes
+                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
+            {
+                var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+                string path = GetTransformPathToRoot(meshRenderer.transform) + "/blendShape.";
+                foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+                {
+                    if (blendShapeID >= 0)
+                    {
+                        usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                        hasUsedBlendShapes.Add(meshRenderer);
+                    }
+                }
+            }
+            var fxLayer = avDescriptor.baseAnimationLayers[4].animatorController as AnimatorController;
+            if (fxLayer != null)
+            {
+                foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+                {
+                    if (binding.type != typeof(SkinnedMeshRenderer)
+                        || !binding.propertyName.StartsWith("blendShape."))
+                        continue;
+                    usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
+                    var t = GetTransformFromPath(binding.path);
+                    if (t != null)
+                    {
+                        hasUsedBlendShapes.Add(t.GetComponent<SkinnedMeshRenderer>());
+                    }
+                }
+            }
+        }
+        foreach (var skinnedMeshRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
+            var blendShapeIDs = new List<int>();
+            blendShapesToBake[skinnedMeshRenderer] = blendShapeIDs;
             string path = GetTransformPathToRoot(skinnedMeshRenderer.transform) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
-                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0)
+                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + mesh.GetBlendShapeName(i)))
                 {
-                    usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
-                    hasUsedBlendShapes.Add(skinnedMeshRenderer);
+                    blendShapeIDs.Add(i);
                 }
-            }
-        }
-        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
-        if (avDescriptor == null)
-            return;
-        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
-            && avDescriptor.VisemeSkinnedMesh != null)
-        {
-            string path = GetTransformPathToRoot(avDescriptor.VisemeSkinnedMesh.transform) + "/blendShape.";
-            foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
-            {
-                usedBlendShapes.Add(path + blendShapeName);
-            }
-        }
-        if (avDescriptor.customEyeLookSettings.eyelidType
-            == VRCAvatarDescriptor.EyelidType.Blendshapes
-            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
-        {
-            var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-            string path = GetTransformPathToRoot(meshRenderer.transform) + "/blendShape.";
-            foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
-            {
-                if (blendShapeID >= 0)
-                {
-                    usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
-                    hasUsedBlendShapes.Add(meshRenderer);
-                }
-            }
-        }
-        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
-        if (fxLayer == null)
-            return;
-        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
-        {
-            if (binding.type != typeof(SkinnedMeshRenderer)
-                || !binding.propertyName.StartsWith("blendShape."))
-                continue;
-            usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-            var t = GetTransformFromPath(binding.path);
-            if (t != null)
-            {
-                hasUsedBlendShapes.Add(t.GetComponent<SkinnedMeshRenderer>());
             }
         }
     }
@@ -1531,6 +1534,30 @@ public class d4rkAvatarOptimizerEditor : Editor
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
                 sourceTangents = sourceTangents.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceTangents;
 
+                var bakedBlendShapeVertexDelta = new Vector3[sourceVertices.Length];
+                var bakedBlendShapeNormalDelta = new Vector3[sourceVertices.Length];
+                var bakedBlendShapeTangentDelta = new Vector3[sourceVertices.Length];
+
+                if (!blendShapesToBake.TryGetValue(skinnedMesh, out var blendShapeIDs))
+                {
+                    blendShapeIDs = new List<int>();
+                }
+
+                foreach (int blendShapeID in blendShapeIDs)
+                {
+                    var weight = skinnedMesh.GetBlendShapeWeight(blendShapeID) / 100f;
+                    var deltaVertices = new Vector3[sourceVertices.Length];
+                    var deltaNormals = new Vector3[sourceVertices.Length];
+                    var deltaTangents = new Vector3[sourceVertices.Length];
+                    mesh.GetBlendShapeFrameVertices(blendShapeID, 0, deltaVertices, deltaNormals, deltaTangents);
+                    for (int i = 0; i < sourceVertices.Length; i++)
+                    {
+                        bakedBlendShapeVertexDelta[i] += deltaVertices[i] * weight;
+                        bakedBlendShapeNormalDelta[i] += deltaNormals[i] * weight;
+                        bakedBlendShapeTangentDelta[i] += deltaTangents[i] * weight;
+                    }
+                }
+
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
                     targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
@@ -1541,9 +1568,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
                     sourceToWorld.Add(toWorld);
-                    targetVertices.Add(toWorld.MultiplyPoint3x4(sourceVertices[vertIndex]));
-                    targetNormals.Add(toWorld.MultiplyVector(sourceNormals[vertIndex]).normalized);
-                    var t = toWorld.MultiplyVector((Vector3)sourceTangents[vertIndex]).normalized;
+                    var vertex = sourceVertices[vertIndex] + bakedBlendShapeVertexDelta[vertIndex];
+                    var normal = sourceNormals[vertIndex] + bakedBlendShapeNormalDelta[vertIndex];
+                    var tangent = (Vector3)sourceTangents[vertIndex] + bakedBlendShapeTangentDelta[vertIndex];
+                    targetVertices.Add(toWorld.MultiplyPoint3x4(vertex));
+                    targetNormals.Add(toWorld.MultiplyVector(normal).normalized);
+                    var t = toWorld.MultiplyVector(tangent).normalized;
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
                     int newIndex;
                     if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
