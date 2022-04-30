@@ -1730,11 +1730,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshID++;
             }
             Profiler.EndSection();
-
-            CreateUniqueAsset(combinedMesh, combinedMesh.name + ".asset");
-            Profiler.StartSection("AssetDatabase.SaveAssets()");
-            AssetDatabase.SaveAssets();
-            Profiler.EndSection();
             
             var meshRenderer = combinableSkinnedMeshes[0];
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
