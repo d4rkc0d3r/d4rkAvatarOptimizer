@@ -619,7 +619,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static HashSet<Behaviour> FindAllAlwaysDisabledBehaviours()
+    private static HashSet<Behaviour> FindAllUnusedBehaviours()
     {
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
@@ -633,9 +633,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                 behaviourToggles.Add(binding.path);
             }
         }
-        return new HashSet<Behaviour>(root.transform.GetComponentsInChildren<Behaviour>(true)
+        var alwaysDisabledBehaviours = new HashSet<Behaviour>(root.transform.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
+            .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetTransformPathToRoot(b.transform))));
+        
+        var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
+            .Where(pb => !alwaysDisabledBehaviours.Contains(pb))
+            .SelectMany(pb => pb.colliders);
+
+        alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
+            .Where(c => !usedPhysBoneColliders.Contains(c)));
+
+        return alwaysDisabledBehaviours;
     }
 
     private static HashSet<Transform> FindAllUnmovingTransforms()
@@ -682,7 +692,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        var alwaysDisabledBehaviours = FindAllAlwaysDisabledBehaviours();
+        var alwaysDisabledBehaviours = FindAllUnusedBehaviours();
         var physBones = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
             .Where(pb => !alwaysDisabledBehaviours.Contains(pb)).ToList();
         foreach (var physBone in physBones)
@@ -1681,7 +1691,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     blendShapeMeshIDtoNewName[(meshID, i)] = name;
                     blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(i);
                     AddAnimationPathChange(
-                        (GetTransformPathToRoot(skinnedMesh.transform), "blendShape." + name, typeof(SkinnedMeshRenderer)),
+                        (GetTransformPathToRoot(skinnedMesh.transform), "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
                         (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
                     {
@@ -1920,7 +1930,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (!settings.DeleteUnusedComponents)
             return;
-        var list = FindAllAlwaysDisabledBehaviours();
+        var list = FindAllUnusedBehaviours();
         foreach (var behaviour in list)
         {
             DestroyImmediate(behaviour);
@@ -2088,7 +2098,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         else if (GUILayout.Button("Select All"))
         {
-            Selection.objects = array;
+            if (typeof(Component).IsAssignableFrom(typeof(T)))
+            {
+                Selection.objects = array.Select(o => (o as Component).gameObject).ToArray();
+            }
+            else
+            {
+                Selection.objects = array;
+            }
         }
     }
     
@@ -2194,10 +2211,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (settings.ShowDebugInfo = EditorGUILayout.Foldout(settings.ShowDebugInfo, "Debug Info"))
         {
-            if (settings.DebugShowAlwaysDisabledBehaviours = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledBehaviours, "Always Disabled Behaviours"))
+            if (settings.DebugShowUnusedBehaviours = EditorGUILayout.Foldout(settings.DebugShowUnusedBehaviours, "Unused Behaviours"))
             {
-                var list = FindAllAlwaysDisabledBehaviours().ToArray();
-                DrawDebugList(list, "No Always Disabled Behaviours Found");
+                var list = FindAllUnusedBehaviours().ToArray();
+                DrawDebugList(list, "No Unused Behaviours Found");
             }
             if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
             {
