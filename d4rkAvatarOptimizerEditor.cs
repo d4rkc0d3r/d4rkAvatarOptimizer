@@ -109,11 +109,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
-    private static HashSet<string> alwaysDisabledGameObjects = new HashSet<string>();
     private static Material nullMaterial = null;
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
-    private static HashSet<SkinnedMeshRenderer> unusedSkinnedMeshRenderers = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private static Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
@@ -161,6 +159,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         return t;
     }
 
+    private static string GetPathToRoot(GameObject obj)
+    {
+        return GetTransformPathToRoot(obj.transform);
+    }
+
+    private static string GetPathToRoot(Component component)
+    {
+        return GetTransformPathToRoot(component.transform);
+    }
+
     private static bool IsCombinableSkinnedMesh(Renderer candidate)
     {
         if (candidate.TryGetComponent(out Cloth cloth))
@@ -198,11 +206,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         if (!settings.ForceMergeBlendShapeMissMatch && (hasUsedBlendShapes.Contains(list[0]) ^ hasUsedBlendShapes.Contains(candidate)))
             return false;
-        var paths = list.Select(smr => GetTransformPathToRoot(smr.transform.parent)).ToList();
+        var paths = list.Select(smr => GetPathToRoot(smr.transform.parent)).ToList();
         var t = candidate.transform;
         while ((t = t.parent) != root.transform)
         {
-            var path = GetTransformPathToRoot(t);
+            var path = GetPathToRoot(t);
             if (gameObjectTogglePaths.Contains(path) && paths.Any(p => !p.StartsWith(path)))
                 return false;
         }
@@ -221,25 +229,25 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void FindAllUnusedSkinnedMeshRenderers()
+    private static HashSet<SkinnedMeshRenderer> FindAllUnusedSkinnedMeshRenderers()
     {
-        FindAllGameObjectTogglePaths();
-        unusedSkinnedMeshRenderers.Clear();
+        var togglePaths = FindAllGameObjectTogglePaths();
+        var unused = new HashSet<SkinnedMeshRenderer>();
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
             if (skinnedMeshRenderer.gameObject.activeSelf)
                 continue;
-            if (gameObjectTogglePaths.Contains(GetTransformPathToRoot(skinnedMeshRenderer.transform)))
+            if (togglePaths.Contains(GetPathToRoot(skinnedMeshRenderer)))
                 continue;
-            unusedSkinnedMeshRenderers.Add(skinnedMeshRenderer);
+            unused.Add(skinnedMeshRenderer);
         }
+        return unused;
     }
 
     private static void DeleteAllUnusedSkinnedMeshRenderers()
     {
-        FindAllUnusedSkinnedMeshRenderers();
-        foreach (var skinnedMeshRenderer in unusedSkinnedMeshRenderers)
+        foreach (var skinnedMeshRenderer in FindAllUnusedSkinnedMeshRenderers())
         {
             var obj = skinnedMeshRenderer.gameObject;
             DestroyImmediate(skinnedMeshRenderer);
@@ -250,13 +258,14 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static List<List<Renderer>> FindPossibleSkinnedMeshMerges()
     {
-        FindAllUnusedSkinnedMeshRenderers();
+        var unused = FindAllUnusedSkinnedMeshRenderers();
+        gameObjectTogglePaths = FindAllGameObjectTogglePaths();
         var renderers = root.GetComponentsInChildren<Renderer>(true);
         var matchedSkinnedMeshes = new List<List<Renderer>>();
         foreach (var renderer in renderers)
         {
             var mesh = renderer.GetSharedMesh();
-            if (mesh == null || renderer.gameObject.CompareTag("EditorOnly") || unusedSkinnedMeshRenderers.Contains(renderer))
+            if (mesh == null || renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer))
                 continue;
 
             bool foundMatch = false;
@@ -282,7 +291,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
             if (index == -1)
             {
-                var obj = subList.OrderBy(smr => GetTransformPathToRoot(smr.transform).Count(c => c == '/')).First();
+                var obj = subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/')).First();
                 index = subList.IndexOf(obj);
             }
             var oldFirst = subList[0];
@@ -333,7 +342,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (transform != null)
                 {
-                    var path = GetTransformPathToRoot(transform);
+                    var path = GetPathToRoot(transform);
                     changed = changed || path != newBinding.path;
                     newBinding.path = path;
                 }
@@ -360,7 +369,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (transform != null)
                 {
-                    var path = GetTransformPathToRoot(transform);
+                    var path = GetPathToRoot(transform);
                     changed = changed || path != newBinding.path;
                     newBinding.path = path;
                 }
@@ -489,7 +498,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
                 && avDescriptor.VisemeSkinnedMesh != null)
             {
-                string path = GetTransformPathToRoot(avDescriptor.VisemeSkinnedMesh.transform) + "/blendShape.";
+                string path = GetPathToRoot(avDescriptor.VisemeSkinnedMesh) + "/blendShape.";
                 foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
                 {
                     usedBlendShapes.Add(path + blendShapeName);
@@ -500,7 +509,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-                string path = GetTransformPathToRoot(meshRenderer.transform) + "/blendShape.";
+                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
                 foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
                 {
                     if (blendShapeID >= 0)
@@ -534,7 +543,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 continue;
             var blendShapeIDs = new List<int>();
             blendShapesToBake[skinnedMeshRenderer] = blendShapeIDs;
-            string path = GetTransformPathToRoot(skinnedMeshRenderer.transform) + "/blendShape.";
+            string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
                 if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + mesh.GetBlendShapeName(i)))
@@ -553,21 +562,21 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void CalculateUsedMaterialProperties()
+    private static Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties()
     {
-        animatedMaterialProperties.Clear();
+        var map = new Dictionary<string, HashSet<string>>();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
-            return;
+            return map;
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
             if (!binding.propertyName.StartsWith("material.") ||
                 (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
                 continue;
-            if (!animatedMaterialProperties.TryGetValue(binding.path, out var props))
+            if (!map.TryGetValue(binding.path, out var props))
             {
-                animatedMaterialProperties[binding.path] = (props = new HashSet<string>());
+                map[binding.path] = (props = new HashSet<string>());
             }
             var propName = binding.propertyName.Substring(9);
             if (propName.Length > 2 && propName[propName.Length - 2] == '.')
@@ -576,37 +585,39 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             props.Add(propName);
         }
+        return map;
     }
 
-    private static void FindAllGameObjectTogglePaths()
+    private static HashSet<string> FindAllGameObjectTogglePaths()
     {
-        gameObjectTogglePaths.Clear();
+        var togglePaths = new HashSet<string>();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
-            return;
+            return new HashSet<string>();
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
-                gameObjectTogglePaths.Add(binding.path);
+                togglePaths.Add(binding.path);
         }
+        return togglePaths;
     }
 
-    private static void FindAllAlwaysDisabledGameObjects()
+    private static HashSet<string> FindAllAlwaysDisabledGameObjects()
     {
-        FindAllGameObjectTogglePaths();
-        alwaysDisabledGameObjects.Clear();
+        var togglePaths = FindAllGameObjectTogglePaths();
+        var disabledGameObjectPaths = new HashSet<string>();
         var queue = new Queue<Transform>();
         queue.Enqueue(root.transform);
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
-            if (current != root.transform && !current.gameObject.activeSelf && !gameObjectTogglePaths.Contains(GetTransformPathToRoot(current)))
+            if (current != root.transform && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
             {
-                alwaysDisabledGameObjects.Add(GetTransformPathToRoot(current));
+                disabledGameObjectPaths.Add(GetPathToRoot(current));
                 foreach (var child in current.GetAllDescendants())
                 {
-                    alwaysDisabledGameObjects.Add(GetTransformPathToRoot(child));
+                    disabledGameObjectPaths.Add(GetPathToRoot(child));
                 }
             }
             else
@@ -617,6 +628,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
         }
+        return disabledGameObjectPaths;
     }
 
     private static HashSet<Behaviour> FindAllUnusedBehaviours()
@@ -636,7 +648,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var alwaysDisabledBehaviours = new HashSet<Behaviour>(root.transform.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
-            .Where(b => !behaviourToggles.Contains(GetTransformPathToRoot(b.transform))));
+            .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
         
         var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
             .Where(pb => !alwaysDisabledBehaviours.Contains(pb))
@@ -1062,7 +1074,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
 
             if (settings.KeepMaterialPropertyAnimationsSeparate
-                && animatedMaterialProperties.TryGetValue(GetTransformPathToRoot(meshRenderer.transform), out var animatedProperties))
+                && animatedMaterialProperties.TryGetValue(GetPathToRoot(meshRenderer), out var animatedProperties))
             {
                 foreach (var mat in meshRenderer.sharedMaterials)
                 {
@@ -1185,7 +1197,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var meshRenderers = root.GetComponentsInChildren<MeshRenderer>(true);
         foreach (var meshRenderer in meshRenderers)
         {
-            var path = GetTransformPathToRoot(meshRenderer.transform);
+            var path = GetPathToRoot(meshRenderer);
             var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
             var alreadyOptimizedMaterials = new HashSet<Material>();
             foreach (var (material, index) in mats)
@@ -1197,7 +1209,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             var toOptimize = mats.Select(t => t.material).Where(m => !alreadyOptimizedMaterials.Contains(m)).Distinct().ToList();
             var optimizeMaterialWrapper = toOptimize.Select(m => new List<Material>() { m }).ToList();
-            var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0, GetTransformPathToRoot(meshRenderer.transform));
+            var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0, GetPathToRoot(meshRenderer));
             var optimizedMaterials = toOptimize.Select((mat, index) => (mat, index))
                 .ToDictionary(t => t.mat, t => optimizedMaterialsList[t.index]);
             var finalMaterials = new Material[meshRenderer.sharedMaterials.Length];
@@ -1433,7 +1445,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, GetTransformPathToRoot(meshRenderer.transform));
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, GetPathToRoot(meshRenderer));
         }
     }
 
@@ -1642,7 +1654,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.EndSection();
 
             string newMeshName = combinableSkinnedMeshes[0].name;
-            string newPath = GetTransformPathToRoot(combinableSkinnedMeshes[0].transform);
+            string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
             var blendShapeWeights = new Dictionary<string, float>();
 
             var combinedMesh = new Mesh();
@@ -1681,7 +1693,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 var mesh = skinnedMesh.sharedMesh;
-                string path = GetTransformPathToRoot(skinnedMesh.transform) + "/blendShape.";
+                string path = GetPathToRoot(skinnedMesh) + "/blendShape.";
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
                     var oldName = mesh.GetBlendShapeName(i);
@@ -1691,7 +1703,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     blendShapeMeshIDtoNewName[(meshID, i)] = name;
                     blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(i);
                     AddAnimationPathChange(
-                        (GetTransformPathToRoot(skinnedMesh.transform), "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
+                        (GetPathToRoot(skinnedMesh), "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
                         (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
                     {
@@ -1753,7 +1765,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
-                var oldPath = GetTransformPathToRoot(skinnedMesh.transform);
+                var oldPath = GetPathToRoot(skinnedMesh);
                 if (combinableSkinnedMeshes.Count > 1)
                 {
                     var properties = new MaterialPropertyBlock();
@@ -1813,7 +1825,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                             }
                                         }
                                     }
-                                    string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
+                                    string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
                                     if (isVector || isColor)
                                     {
                                         var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : new [] { ".r", ".g", ".b", ".a" };
@@ -1833,7 +1845,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 }
                                 else
                                 {
-                                    string path = GetTransformPathToRoot(combinableSkinnedMeshes[mID].transform);
+                                    string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
                                     if (isVector || isColor)
                                     {
                                         var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : new [] { ".r", ".g", ".b", ".a" };
@@ -1942,7 +1954,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         transformFromOldPath = new Dictionary<string, Transform>();
         foreach (var transform in root.transform.GetAllDescendants())
         {
-            transformFromOldPath[GetTransformPathToRoot(transform)] = transform;
+            transformFromOldPath[GetPathToRoot(transform)] = transform;
         }
 
         if (!settings.DeleteUnusedGameObjects)
@@ -2041,7 +2053,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             skinnedMeshRenderer.sharedMesh = mesh;
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
-            convertedMeshRendererPaths.Add(GetTransformPathToRoot(obj.transform));
+            convertedMeshRendererPaths.Add(GetPathToRoot(obj));
         }
     }
 
@@ -2065,8 +2077,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         CalculateUsedBlendShapePaths();
         Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
         DeleteAllUnusedSkinnedMeshRenderers();
-        Profiler.StartNextSection("CalculateUsedMaterialProperties()");
-        CalculateUsedMaterialProperties();
+        Profiler.StartNextSection("FindAllAnimatedMaterialProperties()");
+        animatedMaterialProperties = FindAllAnimatedMaterialProperties();
         Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
         OptimizeMaterialSwapMaterials();
         Profiler.StartNextSection("CombineSkinnedMeshes()");
@@ -2218,8 +2230,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
             {
-                FindAllAlwaysDisabledGameObjects();
-                var list = alwaysDisabledGameObjects
+                var list = FindAllAlwaysDisabledGameObjects()
                     .Select(p => GetTransformFromPath(p).gameObject).ToArray();
                 DrawDebugList(list, "No Always Disabled GameObjects Found");
             }
@@ -2234,8 +2245,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             if (settings.DebugShowGameObjectsWithToggle = EditorGUILayout.Foldout(settings.DebugShowGameObjectsWithToggle, "GameObjects With Toggle Animation"))
             {
-                FindAllGameObjectTogglePaths();
-                var list = gameObjectTogglePaths.Select(p => GetTransformFromPath(p)?.gameObject)
+                var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
                 DrawDebugList(list, "No GameObjects With Toggle Animation Found");
             }
