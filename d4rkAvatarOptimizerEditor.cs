@@ -1974,6 +1974,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 used.Add(constraint.GetSource(i).sourceTransform);
             }
+            used.Add((constraint as AimConstraint)?.worldUpObject);
+            used.Add((constraint as LookAtConstraint)?.worldUpObject);
         }
 
         used.Add(root.transform);
