@@ -603,10 +603,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         return togglePaths;
     }
 
-    private static HashSet<string> FindAllAlwaysDisabledGameObjects()
+    private static HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
         var togglePaths = FindAllGameObjectTogglePaths();
-        var disabledGameObjectPaths = new HashSet<string>();
+        var disabledGameObjects = new HashSet<Transform>();
         var queue = new Queue<Transform>();
         queue.Enqueue(root.transform);
         while (queue.Count > 0)
@@ -614,10 +614,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             var current = queue.Dequeue();
             if (current != root.transform && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
             {
-                disabledGameObjectPaths.Add(GetPathToRoot(current));
+                disabledGameObjects.Add(current);
                 foreach (var child in current.GetAllDescendants())
                 {
-                    disabledGameObjectPaths.Add(GetPathToRoot(child));
+                    disabledGameObjects.Add(child);
                 }
             }
             else
@@ -628,15 +628,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
         }
-        return disabledGameObjectPaths;
+        return disabledGameObjects;
     }
 
-    private static HashSet<Behaviour> FindAllUnusedBehaviours()
+    private static HashSet<Component> FindAllUnusedComponents()
     {
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
-            return new HashSet<Behaviour>();
+            return new HashSet<Component>();
         var behaviourToggles = new HashSet<string>();
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
@@ -645,7 +645,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 behaviourToggles.Add(binding.path);
             }
         }
-        var alwaysDisabledBehaviours = new HashSet<Behaviour>(root.transform.GetComponentsInChildren<Behaviour>(true)
+        var alwaysDisabledBehaviours = new HashSet<Component>(root.transform.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
@@ -656,6 +656,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
             .Where(c => !usedPhysBoneColliders.Contains(c)));
+
+        alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
+            .SelectMany(t => t.GetComponents<Component>().Where(c => !(c is Transform))));
 
         return alwaysDisabledBehaviours;
     }
@@ -704,9 +707,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        var alwaysDisabledBehaviours = FindAllUnusedBehaviours();
+        var alwaysDisabledComponents = FindAllUnusedComponents();
         var physBones = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
-            .Where(pb => !alwaysDisabledBehaviours.Contains(pb)).ToList();
+            .Where(pb => !alwaysDisabledComponents.Contains(pb)).ToList();
         foreach (var physBone in physBones)
         {
             var root = physBone.GetRootTransform();
@@ -737,7 +740,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         var constraints = root.GetComponentsInChildren<Behaviour>(true)
-            .Where(b => !alwaysDisabledBehaviours.Contains(b))
+            .Where(b => !alwaysDisabledComponents.Contains(b))
             .Where(b => b is IConstraint).ToList();
         foreach (var constraint in constraints)
         {
@@ -1947,10 +1950,10 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (!settings.DeleteUnusedComponents)
             return;
-        var list = FindAllUnusedBehaviours();
-        foreach (var behaviour in list)
+        var list = FindAllUnusedComponents();
+        foreach (var component in list)
         {
-            DestroyImmediate(behaviour);
+            DestroyImmediate(component);
         }
     }
 
@@ -2230,15 +2233,14 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (settings.ShowDebugInfo = EditorGUILayout.Foldout(settings.ShowDebugInfo, "Debug Info"))
         {
-            if (settings.DebugShowUnusedBehaviours = EditorGUILayout.Foldout(settings.DebugShowUnusedBehaviours, "Unused Behaviours"))
+            if (settings.DebugShowUnusedComponents = EditorGUILayout.Foldout(settings.DebugShowUnusedComponents, "Unused Components"))
             {
-                var list = FindAllUnusedBehaviours().ToArray();
-                DrawDebugList(list, "No Unused Behaviours Found");
+                var list = FindAllUnusedComponents().ToArray();
+                DrawDebugList(list, "No Unused Components Found");
             }
             if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
             {
-                var list = FindAllAlwaysDisabledGameObjects()
-                    .Select(p => GetTransformFromPath(p).gameObject).ToArray();
+                var list = FindAllAlwaysDisabledGameObjects().ToArray();
                 DrawDebugList(list, "No Always Disabled GameObjects Found");
             }
             if (settings.DebugShowUnparsableMaterials = EditorGUILayout.Foldout(settings.DebugShowUnparsableMaterials, "Unparsable Materials"))
