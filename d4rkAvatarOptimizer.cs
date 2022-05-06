@@ -21,5 +21,5 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowAlwaysDisabledGameObjects = true;
     public bool DebugShowUnparsableMaterials = true;
     public bool DebugShowGameObjectsWithToggle = true;
-    public bool DebugShowUnmovingTransforms = false;
+    public bool DebugShowUnmovingBones = false;
 }

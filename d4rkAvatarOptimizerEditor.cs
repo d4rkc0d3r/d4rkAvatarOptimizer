@@ -2267,9 +2267,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .Where(obj => obj != null).ToArray();
                 DrawDebugList(list);
             }
-            if (settings.DebugShowUnmovingTransforms = EditorGUILayout.Foldout(settings.DebugShowUnmovingTransforms, "Unmoving Transforms"))
+            if (settings.DebugShowUnmovingBones = EditorGUILayout.Foldout(settings.DebugShowUnmovingBones, "Unmoving Bones"))
             {
-                DrawDebugList(FindAllUnmovingTransforms().Select(t => t.gameObject).ToArray());
+                var bones = new HashSet<Transform>();
+                var unmoving = FindAllUnmovingTransforms();
+                root.GetComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
+                    r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
+                DrawDebugList(bones.ToArray());
             }
             EditorGUI.indentLevel--;
         }
