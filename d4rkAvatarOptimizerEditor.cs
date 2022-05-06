@@ -2108,6 +2108,27 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
     }
 
+    public bool Button(string label)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(15 * EditorGUI.indentLevel);
+        var result = GUILayout.Button(label);
+        GUILayout.EndHorizontal();
+        return result;
+    }
+
+    private void DrawMatchedMeshMaterial(Renderer renderer, Material material, int indent)
+    {
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Space(8 * indent);
+        EditorGUILayout.ObjectField(renderer, typeof(Renderer), true);
+        int originalIndent = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+        EditorGUILayout.ObjectField(material, typeof(Material), false);
+        EditorGUI.indentLevel = originalIndent;
+        EditorGUILayout.EndHorizontal();
+    }
+
     public void DrawDebugList<T>(T[] array, string emptyListMessage) where T : Object
     {
         foreach (var obj in array)
@@ -2118,7 +2139,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             EditorGUILayout.LabelField(emptyListMessage);
         }
-        else if (GUILayout.Button("Select All"))
+        else if (Button("Select All"))
         {
             if (typeof(Component).IsAssignableFrom(typeof(T)))
             {
@@ -2147,19 +2168,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
         GUI.enabled = settings.MergeSkinnedMeshes =
             EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        EditorGUI.indentLevel++;
         settings.MergeStaticMeshesAsSkinned =
-            EditorGUILayout.Toggle("  Merge Static Meshes As Skinned", settings.MergeStaticMeshesAsSkinned);
+            EditorGUILayout.Toggle("Merge Static Meshes As Skinned", settings.MergeStaticMeshesAsSkinned);
         settings.ForceMergeBlendShapeMissMatch =
-            EditorGUILayout.Toggle("  Force Merge Blend Shape Miss Match", settings.ForceMergeBlendShapeMissMatch);
+            EditorGUILayout.Toggle("Force Merge Blend Shape Miss Match", settings.ForceMergeBlendShapeMissMatch);
         settings.KeepMaterialPropertyAnimationsSeparate =
-            EditorGUILayout.Toggle("  Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
+            EditorGUILayout.Toggle("Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
+        EditorGUI.indentLevel--;
         GUI.enabled = true;
         GUI.enabled = settings.MergeDifferentPropertyMaterials =
             EditorGUILayout.Toggle("Merge Different Property Materials", settings.MergeDifferentPropertyMaterials);
+        EditorGUI.indentLevel++;
         settings.MergeSameDimensionTextures =
-            EditorGUILayout.Toggle("  Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
+            EditorGUILayout.Toggle("Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
         settings.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("  Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
+            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
+        EditorGUI.indentLevel--;
         GUI.enabled = true;
         settings.DeleteUnusedComponents =
             EditorGUILayout.Toggle("Delete Unused Components", settings.DeleteUnusedComponents);
@@ -2192,38 +2217,37 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             CalculateUsedBlendShapePaths();
             var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
-
             foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
                 EditorGUILayout.Space(6);
                 var matchedMaterials = new List<List<Material>>();
-                var matchedMaterialMeshes = new List<List<Mesh>>();
-                foreach (var meshMat in mergedMeshes.SelectMany(mesh =>
-                    mesh.sharedMaterials.Select(mat => (sharedMesh : mesh.GetSharedMesh(), mat))))
+                var matchedMaterialRenderer = new List<List<Renderer>>();
+                foreach (var match in mergedMeshes.SelectMany(renderer =>
+                    renderer.sharedMaterials.Select(material => (renderer, material))))
                 {
                     bool foundMatch = false;
                     for (int i = 0; i < matchedMaterials.Count; i++)
                     {
-                        if (CanCombineWith(matchedMaterials[i], meshMat.mat))
+                        if (CanCombineWith(matchedMaterials[i], match.material))
                         {
-                            matchedMaterials[i].Add(meshMat.mat);
-                            matchedMaterialMeshes[i].Add(meshMat.sharedMesh);
+                            matchedMaterials[i].Add(match.material);
+                            matchedMaterialRenderer[i].Add(match.renderer);
                             foundMatch = true;
                             break;
                         }
                     }
                     if (!foundMatch)
                     {
-                        matchedMaterials.Add(new List<Material> { meshMat.mat ?? nullMaterial });
-                        matchedMaterialMeshes.Add(new List<Mesh> { meshMat.sharedMesh });
+                        matchedMaterials.Add(new List<Material> { match.material ?? nullMaterial });
+                        matchedMaterialRenderer.Add(new List<Renderer> { match.renderer });
                     }
                 }
                 for (int i = 0; i < matchedMaterials.Count; i++)
                 {
                     for (int j = 0; j < matchedMaterials[i].Count; j++)
                     {
-                        string indent = (i == 0  && j == 0 ? "" : "  ") + (j == 0 ? "" : "  ");
-                        EditorGUILayout.LabelField(indent + matchedMaterialMeshes[i][j].name + "." + matchedMaterials[i][j].name);
+                        int indent = (i == 0  && j == 0 ? 0 : 1) + (j == 0 ? 0 : 1);
+                        DrawMatchedMeshMaterial(matchedMaterialRenderer[i][j], matchedMaterials[i][j], indent);
                     }
                 }
             }
@@ -2233,6 +2257,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (settings.ShowDebugInfo = EditorGUILayout.Foldout(settings.ShowDebugInfo, "Debug Info"))
         {
+            EditorGUI.indentLevel++;
             if (settings.DebugShowUnusedComponents = EditorGUILayout.Foldout(settings.DebugShowUnusedComponents, "Unused Components"))
             {
                 var list = FindAllUnusedComponents().ToArray();
@@ -2263,6 +2288,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var list = FindAllUnmovingTransforms().Select(t => t.gameObject).ToArray();
                 DrawDebugList(list, "No Unmoving Transforms Found");
             }
+            EditorGUI.indentLevel--;
         }
     }
 }
