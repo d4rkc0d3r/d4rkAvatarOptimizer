@@ -2124,11 +2124,22 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
+    public bool Toggle(string label, ref bool value)
+    {
+        bool output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
+        if (GUI.enabled)
+        {
+            value = output;
+        }
+        return value;
+    }
+
     private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
     {
+        indent *= 15;
         EditorGUILayout.BeginHorizontal();
-        GUILayout.Space(8 * indent);
-        EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true);
+        GUILayout.Space(indent);
+        EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true, GUILayout.Width(EditorGUIUtility.currentViewWidth / 2 - 20 - (indent)));
         int originalIndent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
         EditorGUILayout.ObjectField(slot.material, typeof(Material), false);
@@ -2136,7 +2147,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.EndHorizontal();
     }
 
-    public void DrawDebugList<T>(T[] array, string emptyListMessage) where T : Object
+    public void DrawDebugList<T>(T[] array) where T : Object
     {
         foreach (var obj in array)
         {
@@ -2144,7 +2155,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         if (array.Length == 0)
         {
-            EditorGUILayout.LabelField(emptyListMessage);
+            EditorGUILayout.LabelField("---");
         }
         else if (Button("Select All"))
         {
@@ -2171,34 +2182,23 @@ public class d4rkAvatarOptimizerEditor : Editor
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         scriptPath = path.Substring(0, path.LastIndexOf('/'));
 
-        settings.WritePropertiesAsStaticValues =
-            EditorGUILayout.Toggle("Write Properties As Static Values", settings.WritePropertiesAsStaticValues);
-        GUI.enabled = settings.MergeSkinnedMeshes =
-            EditorGUILayout.Toggle("Merge Skinned Meshes", settings.MergeSkinnedMeshes);
+        Toggle("Write Properties as Static Values", ref settings.WritePropertiesAsStaticValues);
+        GUI.enabled = Toggle("Merge Skinned Meshes", ref settings.MergeSkinnedMeshes);
         EditorGUI.indentLevel++;
-        settings.MergeStaticMeshesAsSkinned =
-            EditorGUILayout.Toggle("Merge Static Meshes As Skinned", settings.MergeStaticMeshesAsSkinned);
-        settings.ForceMergeBlendShapeMissMatch =
-            EditorGUILayout.Toggle("Force Merge Blend Shape Miss Match", settings.ForceMergeBlendShapeMissMatch);
-        settings.KeepMaterialPropertyAnimationsSeparate =
-            EditorGUILayout.Toggle("Keep Material Animations Separate", settings.KeepMaterialPropertyAnimationsSeparate);
+        Toggle("Merge Static Meshes as Skinned", ref settings.MergeStaticMeshesAsSkinned);
+        Toggle("Merge Regardless of Blend Shapes", ref settings.ForceMergeBlendShapeMissMatch);
+        Toggle("Keep Material Animations Separate", ref settings.KeepMaterialPropertyAnimationsSeparate);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
-        GUI.enabled = settings.MergeDifferentPropertyMaterials =
-            EditorGUILayout.Toggle("Merge Different Property Materials", settings.MergeDifferentPropertyMaterials);
+        GUI.enabled = Toggle("Merge Different Property Materials", ref settings.MergeDifferentPropertyMaterials);
         EditorGUI.indentLevel++;
-        settings.MergeSameDimensionTextures =
-            EditorGUILayout.Toggle("Merge Same Dimension Textures", settings.MergeSameDimensionTextures);
-        settings.MergeBackFaceCullingWithCullingOff =
-            EditorGUILayout.Toggle("Merge Cull Back with Cull Off", settings.MergeBackFaceCullingWithCullingOff);
+        Toggle("Merge Same Dimension Textures", ref settings.MergeSameDimensionTextures);
+        Toggle("Merge Cull Back with Cull Off", ref settings.MergeBackFaceCullingWithCullingOff);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
-        settings.DeleteUnusedComponents =
-            EditorGUILayout.Toggle("Delete Unused Components", settings.DeleteUnusedComponents);
-        settings.DeleteUnusedGameObjects =
-            EditorGUILayout.Toggle("Delete Unused Game Objects", settings.DeleteUnusedGameObjects);
-        settings.ProfileTimeUsed =
-            EditorGUILayout.Toggle("Profile Time Used", settings.ProfileTimeUsed);
+        Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);
+        Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
+        Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
@@ -2226,13 +2226,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
             foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
-                EditorGUILayout.Space(6);
+                EditorGUILayout.Space(8);
                 var matched = FindAllMergableMaterials(mergedMeshes);
                 for (int i = 0; i < matched.Count; i++)
                 {
                     for (int j = 0; j < matched[i].Count; j++)
                     {
-                        int indent = (i == 0  && j == 0 ? 0 : 1) + (j == 0 ? 0 : 1);
+                        int indent = j == 0 ? 0 : 1;
                         DrawMatchedMaterialSlot(matched[i][j], indent);
                     }
                 }
@@ -2246,13 +2246,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUI.indentLevel++;
             if (settings.DebugShowUnusedComponents = EditorGUILayout.Foldout(settings.DebugShowUnusedComponents, "Unused Components"))
             {
-                var list = FindAllUnusedComponents().ToArray();
-                DrawDebugList(list, "No Unused Components Found");
+                DrawDebugList(FindAllUnusedComponents().ToArray());
             }
             if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
             {
-                var list = FindAllAlwaysDisabledGameObjects().ToArray();
-                DrawDebugList(list, "No Always Disabled GameObjects Found");
+                DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
             }
             if (settings.DebugShowUnparsableMaterials = EditorGUILayout.Foldout(settings.DebugShowUnparsableMaterials, "Unparsable Materials"))
             {
@@ -2261,18 +2259,17 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => !(t.Item2 != null && t.Item2.couldParse && t.Item2.passes.All(p => p.vertex != null && p.fragment != null)))
                     .Select(t => t.mat).ToArray();
-                DrawDebugList(list, "No Unparsable Materials Found");
+                DrawDebugList(list);
             }
             if (settings.DebugShowGameObjectsWithToggle = EditorGUILayout.Foldout(settings.DebugShowGameObjectsWithToggle, "GameObjects With Toggle Animation"))
             {
                 var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
-                DrawDebugList(list, "No GameObjects With Toggle Animation Found");
+                DrawDebugList(list);
             }
             if (settings.DebugShowUnmovingTransforms = EditorGUILayout.Foldout(settings.DebugShowUnmovingTransforms, "Unmoving Transforms"))
             {
-                var list = FindAllUnmovingTransforms().Select(t => t.gameObject).ToArray();
-                DrawDebugList(list, "No Unmoving Transforms Found");
+                DrawDebugList(FindAllUnmovingTransforms().Select(t => t.gameObject).ToArray());
             }
             EditorGUI.indentLevel--;
         }
