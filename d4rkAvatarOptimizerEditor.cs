@@ -184,13 +184,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         return GetTransformPathToRoot(component.transform);
     }
 
-    private static bool IsCombinableSkinnedMesh(Renderer candidate)
+    private static bool IsCombinableRenderer(Renderer candidate)
     {
         if (candidate.TryGetComponent(out Cloth cloth))
         {
             return false;
         }
-        if (!settings.MergeStaticMeshesAsSkinned && candidate is MeshRenderer)
+        if (candidate is MeshRenderer && (candidate.gameObject.layer == 12 || !settings.MergeStaticMeshesAsSkinned))
         {
             return false;
         }
@@ -213,9 +213,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (!settings.MergeSkinnedMeshes)
             return false;
-        if (!IsCombinableSkinnedMesh(list[0]))
+        if (!IsCombinableRenderer(list[0]))
             return false;
-        if (!IsCombinableSkinnedMesh(candidate))
+        if (!IsCombinableRenderer(candidate))
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
             return false;
@@ -2056,10 +2056,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
         var staticMeshes = root.gameObject.GetComponentsInChildren<MeshFilter>(true)
             .Where(f => f.sharedMesh != null && f.gameObject.GetComponent<MeshRenderer>() != null)
+            .Where(f => f.gameObject.layer != 12)
             .Select(f => f.gameObject).Distinct().ToList();
         foreach (var obj in staticMeshes)
         {
-            if (!IsCombinableSkinnedMesh(obj.GetComponent<MeshRenderer>()))
+            if (!IsCombinableRenderer(obj.GetComponent<MeshRenderer>()))
                 continue;
             var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
             var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
