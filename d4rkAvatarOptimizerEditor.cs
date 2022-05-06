@@ -91,6 +91,21 @@ public static class Vector3Extensions
     }
 }
 
+public class MaterialSlot
+{
+    public Renderer renderer;
+    public int index;
+    public Material material
+    {
+        get { return renderer.sharedMaterials[index]; }
+    }
+    public MaterialSlot(Renderer renderer, int index)
+    {
+        this.renderer = renderer;
+        this.index = index;
+    }
+}
+
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
@@ -1140,10 +1155,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
-    private static bool CanCombineMaterialsWith(List<(Renderer renderer, int index)> list, (Renderer renderer, int index) candidate)
+    private static bool CanCombineMaterialsWith(List<MaterialSlot> list, MaterialSlot candidate)
     {
-        var candidateMat = candidate.renderer.sharedMaterials[candidate.index];
-        var firstMat = list[0].renderer.sharedMaterials[list[0].index];
+        var candidateMat = candidate.material;
+        var firstMat = list[0].material;
         if (firstMat.shader != candidateMat.shader)
             return false;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
@@ -1170,8 +1185,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.hasFunctionsWithTextureParameters;
         foreach (var prop in parsedShader.properties)
         {
-            foreach (var mat in list.Select(t => t.renderer.sharedMaterials[t.index]))
+            foreach (var slot in list)
             {
+                var mat = slot.material;
                 switch (prop.type)
                 {
                     case ParsedShader.Property.Type.Color:
@@ -1243,21 +1259,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void CreateTextureArrays()
+    private static List<List<MaterialSlot>> FindAllMergableMaterials(IEnumerable<Renderer> renderers)
     {
-        textureArrayLists.Clear();
-        textureArrays.Clear();
-
-        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        foreach (var meshRenderer in skinnedMeshRenderers)
+        var matched = new List<List<MaterialSlot>>();
+        foreach (var renderer in renderers)
         {
-            var mesh = meshRenderer.sharedMesh;
-
-            if (mesh == null)
-                continue;
-
-            var matched = new List<List<(Renderer renderer, int index)>>();
-            foreach (var candidate in Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(index => (meshRenderer, index)))
+            foreach (var candidate in Enumerable.Range(0, renderer.sharedMaterials.Length).Select(index => new MaterialSlot(renderer, index)))
             {
                 bool foundMatch = false;
                 for (int i = 0; i < matched.Count; i++)
@@ -1271,11 +1278,29 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 if (!foundMatch)
                 {
-                    matched.Add(new List<(Renderer renderer, int index)> { candidate });
+                    matched.Add(new List<MaterialSlot> { candidate });
                 }
             }
+        }
+        return matched;
+    }
+
+    private static void CreateTextureArrays()
+    {
+        textureArrayLists.Clear();
+        textureArrays.Clear();
+
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var meshRenderer in skinnedMeshRenderers)
+        {
+            var mesh = meshRenderer.sharedMesh;
+
+            if (mesh == null)
+                continue;
+
+            var matched = FindAllMergableMaterials(new [] { meshRenderer });
             
-            var matchedMaterials = matched.Select(list => list.Select(slot => slot.renderer.sharedMaterials[slot.index]).ToList()).ToList();
+            var matchedMaterials = matched.Select(list => list.Select(slot => slot.material).ToList()).ToList();
             var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
 
             SearchForTextureArrayCreation(uniqueMatchedMaterials);
@@ -1300,26 +1325,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.GetPropertyBlock(props);
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
 
-            var matched = new List<List<(Renderer renderer, int index)>>();
-            foreach (var candidate in Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(index => (meshRenderer, index)))
-            {
-                bool foundMatch = false;
-                for (int i = 0; i < matched.Count; i++)
-                {
-                    if (CanCombineMaterialsWith(matched[i], candidate))
-                    {
-                        matched[i].Add(candidate);
-                        foundMatch = true;
-                        break;
-                    }
-                }
-                if (!foundMatch)
-                {
-                    matched.Add(new List<(Renderer renderer, int index)> { candidate });
-                }
-            }
+            var matched = FindAllMergableMaterials(new [] { meshRenderer });
             
-            var matchedMaterials = matched.Select(list => list.Select(slot => slot.renderer.sharedMaterials[slot.index]).ToList()).ToList();
+            var matchedMaterials = matched.Select(list => list.Select(slot => slot.material).ToList()).ToList();
             var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
 
             var sourceVertices = mesh.vertices;
@@ -2115,14 +2123,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
-    private void DrawMatchedMeshMaterial((Renderer renderer, int index) materialSlot, int indent)
+    private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
     {
         EditorGUILayout.BeginHorizontal();
         GUILayout.Space(8 * indent);
-        EditorGUILayout.ObjectField(materialSlot.renderer, typeof(Renderer), true);
+        EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true);
         int originalIndent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
-        EditorGUILayout.ObjectField(materialSlot.renderer.sharedMaterials[materialSlot.index], typeof(Material), false);
+        EditorGUILayout.ObjectField(slot.material, typeof(Material), false);
         EditorGUI.indentLevel = originalIndent;
         EditorGUILayout.EndHorizontal();
     }
@@ -2218,31 +2226,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
                 EditorGUILayout.Space(6);
-                var matched = new List<List<(Renderer renderer, int index)>>();
-                foreach (var candidate in mergedMeshes.SelectMany(renderer =>
-                    Enumerable.Range(0, renderer.sharedMaterials.Length).Select(index => (renderer, index))))
-                {
-                    bool foundMatch = false;
-                    for (int i = 0; i < matched.Count; i++)
-                    {
-                        if (CanCombineMaterialsWith(matched[i], candidate))
-                        {
-                            matched[i].Add(candidate);
-                            foundMatch = true;
-                            break;
-                        }
-                    }
-                    if (!foundMatch)
-                    {
-                        matched.Add(new List<(Renderer renderer, int index)> { candidate });
-                    }
-                }
+                var matched = FindAllMergableMaterials(mergedMeshes);
                 for (int i = 0; i < matched.Count; i++)
                 {
                     for (int j = 0; j < matched[i].Count; j++)
                     {
                         int indent = (i == 0  && j == 0 ? 0 : 1) + (j == 0 ? 0 : 1);
-                        DrawMatchedMeshMaterial(matched[i][j], indent);
+                        DrawMatchedMaterialSlot(matched[i][j], indent);
                     }
                 }
             }
