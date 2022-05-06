@@ -1140,15 +1140,17 @@ public class d4rkAvatarOptimizerEditor : Editor
         return true;
     }
 
-    private static bool CanCombineWith(List<Material> list, Material candidate)
+    private static bool CanCombineMaterialsWith(List<(Renderer renderer, int index)> list, (Renderer renderer, int index) candidate)
     {
-        if (list[0].shader != candidate.shader)
+        var candidateMat = candidate.renderer.sharedMaterials[candidate.index];
+        var firstMat = list[0].renderer.sharedMaterials[list[0].index];
+        if (firstMat.shader != candidateMat.shader)
             return false;
-        var parsedShader = ShaderAnalyzer.Parse(candidate.shader);
+        var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.couldParse == false)
             return false;
         if (!settings.MergeDifferentPropertyMaterials)
-            return list.All(m => m == candidate);
+            return list.All(t => t.renderer.sharedMaterials[t.index] == candidateMat);
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
@@ -1162,13 +1164,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         foreach (var keyword in parsedShader.shaderFeatureKeyWords)
         {
-            if (list[0].IsKeywordEnabled(keyword) ^ candidate.IsKeywordEnabled(keyword))
+            if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
                 return false;
         }
         bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.hasFunctionsWithTextureParameters;
         foreach (var prop in parsedShader.properties)
         {
-            foreach (var mat in list)
+            foreach (var mat in list.Select(t => t.renderer.sharedMaterials[t.index]))
             {
                 switch (prop.type)
                 {
@@ -1177,12 +1179,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                         break;
                     case ParsedShader.Property.Type.Float:
                         if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
-                            && mat.GetFloat(prop.name) != candidate.GetFloat(prop.name))
+                            && mat.GetFloat(prop.name) != candidateMat.GetFloat(prop.name))
                             return false;
                         break;
                     case ParsedShader.Property.Type.Int:
                         if (prop.shaderLabParams.Any(s => s != "Cull" || !settings.MergeBackFaceCullingWithCullingOff)
-                            && mat.GetInt(prop.name) != candidate.GetInt(prop.name))
+                            && mat.GetInt(prop.name) != candidateMat.GetInt(prop.name))
                             return false;
                         break;
                     case ParsedShader.Property.Type.Texture2D:
@@ -1192,7 +1194,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     case ParsedShader.Property.Type.TextureCubeArray:
                         {
                             var mTex = mat.GetTexture(prop.name);
-                            var cTex = candidate.GetTexture(prop.name);
+                            var cTex = candidateMat.GetTexture(prop.name);
                             if (mergeTextures && !CanCombineTextures(mTex, cTex))
                                 return false;
                             if (!mergeTextures && cTex != mTex)
@@ -1254,30 +1256,29 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (mesh == null)
                 continue;
 
-            var matchedMaterials = new List<List<Material>>();
-            var matchedMaterialsIndex = new List<List<int>>();
-            for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
+            var matched = new List<List<(Renderer renderer, int index)>>();
+            foreach (var candidate in Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(index => (meshRenderer, index)))
             {
-                var material = meshRenderer.sharedMaterials[i];
                 bool foundMatch = false;
-                for (int j = 0; j < matchedMaterials.Count; j++)
+                for (int i = 0; i < matched.Count; i++)
                 {
-                    if (CanCombineWith(matchedMaterials[j], material))
+                    if (CanCombineMaterialsWith(matched[i], candidate))
                     {
-                        matchedMaterials[j].Add(material);
-                        matchedMaterialsIndex[j].Add(i);
+                        matched[i].Add(candidate);
                         foundMatch = true;
                         break;
                     }
                 }
                 if (!foundMatch)
                 {
-                    matchedMaterials.Add(new List<Material> { material });
-                    matchedMaterialsIndex.Add(new List<int> { i });
+                    matched.Add(new List<(Renderer renderer, int index)> { candidate });
                 }
             }
+            
+            var matchedMaterials = matched.Select(list => list.Select(slot => slot.renderer.sharedMaterials[slot.index]).ToList()).ToList();
+            var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
 
-            SearchForTextureArrayCreation(matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList());
+            SearchForTextureArrayCreation(uniqueMatchedMaterials);
         }
 
         foreach (var textureList in textureArrayLists)
@@ -1299,29 +1300,26 @@ public class d4rkAvatarOptimizerEditor : Editor
             meshRenderer.GetPropertyBlock(props);
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
 
-            var matchedMaterials = new List<List<Material>>();
-            var matchedMaterialsIndex = new List<List<int>>();
-            for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
+            var matched = new List<List<(Renderer renderer, int index)>>();
+            foreach (var candidate in Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(index => (meshRenderer, index)))
             {
-                var material = meshRenderer.sharedMaterials[i];
                 bool foundMatch = false;
-                for (int j = 0; j < matchedMaterials.Count; j++)
+                for (int i = 0; i < matched.Count; i++)
                 {
-                    if (CanCombineWith(matchedMaterials[j], material))
+                    if (CanCombineMaterialsWith(matched[i], candidate))
                     {
-                        matchedMaterials[j].Add(material);
-                        matchedMaterialsIndex[j].Add(i);
+                        matched[i].Add(candidate);
                         foundMatch = true;
                         break;
                     }
                 }
                 if (!foundMatch)
                 {
-                    matchedMaterials.Add(new List<Material> { material });
-                    matchedMaterialsIndex.Add(new List<int> { i });
+                    matched.Add(new List<(Renderer renderer, int index)> { candidate });
                 }
             }
             
+            var matchedMaterials = matched.Select(list => list.Select(slot => slot.renderer.sharedMaterials[slot.index]).ToList()).ToList();
             var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
 
             var sourceVertices = mesh.vertices;
@@ -1356,7 +1354,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedMaterials[i].IndexOf(matchedMaterials[i][k]);
-                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedMaterialsIndex[i][k]);
+                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matched[i][k].index);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
                     for (int j = startIndex; j < endIndex; j++)
@@ -2117,14 +2115,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
-    private void DrawMatchedMeshMaterial(Renderer renderer, Material material, int indent)
+    private void DrawMatchedMeshMaterial((Renderer renderer, int index) materialSlot, int indent)
     {
         EditorGUILayout.BeginHorizontal();
         GUILayout.Space(8 * indent);
-        EditorGUILayout.ObjectField(renderer, typeof(Renderer), true);
+        EditorGUILayout.ObjectField(materialSlot.renderer, typeof(Renderer), true);
         int originalIndent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
-        EditorGUILayout.ObjectField(material, typeof(Material), false);
+        EditorGUILayout.ObjectField(materialSlot.renderer.sharedMaterials[materialSlot.index], typeof(Material), false);
         EditorGUI.indentLevel = originalIndent;
         EditorGUILayout.EndHorizontal();
     }
@@ -2220,34 +2218,31 @@ public class d4rkAvatarOptimizerEditor : Editor
             foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
                 EditorGUILayout.Space(6);
-                var matchedMaterials = new List<List<Material>>();
-                var matchedMaterialRenderer = new List<List<Renderer>>();
-                foreach (var match in mergedMeshes.SelectMany(renderer =>
-                    renderer.sharedMaterials.Select(material => (renderer, material))))
+                var matched = new List<List<(Renderer renderer, int index)>>();
+                foreach (var candidate in mergedMeshes.SelectMany(renderer =>
+                    Enumerable.Range(0, renderer.sharedMaterials.Length).Select(index => (renderer, index))))
                 {
                     bool foundMatch = false;
-                    for (int i = 0; i < matchedMaterials.Count; i++)
+                    for (int i = 0; i < matched.Count; i++)
                     {
-                        if (CanCombineWith(matchedMaterials[i], match.material))
+                        if (CanCombineMaterialsWith(matched[i], candidate))
                         {
-                            matchedMaterials[i].Add(match.material);
-                            matchedMaterialRenderer[i].Add(match.renderer);
+                            matched[i].Add(candidate);
                             foundMatch = true;
                             break;
                         }
                     }
                     if (!foundMatch)
                     {
-                        matchedMaterials.Add(new List<Material> { match.material ?? nullMaterial });
-                        matchedMaterialRenderer.Add(new List<Renderer> { match.renderer });
+                        matched.Add(new List<(Renderer renderer, int index)> { candidate });
                     }
                 }
-                for (int i = 0; i < matchedMaterials.Count; i++)
+                for (int i = 0; i < matched.Count; i++)
                 {
-                    for (int j = 0; j < matchedMaterials[i].Count; j++)
+                    for (int j = 0; j < matched[i].Count; j++)
                     {
                         int indent = (i == 0  && j == 0 ? 0 : 1) + (j == 0 ? 0 : 1);
-                        DrawMatchedMeshMaterial(matchedMaterialRenderer[i][j], matchedMaterials[i][j], indent);
+                        DrawMatchedMeshMaterial(matched[i][j], indent);
                     }
                 }
             }
