@@ -126,8 +126,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
-    private static Dictionary<(string path, int slot), HashSet<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), HashSet<Material>>();
-    private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
+    private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
+    private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
@@ -208,32 +208,40 @@ public class d4rkAvatarOptimizerEditor : Editor
         return GetTransformPathToRoot(component.transform);
     }
 
+    private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
+    {
+        if (material == null)
+            return false;
+        var parsedShader = ShaderAnalyzer.Parse(material.shader);
+        if (!parsedShader.couldParse)
+            return false;
+        if (parsedShader.passes.Any(pass => pass.vertex == null || pass.fragment == null))
+            return false;
+        if (parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
+            return false;
+        return true;
+    }
+
     private static bool IsCombinableRenderer(Renderer candidate)
     {
         if (candidate.TryGetComponent(out Cloth cloth))
-        {
             return false;
-        }
         if (candidate is MeshRenderer && (candidate.gameObject.layer == 12 || !settings.MergeStaticMeshesAsSkinned))
-        {
             return false;
-        }
-        foreach (var material in candidate.sharedMaterials)
+        foreach (var slot in MaterialSlot.GetAllSlotsFrom(candidate))
         {
-            if (material == null)
+            if (!IsMaterialReadyToCombineWithOtherMeshes(slot.material))
                 return false;
-            var parsedShader = ShaderAnalyzer.Parse(material.shader);
-            if (!parsedShader.couldParse)
-                return false;
-            if (parsedShader.passes.Any(pass => pass.vertex == null || pass.fragment == null))
-                return false;
-            if (parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
-                return false;
+            if (slotSwapMaterials.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var materials))
+            {
+                if (!materials.Any(material => IsMaterialReadyToCombineWithOtherMeshes(material)))
+                    return false;
+            }
         }
         return true;
     }
 
-    private static bool CanCombineWith(List<Renderer> list, Renderer candidate)
+    private static bool CanCombineRendererWith(List<Renderer> list, Renderer candidate)
     {
         if (!settings.MergeSkinnedMeshes)
             return false;
@@ -299,6 +307,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         var unused = FindAllUnusedSkinnedMeshRenderers();
         gameObjectTogglePaths = FindAllGameObjectTogglePaths();
+        slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = root.GetComponentsInChildren<Renderer>(true);
         var matchedSkinnedMeshes = new List<List<Renderer>>();
         foreach (var renderer in renderers)
@@ -310,7 +319,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (CanCombineWith(subList, renderer))
+                if (CanCombineRendererWith(subList, renderer))
                 {
                     subList.Add(renderer);
                     foundMatch = true;
@@ -399,7 +408,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     continue;
                 if (!int.TryParse(binding.propertyName.Substring(binding.propertyName.LastIndexOf('[') + 1).TrimEnd(']'), out int index))
                     continue;
-                if (optimizedSwapMaterials.TryGetValue((binding.path, index), out var newMats))
+                if (optimizedSlotSwapMaterials.TryGetValue((binding.path, index), out var newMats))
                 {
                     if (newMats.TryGetValue(oldMat, out var newMat))
                     {
@@ -525,13 +534,13 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void OptimizeMaterialSwapMaterials()
     {
-        materialSlotsWithMaterialSwapAnimations = FindAllMaterialSwapMaterials();
-        optimizedSwapMaterials.Clear();
-        foreach (var entry in materialSlotsWithMaterialSwapAnimations)
+        slotSwapMaterials = FindAllMaterialSwapMaterials();
+        optimizedSlotSwapMaterials.Clear();
+        foreach (var entry in slotSwapMaterials)
         {
-            if (!optimizedSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
+            if (!optimizedSlotSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
             {
-                optimizedSwapMaterials[entry.Key] = optimizedMaterials = new Dictionary<Material, Material>();
+                optimizedSlotSwapMaterials[entry.Key] = optimizedMaterials = new Dictionary<Material, Material>();
             }
             foreach (var material in entry.Value)
             {
@@ -549,7 +558,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         usedBlendShapes.Clear();
         hasUsedBlendShapes.Clear();
         blendShapesToBake.Clear();
-        materialSlotsWithMaterialSwapAnimations.Clear();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor != null)
         {
@@ -1207,6 +1215,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.couldParse == false)
             return false;
+        if (slotSwapMaterials.ContainsKey((GetPathToRoot(candidate.renderer), candidate.index)))
+            return false;
         if (!settings.MergeDifferentPropertyMaterials)
             return list.All(t => t.renderer.sharedMaterials[t.index] == candidateMat);
         foreach (var pass in parsedShader.passes)
@@ -1276,7 +1286,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var alreadyOptimizedMaterials = new HashSet<Material>();
             foreach (var (material, index) in mats)
             {
-                if (materialSlotsWithMaterialSwapAnimations.TryGetValue((path, index), out var matList))
+                if (slotSwapMaterials.TryGetValue((path, index), out var matList))
                 {
                     alreadyOptimizedMaterials.UnionWith(matList);
                 }
@@ -1292,7 +1302,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (!optimizedMaterials.TryGetValue(material, out var optimized))
                 {
                     optimized = material;
-                    if (optimizedSwapMaterials.TryGetValue((path, index), out var optimizedSwapMaterialMap))
+                    if (optimizedSlotSwapMaterials.TryGetValue((path, index), out var optimizedSwapMaterialMap))
                     {
                         if (!optimizedSwapMaterialMap.TryGetValue(material, out optimized))
                         {
