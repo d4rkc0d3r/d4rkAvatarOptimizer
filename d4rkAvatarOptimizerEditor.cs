@@ -117,8 +117,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
-    private static Dictionary<(string path, int slot), List<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), List<Material>>();
-    private static Dictionary<Material, Material> optimizedMaterialSwapMaterial = new Dictionary<Material, Material>();
+    private static Dictionary<(string path, int slot), HashSet<Material>> materialSlotsWithMaterialSwapAnimations = new Dictionary<(string, int), HashSet<Material>>();
+    private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
@@ -373,10 +373,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var oldMat = curve[i].value as Material;
                 if (oldMat == null)
                     continue;
-                if (optimizedMaterialSwapMaterial.TryGetValue(oldMat, out var newMat))
+                if (!int.TryParse(binding.propertyName.Substring(binding.propertyName.LastIndexOf('[') + 1).TrimEnd(']'), out int index))
+                    continue;
+                if (optimizedSwapMaterials.TryGetValue((binding.path, index), out var newMats))
                 {
-                    curve[i].value = newMat;
-                    changed = true;
+                    if (newMats.TryGetValue(oldMat, out var newMat))
+                    {
+                        curve[i].value = newMat;
+                        changed = true;
+                    }
                 }
             }
             var newBinding = binding;
@@ -467,6 +472,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void OptimizeMaterialSwapMaterials()
     {
         materialSlotsWithMaterialSwapAnimations.Clear();
+        optimizedSwapMaterials.Clear();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
@@ -483,18 +489,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                 int slot = int.Parse(binding.propertyName.Substring(start, end));
                 var index = (binding.path, slot);
                 var curve = AnimationUtility.GetObjectReferenceCurve(clip, binding);
-                var materials = curve.Select(c => c.value as Material).Where(m => m != null).Distinct().ToList();
-                if (!materialSlotsWithMaterialSwapAnimations.TryGetValue(index, out var oldMats))
+                var curveMaterials = curve.Select(c => c.value as Material).Where(m => m != null).Distinct().ToList();
+                if (!materialSlotsWithMaterialSwapAnimations.TryGetValue(index, out var materials))
                 {
-                    oldMats = new List<Material>();
+                    materialSlotsWithMaterialSwapAnimations[index] = materials = new HashSet<Material>();
                 }
-                materialSlotsWithMaterialSwapAnimations[index] = materials.Union(oldMats).Distinct().ToList();
-                foreach (var mat in materials)
+                materials.UnionWith(curveMaterials);
+                if (!optimizedSwapMaterials.TryGetValue(index, out var optimizedMaterials))
                 {
-                    if (!optimizedMaterialSwapMaterial.TryGetValue(mat, out var optimizedMaterial))
+                    optimizedSwapMaterials[index] = optimizedMaterials = new Dictionary<Material, Material>();
+                }
+                foreach (var mat in curveMaterials)
+                {
+                    if (!optimizedMaterials.TryGetValue(mat, out var optimizedMaterial))
                     {
                         var matWrapper = new List<List<Material>>() { new List<Material>() { mat } };
-                        optimizedMaterialSwapMaterial[mat] = CreateOptimizedMaterials(matWrapper, 0, binding.path)[0];
+                        optimizedMaterials[mat] = CreateOptimizedMaterials(matWrapper, 0, binding.path)[0];
                     }
                 }
             }
@@ -1248,9 +1258,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (!optimizedMaterials.TryGetValue(material, out var optimized))
                 {
-                    if (!optimizedMaterialSwapMaterial.TryGetValue(material, out optimized))
+                    optimized = material;
+                    if (optimizedSwapMaterials.TryGetValue((path, index), out var optimizedSwapMaterialMap))
                     {
-                        optimized = material;
+                        if (!optimizedSwapMaterialMap.TryGetValue(material, out optimized))
+                        {
+                            optimized = material;
+                        }
                     }
                 }
                 finalMaterials[index] = optimized;
