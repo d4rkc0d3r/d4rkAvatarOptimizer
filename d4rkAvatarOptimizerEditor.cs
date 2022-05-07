@@ -91,7 +91,7 @@ public static class Vector3Extensions
     }
 }
 
-public class MaterialSlot
+public struct MaterialSlot
 {
     public Renderer renderer;
     public int index;
@@ -146,25 +146,25 @@ public class d4rkAvatarOptimizerEditor : Editor
         trashBinPath = scriptPath + "/TrashBin/";
         AssetDatabase.DeleteAsset(scriptPath + "/TrashBin");
         AssetDatabase.CreateFolder(scriptPath, "TrashBin");
-        assetRoot = null;
+        assetBundlePath = null;
         Profiler.EndSection();
     }
 
-    private static string assetRoot = null;
+    private static string assetBundlePath = null;
     private static void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
         bool assetIsBundleable = asset is Material || asset is AnimationClip;
-        if (assetIsBundleable && assetRoot != null)
+        if (assetIsBundleable && assetBundlePath != null)
         {
-            AssetDatabase.AddObjectToAsset(asset, assetRoot);
+            AssetDatabase.AddObjectToAsset(asset, assetBundlePath);
         }
         else
         {
             var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name);
-            if (assetIsBundleable && assetRoot == null)
+            if (assetIsBundleable && assetBundlePath == null)
             {
-                assetRoot = path;
+                assetBundlePath = path;
             }
             AssetDatabase.CreateAsset(asset, path);
         }
