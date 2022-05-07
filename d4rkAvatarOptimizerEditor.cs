@@ -146,13 +146,28 @@ public class d4rkAvatarOptimizerEditor : Editor
         trashBinPath = scriptPath + "/TrashBin/";
         AssetDatabase.DeleteAsset(scriptPath + "/TrashBin");
         AssetDatabase.CreateFolder(scriptPath, "TrashBin");
+        assetRoot = null;
         Profiler.EndSection();
     }
 
+    private static string assetRoot = null;
     private static void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
-        AssetDatabase.CreateAsset(asset, AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name));
+        bool assetIsBundleable = asset is Material || asset is AnimationClip;
+        if (assetIsBundleable && assetRoot != null)
+        {
+            AssetDatabase.AddObjectToAsset(asset, assetRoot);
+        }
+        else
+        {
+            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name);
+            if (assetIsBundleable && assetRoot == null)
+            {
+                assetRoot = path;
+            }
+            AssetDatabase.CreateAsset(asset, path);
+        }
         Profiler.EndSection();
     }
 
@@ -2313,7 +2328,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     EditorGUILayout.LabelField("---");
                 }
             }
-            if (Foldout("GameObjects With Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
+            if (Foldout("GameObjects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
                 var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
