@@ -104,6 +104,15 @@ public class MaterialSlot
         this.renderer = renderer;
         this.index = index;
     }
+    public static MaterialSlot[] GetAllSlotsFrom(Renderer renderer)
+    {
+        var result = new MaterialSlot[renderer.sharedMaterials.Length];
+        for (int i = 0; i < result.Length; i++)
+        {
+            result[i] = new MaterialSlot(renderer, i);
+        }
+        return result;
+    }
 }
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
@@ -469,19 +478,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         AssetDatabase.SaveAssets();
     }
 
-    private static void OptimizeMaterialSwapMaterials()
+    private static Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
     {
-        materialSlotsWithMaterialSwapAnimations.Clear();
-        optimizedSwapMaterials.Clear();
+        var result = new Dictionary<(string path, int index), HashSet<Material>>();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
         if (fxLayer == null)
-            return;
+            return result;
         foreach (var clip in fxLayer.animationClips)
         {
             foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
-                if (binding.type != typeof(MeshRenderer)
+                if (!typeof(Renderer).IsAssignableFrom(binding.type)
                     || !binding.propertyName.StartsWith("m_Materials.Array.data["))
                     continue;
                 int start = binding.propertyName.IndexOf('[') + 1;
@@ -490,22 +498,32 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var index = (binding.path, slot);
                 var curve = AnimationUtility.GetObjectReferenceCurve(clip, binding);
                 var curveMaterials = curve.Select(c => c.value as Material).Where(m => m != null).Distinct().ToList();
-                if (!materialSlotsWithMaterialSwapAnimations.TryGetValue(index, out var materials))
+                if (!result.TryGetValue(index, out var materials))
                 {
-                    materialSlotsWithMaterialSwapAnimations[index] = materials = new HashSet<Material>();
+                    result[index] = materials = new HashSet<Material>();
                 }
                 materials.UnionWith(curveMaterials);
-                if (!optimizedSwapMaterials.TryGetValue(index, out var optimizedMaterials))
+            }
+        }
+        return result;
+    }
+
+    private static void OptimizeMaterialSwapMaterials()
+    {
+        materialSlotsWithMaterialSwapAnimations = FindAllMaterialSwapMaterials();
+        optimizedSwapMaterials.Clear();
+        foreach (var entry in materialSlotsWithMaterialSwapAnimations)
+        {
+            if (!optimizedSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
+            {
+                optimizedSwapMaterials[entry.Key] = optimizedMaterials = new Dictionary<Material, Material>();
+            }
+            foreach (var material in entry.Value)
+            {
+                if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
-                    optimizedSwapMaterials[index] = optimizedMaterials = new Dictionary<Material, Material>();
-                }
-                foreach (var mat in curveMaterials)
-                {
-                    if (!optimizedMaterials.TryGetValue(mat, out var optimizedMaterial))
-                    {
-                        var matWrapper = new List<List<Material>>() { new List<Material>() { mat } };
-                        optimizedMaterials[mat] = CreateOptimizedMaterials(matWrapper, 0, binding.path)[0];
-                    }
+                    var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
+                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, 0, entry.Key.path)[0];
                 }
             }
         }
@@ -1278,7 +1296,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var matched = new List<List<MaterialSlot>>();
         foreach (var renderer in renderers)
         {
-            foreach (var candidate in Enumerable.Range(0, renderer.sharedMaterials.Length).Select(index => new MaterialSlot(renderer, index)))
+            foreach (var candidate in MaterialSlot.GetAllSlotsFrom(renderer))
             {
                 bool foundMatch = false;
                 for (int i = 0; i < matched.Count; i++)
@@ -2148,6 +2166,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         return value;
     }
 
+    public bool Foldout(string label, ref bool value)
+    {
+        return value = EditorGUILayout.Foldout(value, label);
+    }
+
     private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
     {
         indent *= 15;
@@ -2234,7 +2257,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.Separator();
         root = settings.gameObject;
 
-        if (settings.ShowMeshAndMaterialMergePreview = EditorGUILayout.Foldout(settings.ShowMeshAndMaterialMergePreview, "Show Merge Preview"))
+        if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
             CalculateUsedBlendShapePaths();
             var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
@@ -2255,18 +2278,18 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         EditorGUILayout.Separator();
 
-        if (settings.ShowDebugInfo = EditorGUILayout.Foldout(settings.ShowDebugInfo, "Debug Info"))
+        if (Foldout("Debug Info", ref settings.ShowDebugInfo))
         {
             EditorGUI.indentLevel++;
-            if (settings.DebugShowUnusedComponents = EditorGUILayout.Foldout(settings.DebugShowUnusedComponents, "Unused Components"))
+            if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {
                 DrawDebugList(FindAllUnusedComponents().ToArray());
             }
-            if (settings.DebugShowAlwaysDisabledGameObjects = EditorGUILayout.Foldout(settings.DebugShowAlwaysDisabledGameObjects, "Always Disabled GameObjects"))
+            if (Foldout("Always Disabled GameObjects", ref settings.DebugShowAlwaysDisabledGameObjects))
             {
                 DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
             }
-            if (settings.DebugShowUnparsableMaterials = EditorGUILayout.Foldout(settings.DebugShowUnparsableMaterials, "Unparsable Materials"))
+            if (Foldout("Unparsable Materials", ref settings.DebugShowUnparsableMaterials))
             {
                 var list = root.GetComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
@@ -2275,13 +2298,28 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .Select(t => t.mat).ToArray();
                 DrawDebugList(list);
             }
-            if (settings.DebugShowGameObjectsWithToggle = EditorGUILayout.Foldout(settings.DebugShowGameObjectsWithToggle, "GameObjects With Toggle Animation"))
+            if (Foldout("Material Swaps", ref settings.DebugShowMaterialSwaps))
+            {
+                var map = FindAllMaterialSwapMaterials();
+                foreach (var pair in map)
+                {
+                    EditorGUILayout.LabelField(pair.Key.path + " -> " + pair.Key.index);
+                    EditorGUI.indentLevel++;
+                    DrawDebugList(pair.Value.ToArray());
+                    EditorGUI.indentLevel--;
+                }
+                if (map.Count == 0)
+                {
+                    EditorGUILayout.LabelField("---");
+                }
+            }
+            if (Foldout("GameObjects With Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
                 var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
                 DrawDebugList(list);
             }
-            if (settings.DebugShowUnmovingBones = EditorGUILayout.Foldout(settings.DebugShowUnmovingBones, "Unmoving Bones"))
+            if (Foldout("Unmoving Bones", ref settings.DebugShowUnmovingBones))
             {
                 var bones = new HashSet<Transform>();
                 var unmoving = FindAllUnmovingTransforms();

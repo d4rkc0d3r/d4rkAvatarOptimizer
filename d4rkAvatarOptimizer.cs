@@ -20,6 +20,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
     public bool DebugShowUnparsableMaterials = true;
+    public bool DebugShowMaterialSwaps = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
 }
