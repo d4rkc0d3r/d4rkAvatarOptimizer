@@ -533,9 +533,16 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void OptimizeMaterialSwapMaterials()
     {
         slotSwapMaterials = FindAllMaterialSwapMaterials();
+        var mergedMeshes = FindPossibleSkinnedMeshMerges();
         optimizedSlotSwapMaterials.Clear();
         foreach (var entry in slotSwapMaterials)
         {
+            int meshToggleCount = 0;
+            var current = GetTransformFromPath(entry.Key.path).GetComponent<Renderer>();
+            if (current != null)
+            {
+                meshToggleCount = mergedMeshes.FirstOrDefault(list => list.Any(renderer => renderer == current))?.Count ?? 0;
+            }
             if (!optimizedSlotSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
             {
                 optimizedSlotSwapMaterials[entry.Key] = optimizedMaterials = new Dictionary<Material, Material>();
@@ -545,7 +552,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
                     var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
-                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, 0, entry.Key.path)[0];
+                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, meshToggleCount, entry.Key.path)[0];
                 }
             }
         }
