@@ -2102,6 +2102,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
+        used.UnionWith(gameObjectTogglePaths.Select(p => GetTransformFromPath(p)).Where(t => t != null));
+
         var queue = new Queue<Transform>();
         queue.Enqueue(root.transform);
 
