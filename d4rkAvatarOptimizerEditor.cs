@@ -128,6 +128,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static List<Material> optimizedMaterials = new List<Material>();
     private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
+    private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
     private static Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
@@ -368,6 +369,29 @@ public class d4rkAvatarOptimizerEditor : Editor
         bindPoses.Add(root.transform.localToWorldMatrix);
         return bones.Count - 1;
     }
+
+    private static EditorCurveBinding FixAnimationBinding(EditorCurveBinding binding, ref bool changed)
+    {
+        var currentPath = (binding.path, binding.propertyName, binding.type);
+        var newBinding = binding;
+        if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
+        {
+            newBinding.path = modifiedPath.Item1;
+            newBinding.propertyName = modifiedPath.Item2;
+            newBinding.type = modifiedPath.Item3;
+            changed = true;
+        }
+        if (transformFromOldPath.TryGetValue(newBinding.path, out var transform))
+        {
+            if (transform != null)
+            {
+                var path = GetPathToRoot(transform);
+                changed = changed || path != newBinding.path;
+                newBinding.path = path;
+            }
+        }
+        return newBinding;
+    }
     
     private static AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
@@ -377,24 +401,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         bool changed = false;
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
-            var currentPath = (binding.path, binding.propertyName, binding.type);
-            var newBinding = binding;
-            if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
-            {
-                newBinding.path = modifiedPath.Item1;
-                newBinding.propertyName = modifiedPath.Item2;
-                newBinding.type = modifiedPath.Item3;
-                changed = true;
-            }
-            if (transformFromOldPath.TryGetValue(newBinding.path, out var transform))
-            {
-                if (transform != null)
-                {
-                    var path = GetPathToRoot(transform);
-                    changed = changed || path != newBinding.path;
-                    newBinding.path = path;
-                }
-            }
+            var newBinding = FixAnimationBinding(binding, ref changed);
             AnimationUtility.SetEditorCurve(newClip, newBinding,
                 AnimationUtility.GetEditorCurve(clip, binding));
         }
@@ -417,16 +424,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
             }
-            var newBinding = binding;
-            if (transformFromOldPath.TryGetValue(newBinding.path, out var transform))
-            {
-                if (transform != null)
-                {
-                    var path = GetPathToRoot(transform);
-                    changed = changed || path != newBinding.path;
-                    newBinding.path = path;
-                }
-            }
+            var newBinding = FixAnimationBinding(binding, ref changed);
             AnimationUtility.SetObjectReferenceCurve(newClip, newBinding, curve);
         }
         if (changed)
@@ -1217,6 +1215,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         if (slotSwapMaterials.ContainsKey((GetPathToRoot(candidate.renderer), candidate.index)))
             return false;
+        if (materialSlotRemap.TryGetValue((GetPathToRoot(candidate.renderer), candidate.index), out var remap))
+        {
+            if (slotSwapMaterials.ContainsKey(remap))
+                return false;
+        }
         if (!settings.MergeDifferentPropertyMaterials)
             return list.All(t => t.renderer.sharedMaterials[t.index] == candidateMat);
         foreach (var pass in parsedShader.passes)
@@ -1381,11 +1384,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             var props = new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(props);
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
+            string meshPath = GetPathToRoot(meshRenderer);
 
-            var matched = FindAllMergableMaterials(new [] { meshRenderer });
-            
-            var matchedMaterials = matched.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
+            var matchedSlots = FindAllMergableMaterials(new [] { meshRenderer });
+            var uniqueMatchedSlots = matchedSlots.Select(list => list.Select(slot => list.First(slot2 => slot.material == slot2.material)).Distinct().ToList()).ToList();
 
             var sourceVertices = mesh.vertices;
             var sourceIndices = mesh.triangles;
@@ -1412,14 +1414,17 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var targetOldVertexIndex = new List<int>();
 
-            for (int i = 0; i < matchedMaterials.Count; i++)
+            for (int i = 0; i < matchedSlots.Count; i++)
             {
                 var indexList = new List<int>();
-                for (int k = 0; k < matchedMaterials[i].Count; k++)
+                for (int k = 0; k < matchedSlots[i].Count; k++)
                 {
                     var indexMap = new Dictionary<int, int>();
-                    int internalMaterialID = uniqueMatchedMaterials[i].IndexOf(matchedMaterials[i][k]);
-                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matched[i][k].index);
+                    int internalMaterialID = uniqueMatchedSlots[i].Select((slot, index) => (slot, index)).First(t => t.slot.material == matchedSlots[i][k].material).index;
+                    var originalSlot = materialSlotRemap[(meshPath, matchedSlots[i][k].index)];
+                    AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
+                        (meshPath, $"m_Materials.Array.data[{targetIndices.Count}]", typeof(SkinnedMeshRenderer)));
+                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedSlots[i][k].index);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
                     for (int j = startIndex; j < endIndex; j++)
@@ -1483,8 +1488,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 newMesh.SetNormals(targetNormals);
                 if (targetTangents.Any(t => t != Vector4.zero))
                     newMesh.SetTangents(targetTangents);
-                newMesh.subMeshCount = matchedMaterials.Count;
-                for (int i = 0; i < matchedMaterials.Count; i++)
+                newMesh.subMeshCount = matchedSlots.Count;
+                for (int i = 0; i < matchedSlots.Count; i++)
                 {
                     newMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
                 }
@@ -1521,6 +1526,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
+            var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
             meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, GetPathToRoot(meshRenderer));
         }
     }
@@ -1545,6 +1551,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
         movingParentMap = FindMovingParent();
+        materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         int combinedMeshID = 0;
         foreach (var combinableMeshes in combinableSkinnedMeshList)
         {
@@ -1565,6 +1572,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             var sourceToWorld = new List<Matrix4x4>();
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
             var toLocal = (combinableSkinnedMeshes[0].rootBone ?? combinableSkinnedMeshes[0].transform).worldToLocalMatrix;
+
+            string newMeshName = combinableSkinnedMeshes[0].name;
+            string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
 
             Profiler.StartSection("CombineMeshData");
             int meshID = 0;
@@ -1722,6 +1732,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     {
                         indices.Add(sourceIndices[i] + indexOffset);
                     }
+                    materialSlotRemap[(newPath, targetIndices.Count)] = (GetPathToRoot(skinnedMesh), matID);
                     targetIndices.Add(indices);
                 }
 
@@ -1729,8 +1740,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             Profiler.EndSection();
 
-            string newMeshName = combinableSkinnedMeshes[0].name;
-            string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
             var blendShapeWeights = new Dictionary<string, float>();
 
             var combinedMesh = new Mesh();
