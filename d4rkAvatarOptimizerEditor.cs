@@ -2328,7 +2328,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 DrawDebugList(FindAllUnusedComponents().ToArray());
             }
-            if (Foldout("Always Disabled GameObjects", ref settings.DebugShowAlwaysDisabledGameObjects))
+            if (Foldout("Always Disabled Game Objects", ref settings.DebugShowAlwaysDisabledGameObjects))
             {
                 DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
             }
@@ -2356,7 +2356,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     EditorGUILayout.LabelField("---");
                 }
             }
-            if (Foldout("GameObjects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
+            if (Foldout("Game Objects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
                 var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
