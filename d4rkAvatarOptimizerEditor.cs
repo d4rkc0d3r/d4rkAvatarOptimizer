@@ -569,10 +569,18 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
                 && avDescriptor.VisemeSkinnedMesh != null)
             {
-                string path = GetPathToRoot(avDescriptor.VisemeSkinnedMesh) + "/blendShape.";
-                foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+                var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+                if (root.GetComponentsInChildren<SkinnedMeshRenderer>().All(r => r != meshRenderer))
                 {
-                    usedBlendShapes.Add(path + blendShapeName);
+                    Debug.LogWarning("Viseme SkinnedMeshRenderer is not a child of the avatar root.");
+                }
+                else
+                {
+                    string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+                    foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+                    {
+                        usedBlendShapes.Add(path + blendShapeName);
+                    }
                 }
             }
             if (avDescriptor.customEyeLookSettings.eyelidType
@@ -580,13 +588,20 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+                if (root.GetComponentsInChildren<SkinnedMeshRenderer>().All(r => r != meshRenderer))
                 {
-                    if (blendShapeID >= 0)
+                    Debug.LogWarning("Eyelid SkinnedMeshRenderer is not a child of the avatar root.");
+                }
+                else
+                {
+                    string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+                    foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
                     {
-                        usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
-                        hasUsedBlendShapes.Add(meshRenderer);
+                        if (blendShapeID >= 0)
+                        {
+                            usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                            hasUsedBlendShapes.Add(meshRenderer);
+                        }
                     }
                 }
             }
