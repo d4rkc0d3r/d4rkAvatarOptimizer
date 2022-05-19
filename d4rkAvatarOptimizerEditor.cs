@@ -1341,7 +1341,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static List<List<MaterialSlot>> FindAllMergableMaterials(IEnumerable<Renderer> renderers)
+    private static List<List<MaterialSlot>> FindAllMergeAbleMaterials(IEnumerable<Renderer> renderers)
     {
         var matched = new List<List<MaterialSlot>>();
         foreach (var renderer in renderers)
@@ -1380,7 +1380,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (mesh == null)
                 continue;
 
-            var matched = FindAllMergableMaterials(new [] { meshRenderer });
+            var matched = FindAllMergeAbleMaterials(new [] { meshRenderer });
             
             var matchedMaterials = matched.Select(list => list.Select(slot => slot.material).ToList()).ToList();
             var uniqueMatchedMaterials = matchedMaterials.Select(mm => mm.Distinct().ToList()).ToList();
@@ -1408,7 +1408,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
             string meshPath = GetPathToRoot(meshRenderer);
 
-            var matchedSlots = FindAllMergableMaterials(new [] { meshRenderer });
+            var matchedSlots = FindAllMergeAbleMaterials(new [] { meshRenderer });
             var uniqueMatchedSlots = matchedSlots.Select(list => list.Select(slot => list.First(slot2 => slot.material == slot2.material)).Distinct().ToList()).ToList();
 
             var sourceVertices = mesh.vertices;
@@ -2322,7 +2322,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             foreach (var mergedMeshes in matchedSkinnedMeshes)
             {
                 EditorGUILayout.Space(8);
-                var matched = FindAllMergableMaterials(mergedMeshes);
+                var matched = FindAllMergeAbleMaterials(mergedMeshes);
                 for (int i = 0; i < matched.Count; i++)
                 {
                     for (int j = 0; j < matched[i].Count; j++)
