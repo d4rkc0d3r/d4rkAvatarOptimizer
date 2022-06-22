@@ -2140,6 +2140,50 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void MoveRingFingerColliderToFeet()
+    {
+        if (!settings.UseRingFingerAsFootCollider)
+            return;
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+
+        var collider = avDescriptor.collider_footL;
+        collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
+        collider.height *= 0.5f;
+        collider.height -= collider.radius;
+        var parent = new GameObject("leftFootColliderRoot");
+        parent.transform.parent = collider.transform;
+        parent.transform.localRotation = collider.rotation;
+        parent.transform.localPosition = collider.position + collider.rotation * (-collider.height * Vector3.up);
+        parent.transform.localScale = Vector3.one;
+        var leaf = new GameObject("leftFootColliderLeaf");
+        leaf.transform.parent = parent.transform;
+        leaf.transform.localPosition = new Vector3(0, collider.height, 0);
+        leaf.transform.localRotation = Quaternion.identity;
+        leaf.transform.localScale = Vector3.one;
+        collider.transform = leaf.transform;
+        avDescriptor.collider_fingerRingL = collider;
+
+        collider = avDescriptor.collider_footR;
+        collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
+        collider.height *= 0.5f;
+        collider.height -= collider.radius;
+        parent = new GameObject("rightFootColliderRoot");
+        parent.transform.parent = collider.transform;
+        parent.transform.localRotation = collider.rotation;
+        parent.transform.localPosition = collider.position + collider.rotation * (-collider.height * Vector3.up);
+        parent.transform.localScale = Vector3.one;
+        leaf = new GameObject("rightFootColliderLeaf");
+        leaf.transform.parent = parent.transform;
+        leaf.transform.localPosition = new Vector3(0, collider.height, 0);
+        leaf.transform.localRotation = Quaternion.identity;
+        leaf.transform.localScale = Vector3.one;
+        collider.transform = leaf.transform;
+        avDescriptor.collider_fingerRingR = collider;
+
+        // disable collider foldout in the inspector because it resets the collider transform
+        EditorPrefs.SetBool("VRCSDK3_AvatarDescriptorEditor3_CollidersFoldout", false);
+    }
+
     private static void ConvertStaticMeshesToSkinnedMeshes()
     {
         if (!settings.MergeStaticMeshesAsSkinned)
@@ -2203,6 +2247,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.StartNextSection("FixAllAnimationPaths()");
         FixAllAnimationPaths();
         Profiler.EndSection();
+        MoveRingFingerColliderToFeet();
     }
 
     public bool Button(string label)
@@ -2293,6 +2338,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         GUI.enabled = true;
         Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);
         Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
+        Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
 
         if (GUILayout.Button("Create Optimized Copy"))
