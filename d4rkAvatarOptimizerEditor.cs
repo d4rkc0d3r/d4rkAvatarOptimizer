@@ -2192,9 +2192,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             .Where(f => f.sharedMesh != null && f.gameObject.GetComponent<MeshRenderer>() != null)
             .Where(f => f.gameObject.layer != 12)
             .Select(f => f.gameObject).Distinct().ToList();
+        var meshesThatGetCombinedWithOtherMeshes = new HashSet<Renderer>(FindPossibleSkinnedMeshMerges().Where(l => l.Count > 1).SelectMany(l => l));
+
         foreach (var obj in staticMeshes)
         {
-            if (!IsCombinableRenderer(obj.GetComponent<MeshRenderer>()))
+            if (!meshesThatGetCombinedWithOtherMeshes.Contains(obj.GetComponent<Renderer>()))
                 continue;
             var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
             var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
