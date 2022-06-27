@@ -1018,6 +1018,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                             var scale = mat.GetTextureScale(prop.name);
                             var offset = mat.GetTextureOffset(prop.name);
                             propertyArray.values.Add("float4(" + scale.x + "," + scale.y + "," + offset.x + "," + offset.y + ")");
+                            if (!arrayPropertyValues.TryGetValue(prop.name + "_TexelSize", out propertyArray))
+                            {
+                                propertyArray.type = "float4";
+                                propertyArray.values = new List<string>();
+                                arrayPropertyValues[prop.name + "_TexelSize"] = propertyArray;
+                            }
+                            var texelSize = new Vector2(tex?.width ?? 8, tex?.height ?? 8);
+                            propertyArray.values.Add($"float4(1.0 / {texelSize.x}, 1.0 / {texelSize.y}, {texelSize.x}, {texelSize.y})");
                             break;
                     }
                 }
