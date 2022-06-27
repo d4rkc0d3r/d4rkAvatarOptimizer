@@ -1045,7 +1045,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var replace = new Dictionary<string, string>();
             foreach (var tuple in arrayPropertyValues.ToList())
             {
-                if (usedMaterialProps.Contains(tuple.Key) && !settings.KeepMaterialPropertyAnimationsSeparate)
+                if (usedMaterialProps.Contains(tuple.Key) && !(meshToggleCount > 1 && settings.KeepMaterialPropertyAnimationsSeparate))
                 {
                     arrayPropertyValues.Remove(tuple.Key);
                 }
