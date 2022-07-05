@@ -1252,6 +1252,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         if (!settings.MergeDifferentPropertyMaterials)
             return list.All(t => t.renderer.sharedMaterials[t.index] == candidateMat);
+        if (!settings.MergeDifferentRenderQueue && firstMat.renderQueue != candidateMat.renderQueue)
+            return false;
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
@@ -2344,6 +2346,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUI.indentLevel++;
         Toggle("Merge Same Dimension Textures", ref settings.MergeSameDimensionTextures);
         Toggle("Merge Cull Back with Cull Off", ref settings.MergeBackFaceCullingWithCullingOff);
+        Toggle("Merge Different Render Queue", ref settings.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
         Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);

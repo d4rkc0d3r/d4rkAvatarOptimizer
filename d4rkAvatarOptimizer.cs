@@ -12,6 +12,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeDifferentPropertyMaterials = true;
     public bool MergeSameDimensionTextures = false;
     public bool MergeBackFaceCullingWithCullingOff = false;
+    public bool MergeDifferentRenderQueue = false;
     public bool DeleteUnusedComponents = true;
     public bool DeleteUnusedGameObjects = false;
     public bool UseRingFingerAsFootCollider = false;
