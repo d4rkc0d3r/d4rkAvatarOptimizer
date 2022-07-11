@@ -608,7 +608,7 @@ namespace d4rkpl4y3r
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
         private string vertexInUv0Member;
-        private HashSet<string> texturesToCallSoTheSamplerDoesntDissapear;
+        private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
         private List<string> setKeywords;
 
         private ShaderOptimizer() {}
@@ -630,7 +630,7 @@ namespace d4rkpl4y3r
                 parsedShader = source,
                 texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
                 texturesToMerge = texturesToMerge ?? new HashSet<string>(),
-                texturesToCallSoTheSamplerDoesntDissapear = new HashSet<string>(),
+                texturesToCallSoTheSamplerDoesntDisappear = new HashSet<string>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>()
             };
@@ -915,8 +915,8 @@ namespace d4rkpl4y3r
             outParamType = outParamType.Substring(0, outParamType.Length - 1);
             var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.arraySize >= 0);
             var wrapperStructs = new List<string>();
-            bool usesOuputWrapper = animatedPropertyValues.Count > 0 || arrayPropertyValues.Count > 0;
-            bool usesInputWrapper = usesOuputWrapper || meshToggleCount > 1;
+            bool usesOutputWrapper = animatedPropertyValues.Count > 0 || arrayPropertyValues.Count > 0;
+            bool usesInputWrapper = usesOutputWrapper || meshToggleCount > 1;
             if (usesInputWrapper)
             {
                 wrapperStructs.Add("struct geometryInputWrapper");
@@ -925,7 +925,7 @@ namespace d4rkpl4y3r
                 wrapperStructs.Add(inParam.type + " d4rkAvatarOptimizer_geometryInput;");
                 wrapperStructs.Add("};");
             }
-            if (usesOuputWrapper)
+            if (usesOutputWrapper)
             {
                 wrapperStructs.Add("struct geometryOutputWrapper");
                 wrapperStructs.Add("{");
@@ -944,7 +944,7 @@ namespace d4rkpl4y3r
                 + (usesInputWrapper ? "geometryInputWrapper d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
                 + "[" + inParam.arraySize + "], inout "
                 + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
-                + (usesOuputWrapper ? "geometryOutputWrapper" : outParamType)
+                + (usesOutputWrapper ? "geometryOutputWrapper" : outParamType)
                 + "> " + outParam.name
                 + string.Join("", func.parameters.Where(p => p.isInput && p != inParam && p != outParam).Select(p => ", " + p))
                 + ")");
@@ -969,7 +969,7 @@ namespace d4rkpl4y3r
                 InjectArrayPropertyInitialization();
             }
             InjectAnimatedPropertyInitialization();
-            if (!usesOuputWrapper)
+            if (!usesOutputWrapper)
             {
                 return;
             }
@@ -1047,12 +1047,12 @@ namespace d4rkpl4y3r
                     output.Add(line);
                 }
             }
-            if (texturesToCallSoTheSamplerDoesntDissapear.Count > 0)
+            if (texturesToCallSoTheSamplerDoesntDisappear.Count > 0)
             {
                 output.Add("if (d4rkAvatarOptimizer_Zero)");
                 output.Add("{");
                 output.Add("float d4rkAvatarOptimizer_sum = 0;");
-                foreach (var tex in texturesToCallSoTheSamplerDoesntDissapear)
+                foreach (var tex in texturesToCallSoTheSamplerDoesntDisappear)
                 {
                     output.Add("#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + tex);
                     var texType = parsedShader.properties.Find(p => p.name == tex)?.type;
@@ -1122,12 +1122,12 @@ namespace d4rkpl4y3r
                 }
                 output.Add("};");
             }
-            var staticParamDefinitines = new HashSet<(string type, string name)>();
-            staticParamDefinitines.UnionWith(
+            var staticParamDefines = new HashSet<(string type, string name)>();
+            staticParamDefines.UnionWith(
                 animatedPropertyValues.Select(p => (p.Value, p.Key))
                 .Union(arrayPropertyValues.Select(p => (p.Value.type, p.Key)))
             );
-            foreach (var (type, name) in staticParamDefinitines)
+            foreach (var (type, name) in staticParamDefines)
             {
                 if (!staticPropertyValues.TryGetValue(name, out var value))
                 {
@@ -1186,7 +1186,7 @@ namespace d4rkpl4y3r
                     output.Add("#define sampler_MainTex sampler_MainTexButNotQuiteSoThatUnityDoesntCry");
                 }
 
-                texturesToCallSoTheSamplerDoesntDissapear.Add(newTexName);
+                texturesToCallSoTheSamplerDoesntDisappear.Add(newTexName);
                 output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + newTexName);
 
                 output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
@@ -1321,7 +1321,7 @@ namespace d4rkpl4y3r
                         {
                             if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
                             {
-                                texturesToCallSoTheSamplerDoesntDissapear.Add(name.Substring("sampler".Length));
+                                texturesToCallSoTheSamplerDoesntDisappear.Add(name.Substring("sampler".Length));
                                 output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + name.Substring("sampler".Length));
                             }
                             output.Add(type + " " + name + ";");
@@ -1349,7 +1349,7 @@ namespace d4rkpl4y3r
                     {
                         if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
                         {
-                            texturesToCallSoTheSamplerDoesntDissapear.Add(texName);
+                            texturesToCallSoTheSamplerDoesntDisappear.Add(texName);
                             output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + texName);
                         }
                         output.Add(line);
@@ -1440,7 +1440,7 @@ namespace d4rkpl4y3r
                 {
                     var pass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
-                    texturesToCallSoTheSamplerDoesntDissapear.Clear();
+                    texturesToCallSoTheSamplerDoesntDisappear.Clear();
                     InjectPropertyArrays();
                     while (parsedShader.lines[++lineIndex] != "ENDCG")
                     {
