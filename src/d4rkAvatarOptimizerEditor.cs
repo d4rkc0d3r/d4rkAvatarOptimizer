@@ -441,7 +441,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor == null)
             return;
 
-        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "/DummyAnimationToFillEmptyStates.anim");
+        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "/data/DummyAnimationToFillEmptyStates.anim");
         
         var animations = new HashSet<AnimationClip>();
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
@@ -2333,6 +2333,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         scriptPath = path.Substring(0, path.LastIndexOf('/'));
+        scriptPath = scriptPath.Substring(0, scriptPath.LastIndexOf('/'));
 
         Toggle("Write Properties as Static Values", ref settings.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref settings.MergeSkinnedMeshes);
