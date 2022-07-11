@@ -84,6 +84,12 @@ public class ShaderAnalyzerDebugger : EditorWindow
         if (parsedShader == null)
             return;
 
+        GUILayout.Space(15);
+
+        GUILayout.Label(parsedShader.misMatchedCurlyBraces ? "Mismatched curly braces" : "No mismatched curly braces");
+
+        GUILayout.Space(5);
+
         for (int i = 0; i < parsedShader.passes.Count; i++)
         {
             var pass = parsedShader.passes[i];
@@ -102,7 +108,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         if (parsedShader.hasFunctionsWithTextureParameters)
         {
-            GUILayout.Space(20);
+            GUILayout.Space(15);
             foreach (var func in parsedShader.functions.Values)
             {
                 if (!func.parameters.Any(p => p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"))
@@ -113,7 +119,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         if (parsedShader.shaderFeatureKeyWords.Count > 0)
         {
-            GUILayout.Space(20);
+            GUILayout.Space(15);
             GUILayout.Label("Shader keywords(" + parsedShader.shaderFeatureKeyWords.Count + "):");
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
@@ -121,7 +127,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
             }
         }
 
-        GUILayout.Space(20);
+        GUILayout.Space(15);
 
         int shownProperties = 0;
         for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
@@ -135,7 +141,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 + " = " + prop.defaultValue);
         }
 
-        GUILayout.Space(20);
+        GUILayout.Space(15);
 
         for (int i = 0; i < maxLines && i < parsedShader.lines.Count; i++)
         {

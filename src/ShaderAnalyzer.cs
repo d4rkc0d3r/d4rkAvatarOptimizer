@@ -63,6 +63,7 @@ namespace d4rkpl4y3r
         }
         public string name;
         public bool couldParse = true;
+        public bool misMatchedCurlyBraces = false;
         public bool hasFunctionsWithTextureParameters;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
@@ -477,6 +478,8 @@ namespace d4rkpl4y3r
             }
         }
 
+        private static int curlyBraceLevel = 0;
+
         private static void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
         {
             string line;
@@ -494,6 +497,7 @@ namespace d4rkpl4y3r
                 {
                     line = line + " " + lines[++lineIndex];
                 }
+                curlyBraceLevel += line == "{" ? 1 : (line == "}" ? -1 : 0);
                 output.Add(line);
             }
         }
@@ -507,6 +511,7 @@ namespace d4rkpl4y3r
             List<string> lines = parsedShader.lines;
             parsedShader.lines = output;
             var state = ParseState.ShaderLab;
+            curlyBraceLevel = 0;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
             {
                 string line = lines[lineIndex];
@@ -593,6 +598,7 @@ namespace d4rkpl4y3r
             {
                 parsedShader.propertyTable[prop.name] = prop;
             }
+            parsedShader.misMatchedCurlyBraces = curlyBraceLevel != 0;
         }
     }
 
