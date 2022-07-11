@@ -894,7 +894,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(ReplaceTextureSamples(line));
+                    output.Add(line);
                 }
             }
             output.Add("}");
@@ -1002,7 +1002,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(ReplaceTextureSamples(line));
+                    output.Add(line);
                 }
             }
             output.Add("}");
@@ -1167,6 +1167,7 @@ namespace d4rkpl4y3r
                     output.Add("static int " + property.Key + " = " + property.Value + ";");
                 }
             }
+            int textureWrapperCount = 0;
             foreach (var texName in texturesToReplaceCalls)
             {
                 if (texturesToNullCheck.TryGetValue(texName, out string nullCheck))
@@ -1178,6 +1179,7 @@ namespace d4rkpl4y3r
                 string uv = isArray ? "float3(uv, arrayIndex" + texName + ")" : "uv";
 
                 string newTexName = texName;
+                string type = "float4";
 
                 if (isArray && texName == "_MainTex")
                 {
@@ -1189,64 +1191,70 @@ namespace d4rkpl4y3r
                 texturesToCallSoTheSamplerDoesntDisappear.Add(newTexName);
                 output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + newTexName);
 
-                output.Add("uniform Texture2D" + (isArray ? "Array " : " ") + newTexName + ";");
-                output.Add("uniform SamplerState sampler" + newTexName + ";");
+                string textureType = $"Texture2D" + (isArray ? "Array" : "") + $"<{type}>";
+                output.Add($"{textureType} {newTexName};");
+                output.Add($"SamplerState sampler{newTexName};");
 
-                output.Add("#define UNITY_SAMPLE_TEX2D" + texName + "(uv) tex2D" + texName + "(uv)");
-                output.Add("#define UNITY_SAMPLE_TEX2D_SAMPLER" + texName + "(sampl, uv) " + texName + "Sample(sampler##sampl, (uv))");
+                output.Add($"class {texName}_Wrapper {{");
+                output.Add($"float memberToDifferentiateWrapperClasses[{++textureWrapperCount}];");
 
-                output.Add("float4 " + texName + "Sample(SamplerState sampl, float2 uv) {");
+                output.Add($"{type} Sample(SamplerState sampl, float2 uv) {{");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + newTexName + ".Sample(sampl, " + uv + ");}");
+                output.Add($"return {newTexName}.Sample(sampl, {uv});}}");
 
-                output.Add("float4 " + texName + "SampleGrad(SamplerState sampl, float2 uv, float2 ddxuv, float2 ddyuv) {");
+                output.Add($"{type} SampleGrad(SamplerState sampl, float2 uv, float2 ddxuv, float2 ddyuv) {{");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + newTexName + ".SampleGrad(sampl, " + uv + ", ddxuv, ddyuv);}");
+                output.Add($"return {newTexName}.SampleGrad(sampl, {uv}, ddxuv, ddyuv);}}");
 
-                output.Add("float4 " + texName + "SampleLevel(SamplerState sampl, float2 uv, int mipLevel) {");
+                output.Add($"{type} SampleLevel(SamplerState sampl, float2 uv, int mipLevel) {{");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + newTexName + ".SampleLevel(sampl, " + uv + ", mipLevel);}");
+                output.Add($"return {newTexName}.SampleLevel(sampl, {uv}, mipLevel);}}");
 
-                output.Add("float4 " + texName + "SampleBias(SamplerState sampl, float2 uv, float bias) {");
+                output.Add($"{type} SampleBias(SamplerState sampl, float2 uv, float bias) {{");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add("return " + newTexName + ".SampleBias(sampl, " + uv + ", bias);}");
+                output.Add($"return {newTexName}.SampleBias(sampl, {uv}, bias);}}");
 
-                output.Add("float4 tex2D" + texName + "(float2 uv) {");
-                output.Add("return " + texName + "Sample(sampler" + newTexName + ", uv);}");
+                output.Add($"{type} Load(uint3 uv) {{");
+                if (nullCheck != null) output.Add(nullCheck);
+                if (isArray) output.Add($"return {newTexName}.Load(int4(uv.xy, arrayIndex{texName}, uv.z));}}");
+                else output.Add($"return {newTexName}.Load(uv);}}");
 
-                output.Add("float4 tex2Dproj" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "Sample(sampler" + newTexName + ", uv.xy / uv.w);}");
+                output.Add("void GetDimensions(out float width, out float height) {");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
+                if (isArray) output.Add($"float dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
+                else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
-                output.Add("float4 tex2D" + texName + "(float2 uv, float2 ddxuv, float2 ddyuv) {");
-                output.Add("return " + texName + "SampleGrad(sampler" + newTexName + ", uv, ddxuv, ddyuv);}");
+                output.Add("void GetDimensions(out uint width, out uint height) {");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
+                if (isArray) output.Add($"uint dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
+                else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
-                output.Add("float4 tex2Dgrad" + texName + "(float2 uv, float2 ddxuv, float2 ddyuv) {");
-                output.Add("return " + texName + "SampleGrad(sampler" + newTexName + ", uv, ddxuv, ddyuv);}");
+                output.Add("};");
 
-                output.Add("float4 tex2Dlod" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "SampleLevel(sampler" + newTexName + ", uv.xy, uv.w);}");
+                output.Add($"{type} tex2D({texName}_Wrapper wrapper, float2 uv) {{");
+                output.Add($"return wrapper.Sample(sampler{texName}, uv);}}");
 
-                output.Add("float4 tex2Dbias" + texName + "(float4 uv) {");
-                output.Add("return " + texName + "SampleBias(sampler" + newTexName + ", uv.xy, uv.w);}");
+                output.Add($"{type} tex2Dproj({texName}_Wrapper wrapper, float4 uv) {{");
+                output.Add($"return wrapper.Sample(sampler{texName}, uv.xy / uv.w);}}");
+
+                output.Add($"{type} tex2D({texName}_Wrapper wrapper, float2 uv, float2 ddxuv, float2 ddyuv) {{");
+                output.Add($"return wrapper.SampleGrad(sampler{texName}, uv, ddxuv, ddyuv);}}");
+
+                output.Add($"{type} tex2Dgrad({texName}_Wrapper wrapper, float2 uv, float2 ddxuv, float2 ddyuv) {{");
+                output.Add($"return wrapper.SampleGrad(sampler{texName}, uv, ddxuv, ddyuv);}}");
+
+                output.Add($"{type} tex2Dlod({texName}_Wrapper wrapper, float4 uv) {{");
+                output.Add($"return wrapper.SampleLevel(sampler{texName}, uv.xy, uv.w);}}");
+
+                output.Add($"{type} tex2Dbias({texName}_Wrapper wrapper, float4 uv) {{");
+                output.Add($"return wrapper.SampleBias(sampler{texName}, uv.xy, uv.w);}}");
+
+                output.Add($"static {texName}_Wrapper {texName}_Wrapper_Instance;");
+                output.Add($"#define {texName} {texName}_Wrapper_Instance");
+                output.Add($"#define {texName}_Wrapper_Instance_ST {texName}_ST");
+                output.Add($"#define sampler{texName}_Wrapper_Instance sampler{texName}");
+                output.Add($"#define {texName}_Wrapper_Instance_TexelSize {texName}_TexelSize");
             }
-        }
-
-        private static Regex tex2DAndUnityMacroCalls = new Regex(@"(tex2D\w*|UNITY_SAMPLE_TEX2D\w*)\s*\(\s*(\w+)\s*,", RegexOptions.Compiled);
-        private static Regex textureSampleFunctionCalls = new Regex(@"(\w+)\s*\.\s*(Sample\w*)\s*\(", RegexOptions.Compiled);
-        
-        private string ReplaceTextureSamples(string line)
-        {
-            if (texturesToReplaceCalls.Count == 0)
-                return line;
-            line = tex2DAndUnityMacroCalls.Replace(line, match =>
-                texturesToReplaceCalls.Contains(match.Groups[2].Value)
-                ? match.Groups[1].Value + match.Groups[2].Value + "("
-                : match.Value);
-            line = textureSampleFunctionCalls.Replace(line, match =>
-                texturesToReplaceCalls.Contains(match.Groups[1].Value)
-                ? match.Groups[1].Value + match.Groups[2].Value + "("
-                : match.Value);
-            return line;
         }
 
         private static Regex variableDeclaration = new Regex(@"^(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
@@ -1362,7 +1370,7 @@ namespace d4rkpl4y3r
                 }
                 else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
                 {
-                    output.Add(ReplaceTextureSamples(line));
+                    output.Add(line);
                 }
             }
         }
