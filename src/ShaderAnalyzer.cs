@@ -1080,6 +1080,74 @@ namespace d4rkpl4y3r
             }
         }
 
+        private void DuplicateFunctionWithTextureParameter(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
+        {
+            int lineIndex = sourceLineIndex;
+            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref lineIndex);
+            if (func == null || texturesToReplaceCalls.Count == 0)
+            {
+                output.Add(source[sourceLineIndex]);
+                return;
+            }
+
+            if (!func.parameters.Any(p => p.type == "sampler2D" || p.type.StartsWith("Texture2D")))
+            {
+                output.Add(source[sourceLineIndex]);
+                return;
+            }
+
+            string functionDefinitionStart = source[sourceLineIndex].Split('(')[0] + "(";
+            var functionDefinition = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+            for (int i = 0; i < functionDefinition.Count; i++)
+            {
+                if (!functionDefinition[i].StartsWith("#"))
+                {
+                    functionDefinition[i] = functionDefinition[i] + ",";
+                }
+            }
+            for (int i = functionDefinition.Count - 1; i >= 0; i--)
+            {
+                if (!functionDefinition[i].StartsWith("#"))
+                {
+                    functionDefinition[i] = functionDefinition[i].Substring(0, functionDefinition[i].Length - 1);
+                    break;
+                }
+            }
+            functionDefinition.Insert(0, functionDefinitionStart);
+            functionDefinition.Add(")");
+            functionDefinition.Add("{");
+
+            output.AddRange(functionDefinition);
+            
+            int braceDepth = 0;
+            var functionBody = new List<string>();
+            while (++sourceLineIndex < source.Count)
+            {
+                string line = source[sourceLineIndex];
+                functionBody.Add(line);
+                output.Add(line);
+                if (line == "}")
+                {
+                    if (braceDepth-- == 0)
+                    {
+                        break;
+                    }
+                }
+                else if (line == "{")
+                {
+                    braceDepth++;
+                }
+            }
+            foreach (var tex in texturesToReplaceCalls)
+            {
+                foreach (var line in functionDefinition)
+                {
+                    output.Add(Regex.Replace(line, "(sampler2D|Texture2D(<[^<>]*>)?) ", tex + "_Wrapper "));
+                }
+                output.AddRange(functionBody);
+            }
+        }
+
         private void InjectDummyCBufferUsage(string nullReturn)
         {
             output.Add("if (d4rkAvatarOptimizer_Zero)");
@@ -1226,12 +1294,12 @@ namespace d4rkpl4y3r
                 else output.Add($"return {newTexName}.Load(uv);}}");
 
                 output.Add("void GetDimensions(out float width, out float height) {");
-                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 8; height = 8; return; }}");
                 if (isArray) output.Add($"float dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
                 else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
                 output.Add("void GetDimensions(out uint width, out uint height) {");
-                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 8; height = 8; return; }}");
                 if (isArray) output.Add($"uint dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
                 else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
@@ -1280,6 +1348,10 @@ namespace d4rkpl4y3r
             else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
             {
                 InjectFragmentShaderCode(source, ref sourceLineIndex, pass);
+            }
+            else if (func.name != null)
+            {
+                DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex, pass);
             }
             else if ((arrayPropertyValues.Count > 0 || meshToggleCount > 1) && line.StartsWith("struct "))
             {
