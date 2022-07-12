@@ -1889,6 +1889,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                    AddAnimationPathChange((oldPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
+                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     var animatedMaterialPropertiesToAdd = new List<string>();
                     if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                     {
