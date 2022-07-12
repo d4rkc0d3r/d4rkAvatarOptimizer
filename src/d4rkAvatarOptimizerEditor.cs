@@ -2176,6 +2176,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void Validate()
+    {
+        if (settings.UseRingFingerAsFootCollider)
+        {
+            var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+            if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null)
+            {
+                EditorGUILayout.HelpBox("Foot collider transform not set.\nOpen the collider foldout in the avatar descriptor.", MessageType.Error);
+            }
+        }
+    }
+
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
@@ -2311,6 +2323,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
 
+        root = settings.gameObject;
+        Validate();
+
         if (GUILayout.Button("Create Optimized Copy"))
         {
             Profiler.enabled = settings.ProfileTimeUsed;
@@ -2329,7 +2344,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         EditorGUILayout.Separator();
-        root = settings.gameObject;
 
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
