@@ -1911,37 +1911,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                             {
                                 if (settings.KeepMaterialPropertyAnimationsSeparate)
                                 {
-                                    foreach (var mat in combinableSkinnedMeshes[mID].sharedMaterials)
-                                    {
-                                        var parsedShader = ShaderAnalyzer.Parse(mat?.shader);
-                                        if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
-                                        {
-                                            float signal = System.BitConverter.ToSingle(new byte[] {0x55, 0x55, 0x55, 0xFF}, 0);
-                                            if (prop.type == ParsedShader.Property.Type.Int)
-                                            {
-                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, mat.GetInt(propName));
-                                                break;
-                                            }
-                                            else if (prop.type == ParsedShader.Property.Type.Float)
-                                            {
-                                                properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, signal);
-                                                break;
-                                            }
-                                            else if (prop.type == ParsedShader.Property.Type.Color)
-                                            {
-                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
-                                                break;
-                                            }
-                                            else if (prop.type == ParsedShader.Property.Type.Vector)
-                                            {
-                                                properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
-                                                break;
-                                            }
-                                        }
-                                    }
+                                    float signal = System.BitConverter.ToSingle(new byte[] {0x55, 0x55, 0x55, 0xFF}, 0);
                                     string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
                                     if (isVector || isColor)
                                     {
+                                        properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
                                         var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : new [] { ".r", ".g", ".b", ".a" };
                                         foreach (var component in vectorEnd)
                                         {
@@ -1952,6 +1926,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                     }
                                     else
                                     {
+                                        properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, signal);
                                         AddAnimationPathChange(
                                             (path, "material." + propName, typeof(SkinnedMeshRenderer)),
                                             (newPath, "material.d4rkAvatarOptimizer" + propName + mID, typeof(SkinnedMeshRenderer)));
