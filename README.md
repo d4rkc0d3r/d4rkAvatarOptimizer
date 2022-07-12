@@ -29,6 +29,8 @@ Merges materials with the same shader where properties can have different values
 If they do have different values the values will get written to a constant buffer.
 Material IDs get written to uv.w and used to access the correct value from that cbuffer.
 
+If your shader has a "lock in" or "bake" feature, make sure to not use it with this optimizer. Locked in shaders will have different actual shaders for each material, so they can't be combined. "Write Properties as Static Values" will take over the job of locking in the shaders.
+
 Can't merge materials if:
 * Shader is surface shader or has tessellation
 * A property that differs is used in shader lab code (eg `ZWrite [_ZWrite]`)
@@ -37,21 +39,24 @@ Merges materials if they use different textures if their width, height & compres
 Creates a Texture2DArray from the original textures.
 
 Can't merge materials if:
-* Shader has *any* function that takes Texture2D or sampler2D as input  
-  eg `float3 triplanar(float3 pos, float3 normal, sampler2D sampl, float4 st)`
 * Texture property to merge gets used in custom macro. **This is not detected by the optimizer!**
 ## Merge Cull Back with Cull Off
 Merges materials even if their culling properties differ. Forces culling to off.
+## Merge Different Render Queue
+Merges materials even if their render queue differs.
 ## Delete Unused Components
 Deletes all components that are turned off and never get enabled by animations. It also deletes phys bone colliders that are not referenced by any used phys bone components.
 ## Delete Unused Game Objects
 Deletes all game objects that have no used components and are not referenced in any other used components. This also applies to bones referenced in skinned meshes as long as the bones aren't moved by animations, eye look settings or phys bone components. It re parents the children of the deleted game objects to their respective parents as well as transfers its weight to the parent.
+## Use Ring Finger as Foot Collider
+Moves the ring finger collider to match the foot contact. This enables you to touch other players phys bones with your feet.
 ## Profile Time Used
 Outputs how much time the different sections in the code took to execute.
 ## Create Optimized Copy
 Creates a copy of the avatar and performs the selected optimizations on the copy.
 Disables the original avatar so only the copy is active.  
-None of the original assets will be changed so even if the optimizer fails your avatar is still safe!
+None of the original assets will be changed so even if the optimizer fails your avatar is still safe!  
+It also deletes the assets from the previous optimized copy. You should never change the optimized copy, it is only intended to be uploaded and then get deleted again.
 
 In addition to the selected optimizations there are some optimizations that are always performed:
 * Remove unused shape keys with zero weight. Unused here means not a viseme nor referenced in any animation in the fx layer.
