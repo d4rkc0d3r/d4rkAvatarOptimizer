@@ -839,8 +839,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
     {
         Profiler.StartSection("CombineTextures()");
+        bool isLinear = IsTextureLinear(textures[0]);
         var texArray = new Texture2DArray(textures[0].width, textures[0].height,
-            textures.Count, textures[0].format, true);
+            textures.Count, textures[0].format, true, isLinear);
         texArray.anisoLevel = textures[0].anisoLevel;
         texArray.wrapMode = textures[0].wrapMode;
         for (int i = 0; i < textures.Count; i++)
@@ -848,7 +849,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Graphics.CopyTexture(textures[i], 0, texArray, i);
         }
         Profiler.EndSection();
-        CreateUniqueAsset(texArray, textures[0].width + "x" + textures[0].height + "_" + textures[0].format + "_2DArray.asset");
+        CreateUniqueAsset(texArray, textures[0].width + "x" + textures[0].height + "_" + textures[0].format + (isLinear ? "_linear" : "_sRGB") + "_2DArray.asset");
         return texArray;
     }
 
@@ -898,9 +899,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 List<Texture2D> list = null;
                 foreach (var subList in textureArrayLists)
                 {
-                    if (subList[0].texelSize == texArray[0].texelSize && subList[0].format == texArray[0].format)
+                    if (subList[0].texelSize == texArray[0].texelSize && subList[0].format == texArray[0].format && IsTextureLinear(subList[0]) == IsTextureLinear(texArray[0]))
                     {
                         list = subList;
+                        break;
                     }
                 }
                 if (list == null)
@@ -1219,6 +1221,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static bool IsTextureLinear(Texture2D tex)
+    {
+        if (tex == null)
+            return false;
+        var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) as TextureImporter;
+        if (importer == null)
+            return false;
+        return importer.sRGBTexture == false;
+    }
+
     private static bool CanCombineTextures(Texture a, Texture b)
     {
         if (a == null || b == null)
@@ -1230,6 +1242,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var a2D = a as Texture2D;
         var b2D = b as Texture2D;
         if (a2D.format != b2D.format)
+            return false;
+        if (IsTextureLinear(a2D) != IsTextureLinear(b2D))
             return false;
         return true;
     }
