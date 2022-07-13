@@ -259,7 +259,16 @@ namespace d4rkpl4y3r
                     int firstQuote = trimmedLine.IndexOf('"');
                     int lastQuote = trimmedLine.LastIndexOf('"');
                     string includePath = trimmedLine.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
-                    includePath = Path.GetDirectoryName(filePath) + "/" + includePath;
+                    if (includePath.StartsWith("/Assets/"))
+                    {
+                        var path = Path.GetDirectoryName(filePath);
+                        var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
+                        includePath = assetFolderPath + includePath;
+                    }
+                    else
+                    {
+                        includePath = Path.GetDirectoryName(filePath) + "/" + includePath;
+                    }
                     if (!RecursiveParseFile(includePath, processedLines, alreadyIncludedFiles))
                     {
                         processedLines.Add(trimmedLine);

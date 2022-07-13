@@ -23,6 +23,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
     private static string FuncToString(ParsedShader.Function func)
     {
+        if (func.parameters.Count == 0)
+            return func.name;
         string s = "";
         s += func.parameters[0].type + " ";
         s += func.name + "(";
