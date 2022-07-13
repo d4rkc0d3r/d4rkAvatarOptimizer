@@ -6,15 +6,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 {
     public bool WritePropertiesAsStaticValues = true;
     public bool MergeSkinnedMeshes = true;
-    public bool MergeStaticMeshesAsSkinned = false;
+    public bool MergeStaticMeshesAsSkinned = true;
     public bool ForceMergeBlendShapeMissMatch = false;
-    public bool KeepMaterialPropertyAnimationsSeparate = false;
+    public bool KeepMaterialPropertyAnimationsSeparate = true;
     public bool MergeDifferentPropertyMaterials = true;
-    public bool MergeSameDimensionTextures = false;
+    public bool MergeSameDimensionTextures = true;
     public bool MergeBackFaceCullingWithCullingOff = false;
     public bool MergeDifferentRenderQueue = false;
     public bool DeleteUnusedComponents = true;
-    public bool DeleteUnusedGameObjects = false;
+    public bool DeleteUnusedGameObjects = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
     public bool ShowMeshAndMaterialMergePreview = true;
