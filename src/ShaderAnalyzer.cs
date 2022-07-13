@@ -168,7 +168,14 @@ namespace d4rkpl4y3r
             }
             catch (FileNotFoundException)
             {
-                return false; //this is probably a unity include file
+                return false; // this is probably a unity include file
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // happens for example if audio link is not in the project but the shader has a reference to the include file
+                // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
+                Debug.LogWarning("Could not find directory for include file: " + filePath);
+                return false; 
             }
 
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
