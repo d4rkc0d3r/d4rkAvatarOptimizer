@@ -5,6 +5,7 @@
 [Bb]uilds/
 Assets/AssetStoreTools*
 TrashBin/*
+TrashBin.meta
 
 # Visual Studio cache directory
 .vs/
