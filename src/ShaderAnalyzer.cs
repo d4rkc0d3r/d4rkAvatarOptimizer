@@ -170,8 +170,14 @@ namespace d4rkpl4y3r
             {
                 return false; // this is probably a unity include file
             }
-            catch (DirectoryNotFoundException)
+            catch (DirectoryNotFoundException e)
             {
+                if (isTopLevelFile)
+                {
+                    // unity shader files are not assets in the project so we just throw the error again to mark
+                    // the parsed shader as failed to read
+                    throw e;
+                }
                 // happens for example if audio link is not in the project but the shader has a reference to the include file
                 // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
                 Debug.LogWarning("Could not find directory for include file: " + filePath);
