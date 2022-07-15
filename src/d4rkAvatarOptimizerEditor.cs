@@ -2192,13 +2192,36 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void Validate()
     {
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+
+        if (avDescriptor == null)
+        {
+            EditorGUILayout.HelpBox("No VRCAvatarDescriptor found on the root object", MessageType.Error);
+            return;
+        }
+
         if (settings.UseRingFingerAsFootCollider)
         {
-            var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
             if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null)
             {
                 EditorGUILayout.HelpBox("Foot collider transform not set.\nOpen the collider foldout in the avatar descriptor.", MessageType.Error);
             }
+        }
+
+        var allMaterials = root.GetComponentsInChildren<Renderer>()
+            .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
+
+        var correctlyParsedMaterials = allMaterials
+            .Where(m => (ShaderAnalyzer.Parse(m?.shader)?.HasParsedCorrectly() ?? false)).ToArray();
+
+        if (correctlyParsedMaterials.Length != allMaterials.Length)
+        {
+            EditorGUILayout.HelpBox("One or more materials could not be parsed.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+        }
+
+        if (correctlyParsedMaterials.Any(m => !(ShaderAnalyzer.Parse(m?.shader)?.CanMerge() ?? false)))
+        {
+            EditorGUILayout.HelpBox("One or more materials do not support merging.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
         }
     }
 
@@ -2383,6 +2406,39 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (Foldout("Debug Info", ref settings.ShowDebugInfo))
         {
             EditorGUI.indentLevel++;
+            if (Foldout("Unparsable Materials", ref settings.DebugShowUnparsableMaterials))
+            {
+                var list = root.GetComponentsInChildren<Renderer>()
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => !(t.Item2 != null && t.Item2.HasParsedCorrectly()))
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat?.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox((shader?.name ?? "Missing shader") + "\n" +
+                        (parsed?.errorMessage ?? "Missing shader can't be parsed."),
+                        MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat?.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
+            }
+            if (Foldout("Unmergable Materials", ref settings.DebugShowUnmergableMaterials))
+            {
+                var list = root.GetComponentsInChildren<Renderer>()
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => (t.Item2 != null && t.Item2.HasParsedCorrectly()))
+                    .Where(t => !t.Item2.CanMerge())
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeReason(), MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
+            }
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {
                 DrawDebugList(FindAllUnusedComponents().ToArray());
@@ -2390,15 +2446,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Always Disabled Game Objects", ref settings.DebugShowAlwaysDisabledGameObjects))
             {
                 DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
-            }
-            if (Foldout("Unparsable Materials", ref settings.DebugShowUnparsableMaterials))
-            {
-                var list = root.GetComponentsInChildren<Renderer>()
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => !(t.Item2 != null && t.Item2.couldParse && t.Item2.passes.All(p => p.vertex != null && p.fragment != null)))
-                    .Select(t => t.mat).ToArray();
-                DrawDebugList(list);
             }
             if (Foldout("Material Swaps", ref settings.DebugShowMaterialSwaps))
             {

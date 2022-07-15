@@ -63,6 +63,7 @@ namespace d4rkpl4y3r
         }
         public string name;
         public bool couldParse = true;
+        public string errorMessage = "";
         public bool misMatchedCurlyBraces = false;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
@@ -70,6 +71,29 @@ namespace d4rkpl4y3r
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
         public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
+
+        public bool HasParsedCorrectly()
+        {
+            return couldParse && passes.All(p => p.vertex != null && p.fragment != null);
+        }
+
+        public bool CanMerge()
+        {
+            if (!HasParsedCorrectly())
+                return false;
+            if (passes.Any(p => p.hull != null || p.domain != null))
+                return false;
+            return true;
+        }
+
+        public string CantMergeReason()
+        {
+            if (!HasParsedCorrectly())
+                return "Shader has not parsed correctly";
+            if (passes.Any(p => p.hull != null || p.domain != null))
+                return "Shader has a pass with tesselation";
+            return "";
+        }
     }
 
     public static class ShaderAnalyzer
@@ -81,6 +105,11 @@ namespace d4rkpl4y3r
             ShaderLab,
             CGInclude,
             CGProgram
+        }
+
+        private class ParserException : System.Exception
+        {
+            public ParserException(string message) : base(message) { }
         }
 
         private static Dictionary<string, ParsedShader> parsedShaderCache = new Dictionary<string, ParsedShader>();
@@ -108,10 +137,20 @@ namespace d4rkpl4y3r
                 {
                     parsedShader.couldParse = false;
                 }
+                catch (ParserException e)
+                {
+                    parsedShader.couldParse = false;
+                    parsedShader.errorMessage = e.Message;
+                }
                 Profiler.StartNextSection("ShaderAnalyzer.SemanticParseShader()");
                 try
                 {
                     SemanticParseShader(parsedShader);
+                }
+                catch (ParserException e)
+                {
+                    parsedShader.couldParse = false;
+                    parsedShader.errorMessage = e.Message;
                 }
                 catch (System.Exception e)
                 {
@@ -169,13 +208,13 @@ namespace d4rkpl4y3r
             {
                 return false; // this is probably a unity include file
             }
-            catch (DirectoryNotFoundException e)
+            catch (DirectoryNotFoundException)
             {
                 if (isTopLevelFile)
                 {
                     // unity shader files are not assets in the project so we just throw the error again to mark
                     // the parsed shader as failed to read
-                    throw e;
+                    throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
                 }
                 // happens for example if audio link is not in the project but the shader has a reference to the include file
                 // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
@@ -265,6 +304,10 @@ namespace d4rkpl4y3r
                 if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM"))
                 {
                     alreadyIncludedFiles.Clear();
+                }
+                if (trimmedLine.StartsWith("UsePass"))
+                {
+                    throw new ParserException("UsePass is not supported.");
                 }
                 if (trimmedLine.StartsWith("#include "))
                 {
@@ -617,6 +660,10 @@ namespace d4rkpl4y3r
                 parsedShader.propertyTable[prop.name] = prop;
             }
             parsedShader.misMatchedCurlyBraces = curlyBraceLevel != 0;
+            if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
+            {
+                throw new ParserException("A pass is missing a vertex or fragment shader.");
+            }
         }
     }
 
