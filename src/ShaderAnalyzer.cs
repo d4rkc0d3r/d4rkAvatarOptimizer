@@ -64,7 +64,6 @@ namespace d4rkpl4y3r
         public string name;
         public bool couldParse = true;
         public bool misMatchedCurlyBraces = false;
-        public bool hasFunctionsWithTextureParameters;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
@@ -613,9 +612,6 @@ namespace d4rkpl4y3r
                         break;
                 }
             }
-            parsedShader.hasFunctionsWithTextureParameters =
-                parsedShader.functions.Values.Any(f => f.parameters.Any(p =>
-                p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"));
             foreach (var prop in parsedShader.properties)
             {
                 parsedShader.propertyTable[prop.name] = prop;

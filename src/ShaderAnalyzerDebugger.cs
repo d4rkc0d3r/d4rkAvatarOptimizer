@@ -108,17 +108,6 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 GUILayout.Label("fragment: " + FuncToString(pass.fragment));
         }
 
-        if (parsedShader.hasFunctionsWithTextureParameters)
-        {
-            GUILayout.Space(15);
-            foreach (var func in parsedShader.functions.Values)
-            {
-                if (!func.parameters.Any(p => p.type.StartsWith("Texture2D") || p.type == "sampler2D" || p.type == "SamplerState"))
-                    continue;
-                GUILayout.Label(FuncToString(func));
-            }
-        }
-
         if (parsedShader.shaderFeatureKeyWords.Count > 0)
         {
             GUILayout.Space(15);
