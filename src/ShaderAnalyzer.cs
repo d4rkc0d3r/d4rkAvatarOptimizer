@@ -125,7 +125,7 @@ namespace d4rkpl4y3r
                 return null;
             if (!parsedShaderCache.TryGetValue(shader.name, out var parsedShader))
             {
-                maxIncludes = 50;
+                maxIncludes = 1000;
                 parsedShader = new ParsedShader();
                 parsedShader.name = shader.name;
                 Profiler.StartSection("ShaderAnalyzer.RecursiveParseFile()");
@@ -182,6 +182,9 @@ namespace d4rkpl4y3r
         private static int maxIncludes = 50;
         private static bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
         {
+            var fileName = Path.GetFileName(filePath);
+            if (fileName == "UnityCG.cginc" || fileName == "HLSLSupport.cginc" || fileName == "UnityShaderVariables.cginc")
+                return false; // don't inline include these ones since it leads to problems
             bool isTopLevelFile = false;
             if (alreadyIncludedFiles == null)
             {
@@ -190,8 +193,7 @@ namespace d4rkpl4y3r
             }
             if (--maxIncludes < 0)
             {
-                Debug.LogError("Reach max include depth");
-                return false;
+                throw new ParserException("Reached max include depth");
             }
             filePath = Path.GetFullPath(filePath);
             if (alreadyIncludedFiles.Contains(filePath))
@@ -206,7 +208,20 @@ namespace d4rkpl4y3r
             }
             catch (FileNotFoundException)
             {
-                return false; // this is probably a unity include file
+                // this is probably a unity include file, try to find it in the unity cginclude folder
+                var cgIncludePath = Path.Combine(EditorApplication.applicationContentsPath, "CGIncludes");
+                var cgIncludeFilePath = Path.GetFullPath(Path.Combine(cgIncludePath, fileName));
+                if (File.Exists(cgIncludeFilePath))
+                {
+                    maxIncludes++;
+                    return RecursiveParseFile(cgIncludeFilePath, processedLines, alreadyIncludedFiles);
+                }
+                else
+                {
+                    // include file that is not in the cginclude folder either
+                    Debug.LogWarning("Could not find include file: " + filePath);
+                    return false;
+                }
             }
             catch (DirectoryNotFoundException)
             {
@@ -1468,7 +1483,7 @@ namespace d4rkpl4y3r
                     names.Add(match.Groups[3].Value);
                     foreach (var name in names)
                     {
-                        if (type == "SamplerState" && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                        if (type == "SamplerState" && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
                         {
                             if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
                             {
@@ -1486,7 +1501,7 @@ namespace d4rkpl4y3r
                         else if (!arrayPropertyValues.ContainsKey(name)
                             && !animatedPropertyValues.ContainsKey(name)
                             && !texturesToReplaceCalls.Contains(name)
-                            && !(type == "SamplerState" && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
+                            && !(type == "SamplerState" && name.StartsWith("sampler") && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
                         {
                             output.Add(type + " " + name + ";");
                         }
