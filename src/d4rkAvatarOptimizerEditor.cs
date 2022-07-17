@@ -1993,6 +1993,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
+            meshRenderer.gameObject.SetActive(true);
+
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
