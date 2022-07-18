@@ -920,7 +920,10 @@ namespace d4rkpl4y3r
             {
                 string line = source[sourceLineIndex];
                 originalVertexShader?.Add(line);
-                line = line.Replace(vertexInUv0Member, vertexInUv0Member + vertexInUv0EndSwizzle);
+                if (inParam != null && vertexInUv0EndSwizzle != "")
+                {
+                    line = Regex.Replace(line, $"{inParam.name}\\s*\\.\\s*{vertexInUv0Member}", $"$0{vertexInUv0EndSwizzle}");
+                }
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
