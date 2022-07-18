@@ -53,12 +53,12 @@ public class ShaderAnalyzerDebugger : EditorWindow
         maxKeywords = EditorGUILayout.IntField("Max Keywords", maxKeywords);
         showShaderLabParamsOnly = EditorGUILayout.Toggle("Shader Lab Properties Only", showShaderLabParamsOnly);
 
-        GUI.enabled = mat != null && mat.shader != null;
-
         if (GUILayout.Button("Clear Shader Cache"))
         {
             ShaderAnalyzer.ClearParsedShaderCache();
         }
+
+        GUI.enabled = mat != null && mat.shader != null;
 
         if (GUILayout.Button("Optimize"))
         {

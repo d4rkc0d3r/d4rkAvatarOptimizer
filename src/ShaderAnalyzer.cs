@@ -694,6 +694,7 @@ namespace d4rkpl4y3r
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
         private string vertexInUv0Member;
+        private string vertexInUv0EndSwizzle = "";
         private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
         private List<string> setKeywords;
 
@@ -919,6 +920,7 @@ namespace d4rkpl4y3r
             {
                 string line = source[sourceLineIndex];
                 originalVertexShader?.Add(line);
+                line.Replace(vertexInUv0Member, vertexInUv0Member + vertexInUv0EndSwizzle);
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
@@ -1455,6 +1457,9 @@ namespace d4rkpl4y3r
                                 if (semantic == "texcoord" || semantic == "texcoord0")
                                 {
                                     line = line.Replace(type, "float4");
+                                    if (type == "float2") vertexInUv0EndSwizzle = ".xy";
+                                    else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
+                                    else vertexInUv0EndSwizzle = "";
                                     vertexInUv0Member = match.Groups[3].Value;
                                     hasUv0 = true;
                                 }
