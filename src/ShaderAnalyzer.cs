@@ -920,7 +920,7 @@ namespace d4rkpl4y3r
             {
                 string line = source[sourceLineIndex];
                 originalVertexShader?.Add(line);
-                line.Replace(vertexInUv0Member, vertexInUv0Member + vertexInUv0EndSwizzle);
+                line = line.Replace(vertexInUv0Member, vertexInUv0Member + vertexInUv0EndSwizzle);
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
