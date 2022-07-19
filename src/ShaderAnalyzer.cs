@@ -866,6 +866,7 @@ namespace d4rkpl4y3r
             var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
             var returnParam = func.parameters[0];
             var isVoidReturn = returnParam.type == "void";
+            string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
             List<string> funcParams = null;
             List<string> originalVertexShader = null;
             bool needToPassOnMeshOrMaterialID =
@@ -885,9 +886,12 @@ namespace d4rkpl4y3r
                 output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexWithWrapper(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
+                nullReturn = "return (vertexOutputWrapper)0;";
             }
             else
             {
+                int startLineIndex = sourceLineIndex;
+                funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref startLineIndex);
                 string line = source[sourceLineIndex];
                 output.Add(line);
                 while (line != "{" && sourceLineIndex < source.Count - 1)
@@ -896,12 +900,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                 }
             }
-            string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
-            if (funcParams != null)
-            {
-                InitializeOutputParameter(funcParams, output);
-                nullReturn = "return (vertexOutputWrapper)0;";
-            }
+            InitializeOutputParameter(funcParams, output);
             string uv0Name = inParam.name + "." + vertexInUv0Member;
             if (meshToggleCount > 1)
             {
@@ -928,23 +927,15 @@ namespace d4rkpl4y3r
                 {
                     if (braceDepth-- == 0)
                     {
-                        if (isVoidReturn)
+                        if (isVoidReturn && needToPassOnMeshOrMaterialID)
                         {
                             output.Add("{");
-                            var outParamName = outParam.name;
-                            if (funcParams != null)
-                            {
-                                outParamName = "d4rkAvatarOptimizer_vertexOutput";
-                                output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
-                                InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
-                            }
-                            if (needToPassOnMeshOrMaterialID)
-                            {
-                                output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
-                                    + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
-                            }
-                            if (funcParams != null)
-                                output.Add("return d4rkAvatarOptimizer_vertexOutput;");
+                            var outParamName = "d4rkAvatarOptimizer_vertexOutput";
+                            output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
+                            InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
+                            output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
+                                + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
+                            output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                             output.Add("}");
                         }
                         break;
@@ -960,11 +951,11 @@ namespace d4rkpl4y3r
                 {
                     output.Add("{");
                     var outParamName = "d4rkAvatarOptimizer_vertexOutput";
-                    if (funcParams == null && isVoidReturn)
+                    if (!needToPassOnMeshOrMaterialID && isVoidReturn)
                     {
                         outParamName = outParam.name;
                     }
-                    else if (funcParams != null)
+                    else if (needToPassOnMeshOrMaterialID)
                     {
                         output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
                         if (!isVoidReturn)
@@ -980,7 +971,7 @@ namespace d4rkpl4y3r
                         output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
                             + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
                     }
-                    output.Add((funcParams == null && isVoidReturn) ? "return;" : "return d4rkAvatarOptimizer_vertexOutput;");
+                    output.Add((!needToPassOnMeshOrMaterialID && isVoidReturn) ? "return;" : "return d4rkAvatarOptimizer_vertexOutput;");
                     output.Add("}");
                 }
                 else
