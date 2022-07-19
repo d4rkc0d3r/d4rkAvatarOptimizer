@@ -830,7 +830,7 @@ namespace d4rkpl4y3r
             }
         }
 
-        private void InitializeOutputParameter(List<string> funcParams, List<string> output)
+        private void InitializeOutputParameter(List<string> funcParams, List<string> output, bool initOnly)
         {
             foreach (var line in funcParams)
             {
@@ -846,7 +846,7 @@ namespace d4rkpl4y3r
                     {
                         var type = match.Groups[3].Value;
                         var name = match.Groups[4].Value;
-                        output.Add(type + " " + name + " = (" + type + ")0;");
+                        output.Add((initOnly ? "" : type + " ") + name + " = (" + type + ")0;");
                     }
                 }
                 else
@@ -900,7 +900,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                 }
             }
-            InitializeOutputParameter(funcParams, output);
+            InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
             string uv0Name = inParam.name + "." + vertexInUv0Member;
             if (meshToggleCount > 1)
             {
