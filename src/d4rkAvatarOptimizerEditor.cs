@@ -782,7 +782,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        var animators = root.GetComponentsInChildren<Animator>();
+        var animators = root.GetComponentsInChildren<Animator>(true);
         foreach (var animator in animators)
         {
             foreach (var boneId in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
@@ -2060,6 +2060,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         used.Add(root.transform);
         used.UnionWith(root.GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
+
+        foreach (var animator in root.GetComponentsInChildren<Animator>(true))
+        {
+            foreach (var boneId in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
+            {
+                if (boneId < 0 || boneId >= HumanBodyBones.LastBone)
+                    continue;
+                used.Add(animator.GetBoneTransform(boneId));
+            }
+        }
 
         foreach (var skinnedRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
