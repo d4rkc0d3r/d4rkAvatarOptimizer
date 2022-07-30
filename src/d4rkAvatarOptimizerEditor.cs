@@ -2227,6 +2227,17 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static void AssignNewAvatarIDIfEmpty()
+    {
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return;
+        var pm = root.GetOrAddComponent<VRC.Core.PipelineManager>();
+        if (!string.IsNullOrEmpty(pm.blueprintId))
+            return;
+        pm.AssignId();
+    }
+
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
@@ -2332,6 +2343,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     public override void OnInspectorGUI()
     {
         settings = (d4rkAvatarOptimizer)target;
+        root = settings.gameObject;
         if (nullMaterial == null)
         {
             nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
@@ -2362,13 +2374,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
 
-        root = settings.gameObject;
         Validate();
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
+            AssignNewAvatarIDIfEmpty();
             var copy = Instantiate(settings.gameObject);
             copy.name = settings.gameObject.name + "(BrokenCopy)";
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
