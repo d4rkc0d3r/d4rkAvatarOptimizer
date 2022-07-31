@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEditor.Animations;
@@ -933,21 +934,30 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (!animatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
             usedMaterialProps = new HashSet<string>();
         var materials = new Material[sources.Count];
-        int matIndex = 0;
-        foreach (var source in sources)
+        var parsedShader = new ParsedShader[sources.Count];
+        var setShaderKeywords = new List<string>[sources.Count];
+        var replace = new Dictionary<string, string>[sources.Count];
+        var cullReplace = new string[sources.Count];
+        var texturesToMerge = new HashSet<string>[sources.Count];
+        var propertyTextureArrayIndex = new Dictionary<string, int>[sources.Count];
+        var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>[sources.Count];
+        var texturesToCheckNull = new Dictionary<string, string>[sources.Count];
+        var animatedPropertyValues = new Dictionary<string, string>[sources.Count];
+        for (int i = 0; i < sources.Count; i++)
         {
-            var parsedShader = ShaderAnalyzer.Parse(source[0]?.shader);
-            if (parsedShader == null || !parsedShader.couldParse)
+            var source = sources[i];
+            parsedShader[i] = ShaderAnalyzer.Parse(source[0]?.shader);
+            if (parsedShader[i] == null || !parsedShader[i].couldParse)
             {
-                materials[matIndex++] = source[0];
+                materials[i] = source[0];
                 continue;
             }
-            var texturesToMerge = new HashSet<string>();
-            var propertyTextureArrayIndex = new Dictionary<string, int>();
-            var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>();
+            texturesToMerge[i] = new HashSet<string>();
+            propertyTextureArrayIndex[i] = new Dictionary<string, int>();
+            arrayPropertyValues[i] = new Dictionary<string, (string type, List<string> values)>();
             foreach (var mat in source)
             {
-                foreach (var prop in parsedShader.properties)
+                foreach (var prop in parsedShader[i].properties)
                 {
                     if (!mat.HasProperty(prop.name))
                         continue;
@@ -955,46 +965,46 @@ public class d4rkAvatarOptimizerEditor : Editor
                     {
                         case ParsedShader.Property.Type.Float:
                             (string type, List<string> values) propertyArray;
-                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "float";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name] = propertyArray;
+                                arrayPropertyValues[i][prop.name] = propertyArray;
                             }
                             propertyArray.values.Add("" + mat.GetFloat(prop.name));
                         break;
                         case ParsedShader.Property.Type.Vector:
-                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "float4";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name] = propertyArray;
+                                arrayPropertyValues[i][prop.name] = propertyArray;
                             }
                             propertyArray.values.Add("float4" + mat.GetVector(prop.name));
                         break;
                         case ParsedShader.Property.Type.Int:
-                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "int";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name] = propertyArray;
+                                arrayPropertyValues[i][prop.name] = propertyArray;
                             }
                             propertyArray.values.Add("" + mat.GetInt(prop.name));
                         break;
                         case ParsedShader.Property.Type.Color:
-                            if (!arrayPropertyValues.TryGetValue(prop.name, out propertyArray))
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "float4";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name] = propertyArray;
+                                arrayPropertyValues[i][prop.name] = propertyArray;
                             }
                             propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
                             break;
                         case ParsedShader.Property.Type.Texture2D:
-                            if (!arrayPropertyValues.TryGetValue("arrayIndex" + prop.name, out var textureArray))
+                            if (!arrayPropertyValues[i].TryGetValue("arrayIndex" + prop.name, out var textureArray))
                             {
-                                arrayPropertyValues["arrayIndex" + prop.name] = ("int", new List<string>());
-                                arrayPropertyValues["shouldSample" + prop.name] = ("bool", new List<string>());
+                                arrayPropertyValues[i]["arrayIndex" + prop.name] = ("int", new List<string>());
+                                arrayPropertyValues[i]["shouldSample" + prop.name] = ("bool", new List<string>());
                             }
                             var tex = mat.GetTexture(prop.name);
                             var tex2D = tex as Texture2D;
@@ -1005,26 +1015,26 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 if (texArrayIndex != -1)
                                 {
                                     index = textureArrayLists[texArrayIndex].IndexOf(tex2D);
-                                    texturesToMerge.Add(prop.name);
-                                    propertyTextureArrayIndex[prop.name] = texArrayIndex;
+                                    texturesToMerge[i].Add(prop.name);
+                                    propertyTextureArrayIndex[i][prop.name] = texArrayIndex;
                                 }
                             }
-                            arrayPropertyValues["arrayIndex" + prop.name].values.Add("" + index);
-                            arrayPropertyValues["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
-                            if (!arrayPropertyValues.TryGetValue(prop.name + "_ST", out propertyArray))
+                            arrayPropertyValues[i]["arrayIndex" + prop.name].values.Add("" + index);
+                            arrayPropertyValues[i]["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name + "_ST", out propertyArray))
                             {
                                 propertyArray.type = "float4";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name + "_ST"] = propertyArray;
+                                arrayPropertyValues[i][prop.name + "_ST"] = propertyArray;
                             }
                             var scale = mat.GetTextureScale(prop.name);
                             var offset = mat.GetTextureOffset(prop.name);
                             propertyArray.values.Add("float4(" + scale.x + "," + scale.y + "," + offset.x + "," + offset.y + ")");
-                            if (!arrayPropertyValues.TryGetValue(prop.name + "_TexelSize", out propertyArray))
+                            if (!arrayPropertyValues[i].TryGetValue(prop.name + "_TexelSize", out propertyArray))
                             {
                                 propertyArray.type = "float4";
                                 propertyArray.values = new List<string>();
-                                arrayPropertyValues[prop.name + "_TexelSize"] = propertyArray;
+                                arrayPropertyValues[i][prop.name + "_TexelSize"] = propertyArray;
                             }
                             var texelSize = new Vector2(tex?.width ?? 8, tex?.height ?? 8);
                             propertyArray.values.Add($"float4(1.0 / {texelSize.x}, 1.0 / {texelSize.y}, {texelSize.x}, {texelSize.y})");
@@ -1033,92 +1043,113 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
-            string cullReplace = null;
-            var cullProp = parsedShader.properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams.First() == "Cull");
+            cullReplace[i] = null;
+            var cullProp = parsedShader[i].properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams.First() == "Cull");
             if (cullProp != null)
             {
                 int firstCull = source[0].GetInt(cullProp.name);
                 if (source.Any(m => m.GetInt(cullProp.name) != firstCull))
                 {
-                    cullReplace = cullProp.name;
+                    cullReplace[i] = cullProp.name;
                 }
             }
 
-            var replace = new Dictionary<string, string>();
-            foreach (var tuple in arrayPropertyValues.ToList())
+            replace[i] = new Dictionary<string, string>();
+            foreach (var tuple in arrayPropertyValues[i].ToList())
             {
                 if (usedMaterialProps.Contains(tuple.Key) && !(meshToggleCount > 1 && settings.KeepMaterialPropertyAnimationsSeparate))
                 {
-                    arrayPropertyValues.Remove(tuple.Key);
+                    arrayPropertyValues[i].Remove(tuple.Key);
                 }
                 else if (tuple.Value.values.All(v => v == tuple.Value.values[0]))
                 {
-                    arrayPropertyValues.Remove(tuple.Key);
-                    replace[tuple.Key] = tuple.Value.values[0];
+                    arrayPropertyValues[i].Remove(tuple.Key);
+                    replace[i][tuple.Key] = tuple.Value.values[0];
                 }
             }
             if (!settings.WritePropertiesAsStaticValues)
             {
-                replace = null;
+                replace[i] = null;
             }
 
-            var texturesToCheckNull = new Dictionary<string, string>();
-            foreach (var prop in parsedShader.properties)
+            texturesToCheckNull[i] = new Dictionary<string, string>();
+            foreach (var prop in parsedShader[i].properties)
             {
                 if (prop.type == ParsedShader.Property.Type.Texture2D)
                 {
-                    if (arrayPropertyValues.ContainsKey("shouldSample" + prop.name))
+                    if (arrayPropertyValues[i].ContainsKey("shouldSample" + prop.name))
                     {
-                        texturesToCheckNull[prop.name] = prop.defaultValue;
+                        texturesToCheckNull[i][prop.name] = prop.defaultValue;
                     }
                 }
             }
 
-            var animatedPropertyValues = new Dictionary<string, string>();
+            animatedPropertyValues[i] = new Dictionary<string, string>();
             if (meshToggleCount > 1 && settings.KeepMaterialPropertyAnimationsSeparate)
             {
                 foreach (var propName in usedMaterialProps)
                 {
-                    if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
+                    if (parsedShader[i].propertyTable.TryGetValue(propName, out var prop))
                     {
                         string type = "float4";
                         if (prop.type == ParsedShader.Property.Type.Float)
                             type = "float";
                         if (prop.type == ParsedShader.Property.Type.Int)
                             type = "int";
-                        animatedPropertyValues[propName] = type;
+                        animatedPropertyValues[i][propName] = type;
                     }
                 }
             }
 
-            var setShaderKeywords = parsedShader.shaderFeatureKeyWords.Where(k => source[0].IsKeywordEnabled(k)).ToList();
+            setShaderKeywords[i] = parsedShader[i].shaderFeatureKeyWords.Where(k => source[0].IsKeywordEnabled(k)).ToList();
+        }
 
-            Profiler.StartSection("ShaderOptimizer.Run()");
-            var optimizedShader = ShaderOptimizer.Run(parsedShader, replace, meshToggleCount,
-                arrayPropertyValues, texturesToCheckNull, texturesToMerge, animatedPropertyValues, setShaderKeywords);
-            Profiler.EndSection();
+        var optimizedShader = new List<string>[sources.Count];
+        Profiler.StartSection("ShaderOptimizer.Run()");
+        Parallel.For(0, sources.Count, i =>
+        {
+            if (parsedShader[i] != null && parsedShader[i].couldParse)
+            {
+                optimizedShader[i] = ShaderOptimizer.Run(
+                    parsedShader[i],
+                    replace[i],
+                    meshToggleCount,
+                    arrayPropertyValues[i],
+                    texturesToCheckNull[i],
+                    texturesToMerge[i],
+                    animatedPropertyValues[i],
+                    setShaderKeywords[i]);
+            }
+        });
+        Profiler.EndSection();
+
+        for (int i = 0; i < sources.Count; i++)
+        {
+            var source = sources[i];
+            if (parsedShader[i] == null || !parsedShader[i].couldParse)
+                continue;
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
             var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
             name = System.IO.Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
-            System.IO.File.WriteAllLines(shaderFilePath, optimizedShader);
+            optimizedShader[i][0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
+            System.IO.File.WriteAllLines(shaderFilePath, optimizedShader[i]);
             var optimizedMaterial = Instantiate(source[0]);
-            foreach (var keyword in setShaderKeywords)
+            foreach (var keyword in setShaderKeywords[i])
             {
                 optimizedMaterial.DisableKeyword(keyword);
             }
-            if (cullReplace != null)
+            if (cullReplace[i] != null)
             {
-                optimizedMaterial.SetInt(cullReplace, 0);
+                optimizedMaterial.SetInt(cullReplace[i], 0);
             }
             optimizedMaterial.name = name;
-            materials[matIndex++] = optimizedMaterial;
+            materials[i] = optimizedMaterial;
             optimizedMaterials.Add(optimizedMaterial);
             int renderQueue = optimizedMaterial.renderQueue;
             optimizedMaterial.shader = null;
             optimizedMaterial.renderQueue = renderQueue;
-            foreach (var prop in parsedShader.properties)
+            foreach (var prop in parsedShader[i].properties)
             {
                 if (prop.type != ParsedShader.Property.Type.Texture2D)
                     continue;
@@ -1126,7 +1157,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 optimizedMaterial.SetTexture(prop.name, tex);
             }
             var arrayList = new List<(string name, Texture2DArray array)>();
-            foreach (var texArray in propertyTextureArrayIndex)
+            foreach (var texArray in propertyTextureArrayIndex[i])
             {
                 optimizedMaterial.SetTexture(texArray.Key, null);
                 arrayList.Add((texArray.Key, textureArrays[texArray.Value]));
