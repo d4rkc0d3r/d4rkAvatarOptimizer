@@ -2324,10 +2324,18 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private GameObject lastSelected = null;
     private List<List<List<MaterialSlot>>> mergedMaterialPreviewCache = null;
+    private Transform[] unmovingBonesCache = null;
+    private Component[] unusedComponentsCache = null;
+    private Transform[] alwaysDisabledGameObjectsCache = null;
+    private GameObject[] gameObjectsWithToggleAnimationsCache = null;
 
     private void ClearUICaches()
     {
         mergedMaterialPreviewCache = null;
+        unmovingBonesCache = null;
+        unusedComponentsCache = null;
+        alwaysDisabledGameObjectsCache = null;
+        gameObjectsWithToggleAnimationsCache = null;
     }
 
     private void OnSelectionChange()
@@ -2355,6 +2363,61 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
             return mergedMaterialPreviewCache;
+        }
+    }
+
+    private Transform[] UnmovingBones
+    {
+        get
+        {
+            if (unmovingBonesCache == null)
+            {
+                var bones = new HashSet<Transform>();
+                var unmoving = FindAllUnmovingTransforms();
+                root.GetComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
+                    r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
+                unmovingBonesCache = bones.ToArray();
+            }
+            return unmovingBonesCache;
+        }
+    }
+
+    private Component[] UnusedComponents
+    {
+        get
+        {
+            if (unusedComponentsCache == null)
+            {
+                unusedComponentsCache = FindAllUnusedComponents().ToArray();
+            }
+            return unusedComponentsCache;
+        }
+    }
+
+    private Transform[] AlwaysDisabledGameObjects
+    {
+        get
+        {
+            if (alwaysDisabledGameObjectsCache == null)
+            {
+                alwaysDisabledGameObjectsCache = FindAllAlwaysDisabledGameObjects().ToArray();
+            }
+            return alwaysDisabledGameObjectsCache;
+        }
+    }
+
+    private GameObject[] GameObjectsWithToggleAnimations
+    {
+        get
+        {
+            if (gameObjectsWithToggleAnimationsCache == null)
+            {
+                gameObjectsWithToggleAnimationsCache =
+                    FindAllGameObjectTogglePaths()
+                    .Select(p => GetTransformFromPath(p)?.gameObject)
+                    .Where(obj => obj != null).ToArray();
+            }
+            return gameObjectsWithToggleAnimationsCache;
         }
     }
 
@@ -2550,13 +2613,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {
                 Profiler.StartSection("Unused Components");
-                DrawDebugList(FindAllUnusedComponents().ToArray());
+                DrawDebugList(UnusedComponents);
                 Profiler.EndSection();
             }
             if (Foldout("Always Disabled Game Objects", ref settings.DebugShowAlwaysDisabledGameObjects))
             {
                 Profiler.StartSection("Always Disabled Game Objects");
-                DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
+                DrawDebugList(AlwaysDisabledGameObjects);
                 Profiler.EndSection();
             }
             if (Foldout("Material Swaps", ref settings.DebugShowMaterialSwaps))
@@ -2579,25 +2642,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Game Objects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
                 Profiler.StartSection("Game Objects with Toggle Animation");
-                var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
-                    .Where(obj => obj != null).ToArray();
-                DrawDebugList(list);
+                DrawDebugList(AlwaysDisabledGameObjects);
                 Profiler.EndSection();
             }
             if (Foldout("Unmoving Bones", ref settings.DebugShowUnmovingBones))
             {
                 Profiler.StartSection("Unmoving Bones");
-                var bones = new HashSet<Transform>();
-                var unmoving = FindAllUnmovingTransforms();
-                root.GetComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
-                    r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
-                DrawDebugList(bones.ToArray());
+                DrawDebugList(UnmovingBones);
                 Profiler.EndSection();
             }
             EditorGUI.indentLevel--;
         }
         if (settings.ProfileTimeUsed)
         {
+            EditorGUILayout.Separator();
             var timeUsed = Profiler.FormatTimeUsed().Take(6).ToArray();
             foreach (var time in timeUsed)
             {
