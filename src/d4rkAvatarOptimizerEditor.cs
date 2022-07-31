@@ -2416,10 +2416,14 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.PrintTimeUsed();
         }
 
+        Profiler.enabled = settings.ProfileTimeUsed;
+        Profiler.Reset();
+
         EditorGUILayout.Separator();
 
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
+            Profiler.StartSection("Show Merge Preview");
             CalculateUsedBlendShapePaths();
             var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
             foreach (var mergedMeshes in matchedSkinnedMeshes)
@@ -2435,6 +2439,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
             }
+            Profiler.EndSection();
         }
 
         EditorGUILayout.Separator();
@@ -2444,6 +2449,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUI.indentLevel++;
             if (Foldout("Unparsable Materials", ref settings.DebugShowUnparsableMaterials))
             {
+                Profiler.StartSection("Unparsable Materials");
                 var list = root.GetComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
@@ -2458,9 +2464,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                     var materialsWithThisShader = list.Where(mat => mat?.shader == shader).ToArray();
                     DrawDebugList(materialsWithThisShader);
                 }
+                Profiler.EndSection();
             }
             if (Foldout("Unmergable Materials", ref settings.DebugShowUnmergableMaterials))
             {
+                Profiler.StartSection("Unmergable Materials");
                 var list = root.GetComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
@@ -2474,17 +2482,23 @@ public class d4rkAvatarOptimizerEditor : Editor
                     var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
                     DrawDebugList(materialsWithThisShader);
                 }
+                Profiler.EndSection();
             }
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {
+                Profiler.StartSection("Unused Components");
                 DrawDebugList(FindAllUnusedComponents().ToArray());
+                Profiler.EndSection();
             }
             if (Foldout("Always Disabled Game Objects", ref settings.DebugShowAlwaysDisabledGameObjects))
             {
+                Profiler.StartSection("Always Disabled Game Objects");
                 DrawDebugList(FindAllAlwaysDisabledGameObjects().ToArray());
+                Profiler.EndSection();
             }
             if (Foldout("Material Swaps", ref settings.DebugShowMaterialSwaps))
             {
+                Profiler.StartSection("Material Swaps");
                 var map = FindAllMaterialSwapMaterials();
                 foreach (var pair in map)
                 {
@@ -2497,22 +2511,35 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     EditorGUILayout.LabelField("---");
                 }
+                Profiler.EndSection();
             }
             if (Foldout("Game Objects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
+                Profiler.StartSection("Game Objects with Toggle Animation");
                 var list = FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)?.gameObject)
                     .Where(obj => obj != null).ToArray();
                 DrawDebugList(list);
+                Profiler.EndSection();
             }
             if (Foldout("Unmoving Bones", ref settings.DebugShowUnmovingBones))
             {
+                Profiler.StartSection("Unmoving Bones");
                 var bones = new HashSet<Transform>();
                 var unmoving = FindAllUnmovingTransforms();
                 root.GetComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
                     r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
                 DrawDebugList(bones.ToArray());
+                Profiler.EndSection();
             }
             EditorGUI.indentLevel--;
+        }
+        if (settings.ProfileTimeUsed)
+        {
+            var timeUsed = Profiler.FormatTimeUsed().Take(6).ToArray();
+            foreach (var time in timeUsed)
+            {
+                EditorGUILayout.LabelField(time);
+            }
         }
     }
 }

@@ -57,12 +57,13 @@ namespace d4rkpl4y3r.Util
             }
         }
 
-        public static void PrintTimeUsed()
+        public static List<string> FormatTimeUsed()
         {
             if (!enabled)
-                return;
+                return new List<string>();
             long totalTime = DateTime.Now.Ticks - lastReset;
-            Debug.Log(string.Format("Total Time: {0:N3}s", new TimeSpan(totalTime).TotalSeconds));
+            var result = new List<string>();
+            result.Add(string.Format("Total Time: {0:N3}s", new TimeSpan(totalTime).TotalSeconds));
             long unknownTime = totalTime - timeUsed.Values.Sum();
             timeUsed["unknown"] = unknownTime;
             double sum = (double)timeUsed.Values.Sum();
@@ -70,7 +71,16 @@ namespace d4rkpl4y3r.Util
             foreach (var pair in timeUsed.OrderByDescending(p => p.Value))
             {
                 double p = Math.Round(pair.Value / sum * 10000) / 100;
-                Debug.Log(string.Format("Section {0} took {1:N2}% of time", pair.Key, p));
+                result.Add(string.Format("Section {0} took {1:N2}% of time", pair.Key, p));
+            }
+            return result;
+        }
+
+        public static void PrintTimeUsed()
+        {
+            foreach (var line in FormatTimeUsed())
+            {
+                Debug.Log(line);
             }
         }
     }
