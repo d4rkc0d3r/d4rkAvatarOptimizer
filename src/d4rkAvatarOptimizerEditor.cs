@@ -2291,6 +2291,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         MoveRingFingerColliderToFeet();
     }
 
+    private GameObject lastSelected = null;
+
+    private void OnSelectionChange()
+    {
+        if (lastSelected == settings.gameObject)
+            return;
+        lastSelected = settings.gameObject;
+        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected);
+    }
+
     public bool Button(string label)
     {
         GUILayout.BeginHorizontal();
@@ -2355,6 +2365,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         settings = (d4rkAvatarOptimizer)target;
         root = settings.gameObject;
+        OnSelectionChange();
         if (nullMaterial == null)
         {
             nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
