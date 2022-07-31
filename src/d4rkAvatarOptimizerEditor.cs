@@ -2292,6 +2292,12 @@ public class d4rkAvatarOptimizerEditor : Editor
     }
 
     private GameObject lastSelected = null;
+    private List<List<List<MaterialSlot>>> mergedMaterialPreviewCache = null;
+
+    private void ClearUICaches()
+    {
+        mergedMaterialPreviewCache = null;
+    }
 
     private void OnSelectionChange()
     {
@@ -2299,6 +2305,26 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
         lastSelected = settings.gameObject;
         ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected);
+        ClearUICaches();
+    }
+
+    private List<List<List<MaterialSlot>>> MergedMaterialPreview
+    {
+        get
+        {
+            if (mergedMaterialPreviewCache == null)
+            {
+                mergedMaterialPreviewCache = new List<List<List<MaterialSlot>>>();
+                CalculateUsedBlendShapePaths();
+                var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
+                foreach (var mergedMeshes in matchedSkinnedMeshes)
+                {
+                    var matched = FindAllMergeAbleMaterials(mergedMeshes);
+                    mergedMaterialPreviewCache.Add(matched);
+                }
+            }
+            return mergedMaterialPreviewCache;
+        }
     }
 
     public bool Button(string label)
@@ -2315,6 +2341,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         bool output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
         if (GUI.enabled)
         {
+            if (value != output)
+            {
+                ClearUICaches();
+            }
             value = output;
         }
         return value;
@@ -2322,7 +2352,12 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     public bool Foldout(string label, ref bool value)
     {
-        return value = EditorGUILayout.Foldout(value, label);
+        bool output = EditorGUILayout.Foldout(value, label);
+        if (value != output)
+        {
+            ClearUICaches();
+        }
+        return value = output;
     }
 
     private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
@@ -2424,12 +2459,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
             Profiler.StartSection("Show Merge Preview");
-            CalculateUsedBlendShapePaths();
-            var matchedSkinnedMeshes = FindPossibleSkinnedMeshMerges();
-            foreach (var mergedMeshes in matchedSkinnedMeshes)
+            foreach (var matched in MergedMaterialPreview)
             {
                 EditorGUILayout.Space(8);
-                var matched = FindAllMergeAbleMaterials(mergedMeshes);
                 for (int i = 0; i < matched.Count; i++)
                 {
                     for (int j = 0; j < matched[i].Count; j++)
