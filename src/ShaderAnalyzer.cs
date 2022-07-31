@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using d4rkpl4y3r.Util;
 
 namespace d4rkpl4y3r
@@ -96,7 +97,7 @@ namespace d4rkpl4y3r
         }
     }
 
-    public static class ShaderAnalyzer
+    public class ShaderAnalyzer
     {
         private enum ParseState
         {
@@ -125,41 +126,80 @@ namespace d4rkpl4y3r
                 return null;
             if (!parsedShaderCache.TryGetValue(shader.name, out var parsedShader))
             {
-                maxIncludes = 1000;
-                parsedShader = new ParsedShader();
-                parsedShader.name = shader.name;
-                Profiler.StartSection("ShaderAnalyzer.RecursiveParseFile()");
-                try
-                {
-                    RecursiveParseFile(AssetDatabase.GetAssetPath(shader), parsedShader.lines);
-                }
-                catch (IOException)
-                {
-                    parsedShader.couldParse = false;
-                }
-                catch (ParserException e)
-                {
-                    parsedShader.couldParse = false;
-                    parsedShader.errorMessage = e.Message;
-                }
-                Profiler.StartNextSection("ShaderAnalyzer.SemanticParseShader()");
-                try
-                {
-                    SemanticParseShader(parsedShader);
-                }
-                catch (ParserException e)
-                {
-                    parsedShader.couldParse = false;
-                    parsedShader.errorMessage = e.Message;
-                }
-                catch (System.Exception e)
-                {
-                    parsedShader.couldParse = false;
-                    Debug.LogWarning(e);
-                }
+                var analyzer = new ShaderAnalyzer(shader.name, AssetDatabase.GetAssetPath(shader));
+                Profiler.StartSection("ShaderAnalyzer.Parse()");
+                parsedShader = analyzer.Parse();
                 Profiler.EndSection();
                 parsedShaderCache[shader.name] = parsedShader;
             }
+            return parsedShader;
+        }
+
+        public static void ParseAndCacheAllShaders(GameObject root)
+        {
+            var analyzers = root.GetComponentsInChildren<Renderer>(true)
+                .SelectMany(r => r.sharedMaterials)
+                .Where(m => m != null && m.shader != null)
+                .Select(m => m.shader)
+                .Distinct()
+                .Where(s => !parsedShaderCache.ContainsKey(s.name))
+                .Select(s => new ShaderAnalyzer(s.name, AssetDatabase.GetAssetPath(s)))
+                .ToArray();
+            Profiler.StartSection("ShaderAnalyzer.Parse()");
+            Parallel.ForEach(analyzers, a => a.Parse());
+            Profiler.EndSection();
+            foreach (var a in analyzers)
+                parsedShaderCache[a.parsedShader.name] = a.parsedShader;
+        }
+
+        private ParsedShader parsedShader;
+        private int curlyBraceDepth;
+        private int maxIncludes;
+        private string filePath;
+        private bool doneParsing;
+
+        private ShaderAnalyzer(string shaderName, string shaderPath)
+        {
+            parsedShader = new ParsedShader();
+            parsedShader.name = shaderName;
+            filePath = shaderPath;
+            curlyBraceDepth = 0;
+            maxIncludes = 1000;
+            doneParsing = false;
+        }
+
+        private ParsedShader Parse()
+        {
+            if (doneParsing)
+                return parsedShader;
+            try
+            {
+                RecursiveParseFile(filePath, parsedShader.lines);
+            }
+            catch (IOException)
+            {
+                parsedShader.couldParse = false;
+            }
+            catch (ParserException e)
+            {
+                parsedShader.couldParse = false;
+                parsedShader.errorMessage = e.Message;
+            }
+            try
+            {
+                SemanticParseShader();
+            }
+            catch (ParserException e)
+            {
+                parsedShader.couldParse = false;
+                parsedShader.errorMessage = e.Message;
+            }
+            catch (System.Exception e)
+            {
+                parsedShader.couldParse = false;
+                Debug.LogWarning(e);
+            }
+            doneParsing = true;
             return parsedShader;
         }
 
@@ -179,8 +219,7 @@ namespace d4rkpl4y3r
             return -1;
         }
 
-        private static int maxIncludes = 50;
-        private static bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
+        private bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
         {
             var fileName = Path.GetFileName(filePath);
             if (fileName == "UnityCG.cginc" || fileName == "HLSLSupport.cginc" || fileName == "UnityShaderVariables.cginc")
@@ -519,7 +558,7 @@ namespace d4rkpl4y3r
                 pass.fragment = func;
         }
 
-        private static void ParsePragma(string line, ParsedShader.Pass pass, ParsedShader parsedShader)
+        private void ParsePragma(string line, ParsedShader.Pass pass)
         {
             if (!line.StartsWith("#pragma "))
                 return;
@@ -557,9 +596,7 @@ namespace d4rkpl4y3r
             }
         }
 
-        private static int curlyBraceLevel = 0;
-
-        private static void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
+        private void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
         {
             string line;
             while (lineIndex < lines.Count - 1 && (line = lines[++lineIndex]) != "ENDCG")
@@ -576,12 +613,12 @@ namespace d4rkpl4y3r
                 {
                     line = line + " " + lines[++lineIndex];
                 }
-                curlyBraceLevel += line == "{" ? 1 : (line == "}" ? -1 : 0);
+                curlyBraceDepth += line == "{" ? 1 : (line == "}" ? -1 : 0);
                 output.Add(line);
             }
         }
 
-        private static void SemanticParseShader(ParsedShader parsedShader)
+        private void SemanticParseShader()
         {
             var cgIncludePragmas = new ParsedShader.Pass();
             ParsedShader.Pass currentPass = null;
@@ -590,7 +627,6 @@ namespace d4rkpl4y3r
             List<string> lines = parsedShader.lines;
             parsedShader.lines = output;
             var state = ParseState.ShaderLab;
-            curlyBraceLevel = 0;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
             {
                 string line = lines[lineIndex];
@@ -635,7 +671,7 @@ namespace d4rkpl4y3r
                             PreprocessCodeLines(lines, ref lineIndex, cgProgram);
                             for (int programLineIndex = 0; programLineIndex < cgProgram.Count; programLineIndex++)
                             {
-                                ParsePragma(cgProgram[programLineIndex], currentPass, parsedShader);
+                                ParsePragma(cgProgram[programLineIndex], currentPass);
                                 var func = ParseFunctionDefinition(cgProgram, ref programLineIndex);
                                 if (func != null)
                                 {
@@ -674,7 +710,7 @@ namespace d4rkpl4y3r
             {
                 parsedShader.propertyTable[prop.name] = prop;
             }
-            parsedShader.misMatchedCurlyBraces = curlyBraceLevel != 0;
+            parsedShader.misMatchedCurlyBraces = curlyBraceDepth != 0;
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
             {
                 throw new ParserException("A pass is missing a vertex or fragment shader.");

@@ -2252,6 +2252,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         root = toOptimize;
         ShaderAnalyzer.ClearParsedShaderCache();
+        ShaderAnalyzer.ParseAndCacheAllShaders(root);
         ClearTrashBin();
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
