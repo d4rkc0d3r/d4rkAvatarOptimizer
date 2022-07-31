@@ -957,7 +957,7 @@ namespace d4rkpl4y3r
                 originalVertexShader?.Add(line);
                 if (inParam != null && vertexInUv0EndSwizzle != "")
                 {
-                    line = Regex.Replace(line, $"{inParam.name}\\s*\\.\\s*{vertexInUv0Member}", $"$0{vertexInUv0EndSwizzle}");
+                    line = Regex.Replace(line, $"({inParam.name}\\s*\\.\\s*{vertexInUv0Member})([^0-9a-zA-Z])", $"$1{vertexInUv0EndSwizzle}$2");
                 }
                 if (line == "}")
                 {
