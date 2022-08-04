@@ -464,10 +464,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
             if (layer == null)
                 continue;
+            Profiler.StartSection("AssetDatabase.CopyAsset()");
             string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + layer.name + ".controller");
             AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(layer), path);
-            var newLayer = (AnimatorController)
-                AssetDatabase.LoadAssetAtPath(path, typeof(AnimatorController));
+            var newLayer = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            Profiler.EndSection();
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
@@ -498,7 +499,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
         }
+        Profiler.StartSection("AssetDatabase.SaveAssets()");
         AssetDatabase.SaveAssets();
+        Profiler.EndSection();
     }
 
     private static Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
@@ -571,17 +574,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.VisemeSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.VisemeSkinnedMesh;
-                if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+                foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
                 {
-                    Debug.LogWarning("Viseme SkinnedMeshRenderer is not a child of the avatar root.");
-                }
-                else
-                {
-                    string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                    foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
-                    {
-                        usedBlendShapes.Add(path + blendShapeName);
-                    }
+                    usedBlendShapes.Add(path + blendShapeName);
                 }
             }
             if (avDescriptor.customEyeLookSettings.eyelidType
@@ -589,20 +585,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-                if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+                foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
                 {
-                    Debug.LogWarning("Eyelid SkinnedMeshRenderer is not a child of the avatar root.");
-                }
-                else
-                {
-                    string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                    foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+                    if (blendShapeID >= 0)
                     {
-                        if (blendShapeID >= 0)
-                        {
-                            usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
-                            hasUsedBlendShapes.Add(meshRenderer);
-                        }
+                        usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                        hasUsedBlendShapes.Add(meshRenderer);
                     }
                 }
             }
@@ -2247,6 +2236,26 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null)
             {
                 EditorGUILayout.HelpBox("Foot collider transform not set.\nOpen the collider foldout in the avatar descriptor.", MessageType.Error);
+            }
+        }
+
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
+                && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+            if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+            {
+                EditorGUILayout.HelpBox("Viseme SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
+            }
+        }
+
+        if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+            if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+            {
+                EditorGUILayout.HelpBox("Eyelid SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
         }
 
