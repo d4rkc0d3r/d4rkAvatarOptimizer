@@ -2281,8 +2281,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
-        ShaderAnalyzer.ClearParsedShaderCache();
-        ShaderAnalyzer.ParseAndCacheAllShaders(root);
+        ShaderAnalyzer.ParseAndCacheAllShaders(root, true);
         ClearTrashBin();
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
@@ -2342,7 +2341,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (lastSelected == settings.gameObject)
             return;
         lastSelected = settings.gameObject;
-        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected);
+        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected, false);
         ClearUICaches();
     }
 

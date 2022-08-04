@@ -135,14 +135,14 @@ namespace d4rkpl4y3r
             return parsedShader;
         }
 
-        public static void ParseAndCacheAllShaders(GameObject root)
+        public static void ParseAndCacheAllShaders(GameObject root, bool overrideAlreadyCached)
         {
             var analyzers = root.GetComponentsInChildren<Renderer>(true)
                 .SelectMany(r => r.sharedMaterials)
                 .Where(m => m != null && m.shader != null)
                 .Select(m => m.shader)
                 .Distinct()
-                .Where(s => !parsedShaderCache.ContainsKey(s.name))
+                .Where(s => overrideAlreadyCached || !parsedShaderCache.ContainsKey(s.name))
                 .Select(s => new ShaderAnalyzer(s.name, AssetDatabase.GetAssetPath(s)))
                 .ToArray();
             Profiler.StartSection("ShaderAnalyzer.Parse()");
