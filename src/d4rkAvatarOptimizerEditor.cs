@@ -307,7 +307,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static List<List<Renderer>> FindPossibleSkinnedMeshMerges()
     {
-        var unused = FindAllUnusedSkinnedMeshRenderers();
+        var unused = FindAllUnusedComponents();
         gameObjectTogglePaths = FindAllGameObjectTogglePaths();
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = root.GetComponentsInChildren<Renderer>(true);
@@ -571,7 +571,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.VisemeSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.VisemeSkinnedMesh;
-                if (root.GetComponentsInChildren<SkinnedMeshRenderer>().All(r => r != meshRenderer))
+                if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
                 {
                     Debug.LogWarning("Viseme SkinnedMeshRenderer is not a child of the avatar root.");
                 }
@@ -589,7 +589,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
             {
                 var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-                if (root.GetComponentsInChildren<SkinnedMeshRenderer>().All(r => r != meshRenderer))
+                if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
                 {
                     Debug.LogWarning("Eyelid SkinnedMeshRenderer is not a child of the avatar root.");
                 }
@@ -732,7 +732,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 behaviourToggles.Add(binding.path);
             }
         }
-        var alwaysDisabledBehaviours = new HashSet<Component>(root.transform.GetComponentsInChildren<Behaviour>(true)
+        var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
@@ -1178,14 +1178,13 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         foreach(var mat in optimizedMaterials)
         {
-            int renderQueue = mat.renderQueue;
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
+            int renderQueue = mat.renderQueue;
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
-            Profiler.EndSection();
             mat.renderQueue = renderQueue;
+            Profiler.StartNextSection("SetTextureArrayProperties");
             if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
             {
-                Profiler.StartSection("SetTextureArrayProperties");
                 foreach (var texArray in texArrays)
                 {
                     string texArrayName = texArray.name;
@@ -1197,8 +1196,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     mat.SetTextureOffset(texArrayName, mat.GetTextureOffset(texArray.name));
                     mat.SetTextureScale(texArrayName, mat.GetTextureScale(texArray.name));
                 }
-                Profiler.EndSection();
             }
+            Profiler.EndSection();
             CreateUniqueAsset(mat, mat.name + ".mat");
         }
 
@@ -2251,7 +2250,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        var allMaterials = root.GetComponentsInChildren<Renderer>()
+        var allMaterials = root.GetComponentsInChildren<Renderer>(true)
             .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
 
         var correctlyParsedMaterials = allMaterials
@@ -2374,7 +2373,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 var bones = new HashSet<Transform>();
                 var unmoving = FindAllUnmovingTransforms();
-                root.GetComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
+                root.GetComponentsInChildren<SkinnedMeshRenderer>(true).ToList().ForEach(
                     r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
                 unmovingBonesCache = bones.ToArray();
             }
@@ -2525,7 +2524,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
 
+        Profiler.enabled = settings.ProfileTimeUsed;
+        Profiler.Reset();
+
+        Profiler.StartSection("Validate");
         Validate();
+        Profiler.EndSection();
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
@@ -2543,10 +2547,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             settings.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
             Profiler.PrintTimeUsed();
+            Profiler.Reset();
         }
-
-        Profiler.enabled = settings.ProfileTimeUsed;
-        Profiler.Reset();
 
         EditorGUILayout.Separator();
 
@@ -2576,7 +2578,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unparsable Materials", ref settings.DebugShowUnparsableMaterials))
             {
                 Profiler.StartSection("Unparsable Materials");
-                var list = root.GetComponentsInChildren<Renderer>()
+                var list = root.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => !(t.Item2 != null && t.Item2.HasParsedCorrectly()))
@@ -2595,7 +2597,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unmergable Materials", ref settings.DebugShowUnmergableMaterials))
             {
                 Profiler.StartSection("Unmergable Materials");
-                var list = root.GetComponentsInChildren<Renderer>()
+                var list = root.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => (t.Item2 != null && t.Item2.HasParsedCorrectly()))
