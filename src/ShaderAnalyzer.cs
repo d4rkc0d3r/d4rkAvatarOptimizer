@@ -65,6 +65,7 @@ namespace d4rkpl4y3r
         public string name;
         public bool couldParse = true;
         public string errorMessage = "";
+        public List<string> customTextureDeclarations = new List<string>();
         public bool mismatchedCurlyBraces = false;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
@@ -603,6 +604,17 @@ namespace d4rkpl4y3r
             }
         }
 
+        private void ParseCustomFunctionDeclarationMacro(string line)
+        {
+            if (!line.StartsWith("#define "))
+                return;
+            if (line.Contains("Texture2D") || line.Contains("sampler2D"))
+            {
+                if (!parsedShader.customTextureDeclarations.Contains(line))
+                    parsedShader.customTextureDeclarations.Add(line);
+            }
+        }
+
         private void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
         {
             string line;
@@ -679,6 +691,7 @@ namespace d4rkpl4y3r
                             for (int programLineIndex = 0; programLineIndex < cgProgram.Count; programLineIndex++)
                             {
                                 ParsePragma(cgProgram[programLineIndex], currentPass);
+                                ParseCustomFunctionDeclarationMacro(cgProgram[programLineIndex]);
                                 var func = ParseFunctionDefinition(cgProgram, ref programLineIndex);
                                 if (func != null)
                                 {

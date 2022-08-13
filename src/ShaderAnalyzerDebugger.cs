@@ -22,6 +22,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showMismatchedCurlyBraces = true;
     private bool showParseErrors = true;
     private bool showUnmergable = true;
+    private bool showCustomTextureDeclarations = true;
     private bool showErrorLess = true;
 
     [MenuItem("Tools/d4rkpl4y3r/Shader Analyzer Debugger")]
@@ -178,6 +179,25 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
+            var customTextureDeclarations = parsedShaders.Where(s => s.customTextureDeclarations.Count > 0).ToList();
+            if (Foldout(ref showCustomTextureDeclarations, $"Custom Texture Declarations ({customTextureDeclarations.Count})"))
+            {
+                EditorGUI.indentLevel++;
+                foreach (var shader in customTextureDeclarations)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField($"Has {shader.customTextureDeclarations.Count} macros");
+                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUI.indentLevel++;
+                    foreach (var declaration in shader.customTextureDeclarations)
+                    {
+                        EditorGUILayout.LabelField(declaration);
+                    }
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUI.indentLevel--;
+            }
             var errorLess = parsedShaders.Where(s => s.CanMerge() && !s.mismatchedCurlyBraces).ToList();
             if (Foldout(ref showErrorLess, $"Error Less ({errorLess.Count})"))
             {
@@ -217,6 +237,18 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 GUILayout.Label("geometry: " + FuncToString(pass.geometry));
             if (pass.fragment != null)
                 GUILayout.Label("fragment: " + FuncToString(pass.fragment));
+        }
+
+        if (parsedShader.customTextureDeclarations.Count > 0)
+        {
+            GUILayout.Space(15);
+            GUILayout.Label($"Has {parsedShader.customTextureDeclarations.Count} custom texture declaration macros:");
+            EditorGUI.indentLevel++;
+            foreach (var declaration in parsedShader.customTextureDeclarations)
+            {
+                EditorGUILayout.LabelField(declaration);
+            }
+            EditorGUI.indentLevel--;
         }
 
         if (parsedShader.shaderFeatureKeyWords.Count > 0 && material != null)
