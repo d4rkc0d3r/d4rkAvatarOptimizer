@@ -608,7 +608,7 @@ namespace d4rkpl4y3r
         {
             if (!line.StartsWith("#define "))
                 return;
-            if (line.Contains("Texture2D") || line.Contains("sampler2D"))
+            if (line.Contains("Texture2D ") || line.Contains("sampler2D "))
             {
                 if (!parsedShader.customTextureDeclarations.Contains(line))
                     parsedShader.customTextureDeclarations.Add(line);
@@ -617,9 +617,11 @@ namespace d4rkpl4y3r
 
         private void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
         {
-            string line;
-            while (lineIndex < lines.Count - 1 && (line = lines[++lineIndex]) != "ENDCG")
+            while (lineIndex < lines.Count - 1)
             {
+                string line = lines[++lineIndex];
+                if (line == "ENDCG" || line == "ENDHLSL")
+                    break;
                 while (!line.EndsWith(";")
                     && !line.EndsWith("]")
                     && !line.StartsWith("#")
@@ -639,10 +641,10 @@ namespace d4rkpl4y3r
 
         private void SemanticParseShader()
         {
-            var cgIncludePragmas = new ParsedShader.Pass();
             ParsedShader.Pass currentPass = null;
             List<string> output = new List<string>();
             List<string> cgInclude = new List<string>();
+            List<string> hlslInclude = new List<string>();
             List<string> lines = parsedShader.lines;
             parsedShader.lines = output;
             var state = ParseState.ShaderLab;
@@ -678,30 +680,38 @@ namespace d4rkpl4y3r
                             state = ParseState.PropertyBlock;
                             output.Add(line);
                         }
+                        else if (line == "GLSLPROGRAM")
+                        {
+                            throw new ShaderAnalyzer.ParserException("GLSLPROGRAM is not supported.");
+                        }
                         else if (line == "CGINCLUDE")
                         {
                             PreprocessCodeLines(lines, ref lineIndex, cgInclude);
                         }
-                        else if (line == "CGPROGRAM")
+                        else if (line == "HLSLINCLUDE")
+                        {
+                            PreprocessCodeLines(lines, ref lineIndex, hlslInclude);
+                        }
+                        else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                         {
                             currentPass = new ParsedShader.Pass();
                             parsedShader.passes.Add(currentPass);
-                            var cgProgram = new List<string>(cgInclude);
-                            PreprocessCodeLines(lines, ref lineIndex, cgProgram);
-                            for (int programLineIndex = 0; programLineIndex < cgProgram.Count; programLineIndex++)
+                            var program = new List<string>(line == "CGPROGRAM" ? cgInclude : hlslInclude);
+                            PreprocessCodeLines(lines, ref lineIndex, program);
+                            for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
                             {
-                                ParsePragma(cgProgram[programLineIndex], currentPass);
-                                ParseCustomFunctionDeclarationMacro(cgProgram[programLineIndex]);
-                                var func = ParseFunctionDefinition(cgProgram, ref programLineIndex);
+                                ParsePragma(program[programLineIndex], currentPass);
+                                ParseCustomFunctionDeclarationMacro(program[programLineIndex]);
+                                var func = ParseFunctionDefinition(program, ref programLineIndex);
                                 if (func != null)
                                 {
                                     parsedShader.functions[func.name] = func;
                                     UpdateFunctionDefinition(func, currentPass);
                                 }
                             }
-                            output.Add("CGPROGRAM");
-                            output.AddRange(cgProgram);
-                            output.Add("ENDCG");
+                            output.Add(line);
+                            output.AddRange(program);
+                            output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
                         }
                         else
                         {
@@ -1657,17 +1667,18 @@ namespace d4rkpl4y3r
                 if (line.StartsWith("CustomEditor"))
                     continue;
                 output.Add(line);
-                if (line == "CGPROGRAM")
+                if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                 {
                     var pass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
                     texturesToCallSoTheSamplerDoesntDisappear.Clear();
                     InjectPropertyArrays();
-                    while (parsedShader.lines[++lineIndex] != "ENDCG")
+                    string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
+                    while (parsedShader.lines[++lineIndex] != endSymbol)
                     {
                         ParseCodeLines(parsedShader.lines, ref lineIndex, pass);
                     }
-                    output.Add("ENDCG");
+                    output.Add(endSymbol);
                 }
             }
             return output;
