@@ -65,7 +65,7 @@ namespace d4rkpl4y3r
         public string name;
         public bool couldParse = true;
         public string errorMessage = "";
-        public bool misMatchedCurlyBraces = false;
+        public bool mismatchedCurlyBraces = false;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
@@ -90,9 +90,9 @@ namespace d4rkpl4y3r
         public string CantMergeReason()
         {
             if (!HasParsedCorrectly())
-                return "Shader has not parsed correctly";
+                return errorMessage == "" ? "Shader has not parsed correctly." : errorMessage;
             if (passes.Any(p => p.hull != null || p.domain != null))
-                return "Shader has a pass with tesselation";
+                return "Shader has a pass with tesselation.";
             return "";
         }
     }
@@ -135,13 +135,9 @@ namespace d4rkpl4y3r
             return parsedShader;
         }
 
-        public static void ParseAndCacheAllShaders(GameObject root, bool overrideAlreadyCached)
+        public static List<ParsedShader> ParseAndCacheAllShaders(List<Shader> shaders, bool overrideAlreadyCached)
         {
-            var analyzers = root.GetComponentsInChildren<Renderer>(true)
-                .SelectMany(r => r.sharedMaterials)
-                .Where(m => m != null && m.shader != null)
-                .Select(m => m.shader)
-                .Distinct()
+            var analyzers = shaders
                 .Where(s => overrideAlreadyCached || !parsedShaderCache.ContainsKey(s.name))
                 .Select(s => new ShaderAnalyzer(s.name, AssetDatabase.GetAssetPath(s)))
                 .ToArray();
@@ -150,6 +146,17 @@ namespace d4rkpl4y3r
             Profiler.EndSection();
             foreach (var a in analyzers)
                 parsedShaderCache[a.parsedShader.name] = a.parsedShader;
+            return shaders.Select(s => parsedShaderCache[s.name]).ToList();
+        }
+
+        public static void ParseAndCacheAllShaders(GameObject root, bool overrideAlreadyCached)
+        {
+            var shaders = root.GetComponentsInChildren<Renderer>(true)
+                .SelectMany(r => r.sharedMaterials)
+                .Where(m => m != null && m.shader != null)
+                .Select(m => m.shader)
+                .Distinct().ToList();
+            ParseAndCacheAllShaders(shaders, overrideAlreadyCached);
         }
 
         private ParsedShader parsedShader;
@@ -710,7 +717,7 @@ namespace d4rkpl4y3r
             {
                 parsedShader.propertyTable[prop.name] = prop;
             }
-            parsedShader.misMatchedCurlyBraces = curlyBraceDepth != 0;
+            parsedShader.mismatchedCurlyBraces = curlyBraceDepth != 0;
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
             {
                 throw new ParserException("A pass is missing a vertex or fragment shader.");

@@ -1303,7 +1303,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
                 return false;
         }
-        bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.misMatchedCurlyBraces;
+        bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.mismatchedCurlyBraces;
         foreach (var prop in parsedShader.properties)
         {
             foreach (var slot in list)
