@@ -76,7 +76,7 @@ namespace d4rkpl4y3r
 
         public bool HasParsedCorrectly()
         {
-            return couldParse && passes.All(p => p.vertex != null && p.fragment != null);
+            return couldParse;
         }
 
         public bool CanMerge()
@@ -184,9 +184,10 @@ namespace d4rkpl4y3r
             {
                 RecursiveParseFile(filePath, parsedShader.lines);
             }
-            catch (IOException)
+            catch (IOException e)
             {
                 parsedShader.couldParse = false;
+                parsedShader.errorMessage = e.Message;
             }
             catch (ParserException e)
             {
@@ -205,6 +206,7 @@ namespace d4rkpl4y3r
             catch (System.Exception e)
             {
                 parsedShader.couldParse = false;
+                parsedShader.errorMessage = e.Message;
                 Debug.LogWarning(e);
             }
             doneParsing = true;
@@ -363,7 +365,7 @@ namespace d4rkpl4y3r
                 }
                 if (trimmedLine == "")
                     continue;
-                if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM"))
+                if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM" ||trimmedLine == "HLSLINCLUDE" || trimmedLine == "HLSLPROGRAM"))
                 {
                     alreadyIncludedFiles.Clear();
                 }
@@ -570,8 +572,10 @@ namespace d4rkpl4y3r
         {
             if (!line.StartsWith("#pragma "))
                 return;
-            line = line.Substring("#pragma ".Length);
-            var match = Regex.Match(line, @"^\s*(vertex|hull|domain|geometry|fragment)\s+(\w+)");
+            line = line.Substring("#pragma ".Length).TrimStart();
+            if (line.StartsWith("surface"))
+                throw new ParserException("Surface shader not supported.");
+            var match = Regex.Match(line, @"^(vertex|hull|domain|geometry|fragment)\s+(\w+)");
             if (match.Success)
             {
                 var funcName = match.Groups[2].Value;
@@ -596,7 +600,7 @@ namespace d4rkpl4y3r
                         break;
                 }
             }
-            match = Regex.Match(line, @"^\s*shader_feature(?:_local)?(?:\s+(\w+))+");
+            match = Regex.Match(line, @"^shader_feature(?:_local)?(?:\s+(\w+))+");
             if (match.Success)
             {
                 parsedShader.shaderFeatureKeyWords.UnionWith(
