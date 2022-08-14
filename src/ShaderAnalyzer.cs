@@ -65,6 +65,7 @@ namespace d4rkpl4y3r
         public string name;
         public bool couldParse = true;
         public string errorMessage = "";
+        public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new List<string>();
         public bool mismatchedCurlyBraces = false;
         public List<string> lines = new List<string>();
@@ -85,6 +86,8 @@ namespace d4rkpl4y3r
                 return false;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return false;
+            if (hasDisableBatchingTag)
+                return false;
             return true;
         }
 
@@ -94,6 +97,8 @@ namespace d4rkpl4y3r
                 return errorMessage == "" ? "Shader has not parsed correctly." : errorMessage;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return "Shader has a pass with tesselation.";
+            if (hasDisableBatchingTag)
+                return "Shader has DisableBatching set to true.";
             return "";
         }
     }
@@ -105,6 +110,7 @@ namespace d4rkpl4y3r
             Init,
             PropertyBlock,
             ShaderLab,
+            Tags,
             CGInclude,
             CGProgram
         }
@@ -574,7 +580,7 @@ namespace d4rkpl4y3r
                 return;
             line = line.Substring("#pragma ".Length).TrimStart();
             if (line.StartsWith("surface"))
-                throw new ParserException("Surface shader not supported.");
+                throw new ParserException("Surface shader is not supported.");
             var match = Regex.Match(line, @"^(vertex|hull|domain|geometry|fragment)\s+(\w+)");
             if (match.Success)
             {
@@ -678,10 +684,30 @@ namespace d4rkpl4y3r
                             output.Add(line);
                         }
                         break;
+                    case ParseState.Tags:
+                        output.Add(line);
+                        if (line == "}")
+                        {
+                            state = ParseState.ShaderLab;
+                        }
+                        else
+                        {
+                            var lower = line.ToLower();
+                            if (Regex.IsMatch(lower, @"""disablebatching""\s*=\s*""true"""))
+                            {
+                                parsedShader.hasDisableBatchingTag = true;
+                            }
+                        }
+                        break;
                     case ParseState.ShaderLab:
                         if (line == "Properties")
                         {
                             state = ParseState.PropertyBlock;
+                            output.Add(line);
+                        }
+                        else if (line == "Tags")
+                        {
+                            state = ParseState.Tags;
                             output.Add(line);
                         }
                         else if (line == "GLSLPROGRAM")
