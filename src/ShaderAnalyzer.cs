@@ -1687,6 +1687,8 @@ namespace d4rkpl4y3r
                     }
                     line = Regex.Replace(line, @"\[Toggle(?:Off)?(?:\(\w+\))?\]", "[ToggleUI()]");
                     line = Regex.Replace(line, @"\[KeywordEnum\([^)]+\)\]", "");
+                    line = line.Replace("[ThryShaderOptimizerLockButton]", "");
+                    line = line.Replace("_ShaderOptimizer", "_ShaderOptimizerIsDisabled");
                     output.Add(line);
                 }
             }
