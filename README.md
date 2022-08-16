@@ -76,12 +76,16 @@ In addition to the selected optimizations there are some optimizations that are 
 Shows a preview of how meshes and materials would get merged. Resulting meshes are separated by spaces. Materials that get merged together are indented. In the example image you can see that Body/Eyes would get merged with Body/FaceSkin.
 ## Show Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
+### Unparsable Materials
+Shows all materials that can't be parsed by the optimizer.
+### Unmergable Materials
+Shows all materials that can't be merged if their properties differ.
+### Unmergable Texture Materials
+Shows all materials that can't be merged if their textures differ.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
 Lists all game objects that are disabled and never get enabled by animations.
-### Unparsable Materials
-Shows all materials that can't be parsed by the optimizer.
 ### Material Swaps
 Shows all materials that can be swapped into a material slot with an animation.
 ### Game Objects with Toggle Animation
