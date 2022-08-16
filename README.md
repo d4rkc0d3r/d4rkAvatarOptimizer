@@ -1,8 +1,12 @@
 # d4rkAvatarOptimizer
 d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
 ## How To Use
-Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.  
-You should then see something like this:
+1. Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.
+2. Click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes.
+3. Upload this optimized copy of your original avatar to vrc.
+4. Delete the copy after you upload it to vrc.
+
+There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
 ![Example Screenshot](./ExampleImages/example0.png)
 ## Write Properties as Static Values
