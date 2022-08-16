@@ -212,16 +212,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
     {
-        if (material == null)
-            return false;
-        var parsedShader = ShaderAnalyzer.Parse(material.shader);
-        if (!parsedShader.couldParse)
-            return false;
-        if (parsedShader.passes.Any(pass => pass.vertex == null || pass.fragment == null))
-            return false;
-        if (parsedShader.passes.Any(pass => pass.domain != null || pass.hull != null))
-            return false;
-        return true;
+        return material == null ? false : ShaderAnalyzer.Parse(material.shader).CanMerge();
     }
 
     private static bool IsCombinableRenderer(Renderer candidate)
@@ -859,7 +850,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var source in sources)
         {
             var parsedShader = ShaderAnalyzer.Parse(source[0]?.shader);
-            if (parsedShader == null || !parsedShader.couldParse)
+            if (parsedShader == null || !parsedShader.parsedCorrectly)
                 continue;
             var propertyTextureLists = new Dictionary<string, List<Texture2D>>();
             foreach (var mat in source)
@@ -936,7 +927,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             var source = sources[i];
             parsedShader[i] = ShaderAnalyzer.Parse(source[0]?.shader);
-            if (parsedShader[i] == null || !parsedShader[i].couldParse)
+            if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
             {
                 materials[i] = source[0];
                 continue;
@@ -1097,7 +1088,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.StartSection("ShaderOptimizer.Run()");
         Parallel.For(0, sources.Count, i =>
         {
-            if (parsedShader[i] != null && parsedShader[i].couldParse)
+            if (parsedShader[i] != null && parsedShader[i].parsedCorrectly)
             {
                 optimizedShader[i] = ShaderOptimizer.Run(
                     parsedShader[i],
@@ -1115,7 +1106,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         for (int i = 0; i < sources.Count; i++)
         {
             var source = sources[i];
-            if (parsedShader[i] == null || !parsedShader[i].couldParse)
+            if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
                 continue;
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
@@ -1274,7 +1265,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (firstMat.shader != candidateMat.shader)
             return false;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
-        if (parsedShader.couldParse == false)
+        if (parsedShader.parsedCorrectly == false)
             return false;
         if (slotSwapMaterials.ContainsKey((GetPathToRoot(candidate.renderer), candidate.index)))
             return false;
@@ -1303,7 +1294,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
                 return false;
         }
-        bool mergeTextures = settings.MergeSameDimensionTextures && !parsedShader.mismatchedCurlyBraces;
+        bool mergeTextures = settings.MergeSameDimensionTextures && parsedShader.CanMergeTextures();
         foreach (var prop in parsedShader.properties)
         {
             foreach (var slot in list)
@@ -2263,16 +2254,22 @@ public class d4rkAvatarOptimizerEditor : Editor
             .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
 
         var correctlyParsedMaterials = allMaterials
-            .Where(m => (ShaderAnalyzer.Parse(m?.shader)?.HasParsedCorrectly() ?? false)).ToArray();
+            .Select(m => ShaderAnalyzer.Parse(m?.shader))
+            .Where(p => (p?.parsedCorrectly ?? false)).ToArray();
 
         if (correctlyParsedMaterials.Length != allMaterials.Length)
         {
             EditorGUILayout.HelpBox("One or more materials could not be parsed.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
         }
 
-        if (correctlyParsedMaterials.Any(m => !(ShaderAnalyzer.Parse(m?.shader)?.CanMerge() ?? false)))
+        if (settings.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
         {
             EditorGUILayout.HelpBox("One or more materials do not support merging.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+        }
+
+        if (settings.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
+        {
+            EditorGUILayout.HelpBox("One or more materials do not support merging textures.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
         }
     }
 
@@ -2589,7 +2586,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var list = root.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => !(t.Item2 != null && t.Item2.HasParsedCorrectly()))
+                    .Where(t => !(t.Item2 != null && t.Item2.parsedCorrectly))
                     .Select(t => t.mat).ToArray();
                 foreach (var shader in list.Select(mat => mat?.shader).Distinct())
                 {
@@ -2608,8 +2605,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var list = root.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => (t.Item2 != null && t.Item2.HasParsedCorrectly()))
-                    .Where(t => !t.Item2.CanMerge())
+                    .Where(t => (t.Item2 != null && t.Item2.parsedCorrectly && !t.Item2.CanMerge()))
                     .Select(t => t.mat).ToArray();
                 foreach (var shader in list.Select(mat => mat.shader).Distinct())
                 {
@@ -2619,6 +2615,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                     DrawDebugList(materialsWithThisShader);
                 }
                 Profiler.EndSection();
+            }
+            if (Foldout("Unmergable Texture Materials", ref settings.DebugShowUnmergableTextureMaterials))
+            {
+                Profiler.StartSection("Unmergable Texture Materials");
+                var list = root.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => (t.Item2 != null && t.Item2.CanMerge() && !t.Item2.CanMergeTextures()))
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeTexturesReason(), MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
             }
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {

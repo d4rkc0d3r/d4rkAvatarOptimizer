@@ -153,7 +153,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
-            var parseErrors = parsedShaders.Where(s => !s.couldParse).ToList();
+            var parseErrors = parsedShaders.Where(s => !s.parsedCorrectly).ToList();
             if (Foldout(ref showParseErrors, $"Parse Errors ({parseErrors.Count})"))
             {
                 EditorGUI.indentLevel++;

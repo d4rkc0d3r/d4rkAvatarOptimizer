@@ -34,12 +34,14 @@ If your shader has a "lock in" or "bake" feature, make sure to not use it with t
 Can't merge materials if:
 * Shader is surface shader or has tessellation
 * A property that differs is used in shader lab code (eg `ZWrite [_ZWrite]`)
+* Materials have different Keywords set
 ## Merge Same Dimension Textures
 Merges materials if they use different textures if their width, height & compression format match.
 Creates a Texture2DArray from the original textures.
 
 Can't merge materials if:
-* Texture property to merge gets used in custom macro. **This is not detected by the optimizer!**
+* Shader declares Texture2D or sampler2D properties with a custom macro.  
+  eg `#define CUSTOM_TEX2D(name) Texture2D name`
 ## Merge Cull Back with Cull Off
 Merges materials even if their culling properties differ. Forces culling to off.
 ## Merge Different Render Queue

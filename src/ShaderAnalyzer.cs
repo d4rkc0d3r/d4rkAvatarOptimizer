@@ -63,7 +63,7 @@ namespace d4rkpl4y3r
             public Function fragment;
         }
         public string name;
-        public bool couldParse = true;
+        public bool parsedCorrectly = true;
         public string errorMessage = "";
         public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new List<string>();
@@ -75,14 +75,9 @@ namespace d4rkpl4y3r
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
         public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
 
-        public bool HasParsedCorrectly()
-        {
-            return couldParse;
-        }
-
         public bool CanMerge()
         {
-            if (!HasParsedCorrectly())
+            if (!parsedCorrectly)
                 return false;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return false;
@@ -93,12 +88,34 @@ namespace d4rkpl4y3r
 
         public string CantMergeReason()
         {
-            if (!HasParsedCorrectly())
+            if (!parsedCorrectly)
                 return errorMessage == "" ? "Shader has not parsed correctly." : errorMessage;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return "Shader has a pass with tesselation.";
             if (hasDisableBatchingTag)
                 return "Shader has DisableBatching set to true.";
+            return "";
+        }
+
+        public bool CanMergeTextures()
+        {
+            if (!CanMerge())
+                return false;
+            if (customTextureDeclarations.Count > 0)
+                return false;
+            if (mismatchedCurlyBraces)
+                return false;
+            return true;
+        }
+
+        public string CantMergeTexturesReason()
+        {
+            if (!CanMerge())
+                return CantMergeReason();
+            if (customTextureDeclarations.Count > 0)
+                return "Shader has custom texture declaration macros.";
+            if (mismatchedCurlyBraces)
+                return "Shader has mismatched curly braces.";
             return "";
         }
     }
@@ -192,12 +209,12 @@ namespace d4rkpl4y3r
             }
             catch (IOException e)
             {
-                parsedShader.couldParse = false;
+                parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
             }
             catch (ParserException e)
             {
-                parsedShader.couldParse = false;
+                parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
             }
             try
@@ -206,12 +223,12 @@ namespace d4rkpl4y3r
             }
             catch (ParserException e)
             {
-                parsedShader.couldParse = false;
+                parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
             }
             catch (System.Exception e)
             {
-                parsedShader.couldParse = false;
+                parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
                 Debug.LogWarning(e);
             }
