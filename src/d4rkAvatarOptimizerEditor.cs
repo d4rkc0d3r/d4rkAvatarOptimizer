@@ -2231,7 +2231,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
-                && avDescriptor.VisemeSkinnedMesh != null)
+            && avDescriptor.VisemeSkinnedMesh != null)
         {
             var meshRenderer = avDescriptor.VisemeSkinnedMesh;
             if (root.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
@@ -2248,6 +2248,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 EditorGUILayout.HelpBox("Eyelid SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
+        }
+
+        if (Object.FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
+        {
+            EditorGUILayout.HelpBox("Optimized copy of some avatar is present in the scene.\nIts assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
         var allMaterials = root.GetComponentsInChildren<Renderer>(true)
