@@ -1,11 +1,26 @@
 # d4rkAvatarOptimizer
 d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
-## How To Use
+## How to Use
 1. Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.
 2. Click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes.
 3. Upload this optimized copy of your original avatar to vrc.
 4. Delete the copy after you upload it to vrc.
 
+## Why my Shader Pink?
+
+Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. You could try other shaders, for example:
+* [ACLS](https://booth.pm/ja/items/1779615)
+* [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
+
+If using other shaders isn't an option you can try to make a bug report and maybe I'll be able to fix it.  
+For that select the material and export it as `.unitypackage`.
+You can find it in the `d4rkAvatarOptimizer/TrashBin` folder:  
+![Export Material](./ExampleImages/exportMaterial0.png)  
+Then in the next dialog select only the material and shader files in the TrashBin folder like so:  
+![Export Material](./ExampleImages/exportMaterial1.png)  
+Once you have the `.unitypackage` file, please make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues).
+
+## UI Options Documentation
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
 ![Example Screenshot](./ExampleImages/example0.png)
