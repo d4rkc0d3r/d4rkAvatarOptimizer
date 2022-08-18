@@ -1049,7 +1049,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             if (!settings.WritePropertiesAsStaticValues)
             {
-                replace[i] = null;
+                foreach (string key in replace[i].Keys.Where(k => !k.StartsWith("arrayIndex")).ToArray())
+                {
+                    replace[i].Remove(key);
+                }
             }
 
             texturesToCheckNull[i] = new Dictionary<string, string>();
