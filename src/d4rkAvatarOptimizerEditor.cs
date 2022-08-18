@@ -173,16 +173,23 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
     }
 
-    private static string GetTransformPathToRoot(Transform t)
+    private static string GetTransformPathTo(Transform t, Transform root)
     {
-        if (t == root.transform)
+        if (t == root)
             return "";
         string path = t.name;
-        while ((t = t.parent) != root.transform)
+        while ((t = t.parent) != root)
         {
+            if (t == null)
+                return null;
             path = t.name + "/" + path;
         }
         return path;
+    }
+
+    private static string GetTransformPathToRoot(Transform t)
+    {
+        return GetTransformPathTo(t, root.transform);
     }
 
     private static Transform GetTransformFromPath(string path)
@@ -274,11 +281,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         var togglePaths = FindAllGameObjectTogglePaths();
         var unused = new HashSet<SkinnedMeshRenderer>();
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        var exclusions = GetAllExcludedTransforms();
         foreach (var skinnedMeshRenderer in skinnedMeshRenderers)
         {
             if (skinnedMeshRenderer.gameObject.activeSelf)
                 continue;
             if (togglePaths.Contains(GetPathToRoot(skinnedMeshRenderer)))
+                continue;
+            if (exclusions.Contains(skinnedMeshRenderer.transform))
                 continue;
             unused.Add(skinnedMeshRenderer);
         }
@@ -303,6 +313,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = root.GetComponentsInChildren<Renderer>(true);
         var matchedSkinnedMeshes = new List<List<Renderer>>();
+        var exclusions = GetAllExcludedTransforms();
         foreach (var renderer in renderers)
         {
             var mesh = renderer.GetSharedMesh();
@@ -312,6 +323,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
+                if (exclusions.Contains(renderer.transform))
+                    break;
                 if (CanCombineRendererWith(subList, renderer))
                 {
                     subList.Add(renderer);
@@ -530,10 +543,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var mergedMeshes = FindPossibleSkinnedMeshMerges();
         optimizedSlotSwapMaterials.Clear();
+        var exclusions = GetAllExcludedTransforms();
         foreach (var entry in slotSwapMaterials)
         {
             int meshToggleCount = 0;
             var current = GetTransformFromPath(entry.Key.path).GetComponent<Renderer>();
+            if (exclusions.Contains(current.transform))
+                continue;
             if (current != null)
             {
                 meshToggleCount = mergedMeshes.FirstOrDefault(list => list.Any(renderer => renderer == current))?.Count ?? 0;
@@ -675,10 +691,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         var togglePaths = FindAllGameObjectTogglePaths();
         var disabledGameObjects = new HashSet<Transform>();
         var queue = new Queue<Transform>();
+        var exclusions = GetAllExcludedTransforms();
         queue.Enqueue(root.transform);
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
+            if (exclusions.Contains(current))
+                continue;
             if (current != root.transform && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
             {
                 disabledGameObjects.Add(current);
@@ -712,6 +731,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 behaviourToggles.Add(binding.path);
             }
         }
+
         var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
             .Where(b => !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
@@ -726,6 +746,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
             .SelectMany(t => t.GetComponents<Component>().Where(c => !(c is Transform))));
+
+        var exclusions = GetAllExcludedTransforms();
+        alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));
 
         return alwaysDisabledBehaviours;
     }
@@ -1341,8 +1364,11 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void OptimizeMaterialsOnNonSkinnedMeshes()
     {
         var meshRenderers = root.GetComponentsInChildren<MeshRenderer>(true);
+        var exclusions = GetAllExcludedTransforms();
         foreach (var meshRenderer in meshRenderers)
         {
+            if (exclusions.Contains(meshRenderer.transform))
+                continue;
             var path = GetPathToRoot(meshRenderer);
             var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
             var alreadyOptimizedMaterials = new HashSet<Material>();
@@ -1434,10 +1460,11 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void CombineAndOptimizeMaterials()
     {
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        var exclusions = GetAllExcludedTransforms();
         foreach (var meshRenderer in skinnedMeshRenderers)
         {
             var mesh = meshRenderer.sharedMesh;
-            if (mesh == null)
+            if (mesh == null || exclusions.Contains(meshRenderer.transform))
                 continue;
 
             var props = new MaterialPropertyBlock();
@@ -1609,6 +1636,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void CombineSkinnedMeshes()
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
+        var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         int combinedMeshID = 0;
@@ -1616,6 +1644,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             var combinableSkinnedMeshes = combinableMeshes.Select(m => m as SkinnedMeshRenderer).Where(m => m != null).ToList();
             if (combinableSkinnedMeshes.Count < 1)
+                continue;
+            if (combinableMeshes.Any(m => exclusions.Contains(m.transform)))
                 continue;
 
             var targetBones = new List<Transform>();
@@ -2016,6 +2046,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static HashSet<Transform> GetAllExcludedTransforms()
+    {
+        var allExcludedTransforms = new HashSet<Transform>();
+        foreach (var excludedTransform in settings.ExcludeTransforms)
+        {
+            var newTransform = GetTransformFromPath(GetTransformPathTo(excludedTransform, settings.transform));
+            allExcludedTransforms.Add(newTransform);
+            allExcludedTransforms.UnionWith(newTransform.GetAllDescendants());
+        }
+        return allExcludedTransforms;
+    }
+
     private static void DestroyEditorOnlyGameObjects()
     {
         var stack = new Stack<Transform>();
@@ -2123,6 +2165,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         used.UnionWith(gameObjectTogglePaths.Select(p => GetTransformFromPath(p)).Where(t => t != null));
+
+        foreach (var exclusion in settings.ExcludeTransforms)
+        {
+            used.UnionWith(exclusion.GetAllDescendants());
+            var current = exclusion;
+            while ((current = current.parent) != null)
+            {
+                used.Add(current);
+            }
+        }
 
         var queue = new Queue<Transform>();
         queue.Enqueue(root.transform);
@@ -2258,7 +2310,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox("Optimized copy of some avatar is present in the scene.\nIts assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
+        var exclusions = GetAllExcludedTransforms();
+
         var allMaterials = root.GetComponentsInChildren<Renderer>(true)
+            .Where(r => !exclusions.Contains(r.transform))
             .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
 
         var correctlyParsedMaterials = allMaterials
@@ -2449,7 +2504,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return false;
     }
 
-    public bool Button(string label)
+    private bool Button(string label)
     {
         GUILayout.BeginHorizontal();
         GUILayout.Space(15 * EditorGUI.indentLevel);
@@ -2458,7 +2513,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
-    public bool Toggle(string label, ref bool value)
+    private bool Toggle(string label, ref bool value)
     {
         bool output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
         if (GUI.enabled)
@@ -2472,7 +2527,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return value;
     }
 
-    public bool Foldout(string label, ref bool value)
+    private bool Foldout(string label, ref bool value)
     {
         bool output = EditorGUILayout.Foldout(value, label);
         if (value != output)
@@ -2517,6 +2572,35 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
     }
+
+    private void DynamicTransformList(ref List<Transform> list)
+    {
+        list.Add(null);
+        for (int i = 0; i < list.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            var output = EditorGUILayout.ObjectField(list[i], typeof(Transform), true) as Transform;
+            if (i == list.Count - 1)
+            {
+                GUILayout.Space(23);
+            }
+            else if (GUILayout.Button("X", GUILayout.Width(20)))
+            {
+                output = null;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (list[i] != output)
+            {
+                ClearUICaches();
+            }
+            if (output != null && GetTransformPathToRoot(output) == null)
+            {
+                output = null;
+            }
+            list[i] = output;
+        }
+        list = list.Where(o => o != null).ToList();
+    }
     
     public override void OnInspectorGUI()
     {
@@ -2552,6 +2636,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref settings.ProfileTimeUsed);
+
+        if (settings.ExcludeTransforms == null)
+            settings.ExcludeTransforms = new List<Transform>();
+        if (Foldout($"Exclusions ({settings.ExcludeTransforms.Count})", ref settings.ShowExcludedTransforms))
+        {
+            EditorGUI.indentLevel++;
+            DynamicTransformList(ref settings.ExcludeTransforms);
+            EditorGUI.indentLevel--;
+        }
 
         Profiler.enabled = settings.ProfileTimeUsed;
         Profiler.Reset();

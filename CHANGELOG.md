@@ -1,5 +1,7 @@
 ## Next Version
-### Minor features
+### Features
+* Added exclusion Transform list. Anything that is under the hierarchy of the Transforms in the exclusion list will not be touched by the optimizer.  
+  Implements suggestion: [if we could get a way to exclude certain things that would fix it](https://twitter.com/JettsdVRC/status/1559692330965372930)
 * Show warning if any materials are locked in.
 * Add a list of all locked in materials in the debug info foldout.
 ### Bug fixes

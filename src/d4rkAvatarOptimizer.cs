@@ -17,6 +17,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DeleteUnusedGameObjects = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
+    public bool ShowExcludedTransforms = false;
+    public List<Transform> ExcludeTransforms = new List<Transform>();
     public bool ShowMeshAndMaterialMergePreview = true;
     public bool ShowDebugInfo = false;
     public bool DebugShowUnparsableMaterials = true;
