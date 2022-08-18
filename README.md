@@ -12,7 +12,8 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 * [ACLS](https://booth.pm/ja/items/1779615)
 * [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
 
-If using other shaders isn't an option you can try to make a bug report and maybe I'll be able to fix it.  
+You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
+Finally you can try to make a bug report and maybe I'll be able to fix it.  
 For that select the material and export it as `.unitypackage`.
 You can find it in the `d4rkAvatarOptimizer/TrashBin` folder:  
 ![Export Material](./ExampleImages/exportMaterial0.png)  
@@ -73,6 +74,8 @@ Deletes all game objects that have no used components and are not referenced in 
 Moves the ring finger collider to match the foot contact. This enables you to touch other players phys bones with your feet.
 ## Profile Time Used
 Outputs how much time the different sections in the code took to execute.
+## Exclusions
+You can exclude certain parts of the model from all optimizations. Any Transform in this list will stop the optimizer from touching anything on that object or anything below it. The number in the parenthesis indicates how many transforms are excluded even if the foldout is closed.
 ## Create Optimized Copy
 Creates a copy of the avatar and performs the selected optimizations on the copy.
 Disables the original avatar so only the copy is active.  
