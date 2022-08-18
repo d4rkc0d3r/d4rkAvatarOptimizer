@@ -2166,13 +2166,14 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         used.UnionWith(gameObjectTogglePaths.Select(p => GetTransformFromPath(p)).Where(t => t != null));
 
-        foreach (var exclusion in settings.ExcludeTransforms)
+        foreach (var exclusionOnMainAvatar in settings.ExcludeTransforms)
         {
+            var exclusion = GetTransformFromPath(GetTransformPathTo(exclusionOnMainAvatar, settings.transform));
+            used.Add(exclusion);
             used.UnionWith(exclusion.GetAllDescendants());
-            var current = exclusion;
-            while ((current = current.parent) != null)
+            while ((exclusion = exclusion.parent) != null)
             {
-                used.Add(current);
+                used.Add(exclusion);
             }
         }
 
