@@ -1,3 +1,7 @@
+## Next Version
+### Bug fixes
+* Fixed the delete unused gameobjects function not respecting the exclusions properly.
+
 ## v1.1
 ### Features
 * Added exclusion Transform list. Anything that is under the hierarchy of the Transforms in the exclusion list will not be touched by the optimizer.  
