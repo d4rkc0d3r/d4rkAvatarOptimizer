@@ -2212,7 +2212,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static void Validate()
+    private void Validate()
     {
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
 
@@ -2275,6 +2275,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (settings.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
         {
             EditorGUILayout.HelpBox("One or more materials do not support merging textures.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+        }
+
+        if ((settings.MergeDifferentPropertyMaterials || settings.MergeSkinnedMeshes) && allMaterials.Any(m => IsLockedIn(m)))
+        {
+            EditorGUILayout.HelpBox("One or more materials are locked in.\nIt is recommended to unlock them so they can be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
         }
     }
 
@@ -2428,6 +2433,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             return gameObjectsWithToggleAnimationsCache;
         }
+    }
+
+    public bool IsLockedIn(Material material)
+    {
+        if (material == null)
+            return false;
+        if (material.HasProperty("_ShaderOptimizer") && material.GetInt("_ShaderOptimizer") == 1)
+            return true;
+        if (material.HasProperty("_ShaderOptimizerEnabled") && material.GetInt("_ShaderOptimizerEnabled") == 1)
+            return true;
+        return false;
     }
 
     public bool Button(string label)
@@ -2636,6 +2652,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                     var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
                     DrawDebugList(materialsWithThisShader);
                 }
+            }
+            if (Foldout("Locked in Materials", ref settings.DebugShowLockedInMaterials))
+            {
+                Profiler.StartSection("Locked in Materials");
+                var list = root.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Where(mat => IsLockedIn(mat)).ToArray();
+                DrawDebugList(list);
+                Profiler.EndSection();
             }
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))
             {
