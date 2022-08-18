@@ -63,7 +63,7 @@ namespace d4rkpl4y3r
             public Function fragment;
         }
         public string name;
-        public bool parsedCorrectly = true;
+        public bool parsedCorrectly = false;
         public string errorMessage = "";
         public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new List<string>();
@@ -206,20 +206,18 @@ namespace d4rkpl4y3r
             try
             {
                 RecursiveParseFile(filePath, parsedShader.lines);
+                SemanticParseShader();
+                parsedShader.parsedCorrectly = true;
+                if (parsedShader.lines.Count == 0)
+                {
+                    parsedShader.parsedCorrectly = false;
+                    parsedShader.errorMessage = "Parsed shader is empty.";
+                }
             }
             catch (IOException e)
             {
                 parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
-            }
-            catch (ParserException e)
-            {
-                parsedShader.parsedCorrectly = false;
-                parsedShader.errorMessage = e.Message;
-            }
-            try
-            {
-                SemanticParseShader();
             }
             catch (ParserException e)
             {
