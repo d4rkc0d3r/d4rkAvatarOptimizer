@@ -91,7 +91,7 @@ namespace d4rkpl4y3r
             if (!parsedCorrectly)
                 return errorMessage == "" ? "Shader has not parsed correctly." : errorMessage;
             if (passes.Any(p => p.hull != null || p.domain != null))
-                return "Shader has a pass with tesselation.";
+                return "Shader has a pass with tessellation.";
             if (hasDisableBatchingTag)
                 return "Shader has DisableBatching set to true.";
             return "";
