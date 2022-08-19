@@ -1279,6 +1279,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var b2D = b as Texture2D;
         if (a2D.format != b2D.format)
             return false;
+        if (a2D.format == TextureFormat.DXT1Crunched || a2D.format == TextureFormat.DXT5Crunched)
+            return false;
         if (IsTextureLinear(a2D) != IsTextureLinear(b2D))
             return false;
         return true;
@@ -1288,6 +1290,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         var candidateMat = candidate.material;
         var firstMat = list[0].material;
+        if (candidateMat == null || firstMat == null)
+            return false;
         if (firstMat.shader != candidateMat.shader)
             return false;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
@@ -2340,6 +2344,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             EditorGUILayout.HelpBox("One or more materials are locked in.\nIt is recommended to unlock them so they can be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
         }
+
+        if (settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures && CrunchedTextures.Length > 0)
+        {
+            EditorGUILayout.HelpBox("One or more textures are crunch compressed.\nCrunch compressed textures cannot be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
+        }
     }
 
     private static void AssignNewAvatarIDIfEmpty()
@@ -2401,6 +2410,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private Component[] unusedComponentsCache = null;
     private Transform[] alwaysDisabledGameObjectsCache = null;
     private GameObject[] gameObjectsWithToggleAnimationsCache = null;
+    private Texture2D[] crunchedTexturesCache = null;
 
     private void ClearUICaches()
     {
@@ -2409,6 +2419,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         unusedComponentsCache = null;
         alwaysDisabledGameObjectsCache = null;
         gameObjectsWithToggleAnimationsCache = null;
+        crunchedTexturesCache = null;
     }
 
     private void OnSelectionChange()
@@ -2491,6 +2502,38 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .Where(obj => obj != null).ToArray();
             }
             return gameObjectsWithToggleAnimationsCache;
+        }
+    }
+
+    private Texture2D[] CrunchedTextures
+    {
+        get
+        {
+            if (crunchedTexturesCache == null)
+            {
+                var exclusions = GetAllExcludedTransforms();
+                var tuple = root.GetComponentsInChildren<Renderer>(true)
+                    .Where(r => !exclusions.Contains(r.transform))
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => t.Item2?.parsedCorrectly ?? false).ToArray();
+                var textures = new HashSet<Texture2D>();
+                foreach (var (mat, parsed) in tuple)
+                {
+                    if (!parsed.CanMergeTextures())
+                        continue;
+                    foreach (var prop in parsed.properties)
+                    {
+                        if (prop.type != ParsedShader.Property.Type.Texture2D)
+                            continue;
+                        var tex = mat.GetTexture(prop.name) as Texture2D;
+                        if (tex != null && (tex.format == TextureFormat.DXT1Crunched || tex.format == TextureFormat.DXT5Crunched))
+                            textures.Add(tex);
+                    }
+                }
+                crunchedTexturesCache = textures.ToArray();
+            }
+            return crunchedTexturesCache;
         }
     }
 
@@ -2749,6 +2792,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                     var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
                     DrawDebugList(materialsWithThisShader);
                 }
+            }
+            if (Foldout("Crunched Textures", ref settings.DebugShowCrunchedTextures))
+            {
+                Profiler.StartSection("Crunched Textures");
+                DrawDebugList(CrunchedTextures);
+                Profiler.EndSection();
             }
             if (Foldout("Locked in Materials", ref settings.DebugShowLockedInMaterials))
             {

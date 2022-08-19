@@ -24,6 +24,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowUnparsableMaterials = true;
     public bool DebugShowUnmergableMaterials = true;
     public bool DebugShowUnmergableTextureMaterials = true;
+    public bool DebugShowCrunchedTextures = true;
     public bool DebugShowLockedInMaterials = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
