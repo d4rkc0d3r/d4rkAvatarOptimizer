@@ -6,6 +6,7 @@
 ### Bug fixes
 * Fixed the delete unused gameobjects function not respecting the exclusions properly.
 * Don't merge textures that are crunch compressed. Fix for: [Material merging results in corrupted material/textures](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/5)
+* Inline replace the `UNITY_POSITION` macro. Fix for: [Material merging results in corrupted material/textures](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/5)
 
 ### Debug info
 * Add original shader name to the generated shader as a comment.

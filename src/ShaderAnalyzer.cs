@@ -862,9 +862,10 @@ namespace d4rkpl4y3r
         private List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
         {
             var output = new List<string>();
-            string line = source[sourceLineIndex].Split('(')[1];
+            string line = source[sourceLineIndex].Substring(source[sourceLineIndex].IndexOf('(') + 1);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
+                line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
                 if (line.StartsWith("#"))
                 {
                     output.Add(line);
