@@ -1,6 +1,9 @@
 ## Next Version
 ### Bug fixes
 * Fixed the delete unused gameobjects function not respecting the exclusions properly.
+  
+### Debug info
+* Add original shader name to the generated shader as a comment.
 
 ## v1.1
 ### Features

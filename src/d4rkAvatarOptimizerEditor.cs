@@ -1138,7 +1138,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             name = source[0].name + " " + name;
             var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
             name = System.IO.Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[i][0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"";
+            optimizedShader[i][0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"//" + optimizedShader[i][0];
             System.IO.File.WriteAllLines(shaderFilePath, optimizedShader[i]);
             var optimizedMaterial = Instantiate(source[0]);
             foreach (var keyword in setShaderKeywords[i])
