@@ -1033,11 +1033,11 @@ namespace d4rkpl4y3r
             while (++sourceLineIndex < source.Count)
             {
                 string line = source[sourceLineIndex];
-                originalVertexShader?.Add(line);
                 if (inParam != null && vertexInUv0EndSwizzle != "")
                 {
                     line = Regex.Replace(line, $"({inParam.name}\\s*\\.\\s*{vertexInUv0Member})([^0-9a-zA-Z])", $"$1{vertexInUv0EndSwizzle}$2");
                 }
+                originalVertexShader?.Add(line);
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
