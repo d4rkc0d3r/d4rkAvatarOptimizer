@@ -1,4 +1,4 @@
-## Next Version
+## v1.2
 ### Features
 * Show warning if there are textures that are crunch compressed.
 * Add list of all crunch compressed textures to the debug info section.

@@ -62,6 +62,7 @@ Creates a Texture2DArray from the original textures.
 Can't merge materials if:
 * Shader declares Texture2D or sampler2D properties with a custom macro.  
   eg `#define CUSTOM_TEX2D(name) Texture2D name`
+* The textures use crunch compression.
 ## Merge Cull Back with Cull Off
 Merges materials even if their culling properties differ. Forces culling to off.
 ## Merge Different Render Queue
@@ -100,6 +101,8 @@ Shows all materials that can't be parsed by the optimizer.
 Shows all materials that can't be merged if their properties differ.
 ### Unmergable Texture Materials
 Shows all materials that can't be merged if their textures differ.
+### Crunched Textures
+Shows all textures that got crunch compressed.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
