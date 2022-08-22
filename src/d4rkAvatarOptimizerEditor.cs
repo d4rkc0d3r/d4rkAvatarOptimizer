@@ -2545,6 +2545,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             return true;
         if (material.HasProperty("_ShaderOptimizerEnabled") && material.GetInt("_ShaderOptimizerEnabled") == 1)
             return true;
+        if (material.HasProperty("__Baked") && material.GetInt("__Baked") == 1)
+            return true;
         return false;
     }
 

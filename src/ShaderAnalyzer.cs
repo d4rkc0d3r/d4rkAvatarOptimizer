@@ -486,9 +486,12 @@ namespace d4rkpl4y3r
                         case "white": output.defaultValue = "float4(1,1,1,1)"; break;
                         case "black": output.defaultValue = "float4(0,0,0,1)"; break;
                         case "red": output.defaultValue = "float4(1,0,0,1)"; break;
-                        case "lineargrey": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
+                        case "lineargrey":
+                        case "lineargray": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
                         case "bump": output.defaultValue = "float4(0.5,0.5,1,1)"; break;
-                        case "grey": default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
+                        case "grey":
+                        case "gray":
+                        default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
                     }
                 }
                 else if (modifiedLine.StartsWith("3d"))
