@@ -131,6 +131,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (prop.type == ParsedShader.Property.Type.Int)
                     replace[prop.name] = "" + material.GetInt(prop.name);
                 if (prop.type == ParsedShader.Property.Type.Color)
+                    replace[prop.name] = material.GetColor(prop.name).linear.ToString("F6").Replace("RGBA", "float4");
+                if (prop.type == ParsedShader.Property.Type.ColorHDR)
                     replace[prop.name] = material.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
             }
             var shadur = ShaderOptimizer.Run(parsedShader, replace);

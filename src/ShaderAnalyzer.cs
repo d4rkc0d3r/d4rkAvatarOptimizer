@@ -21,6 +21,7 @@ namespace d4rkpl4y3r
             {
                 Unknown,
                 Color,
+                ColorHDR,
                 Float,
                 Vector,
                 Int,
@@ -420,7 +421,7 @@ namespace d4rkpl4y3r
             return true;
         }
 
-        public static ParsedShader.Property ParseProperty(string line)
+        public static ParsedShader.Property ParseProperty(string line, List<string> tags)
         {
             string modifiedLine = line;
             int openBracketIndex = line.IndexOf('[');
@@ -429,6 +430,7 @@ namespace d4rkpl4y3r
                 int closeBracketIndex = modifiedLine.IndexOf(']') + 1;
                 if (closeBracketIndex != 0)
                 {
+                    tags.Add(modifiedLine.Substring(openBracketIndex + 1, closeBracketIndex - openBracketIndex - 2));
                     modifiedLine = modifiedLine.Substring(0, openBracketIndex)
                         + modifiedLine.Substring(closeBracketIndex);
                     openBracketIndex = modifiedLine.IndexOf('[');
@@ -469,7 +471,7 @@ namespace d4rkpl4y3r
                 }
                 else if (modifiedLine.StartsWith("color"))
                 {
-                    output.type = ParsedShader.Property.Type.Color;
+                    output.type = tags.Any(t => t.ToLowerInvariant() == "hdr") ? ParsedShader.Property.Type.ColorHDR : ParsedShader.Property.Type.Color;
                     output.defaultValue = "float4" + output.defaultValue;
                 }
                 else if (modifiedLine.StartsWith("2darray"))
@@ -509,6 +511,7 @@ namespace d4rkpl4y3r
                     output.type = ParsedShader.Property.Type.TextureCubeArray;
                     output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
                 }
+                tags.Clear();
                 return output;
             }
             return null;
@@ -674,6 +677,7 @@ namespace d4rkpl4y3r
             List<string> cgInclude = new List<string>();
             List<string> hlslInclude = new List<string>();
             List<string> lines = parsedShader.lines;
+            List<string> tags = new List<string>();
             parsedShader.lines = output;
             var state = ParseState.ShaderLab;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
@@ -694,7 +698,7 @@ namespace d4rkpl4y3r
                         }
                         else
                         {
-                            var property = ParseProperty(line);
+                            var property = ParseProperty(line, tags);
                             if (property != null)
                             {
                                 parsedShader.properties.Add(property);
@@ -1651,6 +1655,7 @@ namespace d4rkpl4y3r
         private List<string> Run()
         {
             output = new List<string>();
+            var tags = new List<string>();
             int lineIndex = 0;
             while (lineIndex < parsedShader.lines.Count)
             {
@@ -1681,7 +1686,7 @@ namespace d4rkpl4y3r
                         var prop = parsedShader.properties.FirstOrDefault(p => p.name == animatedProperty.Key);
                         string defaultValue = "0";
                         string type = prop.type.ToString();
-                        if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.Vector)
+                        if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.ColorHDR || prop.type == ParsedShader.Property.Type.Vector)
                         {
                             defaultValue = "(0,0,0,0)";
                             type = "Vector";
@@ -1696,7 +1701,7 @@ namespace d4rkpl4y3r
                 {
                     if (texturesToMerge.Count > 0)
                     {
-                        var prop = ShaderAnalyzer.ParseProperty(line);
+                        var prop = ShaderAnalyzer.ParseProperty(line, tags);
                         if (texturesToMerge.Contains(prop?.name))
                         {
                             int index = line.LastIndexOf("2D");

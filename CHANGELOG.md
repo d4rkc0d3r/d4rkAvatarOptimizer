@@ -1,3 +1,7 @@
+## Next Version
+### Bug fixes
+* Fixed that Color properties without hdr tag wrote the raw sRGB value as a linear value into the shader.
+
 ## v1.2
 ### Features
 * Show warning if there are textures that are crunch compressed.

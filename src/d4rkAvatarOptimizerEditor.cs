@@ -995,13 +995,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                             propertyArray.values.Add("" + mat.GetInt(prop.name));
                         break;
                         case ParsedShader.Property.Type.Color:
+                        case ParsedShader.Property.Type.ColorHDR:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "float4";
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
-                            propertyArray.values.Add(mat.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4"));
+                            var col = mat.GetColor(prop.name);
+                            col = prop.type == ParsedShader.Property.Type.ColorHDR ? col : col.linear;
+                            propertyArray.values.Add($"float4({col.r}, {col.g}, {col.b}, {col.a})");
                             break;
                         case ParsedShader.Property.Type.Texture2D:
                             if (!arrayPropertyValues[i].TryGetValue("arrayIndex" + prop.name, out var textureArray))
@@ -1333,6 +1336,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 switch (prop.type)
                 {
                     case ParsedShader.Property.Type.Color:
+                    case ParsedShader.Property.Type.ColorHDR:
                     case ParsedShader.Property.Type.Vector:
                         break;
                     case ParsedShader.Property.Type.Float:
