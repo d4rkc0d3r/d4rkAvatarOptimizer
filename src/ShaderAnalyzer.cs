@@ -1364,6 +1364,7 @@ namespace d4rkpl4y3r
 
         private void InjectPropertyArrays()
         {
+            output.Add("#pragma skip_variants DYNAMICLIGHTMAP_ON LIGHTMAP_ON LIGHTMAP_SHADOW_MIXING DIRLIGHTMAP_COMBINED SHADOWS_SHADOWMASK");
             if (meshToggleCount > 1)
             {
                 output.Add("cbuffer CBd4rkAvatarOptimizer");

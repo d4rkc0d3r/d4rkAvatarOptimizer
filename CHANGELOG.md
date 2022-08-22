@@ -2,6 +2,7 @@
 ### Features
 * Show warning if there are textures that are crunch compressed.
 * Add list of all crunch compressed textures to the debug info section.
+* Always skip variants `DYNAMICLIGHTMAP_ON`, `LIGHTMAP_ON`, `LIGHTMAP_SHADOW_MIXING`, `DIRLIGHTMAP_COMBINED`, and `SHADOWS_SHADOWMASK` since they are unused on avatars.
 
 ### Bug fixes
 * Fixed the delete unused gameobjects function not respecting the exclusions properly.
