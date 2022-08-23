@@ -1686,12 +1686,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var sourceNormals = mesh.normals;
                 var sourceTangents = mesh.tangents;
                 var sourceWeights = mesh.boneWeights;
+                var rootBone = skinnedMesh.rootBone == null ? skinnedMesh.transform : skinnedMesh.rootBone;
                 var sourceBones = skinnedMesh.bones;
+                for (int i = 0; i < sourceBones.Length; i++)
+                {
+                    if (sourceBones[i] == null)
+                        sourceBones[i] = rootBone;
+                }
                 var toWorldArray = Enumerable.Range(0, skinnedMesh.bones.Length).Select(i =>
-                    skinnedMesh.bones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
+                    sourceBones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
                     ).ToArray();
                 var aabb = skinnedMesh.localBounds;
-                var m = toLocal * (skinnedMesh.rootBone ?? skinnedMesh.transform).localToWorldMatrix;
+                var m = toLocal * rootBone.localToWorldMatrix;
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, -1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, -1, 1) + aabb.center));

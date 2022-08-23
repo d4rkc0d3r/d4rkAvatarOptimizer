@@ -1,6 +1,7 @@
 ## Next Version
 ### Bug fixes
 * Fixed that Color properties without hdr tag wrote the raw sRGB value as a linear value into the shader.
+* Some meshes can have `null` bones. Use the root bone instead. Fix for: [NullReferenceException: Object reference not set to an instance of an object.](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/6)
 
 ## v1.2
 ### Features
