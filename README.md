@@ -92,7 +92,11 @@ In addition to the selected optimizations there are some optimizations that are 
 * Remove illegal avatar components.
 * Remove everything with the EditorOnly tag.
 ## Show Merge Preview
-Shows a preview of how meshes and materials would get merged. Resulting meshes are separated by spaces. Materials that get merged together are indented. In the example image you can see that Body/Eyes would get merged with Body/FaceSkin.
+Shows a preview of how meshes and materials would get merged.
+
+First it shows the original and post merge counts and performance ranks for skinned meshes, meshes & material slots.
+
+Then in the detailed view, resulting meshes are separated by spaces. Materials that get merged together are indented. In the example image you can see that Body/Eyes would get merged with Body/FaceSkin.
 ## Show Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
 ### Unparsable Materials

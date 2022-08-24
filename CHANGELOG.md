@@ -1,4 +1,4 @@
-## Next Version
+## v1.3
 ### Features
 * Added perf rank change indicators to the Merge Preview foldout.
 
