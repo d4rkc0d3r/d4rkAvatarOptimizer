@@ -1,3 +1,11 @@
+## Next Version
+### Bug fixes
+* Shader optimizer skips parsed shaders that are null or parsed incorrectly.
+* Fix floats getting written with system localization instead of invariant culture.
+
+### Debug Info
+* Catch exception in the shader optimizer to show which shader is causing the exception.
+
 ## v1.3
 ### Features
 * Added perf rank change indicators to the Merge Preview foldout.

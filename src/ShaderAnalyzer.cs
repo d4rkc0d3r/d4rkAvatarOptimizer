@@ -6,6 +6,7 @@ using UnityEditor;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Text;
+using System.Threading;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -204,6 +205,10 @@ namespace d4rkpl4y3r
         {
             if (doneParsing)
                 return parsedShader;
+            var oldCulture = Thread.CurrentThread.CurrentCulture;
+            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             try
             {
                 RecursiveParseFile(filePath, parsedShader.lines);
@@ -230,6 +235,11 @@ namespace d4rkpl4y3r
                 parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
                 Debug.LogWarning(e);
+            }
+            finally
+            {
+                Thread.CurrentThread.CurrentCulture = oldCulture;
+                Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
             doneParsing = true;
             return parsedShader;
@@ -827,6 +837,12 @@ namespace d4rkpl4y3r
             Dictionary<string, string> animatedPropertyValues = null,
             List<string> setKeywords = null)
         {
+            if (source == null || !source.parsedCorrectly)
+                return null;
+            var oldCulture = Thread.CurrentThread.CurrentCulture;
+            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             var optimizer = new ShaderOptimizer
             {
                 meshToggleCount = meshToggleCount,
@@ -841,7 +857,22 @@ namespace d4rkpl4y3r
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
-            return optimizer.Run();
+            List<string> output = null;
+            try
+            {
+                output = optimizer.Run();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"Error optimizing shader {source.name}: {e.Message}");
+                throw e;
+            }
+            finally
+            {
+                Thread.CurrentThread.CurrentCulture = oldCulture;
+                Thread.CurrentThread.CurrentUICulture = oldUICulture;
+            }
+            return output;
         }
 
         private void InjectArrayPropertyInitialization()

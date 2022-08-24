@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEditor.Animations;
@@ -2787,6 +2789,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
+            var oldCulture = Thread.CurrentThread.CurrentCulture;
+            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
             AssignNewAvatarIDIfEmpty();
@@ -2802,6 +2808,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             Selection.objects = new Object[] { copy };
             Profiler.PrintTimeUsed();
             Profiler.Reset();
+            Thread.CurrentThread.CurrentCulture = oldCulture;
+            Thread.CurrentThread.CurrentUICulture = oldUICulture;
         }
 
         EditorGUILayout.Separator();
