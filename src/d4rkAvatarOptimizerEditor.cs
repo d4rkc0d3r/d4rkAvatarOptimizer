@@ -11,6 +11,7 @@ using d4rkpl4y3r;
 using d4rkpl4y3r.Util;
 using VRC.Dynamics;
 using VRC.SDK3.Avatars.Components;
+using VRC.SDKBase.Validation.Performance;
 
 using Math = System.Math;
 using Type = System.Type;
@@ -2657,6 +2658,81 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         list = list.Where(o => o != null).ToList();
     }
+
+    static Texture _perfIcon_Excellent;
+    static Texture _perfIcon_Good;
+    static Texture _perfIcon_Medium;
+    static Texture _perfIcon_Poor;
+    static Texture _perfIcon_VeryPoor;
+
+    private Texture GetPerformanceIconForRating(PerformanceRating value)
+    {
+        if (_perfIcon_Excellent == null)
+            _perfIcon_Excellent = Resources.Load<Texture>("PerformanceIcons/Perf_Great_32");
+        if (_perfIcon_Good == null)
+            _perfIcon_Good = Resources.Load<Texture>("PerformanceIcons/Perf_Good_32");
+        if (_perfIcon_Medium == null)
+            _perfIcon_Medium = Resources.Load<Texture>("PerformanceIcons/Perf_Medium_32");
+        if (_perfIcon_Poor == null)
+            _perfIcon_Poor = Resources.Load<Texture>("PerformanceIcons/Perf_Poor_32");
+        if (_perfIcon_VeryPoor == null)
+            _perfIcon_VeryPoor = Resources.Load<Texture>("PerformanceIcons/Perf_Horrible_32");
+
+        switch (value)
+        {
+            case PerformanceRating.Excellent:
+                return _perfIcon_Excellent;
+            case PerformanceRating.Good:
+                return _perfIcon_Good;
+            case PerformanceRating.Medium:
+                return _perfIcon_Medium;
+            case PerformanceRating.Poor:
+                return _perfIcon_Poor;
+            default:
+                return _perfIcon_VeryPoor;
+        }
+    }
+
+    PerformanceRating GetPerfRank(int count, int[] perfLevels)
+    {
+        int level = 0;
+        while(level < perfLevels.Length && count > perfLevels[level])
+        {
+            level++;
+        }
+        level++;
+        return (PerformanceRating)level;
+    }
+
+    private void PerfRankChangeLabel(string label, int oldValue, int newValue, AvatarPerformanceCategory category)
+    {
+        var oldRating = PerformanceRating.VeryPoor;
+        var newRating = PerformanceRating.VeryPoor;
+        switch (category)
+        {
+            case AvatarPerformanceCategory.SkinnedMeshCount:
+                oldRating = GetPerfRank(oldValue, new int[] {1, 2, 8, 16, int.MaxValue});
+                newRating = GetPerfRank(newValue, new int[] {1, 2, 8, 16, int.MaxValue});
+                break;
+            case AvatarPerformanceCategory.MeshCount:
+                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 24, int.MaxValue});
+                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 24, int.MaxValue});
+                break;
+            case AvatarPerformanceCategory.MaterialCount:
+                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 32, int.MaxValue});
+                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 32, int.MaxValue});
+                break;
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(15));
+        EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
+        EditorGUILayout.LabelField($"->", GUILayout.Width(25));
+        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(15));
+        EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
+        EditorGUILayout.LabelField(label);
+        EditorGUILayout.EndHorizontal();
+    }
     
     public override void OnInspectorGUI()
     {
@@ -2732,6 +2808,31 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
+            Profiler.StartSection("Show Perf Rank Change");
+            int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length;
+            int meshCount = root.GetComponentsInChildren<MeshRenderer>(true).Length;
+            int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true).Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount);
+            int optimizedSkinnedMeshCount = 0;
+            int optimizedMeshCount = 0;
+            int optimizedTotalMaterialCount = 0;
+            foreach (var matched in MergedMaterialPreview)
+            {
+                optimizedTotalMaterialCount += matched.Count;
+                var renderers = matched.SelectMany(m => m).Select(m => m.renderer).Distinct().ToArray();
+                if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
+                {
+                    optimizedSkinnedMeshCount++;
+                }
+                else
+                {
+                    optimizedMeshCount++;
+                }
+            }
+            PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshCount, optimizedSkinnedMeshCount, AvatarPerformanceCategory.SkinnedMeshCount);
+            PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, AvatarPerformanceCategory.MeshCount);
+            PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, AvatarPerformanceCategory.MaterialCount);
+            Profiler.EndSection();
+
             Profiler.StartSection("Show Merge Preview");
             foreach (var matched in MergedMaterialPreview)
             {
