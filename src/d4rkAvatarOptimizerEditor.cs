@@ -2997,7 +2997,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Game Objects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
             {
                 Profiler.StartSection("Game Objects with Toggle Animation");
-                DrawDebugList(AlwaysDisabledGameObjects);
+                DrawDebugList(GameObjectsWithToggleAnimations);
                 Profiler.EndSection();
             }
             if (Foldout("Unmoving Bones", ref settings.DebugShowUnmovingBones))

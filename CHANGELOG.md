@@ -11,6 +11,7 @@
 * Fix merge perf rank preview not taking into account particle system material slots.
 * Fix merge perf rank preview counting the "hidden" extra material slots if they didn't get baked into a mesh.
 * Fix bug with animated properties that ended in numbers.
+* Fix that debug info for all game objects with toggles would list the always disabled game objects instead.
 
 ### Debug Info
 * Catch exception in the shader optimizer to show which shader is causing the exception.
