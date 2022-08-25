@@ -2364,6 +2364,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             EditorGUILayout.HelpBox("One or more textures are crunch compressed.\nCrunch compressed textures cannot be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
         }
+
+        bool hasExtraMaterialSlots = root.GetComponentsInChildren<Renderer>(true)
+            .Where(r => !exclusions.Contains(r.transform))
+            .Where(r => r.GetSharedMesh() != null)
+            .Any(r => r.sharedMaterials.Length > r.GetSharedMesh().subMeshCount);
+
+        if (hasExtraMaterialSlots)
+        {
+            EditorGUILayout.HelpBox(
+                "One or more renderers have more material slots than sub meshes.\n" + 
+                "Those extra materials & polys are not counted by VRChats performance system. " + 
+                "After optimizing those extra slots and polys will get baked as real ones.\n" + 
+                "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
+        }
     }
 
     private static void AssignNewAvatarIDIfEmpty()
