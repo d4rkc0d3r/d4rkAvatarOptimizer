@@ -525,6 +525,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (!typeof(Renderer).IsAssignableFrom(binding.type)
                     || !binding.propertyName.StartsWith("m_Materials.Array.data["))
                     continue;
+                if (GetTransformFromPath(binding.path) == null)
+                    continue;
                 int start = binding.propertyName.IndexOf('[') + 1;
                 int end = binding.propertyName.IndexOf(']') - start;
                 int slot = int.Parse(binding.propertyName.Substring(start, end));
