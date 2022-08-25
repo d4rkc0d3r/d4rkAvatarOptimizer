@@ -328,6 +328,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (exclusions.Contains(renderer.transform))
                     break;
+                if (exclusions.Contains(subList[0].transform))
+                    continue;
                 if (CanCombineRendererWith(subList, renderer))
                 {
                     subList.Add(renderer);

@@ -6,6 +6,7 @@
 * Shader optimizer skips parsed shaders that are null or parsed incorrectly.
 * Fix floats getting written with system localization instead of invariant culture.
 * Fix crash when an animation has a material swap that doesn't point to a transform on the avatar. Fix for: [Null pointer error on Create Optimized Copy](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/7)
+* Fix bug where the merge mesh logic would ignore the exclusion list when merging into an excluded mesh.
 
 ### Debug Info
 * Catch exception in the shader optimizer to show which shader is causing the exception.
