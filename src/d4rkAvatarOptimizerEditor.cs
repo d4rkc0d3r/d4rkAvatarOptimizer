@@ -2836,6 +2836,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
             Profiler.StartSection("Show Perf Rank Change");
+            var exclusions = GetAllExcludedTransforms();
             var particleSystemCount = root.GetComponentsInChildren<ParticleSystem>(true)
                 .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
             int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
@@ -2854,7 +2855,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
                 {
                     optimizedSkinnedMeshCount++;
-                    optimizedTotalMaterialCount += matched.Count;
+                    if (exclusions.Contains(renderers[0].transform))
+                        optimizedTotalMaterialCount += renderers[0].GetSharedMesh().subMeshCount;
+                    else
+                        optimizedTotalMaterialCount += matched.Count;
                 }
                 else if (renderers[0] is MeshRenderer)
                 {
