@@ -2544,6 +2544,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 var exclusions = GetAllExcludedTransforms();
                 var tuple = root.GetComponentsInChildren<Renderer>(true)
+                    .Where(r => !r.gameObject.CompareTag("EditorOnly"))
                     .Where(r => !exclusions.Contains(r.transform))
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
@@ -2835,9 +2836,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
             Profiler.StartSection("Show Perf Rank Change");
-            int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length;
-            int meshCount = root.GetComponentsInChildren<MeshRenderer>(true).Length;
-            int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true).Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount);
+            int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+            int meshCount = root.GetComponentsInChildren<MeshRenderer>(true)
+                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+            int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true)
+                .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+                .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount);
             int optimizedSkinnedMeshCount = 0;
             int optimizedMeshCount = 0;
             int optimizedTotalMaterialCount = 0;
