@@ -9,6 +9,7 @@
 * Fix bug where the merge mesh logic would ignore the exclusion list when merging into an excluded mesh.
 * Fix merge perf rank preview pre optimization counting EditorOnly meshes & materials.
 * Fix merge perf rank preview not taking into account particle system material slots.
+* Fix merge perf rank preview counting the "hidden" extra material slots if they didn't get baked into a mesh.
 
 ### Debug Info
 * Catch exception in the shader optimizer to show which shader is causing the exception.

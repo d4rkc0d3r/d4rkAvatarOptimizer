@@ -2850,15 +2850,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             int optimizedTotalMaterialCount = 0;
             foreach (var matched in MergedMaterialPreview)
             {
-                optimizedTotalMaterialCount += matched.Count;
-                var renderers = matched.SelectMany(m => m).Select(m => m.renderer).Distinct().ToArray();
+                var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
                 if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
                 {
                     optimizedSkinnedMeshCount++;
+                    optimizedTotalMaterialCount += matched.Count;
                 }
-                else if (renderers.Any(r => r is MeshRenderer))
+                else if (renderers[0] is MeshRenderer)
                 {
                     optimizedMeshCount++;
+                    var mesh = renderers[0].GetSharedMesh();
+                    optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
+                }
+                else // ParticleSystemRenderer
+                {
+                    optimizedTotalMaterialCount += 1;
                 }
             }
             PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshCount, optimizedSkinnedMeshCount, AvatarPerformanceCategory.SkinnedMeshCount);
