@@ -889,10 +889,10 @@ namespace d4rkpl4y3r
             foreach (var animatedProperty in animatedPropertyValues)
             {
                 string name = animatedProperty.Key;
-                string value = "d4rkAvatarOptimizer" + name + "[d4rkAvatarOptimizer_MeshID]";
+                string value = $"d4rkAvatarOptimizer{name}[d4rkAvatarOptimizer_MeshID]";
                 if (animatedProperty.Value.StartsWith("float"))
                 {
-                    output.Add(name + " = asuint(" + value + ".x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? " + name + " : " + value + ";");
+                    output.Add($"{name} = asuint({value}.x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? {name} : {value};");
                 }
             }
         }
@@ -1386,10 +1386,10 @@ namespace d4rkpl4y3r
             output.Add(val + ";");
             foreach (var animatedProperty in animatedPropertyValues.Keys)
             {
-                val = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizer" + animatedProperty + "[d4rkAvatarOptimizer_MeshID].x";
+                val = $"d4rkAvatarOptimizer_val += d4rkAvatarOptimizer{animatedProperty}[d4rkAvatarOptimizer_MeshID].x";
                 for (int i = 0; i < meshToggleCount; i++)
                 {
-                    val += " + d4rkAvatarOptimizer" + animatedProperty + i + ".x";
+                    val += $" + d4rkAvatarOptimizer{animatedProperty}_ArrayIndex{i}.x";
                 }
                 output.Add(val + ";");
             }
@@ -1414,10 +1414,10 @@ namespace d4rkpl4y3r
                 {
                     string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
                     string type = animatedProperty.Value;
-                    output.Add(type + " " + name + "[" + meshToggleCount + "] : packoffset(c" + currentPackOffset + ");");
+                    output.Add($"{type} {name}[{meshToggleCount}] : packoffset(c{currentPackOffset});");
                     for (int i = 0; i < meshToggleCount; i++)
                     {
-                        output.Add(type + " " + name + i + " : packoffset(c" + (currentPackOffset + i) + ");");
+                        output.Add($"{type} {name}_ArrayIndex{i} : packoffset(c{currentPackOffset + i});");
                     }
                     currentPackOffset += meshToggleCount;
                 }
@@ -1724,7 +1724,7 @@ namespace d4rkpl4y3r
                         }
                         for (int i = 0; i < meshToggleCount; i++)
                         {
-                            output.Add("d4rkAvatarOptimizer" + prop.name + i + "(\"" + prop.name + " " + i + "\", " + type + ") = " + defaultValue);
+                            output.Add($"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}(\"{prop.name} {i}\", {type}) = {defaultValue}");
                         }
                     }
                 }

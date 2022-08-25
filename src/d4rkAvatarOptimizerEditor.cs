@@ -1248,13 +1248,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                         }
                         for (int mID = 0; mID < meshCount; mID++)
                         {
+                            var propArrayName = $"{propName}_ArrayIndex{mID}";
                             if (isVector || isColor)
                             {
-                                mat.SetVector(propName + mID, props.GetVector(propName + mID));
+                                mat.SetVector(propArrayName, props.GetVector(propArrayName));
                             }
                             else
                             {
-                                mat.SetFloat(propName + mID, props.GetFloat(propName + mID));
+                                mat.SetFloat(propArrayName, props.GetFloat(propArrayName));
                             }
                         }
                     }
@@ -1990,15 +1991,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 string newPropertyName = $"material.{propName}";
                                 if (settings.KeepMaterialPropertyAnimationsSeparate)
                                 {
-                                    newPropertyName = $"material.d4rkAvatarOptimizer{propName}{mID}";
+                                    newPropertyName = $"material.d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
                                     float signal = System.BitConverter.ToSingle(new byte[] {0x55, 0x55, 0x55, 0xFF}, 0);
                                     if (isVector || isColor)
                                     {
-                                        properties.SetVector("d4rkAvatarOptimizer" + propName + mID, new Vector4(signal, signal, signal, signal));
+                                        properties.SetVector($"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}", new Vector4(signal, signal, signal, signal));
                                     }
                                     else
                                     {
-                                        properties.SetFloat("d4rkAvatarOptimizer" + propName + mID, signal);
+                                        properties.SetFloat($"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}", signal);
                                     }
                                 }
                                 string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
