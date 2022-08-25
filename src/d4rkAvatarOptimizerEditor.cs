@@ -320,13 +320,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var renderer in renderers)
         {
             var mesh = renderer.GetSharedMesh();
-            if (mesh == null || renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer))
+            if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer))
                 continue;
 
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (exclusions.Contains(renderer.transform))
+                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer)
                     break;
                 if (exclusions.Contains(subList[0].transform))
                     continue;
@@ -2836,13 +2836,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
             Profiler.StartSection("Show Perf Rank Change");
+            var particleSystemCount = root.GetComponentsInChildren<ParticleSystem>(true)
+                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
             int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
                 .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
             int meshCount = root.GetComponentsInChildren<MeshRenderer>(true)
                 .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
             int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true)
                 .Where(r => !r.gameObject.CompareTag("EditorOnly"))
-                .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount);
+                .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
             int optimizedSkinnedMeshCount = 0;
             int optimizedMeshCount = 0;
             int optimizedTotalMaterialCount = 0;
@@ -2854,7 +2856,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     optimizedSkinnedMeshCount++;
                 }
-                else
+                else if (renderers.Any(r => r is MeshRenderer))
                 {
                     optimizedMeshCount++;
                 }
