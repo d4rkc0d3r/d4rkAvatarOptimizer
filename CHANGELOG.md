@@ -1,3 +1,7 @@
+## Next Version
+### Bug fixes
+* Fix crash when an EditorOnly tagged game object was in the exclusions list.
+
 ## v1.4
 ### Features
 * Add info box educating about increased poly count after optimization if some renderer has more material slots than sub meshes.

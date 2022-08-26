@@ -2087,6 +2087,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var excludedTransform in settings.ExcludeTransforms)
         {
             var newTransform = GetTransformFromPath(GetTransformPathTo(excludedTransform, settings.transform));
+            if (newTransform == null)
+                continue;
             allExcludedTransforms.Add(newTransform);
             allExcludedTransforms.UnionWith(newTransform.GetAllDescendants());
         }
@@ -2204,6 +2206,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var exclusionOnMainAvatar in settings.ExcludeTransforms)
         {
             var exclusion = GetTransformFromPath(GetTransformPathTo(exclusionOnMainAvatar, settings.transform));
+            if (exclusion == null)
+                continue;
             used.Add(exclusion);
             used.UnionWith(exclusion.GetAllDescendants());
             while ((exclusion = exclusion.parent) != null)
