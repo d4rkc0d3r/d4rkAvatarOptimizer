@@ -1563,7 +1563,7 @@ namespace d4rkpl4y3r
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
             var line = source[sourceLineIndex];
-            var func = (arrayPropertyValues.Count > 0 || meshToggleCount > 1) ? ShaderAnalyzer.ParseFunctionDefinition(line) : (null, null);
+            var func = ShaderAnalyzer.ParseFunctionDefinition(line);
             if (pass.vertex != null && func.name == pass.vertex.name)
             {
                 InjectVertexShaderCode(source, ref sourceLineIndex, pass);
