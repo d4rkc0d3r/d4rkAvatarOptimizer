@@ -13,6 +13,7 @@
 * Fix bug with animated properties that ended in numbers.
 * Fix that debug info for all game objects with toggles would list the always disabled game objects instead.
 * Fix frag inject code not running if there were no array properties or mesh toggles. This caused the code to preserve texture samplers not to be injected. Fix for: [Shader issue?](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/8)
+* Write active mesh toggle state to the `_IsActiveMesh` material properties. Also base them on the Renderer enabled state instead of just the game object active state.
 
 ### Debug Info
 * Catch exception in the shader optimizer to show which shader is causing the exception.

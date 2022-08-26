@@ -1262,6 +1262,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
+            if (meshCount > 1)
+            {
+                foreach (var mat in meshRenderer.sharedMaterials)
+                {
+                    for (int mID = 0; mID < meshCount; mID++)
+                    {
+                        var propName = $"_IsActiveMesh{mID}";
+                        mat.SetFloat(propName, props.GetFloat(propName));
+                    }
+                }
+            }
+
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
@@ -1964,7 +1976,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     {
                         meshRenderer.GetPropertyBlock(properties);
                     }
-                    properties.SetFloat("_IsActiveMesh" + meshID, skinnedMesh.gameObject.activeSelf ? 1f : 0f);
+                    bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
+                    properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
                     properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
@@ -2278,11 +2291,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             if (!meshesThatGetCombinedWithOtherMeshes.Contains(obj.GetComponent<Renderer>()))
                 continue;
+            bool isActive = obj.GetComponent<MeshRenderer>().enabled;
             var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
             var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
             var mesh = obj.GetComponent<MeshFilter>().sharedMesh;
             DestroyImmediate(obj.GetComponent<MeshFilter>());
             var skinnedMeshRenderer = obj.AddComponent<SkinnedMeshRenderer>();
+            skinnedMeshRenderer.enabled = isActive;
             skinnedMeshRenderer.sharedMesh = mesh;
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
