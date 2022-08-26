@@ -1292,6 +1292,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static bool CanCombineTextures(Texture a, Texture b)
     {
+        if (a == b)
+            return true;
         if (a == null || b == null)
             return true;
         if (a.texelSize != b.texelSize)
