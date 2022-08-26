@@ -1,4 +1,4 @@
-## Next Version
+## v1.4
 ### Features
 * Add info box educating about increased poly count after optimization if some renderer has more material slots than sub meshes.
 
