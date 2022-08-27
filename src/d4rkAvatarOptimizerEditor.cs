@@ -1294,11 +1294,13 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (a == b)
             return true;
-        if (a == null || b == null)
+        if (a == null && b is Texture2D)
             return true;
-        if (a.texelSize != b.texelSize)
-            return false;
+        if (a is Texture2D && b == null)
+            return true;
         if (!(a is Texture2D) || !(b is Texture2D))
+            return false;
+        if (a.texelSize != b.texelSize)
             return false;
         var a2D = a as Texture2D;
         var b2D = b as Texture2D;
