@@ -5,6 +5,7 @@
 * Fix non Texture2D textures trying to combine with `null`.
 * Fix crash when vertex shader has no input struct.
 * Fix geometry shader input type to also allow for point & line.
+* Fix nested BlendTrees not getting iterated through to fix animation paths.
 
 ## v1.4
 ### Features

@@ -444,6 +444,26 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         return clip;
     }
+
+    private static Motion FixMotion(Motion motion, Dictionary<AnimationClip, AnimationClip> fixedClips, AnimationClip dummyClip)
+    {
+        if (motion == null)
+            return dummyClip;
+        if (motion is AnimationClip)
+            return fixedClips.TryGetValue(motion as AnimationClip, out var clip) ? clip : motion;
+        if (motion is BlendTree)
+        {
+            var blendTree = motion as BlendTree;
+            var childNodes = blendTree.children;
+            for (int j = 0; j < childNodes.Length; j++)
+            {
+                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedClips, dummyClip);
+            }
+            blendTree.children = childNodes;
+            return blendTree;
+        }
+        return motion;
+    }
     
     private static void FixAllAnimationPaths()
     {
@@ -481,29 +501,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
-                var clip = state.motion as AnimationClip;
-                var blendTree = state.motion as BlendTree;
-                if (blendTree != null)
-                {
-                    var childNodes = blendTree.children;
-                    for (int j = 0; j < childNodes.Length; j++)
-                    {
-                        clip = childNodes[j].motion as AnimationClip;
-                        if (clip != null)
-                        {
-                            childNodes[j].motion = optimizedAnimations[clip];
-                        }
-                    }
-                    blendTree.children = childNodes;
-                }
-                else if (clip != null)
-                {
-                    state.motion = optimizedAnimations[clip];
-                }
-                else
-                {
-                    state.motion = dummyAnimationToFillEmptyStates;
-                }
+                state.motion = FixMotion(state.motion, optimizedAnimations, dummyAnimationToFillEmptyStates);
             }
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
