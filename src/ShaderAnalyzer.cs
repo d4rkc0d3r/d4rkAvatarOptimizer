@@ -1171,9 +1171,10 @@ namespace d4rkpl4y3r
             {
                 line = source[++sourceLineIndex];
             }
-            output.Add("void " + func.name + "(triangle "
+            string geometryType = inParam.arraySize == 1 ? "point" : inParam.arraySize == 2 ? "line" : "triangle";
+            output.Add($"void {func.name}({geometryType} "
                 + (usesInputWrapper ? "geometryInputWrapper d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
-                + "[" + inParam.arraySize + "], inout "
+                + $"[{inParam.arraySize}], inout "
                 + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
                 + (usesOutputWrapper ? "geometryOutputWrapper" : outParamType)
                 + "> " + outParam.name
