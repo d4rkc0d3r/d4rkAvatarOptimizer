@@ -3,6 +3,7 @@
 * Fix crash when an EditorOnly tagged game object was in the exclusions list.
 * Fix non Texture2D textures that are the same reporting that they can't be combined.
 * Fix non Texture2D textures trying to combine with `null`.
+* Fix crash when vertex shader has no input struct.
 
 ## v1.4
 ### Features

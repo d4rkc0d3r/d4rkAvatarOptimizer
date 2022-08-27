@@ -864,7 +864,7 @@ namespace d4rkpl4y3r
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"Error optimizing shader {source.name}: {e.Message}");
+                Debug.LogError($"Error optimizing shader {source.name}: {e.Message}\n{e.StackTrace}");
                 throw e;
             }
             finally
@@ -1051,16 +1051,15 @@ namespace d4rkpl4y3r
                 }
             }
             InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
-            string uv0Name = inParam.name + "." + vertexInUv0Member;
             if (meshToggleCount > 1)
             {
-                output.Add("d4rkAvatarOptimizer_MeshID = " + uv0Name + ".z;");
+                output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z;");
                 InjectDummyCBufferUsage(nullReturn);
                 output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) " + nullReturn);
             }
             if (arrayPropertyValues.Count > 0)
             {
-                output.Add("d4rkAvatarOptimizer_MaterialID = " + uv0Name + ".w;");
+                output.Add($"d4rkAvatarOptimizer_MaterialID = {inParam.name}.{vertexInUv0Member}.w;");
                 InjectArrayPropertyInitialization();
             }
             InjectAnimatedPropertyInitialization();
