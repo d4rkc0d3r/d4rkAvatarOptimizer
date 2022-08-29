@@ -7,6 +7,7 @@ using System.Threading;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.Animations;
+using UnityEngine.SceneManagement;
 using UnityEditor.Animations;
 using UnityEditor;
 using d4rkpl4y3r;
@@ -2838,6 +2839,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.Reset();
             AssignNewAvatarIDIfEmpty();
             var copy = Instantiate(settings.gameObject);
+            SceneManager.MoveGameObjectToScene(copy, settings.gameObject.scene);
             copy.name = settings.gameObject.name + "(BrokenCopy)";
             DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
             if (copy.GetComponent<VRCAvatarDescriptor>() != null)

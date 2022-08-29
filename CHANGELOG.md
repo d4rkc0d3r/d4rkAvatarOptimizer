@@ -6,6 +6,7 @@
 * Fix crash when vertex shader has no input struct.
 * Fix geometry shader input type to also allow for point & line.
 * Fix nested BlendTrees not getting iterated through to fix animation paths.
+* Move the optimized copy to the same scene as the original.
 
 ## v1.4
 ### Features
