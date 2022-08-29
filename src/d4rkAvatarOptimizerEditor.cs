@@ -2155,6 +2155,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         
         foreach (var constraint in root.GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
         {
+            used.Add((constraint as Component).transform.parent);
             for (int i = 0; i < constraint.sourceCount; i++)
             {
                 used.Add(constraint.GetSource(i).sourceTransform);

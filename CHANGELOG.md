@@ -10,6 +10,7 @@
 * Replace VFACE semantic with SV_IsFrontFace.
 * Force include TEXCOORD0 semantic in the vertex shader input struct. This fixes cases where the sematic only exists in some shader variants.
 * Don't delete transforms that are moved by animations.
+* Don't delete parent transforms of Constraints.
 
 ## v1.4
 ### Features
