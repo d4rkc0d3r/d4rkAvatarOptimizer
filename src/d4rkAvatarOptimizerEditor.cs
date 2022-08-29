@@ -759,24 +759,24 @@ public class d4rkAvatarOptimizerEditor : Editor
         return alwaysDisabledBehaviours;
     }
 
-    private static HashSet<Transform> FindAllUnmovingTransforms()
+    private static HashSet<Transform> FindAllMovingTransforms()
     {
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return new HashSet<Transform>();
-        var transforms = new HashSet<Transform>(root.transform.GetAllDescendants());
+        var transforms = new HashSet<Transform>();
 
         if (avDescriptor.enableEyeLook)
         {
-            transforms.Remove(avDescriptor.customEyeLookSettings.leftEye);
-            transforms.Remove(avDescriptor.customEyeLookSettings.rightEye);
+            transforms.Add(avDescriptor.customEyeLookSettings.leftEye);
+            transforms.Add(avDescriptor.customEyeLookSettings.rightEye);
         }
         if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Bones)
         {
-            transforms.Remove(avDescriptor.customEyeLookSettings.lowerLeftEyelid);
-            transforms.Remove(avDescriptor.customEyeLookSettings.lowerRightEyelid);
-            transforms.Remove(avDescriptor.customEyeLookSettings.upperLeftEyelid);
-            transforms.Remove(avDescriptor.customEyeLookSettings.upperRightEyelid);
+            transforms.Add(avDescriptor.customEyeLookSettings.lowerLeftEyelid);
+            transforms.Add(avDescriptor.customEyeLookSettings.lowerRightEyelid);
+            transforms.Add(avDescriptor.customEyeLookSettings.upperLeftEyelid);
+            transforms.Add(avDescriptor.customEyeLookSettings.upperRightEyelid);
         }
 
         var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
@@ -787,7 +787,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (binding.type == typeof(Transform))
                 {
-                    transforms.Remove(GetTransformFromPath(binding.path));
+                    transforms.Add(GetTransformFromPath(binding.path));
                 }
             }
         }
@@ -799,7 +799,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (boneId < 0 || boneId >= HumanBodyBones.LastBone)
                     continue;
-                transforms.Remove(animator.GetBoneTransform(boneId));
+                transforms.Add(animator.GetBoneTransform(boneId));
             }
         }
 
@@ -827,7 +827,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var current = stack.Pop();
                 if (exclusions.Contains(current))
                     continue;
-                transforms.Remove(current);
+                transforms.Add(current);
                 foreach (Transform child in current)
                 {
                     stack.Push(child);
@@ -840,10 +840,19 @@ public class d4rkAvatarOptimizerEditor : Editor
             .Where(b => b is IConstraint).ToList();
         foreach (var constraint in constraints)
         {
-            transforms.Remove(constraint.transform);
+            transforms.Add(constraint.transform);
         }
 
         return transforms;
+    }
+
+    private static HashSet<Transform> FindAllUnmovingTransforms()
+    {
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return new HashSet<Transform>();
+        var moving = FindAllMovingTransforms();
+        return new HashSet<Transform>(root.transform.GetAllDescendants().Where(t => !moving.Contains(t)));
     }
 
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
@@ -2141,6 +2150,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var used = new HashSet<Transform>(
             root.GetComponentsInChildren<SkinnedMeshRenderer>(true).SelectMany(s => s.bones));
+
+        used.UnionWith(FindAllMovingTransforms());
         
         foreach (var constraint in root.GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
         {
@@ -2156,16 +2167,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         used.UnionWith(root.GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
 
-        foreach (var animator in root.GetComponentsInChildren<Animator>(true))
-        {
-            foreach (var boneId in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
-            {
-                if (boneId < 0 || boneId >= HumanBodyBones.LastBone)
-                    continue;
-                used.Add(animator.GetBoneTransform(boneId));
-            }
-        }
-
         foreach (var skinnedRenderer in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
             used.Add(skinnedRenderer.rootBone);
@@ -2174,26 +2175,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
         {
             used.Add(renderer.probeAnchor);
-        }
-
-        foreach (var physBone in root.GetComponentsInChildren<VRCPhysBoneBase>(true))
-        {
-            var root = physBone.GetRootTransform();
-            var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
-            var stack = new Stack<Transform>();
-            used.Add(root);
-            stack.Push(root);
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                if (exclusions.Contains(current))
-                    continue;
-                used.Add(current);
-                foreach (Transform child in current)
-                {
-                    stack.Push(child);
-                }
-            }
         }
 
         foreach (var obj in root.transform.GetAllDescendants())
