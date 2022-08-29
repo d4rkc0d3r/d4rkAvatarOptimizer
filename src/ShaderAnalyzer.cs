@@ -1596,7 +1596,6 @@ namespace d4rkpl4y3r
                     var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
                     if (structName == vertIn?.type)
                     {
-                        bool hasUv0 = false;
                         while (++sourceLineIndex < source.Count)
                         {
                             line = source[sourceLineIndex];
@@ -1612,15 +1611,13 @@ namespace d4rkpl4y3r
                                     else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
                                     else vertexInUv0EndSwizzle = "";
                                     vertexInUv0Member = match.Groups[3].Value;
-                                    hasUv0 = true;
+                                    output.Add($"//{line}");
+                                    continue;
                                 }
                             }
                             if (line.StartsWith("}"))
                             {
-                                if (!hasUv0)
-                                {
-                                    output.Add("float4 texcoord : TEXCOORD0;");
-                                }
+                                output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
                                 output.Add(line);
                                 break;
                             }
