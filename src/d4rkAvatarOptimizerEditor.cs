@@ -446,22 +446,34 @@ public class d4rkAvatarOptimizerEditor : Editor
         return clip;
     }
 
-    private static Motion FixMotion(Motion motion, Dictionary<AnimationClip, AnimationClip> fixedClips, AnimationClip dummyClip)
+    private static Motion FixMotion(Motion motion, Dictionary<Motion, Motion> fixedMotions, string assetPath, AnimationClip dummyClip)
     {
         if (motion == null)
             return dummyClip;
-        if (motion is AnimationClip)
-            return fixedClips.TryGetValue(motion as AnimationClip, out var clip) ? clip : motion;
-        if (motion is BlendTree)
+        if (fixedMotions.TryGetValue(motion, out var fixedMotionValue))
+            return fixedMotionValue;
+        if (motion is BlendTree oldTree)
         {
-            var blendTree = motion as BlendTree;
-            var childNodes = blendTree.children;
+            var newTree = new BlendTree();
+            newTree.name = oldTree.name;
+            newTree.blendType = oldTree.blendType;
+            newTree.blendParameter = oldTree.blendParameter;
+            newTree.blendParameterY = oldTree.blendParameterY;
+            newTree.minThreshold = oldTree.minThreshold;
+            newTree.maxThreshold = oldTree.maxThreshold;
+            newTree.useAutomaticThresholds = oldTree.useAutomaticThresholds;
+            var childNodes = oldTree.children;
             for (int j = 0; j < childNodes.Length; j++)
             {
-                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedClips, dummyClip);
+                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedMotions, assetPath, dummyClip);
             }
-            blendTree.children = childNodes;
-            return blendTree;
+            newTree.children = childNodes;
+            fixedMotions[motion] = newTree;
+            newTree.hideFlags = HideFlags.HideInHierarchy;
+            Profiler.StartSection("AssetDatabase.AddObjectToAsset()");
+            AssetDatabase.AddObjectToAsset(newTree, assetPath);
+            Profiler.EndSection();
+            return newTree;
         }
         return motion;
     }
@@ -483,10 +495,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             animations.UnionWith(layer.animationClips);
         }
 
-        var optimizedAnimations = new Dictionary<AnimationClip, AnimationClip>();
+        var fixedMotions = new Dictionary<Motion, Motion>();
         foreach (var clip in animations)
         {
-            optimizedAnimations[clip] = FixAnimationClipPaths(clip);
+            fixedMotions[clip] = FixAnimationClipPaths(clip);
         }
         
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
@@ -502,7 +514,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
-                state.motion = FixMotion(state.motion, optimizedAnimations, dummyAnimationToFillEmptyStates);
+                state.motion = FixMotion(state.motion, fixedMotions, path, dummyAnimationToFillEmptyStates);
             }
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;

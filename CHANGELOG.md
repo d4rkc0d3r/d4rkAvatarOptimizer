@@ -11,6 +11,7 @@
 * Force include TEXCOORD0 semantic in the vertex shader input struct. This fixes cases where the sematic only exists in some shader variants.
 * Don't delete transforms that are moved by animations.
 * Don't delete parent transforms of Constraints.
+* Deep copy blend trees when fixing animation paths.
 
 ## v1.4
 ### Features
