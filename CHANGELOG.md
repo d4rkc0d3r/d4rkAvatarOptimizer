@@ -7,6 +7,7 @@
 * Fix geometry shader input type to also allow for point & line.
 * Fix nested BlendTrees not getting iterated through to fix animation paths.
 * Move the optimized copy to the same scene as the original.
+* Replace VFACE semantic with SV_IsFrontFace.
 
 ## v1.4
 ### Features

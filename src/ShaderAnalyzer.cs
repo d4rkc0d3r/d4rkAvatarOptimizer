@@ -671,7 +671,8 @@ namespace d4rkpl4y3r
                     && lineIndex < lines.Count - 1
                     && lines[lineIndex + 1] != "{"
                     && lines[lineIndex + 1] != "}"
-                    && !lines[lineIndex + 1].StartsWith("#"))
+                    && !lines[lineIndex + 1].StartsWith("#")
+                    && !lines[lineIndex + 1].StartsWith("return"))
                 {
                     line = line + " " + lines[++lineIndex];
                 }
@@ -938,7 +939,10 @@ namespace d4rkpl4y3r
                 {
                     if (isInput ^ match.Groups[2].Value != "out")
                         continue;
-                    output.Add(match.Groups[3].Value + ";");
+                    if (match.Groups[4].Value.ToLowerInvariant().Contains("vface"))
+                        output.Add("uint d4rkAvatarOptimizer_SV_IsFrontFace : SV_IsFrontFace;");
+                    else
+                        output.Add(match.Groups[3].Value + ";");
                 }
                 else
                 {
@@ -960,17 +964,19 @@ namespace d4rkpl4y3r
                 var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (match.Success)
                 {
-                    if (isInput && match.Groups[2].Value != "out")
+                    var type = match.Groups[3].Value;
+                    var name = match.Groups[4].Value;
+                    if (match.Groups[5].Value.ToLowerInvariant().Contains("vface"))
                     {
-                        var type = match.Groups[3].Value;
-                        var name = match.Groups[4].Value;
-                        output.Add(type + " " + name + " = " + wrapperName + "." + name + ";");
+                        output.Add($"{type} {name} = {wrapperName}.d4rkAvatarOptimizer_SV_IsFrontFace ? 1 : -1;");
+                    }
+                    else if (isInput && match.Groups[2].Value != "out")
+                    {
+                        output.Add($"{type} {name} = {wrapperName}.{name};");
                     }
                     else if (!isInput && match.Groups[2].Value == "out")
                     {
-                        var type = match.Groups[3].Value;
-                        var name = match.Groups[4].Value;
-                        output.Add(wrapperName + "." + name + " = " + name + ";");
+                        output.Add($"{wrapperName}.{name} = {name};");
                     }
                 }
                 else
