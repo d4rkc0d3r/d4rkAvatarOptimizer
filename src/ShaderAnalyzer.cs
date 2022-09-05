@@ -946,7 +946,7 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(line + " // raw line");
+                    output.Add($"// raw line: {line}");
                 }
             }
             output.Add("};");
@@ -981,7 +981,29 @@ namespace d4rkpl4y3r
                 }
                 else
                 {
-                    output.Add(line + " // raw line");
+                    output.Add($"// raw line: {line}");
+                }
+            }
+        }
+
+        private void AddOutParametersToFunctionDeclaration(List<string> funcParams, List<string> output)
+        {
+            foreach (var line in funcParams)
+            {
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                    continue;
+                }
+                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+))?");
+                if (match.Success)
+                {
+                    if (match.Groups[2].Value == "out")
+                        output.Add($", out {match.Groups[3].Value}");
+                }
+                else
+                {
+                    output.Add($"// raw line: {line}");
                 }
             }
         }
@@ -1251,23 +1273,24 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
-            var outParam = pass.fragment.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
-            var isVoidReturn = pass.fragment.parameters[0].type == "void";
+            var returnParam = pass.fragment.parameters[0];
+            string nullReturn = returnParam.type == "void" ? "return;" : "return (" + returnParam.type + ")0;";
             if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
             {
                 var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
                 output.Add(pass.fragment.parameters[0].type + " " + pass.fragment.name + "(");
                 output.Add("fragmentInputWrapper d4rkAvatarOptimizer_fragmentInput");
+                AddOutParametersToFunctionDeclaration(funcParams, output);
                 if (pass.fragment.parameters[0].semantic != null)
                     output.Add(") : " + pass.fragment.parameters[0].semantic);
                 else
                     output.Add(")");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_fragmentInput", true);
+                InitializeOutputParameter(funcParams, output, true);
                 output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
                 output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID >> 16;");
-                string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
                 if (animatedPropertyValues.Count > 0)
                 {
                     InjectDummyCBufferUsage(nullReturn);
@@ -1292,22 +1315,20 @@ namespace d4rkpl4y3r
                 output.Add("float d4rkAvatarOptimizer_sum = 0;");
                 foreach (var tex in texturesToCallSoTheSamplerDoesntDisappear)
                 {
-                    output.Add("#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + tex);
+                    output.Add($"#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_{tex}");
                     var texType = parsedShader.properties.Find(p => p.name == tex)?.type;
                     if (texType == ParsedShader.Property.Type.TextureCube
                         || texType == ParsedShader.Property.Type.TextureCubeArray)
                     {
-                        output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Sample(sampler" + tex + ", 0).x;");
+                        output.Add($"d4rkAvatarOptimizer_sum += {tex}.Sample(sampler{tex}, 0).x;");
                     }
                     else
                     {
-                        output.Add("d4rkAvatarOptimizer_sum += " + tex + ".Load(0).x;");
+                        output.Add($"d4rkAvatarOptimizer_sum += {tex}.Load(0).x;");
                     }
                     output.Add("#endif");
                 }
-                output.Add(pass.fragment.parameters[0].type == "void"
-                    ? "if (d4rkAvatarOptimizer_sum) return;"
-                    : "if (d4rkAvatarOptimizer_sum) return (" + outParam.type + ")0;");
+                output.Add($"if (d4rkAvatarOptimizer_sum) {nullReturn}");
                 output.Add("}");
             }
         }
