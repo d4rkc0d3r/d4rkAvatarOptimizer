@@ -591,6 +591,39 @@ namespace d4rkpl4y3r
             return null;
         }
 
+        public static List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
+        {
+            var output = new List<string>();
+            string line = source[sourceLineIndex].Substring(source[sourceLineIndex].IndexOf('(') + 1);
+            while (line != "{" && sourceLineIndex < source.Count - 1)
+            {
+                line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
+                if (line.StartsWith("#"))
+                {
+                    output.Add(line);
+                }
+                else
+                {
+                    output.AddRange(line.Split(',').Select(s => s.Trim()).Where(s => s != ""));
+                }
+                line = source[++sourceLineIndex];
+            }
+            output[output.Count - 1] = output[output.Count - 1].Split(')')[0];
+            if (output[output.Count - 1].Length == 0)
+                output.RemoveAt(output.Count - 1);
+            foreach (var declaration in output)
+            {
+                if (declaration.StartsWith("#"))
+                    continue;
+                var match = Regex.Match(declaration, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                if (!match.Success)
+                {
+                    throw new ParserException("Unknown function parameter declaration: " + declaration);
+                }
+            }
+            return output;
+        }
+
         private static void UpdateFunctionDefinition(ParsedShader.Function func, ParsedShader.Pass pass)
         {
             if (func.name == pass.vertex?.name)
@@ -745,7 +778,7 @@ namespace d4rkpl4y3r
                         }
                         else if (line == "GLSLPROGRAM")
                         {
-                            throw new ShaderAnalyzer.ParserException("GLSLPROGRAM is not supported.");
+                            throw new ParserException("GLSLPROGRAM is not supported.");
                         }
                         else if (line == "CGINCLUDE")
                         {
@@ -764,13 +797,22 @@ namespace d4rkpl4y3r
                             for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
                             {
                                 ParsePragma(program[programLineIndex], currentPass);
+                            }
+                            for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
+                            {
                                 ParseCustomFunctionDeclarationMacro(program[programLineIndex]);
-                                var func = ParseFunctionDefinition(program, ref programLineIndex);
+                                int tempIndex = programLineIndex;
+                                var func = ParseFunctionDefinition(program, ref tempIndex);
                                 if (func != null)
                                 {
                                     parsedShader.functions[func.name] = func;
                                     UpdateFunctionDefinition(func, currentPass);
+                                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name)
+                                    {
+                                        ParseFunctionParametersWithPreprocessorStatements(program, ref programLineIndex);
+                                    }
                                 }
+                                programLineIndex = tempIndex;
                             }
                             output.Add(line);
                             output.AddRange(program);
@@ -896,29 +938,6 @@ namespace d4rkpl4y3r
                     output.Add($"{name} = asuint({value}.x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? {name} : {value};");
                 }
             }
-        }
-
-        private List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
-        {
-            var output = new List<string>();
-            string line = source[sourceLineIndex].Substring(source[sourceLineIndex].IndexOf('(') + 1);
-            while (line != "{" && sourceLineIndex < source.Count - 1)
-            {
-                line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
-                if (line.StartsWith("#"))
-                {
-                    output.Add(line);
-                }
-                else
-                {
-                    output.AddRange(line.Split(',').Select(s => s.Trim()).Where(s => s != ""));
-                }
-                line = source[++sourceLineIndex];
-            }
-            output[output.Count - 1] = output[output.Count - 1].Split(')')[0];
-            if (output[output.Count - 1].Length == 0)
-                output.RemoveAt(output.Count - 1);
-            return output;
         }
 
         private void AddParameterStructWrapper(List<string> funcParams, List<string> output, string name, bool addMeshMaterialID, bool isInput)
@@ -1054,7 +1073,7 @@ namespace d4rkpl4y3r
             if (needToPassOnMeshOrMaterialID)
             {
                 int startLineIndex = sourceLineIndex;
-                funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+                funcParams = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 originalVertexShader = new List<string>(source.GetRange(startLineIndex, sourceLineIndex - startLineIndex + 1));
                 if (returnParam.type != "void")
                     funcParams = funcParams.Prepend("out " + returnParam.type + " returnWrappedStruct"
@@ -1069,7 +1088,7 @@ namespace d4rkpl4y3r
             else
             {
                 int startLineIndex = sourceLineIndex;
-                funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref startLineIndex);
+                funcParams = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref startLineIndex);
                 string line = source[sourceLineIndex];
                 output.Add(line);
                 while (line != "{" && sourceLineIndex < source.Count - 1)
@@ -1277,7 +1296,7 @@ namespace d4rkpl4y3r
             string nullReturn = returnParam.type == "void" ? "return;" : "return (" + returnParam.type + ")0;";
             if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
             {
-                var funcParams = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+                var funcParams = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
                 output.Add(pass.fragment.parameters[0].type + " " + pass.fragment.name + "(");
                 output.Add("fragmentInputWrapper d4rkAvatarOptimizer_fragmentInput");
@@ -1350,7 +1369,7 @@ namespace d4rkpl4y3r
             }
 
             string functionDefinitionStart = source[sourceLineIndex].Split('(')[0] + "(";
-            var functionDefinition = ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+            var functionDefinition = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
             for (int i = 0; i < functionDefinition.Count; i++)
             {
                 if (!functionDefinition[i].StartsWith("#"))

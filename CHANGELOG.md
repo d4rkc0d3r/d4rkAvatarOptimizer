@@ -1,6 +1,7 @@
 ## Next Version
 ### Bug fixes
 * Fix extra out parameters in the fragment shader not getting added to the function declaration. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/10)
+* Add ParserException if any parameter in vertex or fragment can't be parsed.
 
 ## v1.5
 ### Bug fixes
