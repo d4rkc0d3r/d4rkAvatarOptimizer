@@ -1,7 +1,12 @@
 ## Next Version
+### Features
+* Add info box if build target is Android to tell users that the optimizer doesn't support Quest avatars.
+* Add validation check that checks if the optimizer got added to an optimized copy.
+
 ### Bug fixes
 * Fix extra out parameters in the fragment shader not getting added to the function declaration. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/10)
 * Add ParserException if any parameter in vertex or fragment can't be parsed.
+* Fix parsing of template types to permit spaces between the type and the template brackets.
 
 ## v1.5
 ### Bug fixes

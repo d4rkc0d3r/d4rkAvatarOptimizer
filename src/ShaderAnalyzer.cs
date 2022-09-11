@@ -529,7 +529,7 @@ namespace d4rkpl4y3r
 
         private static Regex functionDefinition = new Regex(@"^(inline\s+)?(\w+)\s+(\w+)\s*\(", RegexOptions.Compiled);
         private static Regex functionParameter = new Regex(
-            @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+(<[\w,\s]+>)?)\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?",
+            @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+)(\s*<[\w,\s]+>)?\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?",
             RegexOptions.Compiled);
 
         public static (string name, string returnType) ParseFunctionDefinition(string line)
@@ -564,6 +564,11 @@ namespace d4rkpl4y3r
                         var geomType = m.Groups[4].Value;
                         var param = new ParsedShader.Function.Parameter();
                         param.type = m.Groups[5].Value;
+                        if (m.Groups[6].Value != "")
+                        {
+                            string s = m.Groups[6].Value;
+                            param.type += $"<{s.Substring(s.IndexOf('<') + 1, s.IndexOf('>') - s.IndexOf('<') - 1).Trim()}>";
+                        }
                         param.name = m.Groups[8].Value;
                         param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : -1;
                         param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
