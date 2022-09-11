@@ -2306,21 +2306,29 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private void Validate()
+    private bool Validate()
     {
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
 
         if (avDescriptor == null)
         {
-            EditorGUILayout.HelpBox("No VRCAvatarDescriptor found on the root object", MessageType.Error);
-            return;
+            EditorGUILayout.HelpBox("No VRCAvatarDescriptor found on the root object.", MessageType.Error);
+            return false;
+        }
+
+        if (root.name.EndsWith("(OptimizedCopy)"))
+        {
+            EditorGUILayout.HelpBox("Put the optimizer on the original avatar, not the optimized copy.", MessageType.Error);
+            return false;
         }
 
         if (settings.UseRingFingerAsFootCollider)
         {
             if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null)
             {
-                EditorGUILayout.HelpBox("Foot collider transform not set.\nOpen the collider foldout in the avatar descriptor.", MessageType.Error);
+                EditorGUILayout.HelpBox(
+                    "Foot collider transform not set.\n" +
+                    "Open the collider foldout in the avatar descriptor.", MessageType.Error);
             }
         }
 
@@ -2346,7 +2354,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Object.FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
         {
-            EditorGUILayout.HelpBox("Optimized copy of some avatar is present in the scene.\nIts assets will be deleted when creating a new optimized copy.", MessageType.Error);
+            EditorGUILayout.HelpBox(
+                "Optimized copy of some avatar is present in the scene.\n" +
+                "Its assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
         var exclusions = GetAllExcludedTransforms();
@@ -2361,27 +2371,39 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (correctlyParsedMaterials.Length != allMaterials.Length)
         {
-            EditorGUILayout.HelpBox("One or more materials could not be parsed.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "One or more materials could not be parsed.\n" +
+                "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if (settings.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
         {
-            EditorGUILayout.HelpBox("One or more materials do not support merging.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "One or more materials do not support merging.\n" +
+                "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if (settings.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
         {
-            EditorGUILayout.HelpBox("One or more materials do not support merging textures.\nCheck the Debug Info foldout for more info.", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "One or more materials do not support merging textures.\n" +
+                "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if ((settings.MergeDifferentPropertyMaterials || settings.MergeSkinnedMeshes) && allMaterials.Any(m => IsLockedIn(m)))
         {
-            EditorGUILayout.HelpBox("One or more materials are locked in.\nIt is recommended to unlock them so they can be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "One or more materials are locked in.\n" +
+                "It is recommended to unlock them so they can be merged.\n" +
+                "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
 
         if (settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures && CrunchedTextures.Length > 0)
         {
-            EditorGUILayout.HelpBox("One or more textures are crunch compressed.\nCrunch compressed textures cannot be merged.\nCheck the Debug Info foldout for a full list.", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "One or more textures are crunch compressed.\n" +
+                "Crunch compressed textures cannot be merged.\n" +
+                "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
 
         bool hasExtraMaterialSlots = root.GetComponentsInChildren<Renderer>(true)
@@ -2397,6 +2419,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "After optimizing those extra slots and polys will get baked as real ones.\n" + 
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
         }
+
+        return true;
     }
 
     private static void AssignNewAvatarIDIfEmpty()
@@ -2825,7 +2849,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.Reset();
 
         Profiler.StartSection("Validate");
-        Validate();
+        GUI.enabled = Validate();
         Profiler.EndSection();
 
         if (GUILayout.Button("Create Optimized Copy"))
@@ -2855,6 +2879,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         EditorGUILayout.Separator();
+        GUI.enabled = true;
 
         if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
