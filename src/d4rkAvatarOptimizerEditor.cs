@@ -2774,6 +2774,11 @@ public class d4rkAvatarOptimizerEditor : Editor
     
     public override void OnInspectorGUI()
     {
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android)
+        {
+            EditorGUILayout.HelpBox("Quest avatars don't support custom shaders. As such this tool can't work for Quest.", MessageType.Error);
+            return;
+        }
         settings = (d4rkAvatarOptimizer)target;
         root = settings.gameObject;
         OnSelectionChange();
