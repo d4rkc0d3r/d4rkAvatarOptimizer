@@ -145,6 +145,18 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private static Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
+    private static float progressBar = 0;
+
+    private static void DisplayProgressBar(string text)
+    {
+        EditorUtility.DisplayProgressBar("Optimizing " + settings.name, text, progressBar);
+    }
+
+    private static void DisplayProgressBar(string text, float progress)
+    {
+        progressBar = progress;
+        DisplayProgressBar(text);
+    }
 
     private static void ClearTrashBin()
     {
@@ -1168,6 +1180,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             var source = sources[i];
             if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
                 continue;
+
+            DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
             var name = System.IO.Path.GetFileName(source[0].shader.name);
             name = source[0].name + " " + name;
             var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
@@ -1218,6 +1232,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         foreach(var mat in optimizedMaterials)
         {
+            DisplayProgressBar($"Loading optimized shader {mat.name}");
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
             int renderQueue = mat.renderQueue;
             mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
@@ -1425,6 +1440,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             if (exclusions.Contains(meshRenderer.transform))
                 continue;
+            DisplayProgressBar($"Optimizing materials on {meshRenderer.name}");
             var path = GetPathToRoot(meshRenderer);
             var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
             var alreadyOptimizedMaterials = new HashSet<Material>();
@@ -1522,6 +1538,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             var mesh = meshRenderer.sharedMesh;
             if (mesh == null || exclusions.Contains(meshRenderer.transform))
                 continue;
+            
+            DisplayProgressBar("Combining mesh: " + meshRenderer.name);
 
             var props = new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(props);
@@ -1703,6 +1721,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 continue;
             if (combinableMeshes.Any(m => exclusions.Contains(m.transform)))
                 continue;
+
+            DisplayProgressBar($"Combining mesh {combinableMeshes[0].name}");
 
             var targetBones = new List<Transform>();
             var targetBoneMap = new Dictionary<Transform, int>();
@@ -2447,13 +2467,16 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void Optimize(GameObject toOptimize)
     {
         root = toOptimize;
+        DisplayProgressBar("Parsing Shaders", 0.05f);
         ShaderAnalyzer.ParseAndCacheAllShaders(root, true);
+        DisplayProgressBar("Clear TrashBin Folder", 0.1f);
         ClearTrashBin();
         optimizedMaterials.Clear();
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
         convertedMeshRendererPaths.Clear();
+        DisplayProgressBar("Destroying unused components", 0.15f);
         Profiler.StartSection("DestroyEditorOnlyGameObjects()");
         DestroyEditorOnlyGameObjects();
         Profiler.StartNextSection("DestroyUnusedComponents()");
@@ -2465,24 +2488,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
         DeleteAllUnusedSkinnedMeshRenderers();
         Profiler.StartNextSection("FindAllAnimatedMaterialProperties()");
+        DisplayProgressBar("Optimizing swap materials", 0.2f);
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
         Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
         OptimizeMaterialSwapMaterials();
         Profiler.StartNextSection("CombineSkinnedMeshes()");
+        DisplayProgressBar("Combining meshes", 0.25f);
         CombineSkinnedMeshes();
         Profiler.StartNextSection("CreateTextureArrays()");
         CreateTextureArrays();
         Profiler.StartNextSection("CombineAndOptimizeMaterials()");
+        DisplayProgressBar("Optimizing materials", 0.3f);
         CombineAndOptimizeMaterials();
         Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
         OptimizeMaterialsOnNonSkinnedMeshes();
         Profiler.StartNextSection("SaveOptimizedMaterials()");
+        DisplayProgressBar("Reload optimized materials", 0.60f);
         SaveOptimizedMaterials();
         Profiler.StartNextSection("DestroyUnusedGameObjects()");
+        DisplayProgressBar("Destroying unused GameObjects", 0.90f);
         DestroyUnusedGameObjects();
         Profiler.StartNextSection("FixAllAnimationPaths()");
+        DisplayProgressBar("Fixing animation paths", 0.95f);
         FixAllAnimationPaths();
         Profiler.EndSection();
+        DisplayProgressBar("Done", 1.0f);
         MoveRingFingerColliderToFeet();
     }
 
@@ -2866,26 +2896,35 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             var oldCulture = Thread.CurrentThread.CurrentCulture;
             var oldUICulture = Thread.CurrentThread.CurrentUICulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-            Profiler.enabled = settings.ProfileTimeUsed;
-            Profiler.Reset();
-            AssignNewAvatarIDIfEmpty();
-            var copy = Instantiate(settings.gameObject);
-            SceneManager.MoveGameObjectToScene(copy, settings.gameObject.scene);
-            copy.name = settings.gameObject.name + "(BrokenCopy)";
-            DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
-            if (copy.GetComponent<VRCAvatarDescriptor>() != null)
-                VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
-            Optimize(copy);
-            copy.name = settings.gameObject.name + "(OptimizedCopy)";
-            copy.SetActive(true);
-            settings.gameObject.SetActive(false);
-            Selection.objects = new Object[] { copy };
-            Profiler.PrintTimeUsed();
-            Profiler.Reset();
-            Thread.CurrentThread.CurrentCulture = oldCulture;
-            Thread.CurrentThread.CurrentUICulture = oldUICulture;
+            try
+            {
+                Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+                Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+                Profiler.enabled = settings.ProfileTimeUsed;
+                Profiler.Reset();
+                DisplayProgressBar("Copy Avatar", 0);
+                AssignNewAvatarIDIfEmpty();
+                var copy = Instantiate(settings.gameObject);
+                SceneManager.MoveGameObjectToScene(copy, settings.gameObject.scene);
+                copy.name = settings.gameObject.name + "(BrokenCopy)";
+                DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
+                if (copy.GetComponent<VRCAvatarDescriptor>() != null)
+                    VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
+                Optimize(copy);
+                copy.name = settings.gameObject.name + "(OptimizedCopy)";
+                copy.SetActive(true);
+                settings.gameObject.SetActive(false);
+                Selection.objects = new Object[] { copy };
+                Profiler.PrintTimeUsed();
+                Profiler.Reset();
+            }
+            finally
+            {
+                Thread.CurrentThread.CurrentCulture = oldCulture;
+                Thread.CurrentThread.CurrentUICulture = oldUICulture;
+                EditorUtility.ClearProgressBar();
+            }
+            return;
         }
 
         EditorGUILayout.Separator();
