@@ -351,7 +351,7 @@ namespace d4rkpl4y3r
                         int end = FindEndOfStringLiteral(trimmedLine, i + 1);
                         while (end == -1 && ++lineIndex < rawLines.Length)
                         {
-                            trimmedLine += "\n" + rawLines[lineIndex].Trim();
+                            trimmedLine += System.Environment.NewLine + rawLines[lineIndex].Trim();
                             end = FindEndOfStringLiteral(trimmedLine, i + 1);
                         }
                         i = end;
