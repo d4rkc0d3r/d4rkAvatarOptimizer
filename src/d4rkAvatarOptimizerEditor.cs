@@ -527,8 +527,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
     {
         var result = new Dictionary<(string path, int index), HashSet<Material>>();
-        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
-        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return result;
         foreach (var clip in fxLayer.animationClips)
@@ -587,6 +586,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static AnimatorController GetFXLayer()
+    {
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != 5)
+            return null;
+        return avDescriptor.baseAnimationLayers[4].animatorController as AnimatorController;
+    }
+
     private static void CalculateUsedBlendShapePaths()
     {
         usedBlendShapes.Clear();
@@ -620,7 +627,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
             }
-            var fxLayer = avDescriptor.baseAnimationLayers[4].animatorController as AnimatorController;
+            var fxLayer = GetFXLayer();
             if (fxLayer != null)
             {
                 foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
@@ -666,8 +673,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties()
     {
         var map = new Dictionary<string, HashSet<string>>();
-        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
-        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return map;
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
@@ -692,8 +698,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static HashSet<string> FindAllGameObjectTogglePaths()
     {
         var togglePaths = new HashSet<string>();
-        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
-        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<string>();
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
@@ -737,8 +742,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static HashSet<Component> FindAllUnusedComponents()
     {
-        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
-        var fxLayer = avDescriptor?.baseAnimationLayers[4].animatorController as AnimatorController;
+        var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<Component>();
         var behaviourToggles = new HashSet<string>();
@@ -2313,6 +2317,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor == null)
         {
             EditorGUILayout.HelpBox("No VRCAvatarDescriptor found on the root object.", MessageType.Error);
+            return false;
+        }
+
+        if (avDescriptor.baseAnimationLayers == null || avDescriptor.baseAnimationLayers.Length != 5)
+        {
+            EditorGUILayout.HelpBox("Playable base layer count in the avatar descriptor is not 5.", MessageType.Error);
             return false;
         }
 
