@@ -1572,12 +1572,12 @@ namespace d4rkpl4y3r
                 else output.Add($"return {newTexName}.Load(uv);}}");
 
                 output.Add("void GetDimensions(out float width, out float height) {");
-                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 8; height = 8; return; }}");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
                 if (isArray) output.Add($"float dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
                 else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
                 output.Add("void GetDimensions(out uint width, out uint height) {");
-                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 8; height = 8; return; }}");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; return; }}");
                 if (isArray) output.Add($"uint dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
                 else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 

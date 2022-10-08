@@ -10,6 +10,7 @@
 * Add ParserException if any parameter in vertex or fragment can't be parsed.
 * Fix parsing of template types to permit spaces between the type and the template brackets.
 * Fix new lines in string literals not being the environment's new line character. This caused shader warning spam on poi shader.
+* Fix default texel size to 4 instead of 8. This matches the sizes of the default textures as checked with nvidia nsight.
 
 ## v1.5
 ### Bug fixes

@@ -1089,7 +1089,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name + "_TexelSize"] = propertyArray;
                             }
-                            var texelSize = new Vector2(tex?.width ?? 8, tex?.height ?? 8);
+                            var texelSize = new Vector2(tex?.width ?? 4, tex?.height ?? 4);
                             propertyArray.values.Add($"float4(1.0 / {texelSize.x}, 1.0 / {texelSize.y}, {texelSize.x}, {texelSize.y})");
                             break;
                     }
