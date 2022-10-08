@@ -12,6 +12,7 @@ using UnityEditor.Animations;
 using UnityEditor;
 using d4rkpl4y3r;
 using d4rkpl4y3r.Util;
+using d4rkpl4y3r.Util.Extensions;
 using VRC.Dynamics;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase.Validation.Performance;
@@ -20,79 +21,82 @@ using Math = System.Math;
 using Type = System.Type;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 
-public static class RendererExtensions
+namespace d4rkpl4y3r.Util.Extensions
 {
-    public static Mesh GetSharedMesh(this Renderer renderer)
+    public static class RendererExtensions
     {
-        if (renderer is SkinnedMeshRenderer)
+        public static Mesh GetSharedMesh(this Renderer renderer)
         {
-            return (renderer as SkinnedMeshRenderer).sharedMesh;
-        }
-        else if (renderer.TryGetComponent<MeshFilter>(out var filter))
-        {
-            return filter.sharedMesh;
-        }
-        else
-        {
-            return null;
+            if (renderer is SkinnedMeshRenderer)
+            {
+                return (renderer as SkinnedMeshRenderer).sharedMesh;
+            }
+            else if (renderer.TryGetComponent<MeshFilter>(out var filter))
+            {
+                return filter.sharedMesh;
+            }
+            else
+            {
+                return null;
+            }
         }
     }
-}
 
-public static class TransformExtensions
-{
-    public static IEnumerable<Transform> GetAllDescendants(this Transform transform)
+    public static class TransformExtensions
     {
-        var stack = new Stack<Transform>();
-        foreach (Transform child in transform)
+        public static IEnumerable<Transform> GetAllDescendants(this Transform transform)
         {
-            stack.Push(child);
-        }
-        while (stack.Count > 0)
-        {
-            var current = stack.Pop();
-            yield return current;
-            foreach (Transform child in current)
+            var stack = new Stack<Transform>();
+            foreach (Transform child in transform)
             {
                 stack.Push(child);
             }
-        }
-    }
-}
-
-public static class AnimationControllerExtensions
-{
-
-    public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
-    {
-        var queue = new Queue<AnimatorStateMachine>();
-        foreach (var layer in controller.layers)
-        {
-            queue.Enqueue(layer.stateMachine);
-            while (queue.Count > 0)
+            while (stack.Count > 0)
             {
-                var stateMachine = queue.Dequeue();
-                foreach (var subStateMachine in stateMachine.stateMachines)
+                var current = stack.Pop();
+                yield return current;
+                foreach (Transform child in current)
                 {
-                    queue.Enqueue(subStateMachine.stateMachine);
-                }
-                foreach (var state in stateMachine.states.Select(s => s.state))
-                {
-                    yield return state;
+                    stack.Push(child);
                 }
             }
         }
     }
-}
 
-public static class Vector3Extensions
-{
-    public static Vector3 Multiply(this Vector3 vec, float x, float y, float z)
+    public static class AnimationControllerExtensions
     {
-        vec.x *= x;
-        vec.y *= y;
-        vec.z *= z;
-        return vec;
+
+        public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
+        {
+            var queue = new Queue<AnimatorStateMachine>();
+            foreach (var layer in controller.layers)
+            {
+                queue.Enqueue(layer.stateMachine);
+                while (queue.Count > 0)
+                {
+                    var stateMachine = queue.Dequeue();
+                    foreach (var subStateMachine in stateMachine.stateMachines)
+                    {
+                        queue.Enqueue(subStateMachine.stateMachine);
+                    }
+                    foreach (var state in stateMachine.states.Select(s => s.state))
+                    {
+                        yield return state;
+                    }
+                }
+            }
+        }
+    }
+
+    public static class Vector3Extensions
+    {
+        public static Vector3 Multiply(this Vector3 vec, float x, float y, float z)
+        {
+            vec.x *= x;
+            vec.y *= y;
+            vec.z *= z;
+            return vec;
+        }
     }
 }
 
