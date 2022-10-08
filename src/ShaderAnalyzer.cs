@@ -938,10 +938,7 @@ namespace d4rkpl4y3r
             {
                 string name = animatedProperty.Key;
                 string value = $"d4rkAvatarOptimizer{name}[d4rkAvatarOptimizer_MeshID]";
-                if (animatedProperty.Value.StartsWith("float"))
-                {
-                    output.Add($"{name} = asuint({value}.x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? {name} : {value};");
-                }
+                output.Add($"{name} = asuint({value}.x + d4rkAvatarOptimizer_Zero) == 0xFF555555 ? {name} : {value};");
             }
         }
 
@@ -1465,6 +1462,7 @@ namespace d4rkpl4y3r
                 {
                     string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
                     string type = animatedProperty.Value;
+                    type = Regex.Replace(type, "^(bool|int|uint)([1-4]?)$", "float$2");
                     output.Add($"{type} {name}[{meshToggleCount}] : packoffset(c{currentPackOffset});");
                     for (int i = 0; i < meshToggleCount; i++)
                     {
