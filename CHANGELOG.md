@@ -1,4 +1,4 @@
-## Next Version
+## v1.6
 ### Features
 * Optimizer now shows a progress bar dialog when optimizing an avatar.
 * Add info box if build target is Android to tell users that the optimizer doesn't support Quest avatars.
