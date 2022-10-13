@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Globalization;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.SceneManagement;
@@ -2839,6 +2840,34 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.LabelField(label);
         EditorGUILayout.EndHorizontal();
     }
+
+    private void RemoveIllegalComponents(GameObject target)
+    {
+        // call VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(target, true) with reflection if it exists
+        var RemoveIllegalComponents = Type.GetType("VRC.SDK3.Validation.AvatarValidation, Assembly-CSharp")
+            ?.GetMethod("RemoveIllegalComponents", BindingFlags.Static | BindingFlags.Public);
+        if (RemoveIllegalComponents != null)
+        {
+            RemoveIllegalComponents.Invoke(null, new object[] { target, true });
+            return;
+        }
+
+        // if not found use newer sdk method with reflection
+        // VRC.SDK3.Validation.AvatarValidation.GetComponentWhitelist()
+        // VRC.SDKBase.Validation.ValidationUtils.RemoveIllegalComponents(GameObject target, HashSet<Type> whitelist, bool retry, bool onlySceneObjects, bool logStripping)
+        var GetComponentWhitelist = Type.GetType("VRC.SDK3.Validation.AvatarValidation, Assembly-CSharp")
+            ?.GetMethod("GetComponentWhitelist", BindingFlags.Static | BindingFlags.NonPublic);
+        RemoveIllegalComponents = Type.GetType("VRC.SDKBase.Validation.ValidationUtils, Assembly-CSharp")
+            ?.GetMethod("RemoveIllegalComponents", BindingFlags.Static | BindingFlags.Public);
+        if (GetComponentWhitelist != null && RemoveIllegalComponents != null)
+        {
+            var whitelist = GetComponentWhitelist.Invoke(null, null) as HashSet<Type>;
+            RemoveIllegalComponents.Invoke(null, new object[] { target, whitelist, true, false, true });
+            return;
+        }
+
+        Debug.LogWarning("Could not find RemoveIllegalComponents method");
+    }
     
     public override void OnInspectorGUI()
     {
@@ -2913,7 +2942,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 copy.name = settings.gameObject.name + "(BrokenCopy)";
                 DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
                 if (copy.GetComponent<VRCAvatarDescriptor>() != null)
-                    VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(copy);
+                    RemoveIllegalComponents(copy);
                 Optimize(copy);
                 copy.name = settings.gameObject.name + "(OptimizedCopy)";
                 copy.SetActive(true);
