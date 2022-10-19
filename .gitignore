@@ -6,6 +6,8 @@
 Assets/AssetStoreTools*
 TrashBin/*
 TrashBin.meta
+TextureAnalyzer/*
+TextureAnalyzer.meta
 
 # Visual Studio cache directory
 .vs/
