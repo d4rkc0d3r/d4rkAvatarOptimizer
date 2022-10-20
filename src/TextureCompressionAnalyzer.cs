@@ -61,7 +61,39 @@ public class TextureCompressionAnalyzer : EditorWindow
                 textureImporter.crunchedCompression = variant.crunchQuality != null;
                 textureImporter.compressionQuality = variant.crunchQuality ?? 100;
                 textureImporter.maxTextureSize = int.Parse(match.Groups[2].Value);
+                var platformSettings = textureImporter.GetPlatformTextureSettings("DefaultTexturePlatform");
+                platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+                textureImporter.SetPlatformTextureSettings(platformSettings);
+                platformSettings = textureImporter.GetPlatformTextureSettings("Standalone");
+                platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+                textureImporter.SetPlatformTextureSettings(platformSettings);
+                platformSettings = textureImporter.GetPlatformTextureSettings("Android");
+                platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+                textureImporter.SetPlatformTextureSettings(platformSettings);
             }
+        }
+    }
+
+    public class TextureQuality
+    {
+        public enum Metric
+        {
+            Mip0PSNR,
+            Mip1PSNR,
+            DerivativePSNR,
+        }
+        private readonly Dictionary<Metric, (float value, string unit)> data = new Dictionary<Metric, (float value, string unit)>();
+        public void SetResult(Metric metric, (float value, string unit) result)
+        {
+            data[metric] = result;
+        }
+        public (float value, string unit)? GetResult(Metric metric)
+        {
+            return data.ContainsKey(metric) ? ((float value, string unit)?)data[metric] : null;
+        }
+        public IEnumerable<(Metric metric, (float value, string unit) result)> GetResults()
+        {
+            return System.Enum.GetValues(typeof(Metric)).Cast<Metric>().Where(metric => data.ContainsKey(metric)).Select(metric => (metric, data[metric]));
         }
     }
 
@@ -72,14 +104,11 @@ public class TextureCompressionAnalyzer : EditorWindow
         new TextureVariant(TextureImporterCompression.Uncompressed, 1),
         new TextureVariant(TextureImporterCompression.CompressedHQ, 1),
         new TextureVariant(TextureImporterCompression.CompressedHQ, 2),
-        new TextureVariant(TextureImporterCompression.CompressedHQ, 4),
         new TextureVariant(TextureImporterCompression.Compressed, 1),
-        new TextureVariant(TextureImporterCompression.Compressed, 2),
         new TextureVariant(TextureImporterCompression.Compressed, 1, 100),
         new TextureVariant(TextureImporterCompression.Compressed, 1, 50),
-        new TextureVariant(TextureImporterCompression.Compressed, 1, 0),
     };
-    float[] psnr = null;
+    TextureQuality[] quality = null;
 
     [MenuItem("Tools/d4rkpl4y3r/Texture Compression Analyzer")]
     static void Init()
@@ -93,7 +122,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         if (result != obj)
         {
             obj = result;
-            psnr = null;
+            quality = null;
             return true;
         }
         return false;
@@ -162,25 +191,21 @@ public class TextureCompressionAnalyzer : EditorWindow
         return (vramSize, assetBundleSize);
     }
 
-    private float CalculatePSNR(TextureVariant reference, TextureVariant target)
+    private float CalculatePSNR(Texture2D reference, Texture2D target, bool sRGB, int mipLevel, bool derivative)
     {
-        var refTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(reference));
-        var targetTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(target));
-        var refImporter = AssetImporter.GetAtPath(GetVariantPath(reference)) as TextureImporter;
-        if (refTexture == null || targetTexture == null || refImporter == null)
-        {
-            return -1;
-        }
-
-        var mseRenderTexture = new RenderTexture(refTexture.width, refTexture.height, 0, RenderTextureFormat.ARGBFloat);
+        var mseRenderTexture = new RenderTexture(
+            reference.width / (int)Mathf.Pow(2, mipLevel),
+            reference.height / (int)Mathf.Pow(2, mipLevel),
+            0, RenderTextureFormat.ARGBFloat);
         mseRenderTexture.useMipMap = true;
         mseRenderTexture.autoGenerateMips = false;
         mseRenderTexture.Create();
         var mseMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/MeanSquaredError"));
-        mseMaterial.SetTexture("_Reference", refTexture);
-        mseMaterial.SetTexture("_Target", targetTexture);
-        mseMaterial.SetFloat("_sRGB", refImporter.sRGBTexture ? 1 : 0);
-        Graphics.Blit(refTexture, mseRenderTexture, mseMaterial);
+        mseMaterial.SetTexture("_Reference", reference);
+        mseMaterial.SetTexture("_Target", target);
+        mseMaterial.SetFloat("_sRGB", sRGB ? 1 : 0);
+        mseMaterial.SetFloat("_Derivative", derivative ? 1 : 0);
+        Graphics.Blit(reference, mseRenderTexture, mseMaterial);
         mseRenderTexture.GenerateMips();
 
         var onePixelRenderTexture = new RenderTexture(1, 1, 0, RenderTextureFormat.ARGBFloat);
@@ -200,7 +225,7 @@ public class TextureCompressionAnalyzer : EditorWindow
             TextureFormat.DXT1Crunched,
             TextureFormat.RGB24
         };
-        if (rgbOnlyFormats.Contains(refTexture.format))
+        if (rgbOnlyFormats.Contains(reference.format))
         {
             mse = (color.r + color.g + color.b) / 3;
         }
@@ -209,6 +234,29 @@ public class TextureCompressionAnalyzer : EditorWindow
             mse = (color.r + color.g + color.b + color.a) / 4;
         }
         return 20 * Mathf.Log10(1) - 10 * Mathf.Log10(mse);
+    }
+
+    private TextureQuality CalculateQualityMetrics(TextureVariant reference, TextureVariant target)
+    {
+        var refTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(reference));
+        var targetTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(target));
+        var refImporter = AssetImporter.GetAtPath(GetVariantPath(reference)) as TextureImporter;
+        if (refTexture == null || targetTexture == null || refImporter == null)
+        {
+            return null;
+        }
+        var quality = new TextureQuality();
+
+        float psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 0, false);        
+        quality.SetResult(TextureQuality.Metric.Mip0PSNR, (psnr, "dB"));
+
+        psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 1, false);
+        quality.SetResult(TextureQuality.Metric.Mip1PSNR, (psnr, "dB"));
+
+        psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 0, true);
+        quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
+
+        return quality;
     }
 
     public string FormatByteSize(float size)
@@ -243,7 +291,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         if (GUILayout.Button("Clear Cache"))
         {
             AssetDatabase.DeleteAsset(assetRootPath + "/TextureAnalyzer");
-            psnr = null;
+            quality = null;
         }
         if (!AssetDatabase.IsValidFolder(assetRootPath + "/TextureAnalyzer"))
         {
@@ -273,17 +321,13 @@ public class TextureCompressionAnalyzer : EditorWindow
 
         if (GUILayout.Button("Analyze Variants"))
         {
-            d4rkpl4y3r.Util.Profiler.Reset();
-            d4rkpl4y3r.Util.Profiler.StartSection("Create Folder");
             if (!AssetDatabase.IsValidFolder(texFolder))
             {
                 AssetDatabase.CreateFolder(assetRootPath, texGUID);
             }
-            d4rkpl4y3r.Util.Profiler.EndSection();
             var buildMap = new List<AssetBundleBuild>();
             foreach (var variant in variants)
             {
-                d4rkpl4y3r.Util.Profiler.StartSection($"Import Variant {variant}");
                 string variantPath = GetVariantPath(variant);
                 var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(variantPath);
                 if (asset == null)
@@ -294,17 +338,13 @@ public class TextureCompressionAnalyzer : EditorWindow
                         assetNames = new string[] { variantPath }
                     });
                 }
-                d4rkpl4y3r.Util.Profiler.EndSection();
             }
-            d4rkpl4y3r.Util.Profiler.StartSection("Build AssetBundles");
             if (buildMap.Count > 0)
             {
                 BuildPipeline.BuildAssetBundles(texFolder, buildMap.ToArray(), BuildAssetBundleOptions.None, BuildTarget.StandaloneWindows64);
                 AssetDatabase.Refresh();
             }
-            d4rkpl4y3r.Util.Profiler.EndSection();
-            d4rkpl4y3r.Util.Profiler.PrintTimeUsed();
-            psnr = null;
+            quality = null;
         }
 
         EditorGUILayout.LabelField("textureGUID: " + texGUID);
@@ -323,24 +363,24 @@ public class TextureCompressionAnalyzer : EditorWindow
             return;
         }
 
-        if (psnr == null || psnr.Length != variants.Length)
+        if (quality == null || quality.Length != variants.Length)
         {
-            psnr = new float[variants.Length];
+            quality = new TextureQuality[variants.Length];
             for (int i = 0; i < variants.Length; i++)
             {
-                psnr[i] = CalculatePSNR(variants[0], variants[i]);
+                quality[i] = CalculateQualityMetrics(variants[0], variants[i]);
             }
         }
 
-        var variantsWithPSNR = Enumerable.Range(0, variants.Length)
-            .Select(i => new { variant = variants[i], psnr = psnr[i] })
-            .OrderByDescending(v => v.psnr)
+        var variantsWithQualityResult = Enumerable.Range(0, variants.Length)
+            .Select(i => new { variant = variants[i], quality = quality[i] })
+            .OrderByDescending(v => v.quality.GetResult(TextureQuality.Metric.Mip0PSNR)?.value ?? 0)
             .ToArray();
 
-        foreach (var tuple in variantsWithPSNR)
+        foreach (var tuple in variantsWithQualityResult)
         {
             var variant = tuple.variant;
-            var psnr = tuple.psnr;
+            var quality = tuple.quality;
             EditorGUILayout.Space(5);
             string variantPath = GetVariantPath(variant);
             var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(variantPath);
@@ -354,7 +394,13 @@ public class TextureCompressionAnalyzer : EditorWindow
             var size = GetVariantSize(variant);
             EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
             EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
-            EditorGUILayout.LabelField($"psnr: {psnr:F2}dB");
+            if (variant.compression != TextureImporterCompression.Uncompressed || variant.sizeReductionFactor != 1)
+            {
+                foreach(var entry in quality.GetResults())
+                {
+                    EditorGUILayout.LabelField($"{entry.metric}: {entry.result.value:F2}{entry.result.unit}");
+                }
+            }
             EditorGUI.indentLevel--;
         }
     }

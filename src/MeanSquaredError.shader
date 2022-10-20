@@ -5,6 +5,7 @@
         _Reference ("Reference Texture", 2D) = "white" {}
         _Target ("Target Texture", 2D) = "white" {}
         [ToggleUI] _sRGB ("sRGB", Float) = 1
+        [ToggleUI] _Derivative ("Derivative", Float) = 0
     }
     SubShader
     {
@@ -32,11 +33,10 @@
             };
 
             Texture2D _Reference;
-            float4 _Reference_TexelSize;
             Texture2D _Target;
-            float4 _Target_TexelSize;
             SamplerState linear_clamp_sampler;
             bool _sRGB;
+            bool _Derivative;
 
             v2f vert (appdata v)
             {
@@ -49,22 +49,50 @@
                 return o;
             }
 
+            float4 AdjustColorSpace(float4 color)
+            {
+                float4 srgb;
+                srgb.r = LinearToGammaSpaceExact(color.r);
+                srgb.g = LinearToGammaSpaceExact(color.g);
+                srgb.b = LinearToGammaSpaceExact(color.b);
+                srgb.a = color.a;
+                return _sRGB ? srgb : color;
+            }
+
+            float4 Sample(Texture2D tex, float2 uv)
+            {
+                float2 texSize;
+                tex.GetDimensions(texSize.x, texSize.y);
+                float scale = max(texSize.x, texSize.y) / max(_ScreenParams.x, _ScreenParams.y);
+                float texMip = round(log2(scale));
+                return AdjustColorSpace(tex.SampleLevel(linear_clamp_sampler, uv, texMip));
+            }
+
             float4 frag (v2f i) : SV_Target
             {
-                float4 reference = _Reference.SampleLevel(linear_clamp_sampler, i.uv, 0);
-                float4 target = _Target.SampleLevel(linear_clamp_sampler, i.uv, 0);
-                if (_sRGB)
-                {
-                    reference.r = LinearToGammaSpaceExact(reference.r);
-                    reference.g = LinearToGammaSpaceExact(reference.g);
-                    reference.b = LinearToGammaSpaceExact(reference.b);
-                    target.r = LinearToGammaSpaceExact(target.r);
-                    target.g = LinearToGammaSpaceExact(target.g);
-                    target.b = LinearToGammaSpaceExact(target.b);
-                }
+                float4 reference = Sample(_Reference, i.uv);
+                float4 target = Sample(_Target, i.uv);
                 float4 error = reference - target;
                 float4 mse = error * error;
                 mse.rgb *= reference.a;
+                if (_Derivative)
+                {
+                    float4 refX = Sample(_Reference, i.uv + ddx(i.uv));
+                    float4 refY = Sample(_Reference, i.uv + ddy(i.uv));
+                    float4 tarX = Sample(_Target, i.uv + ddx(i.uv));
+                    float4 tarY = Sample(_Target, i.uv + ddy(i.uv));
+                    float4 refdX = refX - reference;
+                    float4 refdY = refY - reference;
+                    float4 tardX = tarX - target;
+                    float4 tardY = tarY - target;
+                    float4 errorX = refdX - tardX;
+                    float4 errorY = refdY - tardY;
+                    float4 mseX = errorX * errorX;
+                    float4 mseY = errorY * errorY;
+                    mseX.rgb *= reference.a;
+                    mseY.rgb *= reference.a;
+                    return mseX * 0.5 + mseY * 0.5;
+                }
                 return mse;
             }
             ENDCG
