@@ -1258,7 +1258,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
             Profiler.EndSection();
-            CreateUniqueAsset(mat, mat.name + ".mat");
         }
 
         var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -1317,10 +1316,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
             }
+        }
 
-            Profiler.StartSection("AssetDatabase.SaveAssets()");
-            AssetDatabase.SaveAssets();
-            Profiler.EndSection();
+        foreach (var mat in optimizedMaterials)
+        {
+            CreateUniqueAsset(mat, mat.name + ".mat");
         }
     }
 
@@ -2124,7 +2124,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
 
-            meshRenderer.gameObject.SetActive(true);
+            if (combinableSkinnedMeshes.Count > 1)
+            {
+                meshRenderer.gameObject.SetActive(true);
+                meshRenderer.enabled = true;
+            }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
