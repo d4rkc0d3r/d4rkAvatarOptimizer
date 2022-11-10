@@ -1,3 +1,7 @@
+## Next Version
+### Changes
+* The optimized animator controllers now have `(OptimizedCopy)` appended to their name.
+
 ## v1.7
 ### Bug Fixes
 * Fix optimizer not working with VRCSDK3-AVATAR-2022.10.12.21.07 SDK onwards. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/12)

@@ -524,7 +524,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (layer == null)
                 continue;
             Profiler.StartSection("AssetDatabase.CopyAsset()");
-            string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + layer.name + ".controller");
+            string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + layer.name + "(OptimizedCopy).controller");
             AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(layer), path);
             var newLayer = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
             Profiler.EndSection();
