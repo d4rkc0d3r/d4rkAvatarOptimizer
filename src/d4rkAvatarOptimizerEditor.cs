@@ -2192,7 +2192,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         var used = new HashSet<Transform>(
             root.GetComponentsInChildren<SkinnedMeshRenderer>(true).SelectMany(s => s.bones));
 
-        used.UnionWith(FindAllMovingTransforms());
+        var movingTransforms = FindAllMovingTransforms();
+        used.UnionWith(movingTransforms);
+        used.UnionWith(movingTransforms.Select(t => t != null ? t.parent : null));
         
         foreach (var constraint in root.GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
         {
