@@ -7,6 +7,7 @@
 * Fix parents of animated transforms getting deleted. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/14)
 * Always enable SkinnedMeshRenderer component that gets other meshes merged into it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/15)
 * Ignore Renderers that have no materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/19)
+* Only add `#define KEYWORD` to passes that have a corresponding `#pragma shader_feature` in the pass. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/18)
 
 ## v1.7
 ### Bug Fixes

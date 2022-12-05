@@ -63,6 +63,7 @@ namespace d4rkpl4y3r
             public Function domain;
             public Function geometry;
             public Function fragment;
+            public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
         }
         public string name;
         public bool parsedCorrectly = false;
@@ -679,6 +680,8 @@ namespace d4rkpl4y3r
             if (match.Success)
             {
                 parsedShader.shaderFeatureKeyWords.UnionWith(
+                    match.Groups[1].Captures.Cast<Capture>().Select(c => c.Value));
+                pass.shaderFeatureKeyWords.UnionWith(
                     match.Groups[1].Captures.Cast<Capture>().Select(c => c.Value));
             }
         }
@@ -1445,7 +1448,7 @@ namespace d4rkpl4y3r
             output.Add("}");
         }
 
-        private void InjectPropertyArrays()
+        private void InjectPropertyArrays(ParsedShader.Pass pass)
         {
             output.Add("#pragma skip_variants DYNAMICLIGHTMAP_ON LIGHTMAP_ON LIGHTMAP_SHADOW_MIXING DIRLIGHTMAP_COMBINED SHADOWS_SHADOWMASK");
             if (meshToggleCount > 1)
@@ -1488,7 +1491,7 @@ namespace d4rkpl4y3r
                     varName = "_MainTexButNotQuiteSoThatUnityDoesntCry_ST";
                 output.Add("static " + type + " " + varName + " = " + value + ";");
             }
-            foreach(var keyword in setKeywords)
+            foreach(var keyword in setKeywords.Where(k => pass.shaderFeatureKeyWords.Contains(k)))
             {
                 output.Add("#define " + keyword);
             }
@@ -1806,7 +1809,7 @@ namespace d4rkpl4y3r
                     var pass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
                     texturesToCallSoTheSamplerDoesntDisappear.Clear();
-                    InjectPropertyArrays();
+                    InjectPropertyArrays(pass);
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     while (parsedShader.lines[++lineIndex] != endSymbol)
                     {
