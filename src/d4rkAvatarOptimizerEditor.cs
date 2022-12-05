@@ -338,7 +338,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         foreach (var renderer in renderers)
         {
             var mesh = renderer.GetSharedMesh();
-            if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer))
+            if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer) || renderer.sharedMaterials.Length == 0)
                 continue;
 
             bool foundMatch = false;
