@@ -1,10 +1,16 @@
 # d4rkAvatarOptimizer
 d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
+
 ## How to Use
 1. Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.
 2. Click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes.
 3. Upload this optimized copy of your original avatar to vrc.
 4. Delete the copy after you upload it to vrc.
+
+## Limitations
+The optimizer relies on creating custom variations of your shaders that support shader toggles. As such, your avatar might not show up correctly if your shaders are disabled.  
+For toggles that means all meshes that get merged will always be visible. If you use the option [Merge Same Dimension Textures](#merge-same-dimension-textures) and different textures in the `_MainTex` property get merged, those textures will show up as a white material like [here](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17) when shaders are blocked.  
+Since it relies on custom shaders, the optimizer also won't work for quest avatars.
 
 ## Why my Shader Pink?
 
