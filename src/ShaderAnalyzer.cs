@@ -1610,6 +1610,16 @@ namespace d4rkpl4y3r
                 if (isArray) output.Add($"uint dummy;{newTexName}.GetDimensions(width, height, dummy);}}");
                 else output.Add($"{newTexName}.GetDimensions(width, height);}}");
 
+                output.Add("void GetDimensions(uint mipLevel, out float width, out float height, out float numberOfLevels) {");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; numberOfLevels = 1; return; }}");
+                if (isArray) output.Add($"float dummy;{newTexName}.GetDimensions(mipLevel, width, height, dummy, numberOfLevels);}}");
+                else output.Add($"{newTexName}.GetDimensions(mipLevel, width, height, numberOfLevels);}}");
+
+                output.Add("void GetDimensions(uint mipLevel, out uint width, out uint height, out uint numberOfLevels) {");
+                if (nullCheck != null) output.Add($"if (!shouldSample{texName}) {{ width = 4; height = 4; numberOfLevels = 1; return; }}");
+                if (isArray) output.Add($"uint dummy;{newTexName}.GetDimensions(mipLevel, width, height, dummy, numberOfLevels);}}");
+                else output.Add($"{newTexName}.GetDimensions(mipLevel, width, height, numberOfLevels);}}");
+
                 output.Add("};");
 
                 output.Add($"{type} tex2D({texName}_Wrapper wrapper, float2 uv) {{");
