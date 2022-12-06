@@ -8,6 +8,7 @@
 * Always enable SkinnedMeshRenderer component that gets other meshes merged into it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/15)
 * Ignore Renderers that have no materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/19)
 * Only add `#define KEYWORD` to passes that have a corresponding `#pragma shader_feature` in the pass. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/18)
+* Fixed that multiple vert/geometry/fragment shader declarations would cause the optimizer to only use the last one.
 
 ## v1.7
 ### Bug Fixes

@@ -55,6 +55,29 @@ namespace d4rkpl4y3r
             }
             public string name;
             public List<Parameter> parameters = new List<Parameter>();
+            public override string ToString()
+            {
+                if (parameters.Count == 0)
+                    return name;
+                string s = "";
+                s += parameters[0].type + " ";
+                s += name + "(";
+                for (int i = 1; i < parameters.Count; i++)
+                {
+                    var param = parameters[i];
+                    s += i > 1 ? ", " : "";
+                    s += (param.isInput ? "in" : "") + (param.isOutput ? "out " : " ");
+                    s += param.type;
+                    s += " ";
+                    s += param.name;
+                    s += param.arraySize > 0 ? "[" + param.arraySize + "]" : "";
+                    s += param.semantic == null ? "" : " : " + param.semantic;
+                }
+                s += ")";
+                s += parameters[0].semantic == null ? "" : " : " + parameters[0].semantic;
+                s += ";";
+                return s;
+            }
         }
         public class Pass
         {
@@ -630,18 +653,21 @@ namespace d4rkpl4y3r
             return output;
         }
 
+        private static void UpdateFunctionDefinition(ref ParsedShader.Function passFunction, ParsedShader.Function candidate, string name)
+        {
+            if (candidate.name == passFunction?.name)
+            {
+                passFunction = candidate;
+            }
+        }
+
         private static void UpdateFunctionDefinition(ParsedShader.Function func, ParsedShader.Pass pass)
         {
-            if (func.name == pass.vertex?.name)
-                pass.vertex = func;
-            if (func.name == pass.hull?.name)
-                pass.hull = func;
-            if (func.name == pass.domain?.name)
-                pass.domain = func;
-            if (func.name == pass.geometry?.name)
-                pass.geometry = func;
-            if (func.name == pass.fragment?.name)
-                pass.fragment = func;
+            UpdateFunctionDefinition(ref pass.vertex, func, "vertex");
+            UpdateFunctionDefinition(ref pass.hull, func, "hull");
+            UpdateFunctionDefinition(ref pass.domain, func, "domain");
+            UpdateFunctionDefinition(ref pass.geometry, func, "geometry");
+            UpdateFunctionDefinition(ref pass.fragment, func, "fragment");
         }
 
         private void ParsePragma(string line, ParsedShader.Pass pass)
@@ -1063,7 +1089,8 @@ namespace d4rkpl4y3r
             ref int sourceLineIndex,
             ParsedShader.Pass pass)
         {
-            var func = pass.vertex;
+            var dummyLineIndex = sourceLineIndex;
+            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref dummyLineIndex);
             var outParam = func.parameters.FirstOrDefault(p => p.isOutput && p.type != "void");
             var inParam = func.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
             var returnParam = func.parameters[0];
@@ -1189,10 +1216,10 @@ namespace d4rkpl4y3r
 
         private void InjectGeometryShaderCode(
             List<string> source,
-            ref int sourceLineIndex,
-            ParsedShader.Pass pass)
+            ref int sourceLineIndex)
         {
-            var func = pass.geometry;
+            var dummyLineIndex = sourceLineIndex;
+            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref dummyLineIndex);
             var outParam = func.parameters.FirstOrDefault(p => p.type.Contains("Stream<"));
             var outParamType = outParam.type.Substring(outParam.type.IndexOf('<') + 1);
             outParamType = outParamType.Substring(0, outParamType.Length - 1);
@@ -1294,20 +1321,21 @@ namespace d4rkpl4y3r
 
         private void InjectFragmentShaderCode(
             List<string> source,
-            ref int sourceLineIndex,
-            ParsedShader.Pass pass)
+            ref int sourceLineIndex)
         {
-            var returnParam = pass.fragment.parameters[0];
+            var dummyLineIndex = sourceLineIndex;
+            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref dummyLineIndex);
+            var returnParam = func.parameters[0];
             string nullReturn = returnParam.type == "void" ? "return;" : "return (" + returnParam.type + ")0;";
             if (arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
             {
                 var funcParams = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
                 AddParameterStructWrapper(funcParams, output, "fragmentInput", true, true);
-                output.Add(pass.fragment.parameters[0].type + " " + pass.fragment.name + "(");
+                output.Add(func.parameters[0].type + " " + func.name + "(");
                 output.Add("fragmentInputWrapper d4rkAvatarOptimizer_fragmentInput");
                 AddOutParametersToFunctionDeclaration(funcParams, output);
-                if (pass.fragment.parameters[0].semantic != null)
-                    output.Add(") : " + pass.fragment.parameters[0].semantic);
+                if (func.parameters[0].semantic != null)
+                    output.Add(") : " + func.parameters[0].semantic);
                 else
                     output.Add(")");
                 output.Add("{");
@@ -1357,7 +1385,7 @@ namespace d4rkpl4y3r
             }
         }
 
-        private void DuplicateFunctionWithTextureParameter(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
+        private void DuplicateFunctionWithTextureParameter(List<string> source, ref int sourceLineIndex)
         {
             int lineIndex = sourceLineIndex;
             var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref lineIndex);
@@ -1622,15 +1650,15 @@ namespace d4rkpl4y3r
             }
             else if (pass.geometry != null && pass.fragment != null && pass.vertex != null && func.name == pass.geometry.name)
             {
-                InjectGeometryShaderCode(source, ref sourceLineIndex, pass);
+                InjectGeometryShaderCode(source, ref sourceLineIndex);
             }
             else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
             {
-                InjectFragmentShaderCode(source, ref sourceLineIndex, pass);
+                InjectFragmentShaderCode(source, ref sourceLineIndex);
             }
             else if (func.name != null)
             {
-                DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex, pass);
+                DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex);
             }
             else if ((arrayPropertyValues.Count > 0 || meshToggleCount > 1) && line.StartsWith("struct "))
             {

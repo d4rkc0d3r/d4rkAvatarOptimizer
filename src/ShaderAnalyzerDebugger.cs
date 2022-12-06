@@ -31,30 +31,6 @@ public class ShaderAnalyzerDebugger : EditorWindow
         GetWindow(typeof(ShaderAnalyzerDebugger));
     }
 
-    private static string FuncToString(ParsedShader.Function func)
-    {
-        if (func.parameters.Count == 0)
-            return func.name;
-        string s = "";
-        s += func.parameters[0].type + " ";
-        s += func.name + "(";
-        for (int i = 1; i < func.parameters.Count; i++)
-        {
-            var param = func.parameters[i];
-            s += i > 1 ? ", " : "";
-            s += (param.isInput ? "in" : "") + (param.isOutput ? "out " : " ");
-            s += param.type;
-            s += " ";
-            s += param.name;
-            s += param.arraySize > 0 ? "[" + param.arraySize + "]" : "";
-            s += param.semantic == null ? "" : " : " + param.semantic;
-        }
-        s += ")";
-        s += func.parameters[0].semantic == null ? "" : " : " + func.parameters[0].semantic;
-        s += ";";
-        return s;
-    }
-
     private bool Foldout(ref bool property, string name)
     {
         return property = EditorGUILayout.Foldout(property, name);
@@ -230,15 +206,15 @@ public class ShaderAnalyzerDebugger : EditorWindow
             var pass = parsedShader.passes[i];
             GUILayout.Space(10);
             if (pass.vertex != null)
-                GUILayout.Label("vertex: " + FuncToString(pass.vertex));
+                GUILayout.Label("vertex: " + pass.vertex);
             if (pass.hull != null)
-                GUILayout.Label("hull: " + FuncToString(pass.hull));
+                GUILayout.Label("hull: " + pass.hull);
             if (pass.domain != null)
-                GUILayout.Label("domain: " + FuncToString(pass.domain));
+                GUILayout.Label("domain: " + pass.domain);
             if (pass.geometry != null)
-                GUILayout.Label("geometry: " + FuncToString(pass.geometry));
+                GUILayout.Label("geometry: " + pass.geometry);
             if (pass.fragment != null)
-                GUILayout.Label("fragment: " + FuncToString(pass.fragment));
+                GUILayout.Label("fragment: " + pass.fragment);
         }
 
         if (parsedShader.customTextureDeclarations.Count > 0)
