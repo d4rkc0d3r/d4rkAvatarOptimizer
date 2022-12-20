@@ -331,10 +331,14 @@ public class TextureCompressionAnalyzer : EditorWindow
             return;
         }
 
-        TextureVariant[] variants = variantsRGBA;
+        TextureVariant[] variants = variantsRGB;
         if (textureImporter.textureType == TextureImporterType.NormalMap)
         {
             variants = variantsNormal;
+        }
+        else if (textureImporter.DoesSourceTextureHaveAlpha())
+        {
+            variants = variantsRGBA;
         }
 
         string texGUID = AssetDatabase.AssetPathToGUID(texturePath);
@@ -374,6 +378,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         EditorGUILayout.LabelField("texture.sRGB: " + textureImporter.sRGBTexture);
         EditorGUILayout.LabelField("texture.mipmap: " + textureImporter.mipmapEnabled);
         EditorGUILayout.LabelField("texture.textureType: " + textureImporter.textureType);
+        EditorGUILayout.LabelField("texture.hasAlpha: " + textureImporter.DoesSourceTextureHaveAlpha());
 
         var sizes = variants.Select(v => GetVariantSize(v)).ToArray();
         var maxVram = sizes[0].vram;
@@ -411,12 +416,12 @@ public class TextureCompressionAnalyzer : EditorWindow
                 EditorGUILayout.HelpBox($"Variant {variant} is not analyzed.", MessageType.Warning);
                 continue;
             }
-            EditorGUILayout.LabelField($"{variant} ({asset.format})");
+            EditorGUILayout.LabelField($"{variant}:");
             EditorGUI.indentLevel++;
             var size = GetVariantSize(variant);
             EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
             EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
-            if (variant.compression != TextureImporterFormat.RGBA32 || variant.sizeReductionFactor != 1)
+            if ((variant.compression != TextureImporterFormat.RGBA32 && variant.compression != TextureImporterFormat.RGB24) || variant.sizeReductionFactor != 1)
             {
                 foreach(var entry in quality.GetResults())
                 {
