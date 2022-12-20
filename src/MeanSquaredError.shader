@@ -6,6 +6,7 @@
         _Target ("Target Texture", 2D) = "white" {}
         [ToggleUI] _sRGB ("sRGB", Float) = 1
         [ToggleUI] _Derivative ("Derivative", Float) = 0
+        [ToggleUI] _NormalMap ("Normal Map", Float) = 0
     }
     SubShader
     {
@@ -37,6 +38,7 @@
             SamplerState linear_clamp_sampler;
             bool _sRGB;
             bool _Derivative;
+            bool _NormalMap;
 
             v2f vert (appdata v)
             {
@@ -51,6 +53,10 @@
 
             float4 AdjustColorSpace(float4 color)
             {
+                if (_NormalMap)
+                {
+                    return float4(UnpackNormal(color), 1);
+                }
                 float4 srgb;
                 srgb.r = LinearToGammaSpaceExact(color.r);
                 srgb.g = LinearToGammaSpaceExact(color.g);

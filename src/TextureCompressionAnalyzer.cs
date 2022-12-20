@@ -17,10 +17,10 @@ public class TextureCompressionAnalyzer : EditorWindow
             Crunched,
             HighQuality
         };
-        public TextureImporterCompression compression;
+        public TextureImporterFormat compression;
         public int sizeReductionFactor;
         public int? crunchQuality;
-        public TextureVariant(TextureImporterCompression compression, int sizeReductionFactor, int? crunchQuality = null)
+        public TextureVariant(TextureImporterFormat compression, int sizeReductionFactor, int? crunchQuality = null)
         {
             this.compression = compression;
             this.sizeReductionFactor = sizeReductionFactor;
@@ -28,19 +28,16 @@ public class TextureCompressionAnalyzer : EditorWindow
         }
         public override string ToString()
         {
-            return (crunchQuality != null ? "Crunched" : compression.ToString())
+            return compression.ToString()
                 + (crunchQuality != null ? $"({crunchQuality})" : "")
                 + (sizeReductionFactor > 1 ? "_div" + sizeReductionFactor : "");
         }
         public static TextureVariant? Parse(string str)
         {
-            var match = Regex.Match(str, @"^(?<compression>Uncompressed|Compressed|CompressedLQ|CompressedHQ|Crunched)(\((?<crunchQuality>\d+)\))?(?:_div(?<sizeReductionFactor>\d+))?$");
+            var match = Regex.Match(str, @"^(?<compression>[a-zA-Z0-9]+)(\((?<crunchQuality>\d+)\))?(?:_div(?<sizeReductionFactor>\d+))?$");
             if (!match.Success)
                 return null;
-            var compression =
-                match.Groups["compression"].Value == "Crunched"
-                ? TextureImporterCompression.Compressed
-                : (TextureImporterCompression)System.Enum.Parse(typeof(TextureImporterCompression), match.Groups["compression"].Value);
+            var compression = (TextureImporterFormat)System.Enum.Parse(typeof(TextureImporterFormat), match.Groups["compression"].Value);
             var crunchQuality = match.Groups["crunchQuality"].Success ? (int?)int.Parse(match.Groups["crunchQuality"].Value) : null;
             var sizeReductionFactor = match.Groups["sizeReductionFactor"].Success ? int.Parse(match.Groups["sizeReductionFactor"].Value) : 1;
             return new TextureVariant(compression, sizeReductionFactor, crunchQuality);
@@ -57,18 +54,13 @@ public class TextureCompressionAnalyzer : EditorWindow
             if (parsedVariant != null)
             {
                 var variant = parsedVariant.Value;
-                textureImporter.textureCompression = variant.compression;
-                textureImporter.crunchedCompression = variant.crunchQuality != null;
-                textureImporter.compressionQuality = variant.crunchQuality ?? 100;
-                textureImporter.maxTextureSize = int.Parse(match.Groups[2].Value);
-                var platformSettings = textureImporter.GetPlatformTextureSettings("DefaultTexturePlatform");
+                var platformSettings = textureImporter.GetPlatformTextureSettings("Standalone");
                 platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
-                textureImporter.SetPlatformTextureSettings(platformSettings);
-                platformSettings = textureImporter.GetPlatformTextureSettings("Standalone");
-                platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
-                textureImporter.SetPlatformTextureSettings(platformSettings);
-                platformSettings = textureImporter.GetPlatformTextureSettings("Android");
-                platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+                platformSettings.overridden = true;
+                platformSettings.format = variant.compression;
+                platformSettings.maxTextureSize = int.Parse(match.Groups[2].Value);
+                platformSettings.compressionQuality = variant.crunchQuality ?? 100;
+                platformSettings.crunchedCompression = variant.crunchQuality != null;
                 textureImporter.SetPlatformTextureSettings(platformSettings);
             }
         }
@@ -99,14 +91,34 @@ public class TextureCompressionAnalyzer : EditorWindow
 
     string assetRootPath;
     Texture2D texture;
-    TextureVariant[] variants = new TextureVariant[]
+    TextureVariant[] variantsRGBA = new TextureVariant[]
     {
-        new TextureVariant(TextureImporterCompression.Uncompressed, 1),
-        new TextureVariant(TextureImporterCompression.CompressedHQ, 1),
-        new TextureVariant(TextureImporterCompression.CompressedHQ, 2),
-        new TextureVariant(TextureImporterCompression.Compressed, 1),
-        new TextureVariant(TextureImporterCompression.Compressed, 1, 100),
-        new TextureVariant(TextureImporterCompression.Compressed, 1, 50),
+        new TextureVariant(TextureImporterFormat.RGBA32, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 2),
+        new TextureVariant(TextureImporterFormat.DXT5, 1),
+        new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 100),
+        new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 50),
+    };
+    TextureVariant[] variantsRGB = new TextureVariant[]
+    {
+        new TextureVariant(TextureImporterFormat.RGB24, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 2),
+        new TextureVariant(TextureImporterFormat.DXT1, 1),
+        new TextureVariant(TextureImporterFormat.DXT1Crunched, 1, 100),
+        new TextureVariant(TextureImporterFormat.DXT1Crunched, 1, 50),
+    };
+    TextureVariant[] variantsNormal = new TextureVariant[]
+    {
+        new TextureVariant(TextureImporterFormat.RGBA32, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 1),
+        new TextureVariant(TextureImporterFormat.BC7, 2),
+        new TextureVariant(TextureImporterFormat.BC5, 1),
+        new TextureVariant(TextureImporterFormat.BC5, 2),
+        new TextureVariant(TextureImporterFormat.DXT5, 1),
+        new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 100),
+        new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 50),
     };
     TextureQuality[] quality = null;
 
@@ -166,6 +178,7 @@ public class TextureCompressionAnalyzer : EditorWindow
                 break;
             case TextureFormat.DXT5:
             case TextureFormat.DXT5Crunched:
+            case TextureFormat.BC5:
             case TextureFormat.BC7:
             case TextureFormat.BC6H:
                 bpp = 8;
@@ -191,7 +204,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         return (vramSize, assetBundleSize);
     }
 
-    private float CalculatePSNR(Texture2D reference, Texture2D target, bool sRGB, int mipLevel, bool derivative)
+    private float CalculatePSNR(Texture2D reference, Texture2D target, bool isNormalMap, bool sRGB, int mipLevel, bool derivative)
     {
         var mseRenderTexture = new RenderTexture(
             reference.width / (int)Mathf.Pow(2, mipLevel),
@@ -205,6 +218,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         mseMaterial.SetTexture("_Target", target);
         mseMaterial.SetFloat("_sRGB", sRGB ? 1 : 0);
         mseMaterial.SetFloat("_Derivative", derivative ? 1 : 0);
+        mseMaterial.SetFloat("_NormalMap", isNormalMap ? 1 : 0);
         Graphics.Blit(reference, mseRenderTexture, mseMaterial);
         mseRenderTexture.GenerateMips();
 
@@ -225,7 +239,7 @@ public class TextureCompressionAnalyzer : EditorWindow
             TextureFormat.DXT1Crunched,
             TextureFormat.RGB24
         };
-        if (rgbOnlyFormats.Contains(reference.format))
+        if (rgbOnlyFormats.Contains(reference.format) || isNormalMap)
         {
             mse = (color.r + color.g + color.b) / 3;
         }
@@ -246,14 +260,15 @@ public class TextureCompressionAnalyzer : EditorWindow
             return null;
         }
         var quality = new TextureQuality();
+        bool isNormalMap = refImporter.textureType == TextureImporterType.NormalMap;
 
-        float psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 0, false);        
+        float psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);        
         quality.SetResult(TextureQuality.Metric.Mip0PSNR, (psnr, "dB"));
 
-        psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 1, false);
+        psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
         quality.SetResult(TextureQuality.Metric.Mip1PSNR, (psnr, "dB"));
 
-        psnr = CalculatePSNR(refTexture, targetTexture, refImporter.sRGBTexture, 0, true);
+        psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, true);
         quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
 
         return quality;
@@ -288,7 +303,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         assetRootPath = path.Substring(0, path.LastIndexOf('/'));
         assetRootPath = assetRootPath.Substring(0, assetRootPath.LastIndexOf('/'));
-        if (GUILayout.Button("Clear Cache"))
+        if (GUILayout.Button($"Clear Cache ({AssetDatabase.GetSubFolders(assetRootPath + "/TextureAnalyzer").Length})"))
         {
             AssetDatabase.DeleteAsset(assetRootPath + "/TextureAnalyzer");
             quality = null;
@@ -314,6 +329,12 @@ public class TextureCompressionAnalyzer : EditorWindow
         {
             EditorGUILayout.LabelField("textureImporter is null");
             return;
+        }
+
+        TextureVariant[] variants = variantsRGBA;
+        if (textureImporter.textureType == TextureImporterType.NormalMap)
+        {
+            variants = variantsNormal;
         }
 
         string texGUID = AssetDatabase.AssetPathToGUID(texturePath);
@@ -352,6 +373,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         EditorGUILayout.LabelField("texture.format: " + texture.format);
         EditorGUILayout.LabelField("texture.sRGB: " + textureImporter.sRGBTexture);
         EditorGUILayout.LabelField("texture.mipmap: " + textureImporter.mipmapEnabled);
+        EditorGUILayout.LabelField("texture.textureType: " + textureImporter.textureType);
 
         var sizes = variants.Select(v => GetVariantSize(v)).ToArray();
         var maxVram = sizes[0].vram;
@@ -394,7 +416,7 @@ public class TextureCompressionAnalyzer : EditorWindow
             var size = GetVariantSize(variant);
             EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
             EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
-            if (variant.compression != TextureImporterCompression.Uncompressed || variant.sizeReductionFactor != 1)
+            if (variant.compression != TextureImporterFormat.RGBA32 || variant.sizeReductionFactor != 1)
             {
                 foreach(var entry in quality.GetResults())
                 {
