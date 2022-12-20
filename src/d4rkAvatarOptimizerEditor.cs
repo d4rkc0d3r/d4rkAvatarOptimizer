@@ -2447,6 +2447,29 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
 
+        if (NonBC5NormalMaps.Length > 0)
+        {
+            EditorGUILayout.HelpBox(
+                "One or more normal maps are not BC5 compressed.\n" +
+                "BC5 compressed normal maps are highest quality for the same VRAM size as the other compression options.\n" +
+                "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.", MessageType.Info);
+            if (GUILayout.Button($"Convert all ({NonBC5NormalMaps.Length}) normal maps to BC5"))
+            {
+                foreach (var tex in NonBC5NormalMaps)
+                {
+                    var path = AssetDatabase.GetAssetPath(tex);
+                    var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    var platformSettings = importer.GetPlatformTextureSettings("Standalone");
+                    platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+                    platformSettings.overridden = true;
+                    platformSettings.format = TextureImporterFormat.BC5;
+                    importer.SetPlatformTextureSettings(platformSettings);
+                    importer.SaveAndReimport();
+                }
+                ClearUICaches();
+            }
+        }
+
         bool hasExtraMaterialSlots = root.GetComponentsInChildren<Renderer>(true)
             .Where(r => !exclusions.Contains(r.transform))
             .Where(r => r.GetSharedMesh() != null)
@@ -2534,6 +2557,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private Transform[] alwaysDisabledGameObjectsCache = null;
     private GameObject[] gameObjectsWithToggleAnimationsCache = null;
     private Texture2D[] crunchedTexturesCache = null;
+    private Texture2D[] nonBC5NormalMapsCache = null;
 
     private void ClearUICaches()
     {
@@ -2543,6 +2567,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         alwaysDisabledGameObjectsCache = null;
         gameObjectsWithToggleAnimationsCache = null;
         crunchedTexturesCache = null;
+        nonBC5NormalMapsCache = null;
     }
 
     private void OnSelectionChange()
@@ -2658,6 +2683,51 @@ public class d4rkAvatarOptimizerEditor : Editor
                 crunchedTexturesCache = textures.ToArray();
             }
             return crunchedTexturesCache;
+        }
+    }
+
+    private Texture2D[] NonBC5NormalMaps
+    {
+        get
+        {
+            if (nonBC5NormalMapsCache == null)
+            {
+                var exclusions = GetAllExcludedTransforms();
+                var renderers = root.GetComponentsInChildren<Renderer>(true)
+                    .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+                    .ToArray();
+                var textures = new HashSet<Texture2D>();
+                foreach (var renderer in renderers)
+                {
+                    if (exclusions.Contains(renderer.transform))
+                        continue;
+                    var materials = renderer.sharedMaterials;
+                    foreach (var material in materials)
+                    {
+                        if (material == null || material.shader == null)
+                            continue;
+                        var parsed = ShaderAnalyzer.Parse(material.shader);
+                        if (parsed == null)
+                            continue;
+                        foreach (var prop in parsed.properties)
+                        {
+                            if (prop.type != ParsedShader.Property.Type.Texture2D)
+                                continue;
+                            var tex = material.GetTexture(prop.name) as Texture2D;
+                            if (tex != null && tex.format != TextureFormat.BC5)
+                            {
+                                var assetImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) as TextureImporter;
+                                if (assetImporter != null && assetImporter.textureType == TextureImporterType.NormalMap)
+                                {
+                                    textures.Add(tex);
+                                }
+                            }
+                        }
+                    }
+                }
+                nonBC5NormalMapsCache = textures.ToArray();
+            }
+            return nonBC5NormalMapsCache;
         }
     }
 
@@ -3089,6 +3159,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 Profiler.StartSection("Crunched Textures");
                 DrawDebugList(CrunchedTextures);
+                Profiler.EndSection();
+            }
+            if (Foldout("NonBC5 Normal Maps", ref settings.DebugShowNonBC5NormalMaps))
+            {
+                Profiler.StartSection("NonBC5 Normal Maps");
+                DrawDebugList(NonBC5NormalMaps);
                 Profiler.EndSection();
             }
             if (Foldout("Locked in Materials", ref settings.DebugShowLockedInMaterials))
