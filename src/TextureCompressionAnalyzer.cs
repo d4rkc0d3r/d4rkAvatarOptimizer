@@ -440,8 +440,8 @@ public class TextureCompressionAnalyzer : EditorWindow
                 EditorGUILayout.LabelField($"{variant}:");
                 EditorGUI.indentLevel++;
                 var size = GetVariantSize(variant);
-                EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
-                EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
+                EditorGUILayout.LabelField($"VRAM: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
+                EditorGUILayout.LabelField($"Download: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space(5);
             }
@@ -461,8 +461,8 @@ public class TextureCompressionAnalyzer : EditorWindow
             EditorGUILayout.LabelField($"{variant}:");
             EditorGUI.indentLevel++;
             var size = GetVariantSize(variant);
-            EditorGUILayout.LabelField($"VRAM Size: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
-            EditorGUILayout.LabelField($"Download Size: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
+            EditorGUILayout.LabelField($"VRAM: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
+            EditorGUILayout.LabelField($"Download: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
             foreach(var entry in quality.GetResults())
             {
                 EditorGUILayout.LabelField($"{entry.metric}: {entry.result.value:F2}{entry.result.unit}");
