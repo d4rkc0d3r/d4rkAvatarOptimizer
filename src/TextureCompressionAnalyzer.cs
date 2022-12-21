@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
-
+using System.Reflection;
 public class TextureCompressionAnalyzer : EditorWindow
 {
     public struct TextureVariant
@@ -90,6 +90,7 @@ public class TextureCompressionAnalyzer : EditorWindow
     }
 
     string assetRootPath;
+    Vector2 scrollPosition = Vector2.zero;
     Texture2D texture;
     TextureVariant[] variantsRGBA = new TextureVariant[]
     {
@@ -127,18 +128,6 @@ public class TextureCompressionAnalyzer : EditorWindow
     {
         GetWindow(typeof(TextureCompressionAnalyzer));
     }
-    
-    private bool ObjectField<T>(ref T obj, string label = null, bool allowSceneObjects = false) where T : Object
-    {
-        var result = EditorGUILayout.ObjectField(label, obj, typeof(T), allowSceneObjects) as T;
-        if (result != obj)
-        {
-            obj = result;
-            quality = null;
-            return true;
-        }
-        return false;
-    }
 
     private string GetVariantPath(TextureVariant variant)
     {
@@ -146,6 +135,10 @@ public class TextureCompressionAnalyzer : EditorWindow
         string fileExtension = System.IO.Path.GetExtension(texturePath);
         string texGUID = AssetDatabase.AssetPathToGUID(texturePath);
         var textureImporter = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+        if (textureImporter == null)
+        {
+            return null;
+        }
         int textureResolution = Mathf.Min(textureImporter.maxTextureSize, Mathf.Max(texture.width, texture.height));
         textureResolution /= variant.sizeReductionFactor;
         return $"{assetRootPath}/{texGUID}/Z_IGNORE_{variant}_{textureResolution}px{fileExtension}";
@@ -298,6 +291,20 @@ public class TextureCompressionAnalyzer : EditorWindow
         }
     }
 
+    private T MiniTextureField<T>(string label, T texture, bool allowSceneObjects, params GUILayoutOption[] options) where T : Texture
+    {
+        var rect = EditorGUILayout.GetControlRect(true, 20f, EditorStyles.layerMaskField);
+        var rects = new object[] {rect, new Rect(), new Rect()};
+        typeof(EditorGUI)
+            .GetMethod("GetRectsForMiniThumbnailField", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.Invoke(null, rects);
+        var textureRect = (Rect) rects[1];
+        var labelRect = (Rect) rects[0];
+        labelRect.x = textureRect.width + 2;
+        EditorGUI.LabelField(labelRect, label);
+        return EditorGUI.ObjectField(textureRect, texture, typeof(T), false) as T;
+    }
+
     public void OnGUI()
     {
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
@@ -314,37 +321,51 @@ public class TextureCompressionAnalyzer : EditorWindow
         }
         assetRootPath += "/TextureAnalyzer";
 
-        EditorGUILayout.LabelField("assetRootPath: " + assetRootPath);
-
-        ObjectField(ref texture);
-
-        if (texture == null)
-            return;
-
         string texturePath = AssetDatabase.GetAssetPath(texture);
         string fileExtension = System.IO.Path.GetExtension(texturePath);
-
+        string texGUID = AssetDatabase.AssetPathToGUID(texturePath);
+        string texFolder = assetRootPath + "/" + texGUID;
         var textureImporter = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+
+        string textureInfo = texture == null ? "None" : $"{texture.name} | {texture.width}x{texture.height} | {texture.format}";
+        if (textureImporter != null)
+        {
+            if (textureImporter.sRGBTexture)
+                textureInfo += " | sRGB";
+            if (textureImporter.mipmapEnabled)
+                textureInfo += " | Mips";
+            if (textureImporter.textureType == TextureImporterType.NormalMap)
+                textureInfo += " | NormalMap";
+            else if (textureImporter.DoesSourceTextureHaveAlpha())
+                textureInfo += " | Alpha";
+        }
+        
+        texture = MiniTextureField(textureInfo, texture, false);
+
+        string disableButtonError = "";
+
         if (textureImporter == null)
         {
-            EditorGUILayout.LabelField("textureImporter is null");
-            return;
+            disableButtonError = " (No TextureImporter found)";
+        }
+        if (texture == null)
+        {
+            disableButtonError = " (No Texture selected)";
         }
 
         TextureVariant[] variants = variantsRGB;
-        if (textureImporter.textureType == TextureImporterType.NormalMap)
+        if (textureImporter?.textureType == TextureImporterType.NormalMap)
         {
             variants = variantsNormal;
         }
-        else if (textureImporter.DoesSourceTextureHaveAlpha())
+        else if (textureImporter?.DoesSourceTextureHaveAlpha() ?? false)
         {
             variants = variantsRGBA;
         }
 
-        string texGUID = AssetDatabase.AssetPathToGUID(texturePath);
-        string texFolder = assetRootPath + "/" + texGUID;
+        GUI.enabled = disableButtonError == "";
 
-        if (GUILayout.Button("Analyze Variants"))
+        if (GUILayout.Button("Analyze Variants" + disableButtonError))
         {
             if (!AssetDatabase.IsValidFolder(texFolder))
             {
@@ -372,23 +393,21 @@ public class TextureCompressionAnalyzer : EditorWindow
             quality = null;
         }
 
-        EditorGUILayout.LabelField("textureGUID: " + texGUID);
-        EditorGUILayout.LabelField("texture.resolution: " + texture.width + "x" + texture.height);
-        EditorGUILayout.LabelField("texture.format: " + texture.format);
-        EditorGUILayout.LabelField("texture.sRGB: " + textureImporter.sRGBTexture);
-        EditorGUILayout.LabelField("texture.mipmap: " + textureImporter.mipmapEnabled);
-        EditorGUILayout.LabelField("texture.textureType: " + textureImporter.textureType);
-        EditorGUILayout.LabelField("texture.hasAlpha: " + textureImporter.DoesSourceTextureHaveAlpha());
+        if (!GUI.enabled)
+        {
+            return;
+        }
 
         var sizes = variants.Select(v => GetVariantSize(v)).ToArray();
         var maxVram = sizes[0].vram;
         var maxAssetBundle = sizes[0].assetBundle;
         if (maxVram < 0 || maxAssetBundle < 0)
         {
-            EditorGUILayout.Space(5);
-            EditorGUILayout.HelpBox("Please click \"Analyze Variants\" button first.", MessageType.Warning);
+            EditorGUILayout.HelpBox("Please click the \"Analyze Variants\" button first.", MessageType.Warning);
             return;
         }
+
+        EditorGUILayout.ObjectField("Variants Folder", AssetDatabase.LoadAssetAtPath<DefaultAsset>(texFolder), typeof(DefaultAsset), false);
 
         if (quality == null || quality.Length != variants.Length)
         {
@@ -404,11 +423,34 @@ public class TextureCompressionAnalyzer : EditorWindow
             .OrderByDescending(v => v.quality.GetResult(TextureQuality.Metric.Mip0PSNR)?.value ?? 0)
             .ToArray();
 
-        foreach (var tuple in variantsWithQualityResult)
+        EditorGUILayout.Space(5);
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+
+        {
+            var variant = variantsWithQualityResult[0].variant;
+            var quality = variantsWithQualityResult[0].quality;
+            string variantPath = GetVariantPath(variant);
+            var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(variantPath);
+            if (asset == null)
+            {
+                EditorGUILayout.HelpBox($"Variant {variant} is not analyzed.", MessageType.Warning);
+            }
+            else
+            {
+                EditorGUILayout.LabelField($"{variant}:");
+                EditorGUI.indentLevel++;
+                var size = GetVariantSize(variant);
+                EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
+                EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
+                EditorGUI.indentLevel--;
+                EditorGUILayout.Space(5);
+            }
+        }
+
+        foreach (var tuple in variantsWithQualityResult.Skip(1))
         {
             var variant = tuple.variant;
             var quality = tuple.quality;
-            EditorGUILayout.Space(5);
             string variantPath = GetVariantPath(variant);
             var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(variantPath);
             if (asset == null)
@@ -419,17 +461,17 @@ public class TextureCompressionAnalyzer : EditorWindow
             EditorGUILayout.LabelField($"{variant}:");
             EditorGUI.indentLevel++;
             var size = GetVariantSize(variant);
-            EditorGUILayout.LabelField($"vramSize: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
-            EditorGUILayout.LabelField($"downloadSize: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
-            if ((variant.compression != TextureImporterFormat.RGBA32 && variant.compression != TextureImporterFormat.RGB24) || variant.sizeReductionFactor != 1)
+            EditorGUILayout.LabelField($"VRAM Size: {FormatByteSize(size.vram)} ({(size.vram / maxVram * 100):F2}%)");
+            EditorGUILayout.LabelField($"Download Size: {FormatByteSize(size.assetBundle)} ({(size.assetBundle / maxAssetBundle * 100):F2}%)");
+            foreach(var entry in quality.GetResults())
             {
-                foreach(var entry in quality.GetResults())
-                {
-                    EditorGUILayout.LabelField($"{entry.metric}: {entry.result.value:F2}{entry.result.unit}");
-                }
+                EditorGUILayout.LabelField($"{entry.metric}: {entry.result.value:F2}{entry.result.unit}");
             }
             EditorGUI.indentLevel--;
+            EditorGUILayout.Space(5);
         }
+
+        EditorGUILayout.EndScrollView();
     }
 }
 #endif
