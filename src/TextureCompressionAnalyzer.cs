@@ -121,6 +121,16 @@ public class TextureCompressionAnalyzer : EditorWindow
         new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 100),
         new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 50),
     };
+    TextureVariant[] variantsHDR = new TextureVariant[]
+    {
+        new TextureVariant(TextureImporterFormat.RGBAHalf, 1),
+        new TextureVariant(TextureImporterFormat.BC6H, 1),
+        new TextureVariant(TextureImporterFormat.BC6H, 2),
+        new TextureVariant(TextureImporterFormat.BC7, 1),
+        new TextureVariant(TextureImporterFormat.DXT1, 1),
+        new TextureVariant(TextureImporterFormat.DXT1Crunched, 1, 100),
+        new TextureVariant(TextureImporterFormat.DXT1Crunched, 1, 50),
+    };
     TextureQuality[] quality = null;
 
     [MenuItem("Tools/d4rkpl4y3r/Texture Compression Analyzer")]
@@ -230,7 +240,8 @@ public class TextureCompressionAnalyzer : EditorWindow
         {
             TextureFormat.DXT1,
             TextureFormat.DXT1Crunched,
-            TextureFormat.RGB24
+            TextureFormat.RGB24,
+            TextureFormat.RGBAHalf,
         };
         if (rgbOnlyFormats.Contains(reference.format) || isNormalMap)
         {
@@ -327,9 +338,12 @@ public class TextureCompressionAnalyzer : EditorWindow
         string texFolder = assetRootPath + "/" + texGUID;
         var textureImporter = AssetImporter.GetAtPath(texturePath) as TextureImporter;
 
+        bool hdr = texture != null && (texture.format == TextureFormat.RGBAHalf || texture.format == TextureFormat.BC6H);
         string textureInfo = texture == null ? "None" : $"{texture.name} | {texture.width}x{texture.height} | {texture.format}";
         if (textureImporter != null)
         {
+            if (hdr)
+                textureInfo += " | HDR";
             if (textureImporter.sRGBTexture)
                 textureInfo += " | sRGB";
             if (textureImporter.mipmapEnabled)
@@ -356,7 +370,11 @@ public class TextureCompressionAnalyzer : EditorWindow
         }
 
         TextureVariant[] variants = variantsRGB;
-        if (textureImporter?.textureType == TextureImporterType.NormalMap)
+        if (hdr)
+        {
+            variants = variantsHDR;
+        }
+        else if (textureImporter?.textureType == TextureImporterType.NormalMap)
         {
             variants = variantsNormal;
         }
