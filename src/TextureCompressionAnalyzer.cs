@@ -340,17 +340,19 @@ public class TextureCompressionAnalyzer : EditorWindow
                 textureInfo += " | Alpha";
         }
         
+        EditorGUILayout.Space();
         texture = MiniTextureField(textureInfo, texture, false);
+        EditorGUILayout.Space();
 
         string disableButtonError = "";
 
         if (textureImporter == null)
         {
-            disableButtonError = " (No TextureImporter found)";
+            disableButtonError = "No TextureImporter found";
         }
         if (texture == null)
         {
-            disableButtonError = " (No Texture selected)";
+            disableButtonError = "No Texture selected";
         }
 
         TextureVariant[] variants = variantsRGB;
@@ -365,7 +367,7 @@ public class TextureCompressionAnalyzer : EditorWindow
 
         GUI.enabled = disableButtonError == "";
 
-        if (GUILayout.Button("Analyze Variants" + disableButtonError))
+        if (GUILayout.Button("Analyze Variants"))
         {
             if (!AssetDatabase.IsValidFolder(texFolder))
             {
@@ -395,6 +397,8 @@ public class TextureCompressionAnalyzer : EditorWindow
 
         if (!GUI.enabled)
         {
+            GUI.enabled = true;
+            EditorGUILayout.HelpBox(disableButtonError, MessageType.Error);
             return;
         }
 
@@ -406,8 +410,6 @@ public class TextureCompressionAnalyzer : EditorWindow
             EditorGUILayout.HelpBox("Please click the \"Analyze Variants\" button first.", MessageType.Warning);
             return;
         }
-
-        EditorGUILayout.ObjectField("Variants Folder", AssetDatabase.LoadAssetAtPath<DefaultAsset>(texFolder), typeof(DefaultAsset), false);
 
         if (quality == null || quality.Length != variants.Length)
         {
