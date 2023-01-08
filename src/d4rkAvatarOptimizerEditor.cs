@@ -1630,7 +1630,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 newMesh.SetVertices(targetVertices);
                 newMesh.bindposes = mesh.bindposes;
                 newMesh.boneWeights = targetWeights.ToArray();
-                if (targetColor != null && targetColor.Any(c => !c.Equals(new Color())))
+                if (targetColor != null && targetColor.Any(c => !c.Equals(Color.white)))
                 {
                     newMesh.colors = targetColor.ToArray();
                 }
@@ -1819,7 +1819,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 else
                 {
-                    targetColor.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => new Color()));
+                    targetColor.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Color.white));
                 }
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
@@ -1925,7 +1925,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMesh.SetVertices(targetVertices);
             combinedMesh.bindposes = targetBindPoses.ToArray();
             combinedMesh.boneWeights = targetWeights.ToArray();
-            if (targetColor.Any(c => !c.Equals(new Color())))
+            if (targetColor.Any(c => !c.Equals(Color.white)))
             {
                 combinedMesh.colors = targetColor.ToArray();
             }

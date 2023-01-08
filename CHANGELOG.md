@@ -14,6 +14,7 @@
 * Only add `#define KEYWORD` to passes that have a corresponding `#pragma shader_feature` in the pass. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/18)
 * Fixed that multiple vert/geometry/fragment shader declarations would cause the optimizer to only use the last one.
 * Add `Texture2D.GetDimensions(uint mipLevel, out float width, out float height, out float numberOfLevels)` and the `uint` variant overloads to the merged texture wrapper class. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/20)
+* Fix assumed default vertex color to be white instead of black.
 
 ## v1.7
 ### Bug Fixes
