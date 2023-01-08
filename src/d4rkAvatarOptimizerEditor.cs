@@ -1696,6 +1696,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-8f)
+    {
+        value.x = Mathf.Abs(value.x) < threshold ? 0 : value.x;
+        value.y = Mathf.Abs(value.y) < threshold ? 0 : value.y;
+        value.z = Mathf.Abs(value.z) < threshold ? 0 : value.z;
+        return value;
+    }
+
     private static Dictionary<Transform, Transform> FindMovingParent()
     {
         var nonMovingTransforms = FindAllUnmovingTransforms();
@@ -1979,9 +1987,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                         {
                             int vertIndex = k + vertexOffset;
                             var toWorld = sourceToWorld[vertIndex];
-                            targetDeltaVertices[vertIndex] = toWorld.MultiplyVector(sourceDeltaVertices[k]);
-                            targetDeltaNormals[vertIndex] = toWorld.MultiplyVector(sourceDeltaNormals[k]);
-                            targetDeltaTangents[vertIndex] = toWorld.MultiplyVector(sourceDeltaTangents[k]);
+                            targetDeltaVertices[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaVertices[k]));
+                            targetDeltaNormals[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaNormals[k]));
+                            targetDeltaTangents[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaTangents[k]));
                         }
                         var weight = mesh.GetBlendShapeFrameWeight(i, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);

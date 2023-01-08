@@ -6,6 +6,7 @@
 ### Changes
 * The optimized animator controllers now have `(OptimizedCopy)` appended to their name.
 * Add Limitations section to the readme to clarify that avatars might look broken if shaders are disabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17)
+* Slight blend shape download size reduction by setting delta values to 0 if they are below 1e-8.
 
 ### Bug Fixes
 * Fix parents of animated transforms getting deleted. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/14)
