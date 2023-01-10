@@ -17,6 +17,7 @@
 * Add `Texture2D.GetDimensions(uint mipLevel, out float width, out float height, out float numberOfLevels)` and the `uint` variant overloads to the merged texture wrapper class. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/20)
 * Fix assumed default vertex color to be white instead of black.
 * Ignore Renderers that have no mesh. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/22)
+* Vector4 properties now use G formatting instead of the default unity F1 formatting. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/21)
 
 ## v1.7
 ### Bug Fixes

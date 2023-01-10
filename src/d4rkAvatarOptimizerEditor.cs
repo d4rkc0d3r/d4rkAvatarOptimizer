@@ -1030,7 +1030,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
-                            propertyArray.values.Add("float4" + mat.GetVector(prop.name));
+                            propertyArray.values.Add("float4" + mat.GetVector(prop.name).ToString("G"));
                         break;
                         case ParsedShader.Property.Type.Int:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
