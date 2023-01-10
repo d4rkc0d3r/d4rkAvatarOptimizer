@@ -337,14 +337,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         var exclusions = GetAllExcludedTransforms();
         foreach (var renderer in renderers)
         {
-            var mesh = renderer.GetSharedMesh();
             if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer) || renderer.sharedMaterials.Length == 0)
                 continue;
 
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer)
+                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null)
                     break;
                 if (exclusions.Contains(subList[0].transform))
                     continue;
@@ -1443,7 +1442,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var exclusions = GetAllExcludedTransforms();
         foreach (var meshRenderer in meshRenderers)
         {
-            if (exclusions.Contains(meshRenderer.transform))
+            if (exclusions.Contains(meshRenderer.transform) || meshRenderer.GetSharedMesh() == null)
                 continue;
             DisplayProgressBar($"Optimizing materials on {meshRenderer.name}");
             var path = GetPathToRoot(meshRenderer);
@@ -1733,6 +1732,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (combinableSkinnedMeshes.Count < 1)
                 continue;
             if (combinableMeshes.Any(m => exclusions.Contains(m.transform)))
+                continue;
+            if (combinableSkinnedMeshes[0].sharedMesh == null)
                 continue;
 
             DisplayProgressBar($"Combining mesh {combinableMeshes[0].name}");
