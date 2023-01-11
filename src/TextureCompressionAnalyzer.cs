@@ -49,7 +49,8 @@ public class TextureCompressionAnalyzer : EditorWindow
         void OnPreprocessTexture()
         {
             var textureImporter = assetImporter as TextureImporter;
-            var match = Regex.Match(assetPath, @"/Z_IGNORE_([\w()\d]+)_(\d+)px\.(\w+)$");
+            var refTextureImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(staticTexture)) as TextureImporter;
+            var match = Regex.Match(assetPath, @"/Z_IGNORE_([\w()\d]+)\.(\w+)$");
             var parsedVariant = match.Groups[1].Success ? TextureVariant.Parse(match.Groups[1].Value) : null;
             if (parsedVariant != null)
             {
@@ -58,9 +59,20 @@ public class TextureCompressionAnalyzer : EditorWindow
                 platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
                 platformSettings.overridden = true;
                 platformSettings.format = variant.compression;
-                platformSettings.maxTextureSize = int.Parse(match.Groups[2].Value);
                 platformSettings.compressionQuality = variant.crunchQuality ?? 100;
                 platformSettings.crunchedCompression = variant.crunchQuality != null;
+                platformSettings.maxTextureSize = refTextureImporter.maxTextureSize / variant.sizeReductionFactor;
+                textureImporter.isReadable = true;
+                textureImporter.streamingMipmaps = refTextureImporter.streamingMipmaps;
+                textureImporter.mipmapEnabled = refTextureImporter.mipmapEnabled;
+                textureImporter.wrapMode = refTextureImporter.wrapMode;
+                textureImporter.filterMode = refTextureImporter.filterMode;
+                textureImporter.anisoLevel = refTextureImporter.anisoLevel;
+                textureImporter.textureType = refTextureImporter.textureType;
+                textureImporter.alphaIsTransparency = refTextureImporter.alphaIsTransparency;
+                textureImporter.sRGBTexture = refTextureImporter.sRGBTexture;
+                textureImporter.mipmapFilter = refTextureImporter.mipmapFilter;
+                textureImporter.mipMapsPreserveCoverage = refTextureImporter.mipMapsPreserveCoverage;
                 textureImporter.SetPlatformTextureSettings(platformSettings);
             }
         }
@@ -92,6 +104,8 @@ public class TextureCompressionAnalyzer : EditorWindow
     string assetRootPath;
     Vector2 scrollPosition = Vector2.zero;
     Texture2D texture;
+    static Texture2D staticTexture;
+    TextureVariant[] variants;
     TextureVariant[] variantsRGBA = new TextureVariant[]
     {
         new TextureVariant(TextureImporterFormat.RGBA32, 1),
@@ -149,9 +163,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         {
             return null;
         }
-        int textureResolution = Mathf.Min(textureImporter.maxTextureSize, Mathf.Max(texture.width, texture.height));
-        textureResolution /= variant.sizeReductionFactor;
-        return $"{assetRootPath}/{texGUID}/Z_IGNORE_{variant}_{textureResolution}px{fileExtension}";
+        return $"{assetRootPath}/{texGUID}/Z_IGNORE_{variant}{fileExtension}";
     }
 
     private string GetAssetBundlePath(TextureVariant variant)
@@ -272,10 +284,30 @@ public class TextureCompressionAnalyzer : EditorWindow
         psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
         quality.SetResult(TextureQuality.Metric.Mip1PSNR, (psnr, "dB"));
 
-        psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, true);
-        quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
+        //psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, true);
+        //quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
 
         return quality;
+    }
+
+    private bool CreateVariant(TextureVariant variant)
+    {
+        if (variant.ToString() == variants[0].ToString())
+        {
+            return false;
+        }
+        if (AssetImporter.GetAtPath(GetVariantPath(variants[0])) is TextureImporter importer && importer.textureType == TextureImporterType.NormalMap)
+        {
+            return false;
+        }
+        var rawTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(variants[0]));
+        var variantTexture = new Texture2D(rawTexture.width / variant.sizeReductionFactor, rawTexture.height / variant.sizeReductionFactor, rawTexture.format, rawTexture.mipmapCount > 1);
+        variantTexture.SetPixels(rawTexture.GetPixels((int)Mathf.Log(variant.sizeReductionFactor, 2)));
+        variantTexture.Apply();
+        var path = GetVariantPath(variant);
+        System.IO.File.WriteAllBytes(Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length) + path, ImageConversion.EncodeToPNG(variantTexture));
+        AssetDatabase.ImportAsset(path);
+        return true;
     }
 
     public string FormatByteSize(float size)
@@ -355,7 +387,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         }
         
         EditorGUILayout.Space();
-        texture = MiniTextureField(textureInfo, texture, false);
+        staticTexture = texture = MiniTextureField(textureInfo, texture, false);
         EditorGUILayout.Space();
 
         string disableButtonError = "";
@@ -369,7 +401,7 @@ public class TextureCompressionAnalyzer : EditorWindow
             disableButtonError = "No Texture selected";
         }
 
-        TextureVariant[] variants = variantsRGB;
+        variants = variantsRGB;
         if (hdr)
         {
             variants = variantsHDR;
@@ -398,7 +430,10 @@ public class TextureCompressionAnalyzer : EditorWindow
                 var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(variantPath);
                 if (asset == null)
                 {
-                    AssetDatabase.CopyAsset(texturePath, variantPath);
+                    if(!CreateVariant(variant))
+                    {
+                        AssetDatabase.CopyAsset(texturePath, variantPath);
+                    }
                     buildMap.Add(new AssetBundleBuild() {
                         assetBundleName = $"Z_IGNORE_{variant}.AssetBundle",
                         assetNames = new string[] { variantPath }
