@@ -280,16 +280,29 @@ public class TextureCompressionAnalyzer : EditorWindow
         {
             return false;
         }
-        if (AssetImporter.GetAtPath(GetVariantPath(variants[0])) is TextureImporter importer && importer.textureType == TextureImporterType.NormalMap)
-        {
-            return false;
-        }
         var rawTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(variants[0]));
         var variantTexture = new Texture2D(rawTexture.width / variant.sizeReductionFactor, rawTexture.height / variant.sizeReductionFactor, rawTexture.format, rawTexture.mipmapCount > 1);
-        variantTexture.SetPixels(rawTexture.GetPixels((int)Mathf.Log(variant.sizeReductionFactor, 2)));
+        Color[] colors = rawTexture.GetPixels((int)Mathf.Log(variant.sizeReductionFactor, 2));
+        if ((AssetImporter.GetAtPath(GetVariantPath(variants[0])) as TextureImporter)?.textureType == TextureImporterType.NormalMap)
+        {
+            for (int i = 0; i < colors.Length; i++)
+            {
+                colors[i].r *= colors[i].a;
+                colors[i].r = colors[i].r * 2 - 1;
+                colors[i].g = colors[i].g * 2 - 1;
+                colors[i].b = Mathf.Sqrt(1 - Mathf.Clamp01(colors[i].r * colors[i].r + colors[i].g * colors[i].g));
+                colors[i].r = colors[i].r * 0.5f + 0.5f;
+                colors[i].g = colors[i].g * 0.5f + 0.5f;
+                colors[i].a = 1;
+            }
+        }
+        variantTexture.SetPixels(colors);
         variantTexture.Apply();
         var path = GetVariantPath(variant);
-        System.IO.File.WriteAllBytes(Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length) + path, ImageConversion.EncodeToPNG(variantTexture));
+        byte[] data = rawTexture.format == TextureFormat.RGBAHalf
+            ? ImageConversion.EncodeToEXR(variantTexture, Texture2D.EXRFlags.CompressZIP)
+            : ImageConversion.EncodeToPNG(variantTexture);
+        System.IO.File.WriteAllBytes(Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length) + path, data);
         AssetDatabase.ImportAsset(path);
         return true;
     }
