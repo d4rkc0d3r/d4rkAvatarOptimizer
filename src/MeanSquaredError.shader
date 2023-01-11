@@ -67,20 +67,25 @@
 
             float4 Sample(Texture2D tex, float2 uv)
             {
-                float2 texSize;
-                tex.GetDimensions(texSize.x, texSize.y);
-                float scale = max(texSize.x, texSize.y) / max(_ScreenParams.x, _ScreenParams.y);
-                float texMip = round(log2(scale));
-                return AdjustColorSpace(tex.SampleLevel(linear_clamp_sampler, uv, texMip));
+                return AdjustColorSpace(tex.Sample(linear_clamp_sampler, uv));
             }
 
-            float4 frag (v2f i) : SV_Target
+            float Distance(float4 a, float4 b)
+            {
+                float4 deltaSq = (a - b) * (a - b);
+                if (_sRGB) // redmean
+                {
+                    float rMean = (a.r * 0.5 + b.r * 0.5);
+                    float dist = (2 + rMean) * deltaSq.r + 4 * deltaSq.g + (3 - rMean) * deltaSq.b;
+                    return lerp(deltaSq.a, dist, a.a);
+                }
+                return lerp(deltaSq.a, dot(deltaSq.rgb, 1), a.a);
+            }
+
+            float frag (v2f i) : SV_Target
             {
                 float4 reference = Sample(_Reference, i.uv);
                 float4 target = Sample(_Target, i.uv);
-                float4 error = reference - target;
-                float4 mse = error * error;
-                mse.rgb *= reference.a;
                 if (_Derivative)
                 {
                     float4 refX = Sample(_Reference, i.uv + ddx(i.uv));
@@ -91,15 +96,9 @@
                     float4 refdY = refY - reference;
                     float4 tardX = tarX - target;
                     float4 tardY = tarY - target;
-                    float4 errorX = refdX - tardX;
-                    float4 errorY = refdY - tardY;
-                    float4 mseX = errorX * errorX;
-                    float4 mseY = errorY * errorY;
-                    mseX.rgb *= reference.a;
-                    mseY.rgb *= reference.a;
-                    return mseX * 0.5 + mseY * 0.5;
+                    return Distance(refdX, tardX) + Distance(refdY, tardY);
                 }
-                return mse;
+                return Distance(reference, target);
             }
             ENDCG
         }

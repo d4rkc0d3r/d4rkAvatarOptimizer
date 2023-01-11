@@ -237,32 +237,16 @@ public class TextureCompressionAnalyzer : EditorWindow
         Graphics.Blit(reference, mseRenderTexture, mseMaterial);
         mseRenderTexture.GenerateMips();
 
-        var onePixelRenderTexture = new RenderTexture(1, 1, 0, RenderTextureFormat.ARGBFloat);
+        var onePixelRenderTexture = new RenderTexture(1, 1, 0, RenderTextureFormat.RFloat);
         var copyMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/Copy"));
         copyMaterial.SetFloat("_MipLevel", mseRenderTexture.mipmapCount);
         Graphics.Blit(mseRenderTexture, onePixelRenderTexture, copyMaterial);
 
-        var onePixelTexture = new Texture2D(1, 1, TextureFormat.RGBAFloat, true);
+        var onePixelTexture = new Texture2D(1, 1, TextureFormat.RFloat, true);
         RenderTexture.active = onePixelRenderTexture;
         onePixelTexture.ReadPixels(new Rect(0, 0, 1, 1), 0, 0);
-        var color = onePixelTexture.GetPixel(0, 0);
+        var mse = onePixelTexture.GetPixel(0, 0).r;
 
-        float mse = 0;
-        var rgbOnlyFormats = new TextureFormat[]
-        {
-            TextureFormat.DXT1,
-            TextureFormat.DXT1Crunched,
-            TextureFormat.RGB24,
-            TextureFormat.RGBAHalf,
-        };
-        if (rgbOnlyFormats.Contains(reference.format) || isNormalMap)
-        {
-            mse = (color.r + color.g + color.b) / 3;
-        }
-        else
-        {
-            mse = (color.r + color.g + color.b + color.a) / 4;
-        }
         return 20 * Mathf.Log10(1) - 10 * Mathf.Log10(mse);
     }
 
