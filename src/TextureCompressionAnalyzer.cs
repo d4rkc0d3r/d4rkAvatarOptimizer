@@ -82,11 +82,11 @@ public class TextureCompressionAnalyzer : EditorWindow
     {
         public enum Metric
         {
-            PSNRmip0,
-            PSNRmip1,
-            PSNRderivative,
-            SSIMmip0,
-            SSIMmip1,
+            SSIM_mip0,
+            SSIM_mip1,
+            PSNR_mip0,
+            PSNR_mip1,
+            //PSNR_derivative,
         }
         private readonly Dictionary<Metric, (float value, string unit)> data = new Dictionary<Metric, (float value, string unit)>();
         public void SetResult(Metric metric, (float value, string unit) result)
@@ -107,6 +107,15 @@ public class TextureCompressionAnalyzer : EditorWindow
     Vector2 scrollPosition = Vector2.zero;
     Texture2D texture;
     static Texture2D staticTexture;
+    bool showMetricOptions = false;
+    TextureQuality.Metric sortMetric = TextureQuality.Metric.SSIM_mip0;
+    Dictionary<TextureQuality.Metric, bool> enabledMetrics = new Dictionary<TextureQuality.Metric, bool>()
+    {
+        { TextureQuality.Metric.PSNR_mip0, true },
+        { TextureQuality.Metric.PSNR_mip1, true },
+        { TextureQuality.Metric.SSIM_mip0, true },
+        { TextureQuality.Metric.SSIM_mip1, true },
+    };
     TextureVariant[] variants;
     TextureVariant[] variantsRGBA = new TextureVariant[]
     {
@@ -267,7 +276,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         ssimMaterial.SetFloat("_sRGB", sRGB ? 1 : 0);
         ssimMaterial.SetFloat("_Derivative", derivative ? 1 : 0);
         ssimMaterial.SetFloat("_NormalMap", isNormalMap ? 1 : 0);
-        ssimMaterial.SetFloat("_KernelSize", 8);
+        ssimMaterial.SetFloat("_KernelSize", 11);
         Graphics.Blit(reference, ssimRenderTexture, ssimMaterial);
         ssimRenderTexture.GenerateMips();
 
@@ -296,20 +305,32 @@ public class TextureCompressionAnalyzer : EditorWindow
         var quality = new TextureQuality();
         bool isNormalMap = refImporter.textureType == TextureImporterType.NormalMap;
 
-        float psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);        
-        quality.SetResult(TextureQuality.Metric.PSNRmip0, (psnr, "dB"));
+        if (enabledMetrics[TextureQuality.Metric.PSNR_mip0])
+        {
+            float psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);        
+            quality.SetResult(TextureQuality.Metric.PSNR_mip0, (psnr, "dB"));
+        }
 
-        psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
-        quality.SetResult(TextureQuality.Metric.PSNRmip1, (psnr, "dB"));
+        if (enabledMetrics[TextureQuality.Metric.PSNR_mip1]) 
+        {
+            float psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
+            quality.SetResult(TextureQuality.Metric.PSNR_mip1, (psnr, "dB"));
+        }
+
+        if (enabledMetrics[TextureQuality.Metric.SSIM_mip0])
+        {
+            float ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);
+            quality.SetResult(TextureQuality.Metric.SSIM_mip0, (ssim * 100, ""));
+        }
+
+        if (enabledMetrics[TextureQuality.Metric.SSIM_mip1])
+        {
+            float ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
+            quality.SetResult(TextureQuality.Metric.SSIM_mip1, (ssim * 100, ""));
+        }
 
         //psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, true);
-        //quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
-
-        float ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);
-        quality.SetResult(TextureQuality.Metric.SSIMmip0, (ssim * 100, ""));
-
-        ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
-        quality.SetResult(TextureQuality.Metric.SSIMmip1, (ssim * 100, ""));
+        //quality.SetResult(TextureQuality.Metric.PSNR_derivative, (psnr, "dB"));
 
         return quality;
     }
@@ -427,6 +448,21 @@ public class TextureCompressionAnalyzer : EditorWindow
         EditorGUILayout.Space();
         staticTexture = texture = MiniTextureField(textureInfo, texture, false);
         EditorGUILayout.Space();
+        if (showMetricOptions = EditorGUILayout.Foldout(showMetricOptions, "Quality Metric Options"))
+        {
+            EditorGUI.indentLevel++;
+            sortMetric = (TextureQuality.Metric) EditorGUILayout.EnumPopup("Sort Metric", sortMetric);
+            enabledMetrics[sortMetric] = true;
+            foreach (var metric in System.Enum.GetValues(typeof(TextureQuality.Metric)).Cast<TextureQuality.Metric>())
+            {
+                if (metric == sortMetric)
+                    GUI.enabled = false;
+                enabledMetrics[metric] = EditorGUILayout.Toggle(metric.ToString(), enabledMetrics[metric]);
+                GUI.enabled = true;
+            }
+            EditorGUI.indentLevel--;
+        }
+        EditorGUILayout.Space();
 
         string disableButtonError = "";
 
@@ -516,7 +552,7 @@ public class TextureCompressionAnalyzer : EditorWindow
 
         var variantsWithQualityResult = Enumerable.Range(0, variants.Length)
             .Select(i => new { variant = variants[i], quality = quality[i] })
-            .OrderByDescending(v => v.quality.GetResult(TextureQuality.Metric.PSNRmip0)?.value ?? 0)
+            .OrderByDescending(v => v.quality.GetResult(sortMetric)?.value ?? 0)
             .ToArray();
 
         EditorGUILayout.Space(5);
