@@ -82,9 +82,11 @@ public class TextureCompressionAnalyzer : EditorWindow
     {
         public enum Metric
         {
-            Mip0PSNR,
-            Mip1PSNR,
-            DerivativePSNR,
+            PSNRmip0,
+            PSNRmip1,
+            PSNRderivative,
+            SSIMmip0,
+            SSIMmip1,
         }
         private readonly Dictionary<Metric, (float value, string unit)> data = new Dictionary<Metric, (float value, string unit)>();
         public void SetResult(Metric metric, (float value, string unit) result)
@@ -224,7 +226,7 @@ public class TextureCompressionAnalyzer : EditorWindow
         var mseRenderTexture = new RenderTexture(
             reference.width / (int)Mathf.Pow(2, mipLevel),
             reference.height / (int)Mathf.Pow(2, mipLevel),
-            0, RenderTextureFormat.ARGBFloat);
+            0, RenderTextureFormat.RFloat);
         mseRenderTexture.useMipMap = true;
         mseRenderTexture.autoGenerateMips = false;
         mseRenderTexture.Create();
@@ -250,6 +252,38 @@ public class TextureCompressionAnalyzer : EditorWindow
         return 20 * Mathf.Log10(1) - 10 * Mathf.Log10(mse);
     }
 
+    private float CalculateSSIM(Texture2D reference, Texture2D target, bool isNormalMap, bool sRGB, int mipLevel, bool derivative)
+    {
+        var ssimRenderTexture = new RenderTexture(
+            reference.width / (int)Mathf.Pow(2, mipLevel),
+            reference.height / (int)Mathf.Pow(2, mipLevel),
+            0, RenderTextureFormat.ARGBFloat);
+        ssimRenderTexture.useMipMap = true;
+        ssimRenderTexture.autoGenerateMips = false;
+        ssimRenderTexture.Create();
+        var ssimMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM"));
+        ssimMaterial.SetTexture("_Reference", reference);
+        ssimMaterial.SetTexture("_Target", target);
+        ssimMaterial.SetFloat("_sRGB", sRGB ? 1 : 0);
+        ssimMaterial.SetFloat("_Derivative", derivative ? 1 : 0);
+        ssimMaterial.SetFloat("_NormalMap", isNormalMap ? 1 : 0);
+        ssimMaterial.SetFloat("_KernelSize", 8);
+        Graphics.Blit(reference, ssimRenderTexture, ssimMaterial);
+        ssimRenderTexture.GenerateMips();
+
+        var onePixelRenderTexture = new RenderTexture(1, 1, 0, RenderTextureFormat.RFloat);
+        var copyMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/Copy"));
+        copyMaterial.SetFloat("_MipLevel", ssimRenderTexture.mipmapCount);
+        Graphics.Blit(ssimRenderTexture, onePixelRenderTexture, copyMaterial);
+
+        var onePixelTexture = new Texture2D(1, 1, TextureFormat.RFloat, true);
+        RenderTexture.active = onePixelRenderTexture;
+        onePixelTexture.ReadPixels(new Rect(0, 0, 1, 1), 0, 0);
+        var ssim = onePixelTexture.GetPixel(0, 0).r;
+
+        return ssim;
+    }
+
     private TextureQuality CalculateQualityMetrics(TextureVariant reference, TextureVariant target)
     {
         var refTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(GetVariantPath(reference));
@@ -263,13 +297,19 @@ public class TextureCompressionAnalyzer : EditorWindow
         bool isNormalMap = refImporter.textureType == TextureImporterType.NormalMap;
 
         float psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);        
-        quality.SetResult(TextureQuality.Metric.Mip0PSNR, (psnr, "dB"));
+        quality.SetResult(TextureQuality.Metric.PSNRmip0, (psnr, "dB"));
 
         psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
-        quality.SetResult(TextureQuality.Metric.Mip1PSNR, (psnr, "dB"));
+        quality.SetResult(TextureQuality.Metric.PSNRmip1, (psnr, "dB"));
 
         //psnr = CalculatePSNR(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, true);
         //quality.SetResult(TextureQuality.Metric.DerivativePSNR, (psnr, "dB"));
+
+        float ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 0, false);
+        quality.SetResult(TextureQuality.Metric.SSIMmip0, (ssim * 100, ""));
+
+        ssim = CalculateSSIM(refTexture, targetTexture, isNormalMap, refImporter.sRGBTexture, 1, false);
+        quality.SetResult(TextureQuality.Metric.SSIMmip1, (ssim * 100, ""));
 
         return quality;
     }
@@ -472,7 +512,7 @@ public class TextureCompressionAnalyzer : EditorWindow
 
         var variantsWithQualityResult = Enumerable.Range(0, variants.Length)
             .Select(i => new { variant = variants[i], quality = quality[i] })
-            .OrderByDescending(v => v.quality.GetResult(TextureQuality.Metric.Mip0PSNR)?.value ?? 0)
+            .OrderByDescending(v => v.quality.GetResult(TextureQuality.Metric.PSNRmip0)?.value ?? 0)
             .ToArray();
 
         EditorGUILayout.Space(5);
