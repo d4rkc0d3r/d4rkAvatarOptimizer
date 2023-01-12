@@ -423,6 +423,7 @@ public class TextureCompressionAnalyzer : EditorWindow
                 textureInfo += " | Alpha";
         }
         
+        EditorGUI.BeginChangeCheck();
         EditorGUILayout.Space();
         staticTexture = texture = MiniTextureField(textureInfo, texture, false);
         EditorGUILayout.Space();
@@ -491,6 +492,9 @@ public class TextureCompressionAnalyzer : EditorWindow
             EditorGUILayout.HelpBox(disableButtonError, MessageType.Error);
             return;
         }
+
+        if (EditorGUI.EndChangeCheck())
+            quality = null;
 
         var sizes = variants.Select(v => GetVariantSize(v)).ToArray();
         var maxVram = sizes[0].vram;
