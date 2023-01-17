@@ -474,6 +474,10 @@ public class TextureCompressionAnalyzer : EditorWindow
         {
             disableButtonError = "No Texture selected";
         }
+        else if (texture.mipmapCount == 1)
+        {
+            disableButtonError = "Texture has no mipmaps";
+        }
 
         variants = variantsRGB;
         if (hdr)
