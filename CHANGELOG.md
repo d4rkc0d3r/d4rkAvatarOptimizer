@@ -1,7 +1,8 @@
-## Next Version
+## v1.8
 ### Features
 * Add info text if any normal maps are found that are not using BC5 compression.
 * Add button to automatically convert all normal maps to BC5 compression.
+* Add Texture Compression Analyzer under the `Tools/d4rkpl4y3r/Texture Compression Analyzer` menu.
 
 ### Changes
 * The optimized animator controllers now have `(OptimizedCopy)` appended to their name.
