@@ -1362,6 +1362,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         if (a2D.format == TextureFormat.DXT1Crunched || a2D.format == TextureFormat.DXT5Crunched)
             return false;
+        if (a2D.mipmapCount != b2D.mipmapCount)
+            return false;
         if (IsTextureLinear(a2D) != IsTextureLinear(b2D))
             return false;
         return true;

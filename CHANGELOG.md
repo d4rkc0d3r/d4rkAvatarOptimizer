@@ -2,6 +2,9 @@
 ### Changes
 * Instead of doing a `AssetDatabase.Refresh()` to import the optimized shaders it now uses `ImportAsset()` inside a `StartAssetEditing()` and `StopAssetEditing()` block. This saves a tiny bit of time.
 
+### Bug Fixes
+* Fix that the optimizer would try to merge textures with different mip count.
+
 ## v1.8
 ### Features
 * Add info text if any normal maps are found that are not using BC5 compression.
