@@ -1230,8 +1230,19 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void SaveOptimizedMaterials()
     {
-        Profiler.StartSection("AssetDatabase.Refresh()");
-        AssetDatabase.Refresh();
+        Profiler.StartSection("AssetDatabase.ImportAsset()");
+        try
+        {
+            AssetDatabase.StartAssetEditing();
+            foreach(var mat in optimizedMaterials)
+            {
+                AssetDatabase.ImportAsset(trashBinPath + mat.name + ".shader");
+            }
+        }
+        finally
+        {
+            AssetDatabase.StopAssetEditing();
+        }
         Profiler.EndSection();
 
         foreach(var mat in optimizedMaterials)
