@@ -551,73 +551,101 @@ namespace d4rkpl4y3r
             return null;
         }
 
-        private static Regex functionDefinition = new Regex(@"^(inline\s+)?(\w+)\s+(\w+)\s*\(", RegexOptions.Compiled);
         private static Regex functionParameter = new Regex(
             @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+)(\s*<[\w,\s]+>)?\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?",
             RegexOptions.Compiled);
 
+        public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
+        {
+            int startIndex = index;
+            while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
+            {
+                index++;
+            }
+            if (index == startIndex || index == str.Length)
+            {
+                return null;
+            }
+            int endIndex = index;
+            while (index < str.Length && char.IsWhiteSpace(str[index]))
+            {
+                index++;
+            }
+            return str.Substring(startIndex, endIndex - startIndex);
+        }
+
         public static (string name, string returnType) ParseFunctionDefinition(string line)
         {
-            var match = functionDefinition.Match(line);
-            if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
+            int index = 0;
+            string returnType = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (returnType == "inline")
             {
-                return (match.Groups[3].Value, match.Groups[2].Value);
+                returnType = ParseIdentifierAndTrailingWhitespace(line, ref index);
             }
-            return (null, null);
+            if (returnType == null || returnType == "return" || returnType == "else" || !char.IsWhiteSpace(line[index - 1]))
+            {
+                return (null, null);
+            }
+            string name = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (name == null || index == line.Length || line[index] != '(')
+            {
+                return (null, null);
+            }
+            return (name, returnType);
         }
 
         public static ParsedShader.Function ParseFunctionDefinition(List<string> source, ref int lineIndex)
         {
-            var match = functionDefinition.Match(source[lineIndex]);
-            if (match.Success && match.Groups[2].Value != "return" && match.Groups[2].Value != "else")
+            var match = ParseFunctionDefinition(source[lineIndex]);
+            if (match.name == null)
             {
-                var func = new ParsedShader.Function();
-                func.name = match.Groups[3].Value;
-                var returnParam = new ParsedShader.Function.Parameter();
-                returnParam.isOutput = true;
-                returnParam.name = "return";
-                returnParam.type = match.Groups[2].Value;
-                func.parameters.Add(returnParam);
-                string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
-                while (lineIndex < source.Count - 1)
-                {
-                    var matches = functionParameter.Matches(line);
-                    foreach (Match m in matches)
-                    {
-                        var inout = m.Groups[2].Value;
-                        var geomType = m.Groups[4].Value;
-                        var param = new ParsedShader.Function.Parameter();
-                        param.type = m.Groups[5].Value;
-                        if (m.Groups[6].Value != "")
-                        {
-                            string s = m.Groups[6].Value;
-                            param.type += $"<{s.Substring(s.IndexOf('<') + 1, s.IndexOf('>') - s.IndexOf('<') - 1).Trim()}>";
-                        }
-                        param.name = m.Groups[8].Value;
-                        param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : -1;
-                        param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
-                        param.isInput = inout != "out";
-                        param.isOutput = inout == "out" || inout == "inout";
-                        func.parameters.Add(param);
-                    }
-                    while (source[lineIndex + 1].StartsWith("#"))
-                    {
-                        lineIndex++;
-                    }
-                    if (source[lineIndex + 1] == "{" || line.EndsWith(";"))
-                    {
-                        var m = Regex.Match(line, @"\)\s*:\s*(\w+)");
-                        if (m.Success)
-                        {
-                            returnParam.semantic = m.Groups[1].Value;
-                        }
-                        break;
-                    }
-                    line = source[++lineIndex];
-                }
-                return func;
+                return null;
             }
-            return null;
+            var func = new ParsedShader.Function();
+            func.name = match.name;
+            var returnParam = new ParsedShader.Function.Parameter();
+            returnParam.isOutput = true;
+            returnParam.name = "return";
+            returnParam.type = match.returnType;
+            func.parameters.Add(returnParam);
+            string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
+            while (lineIndex < source.Count - 1)
+            {
+                var matches = functionParameter.Matches(line);
+                foreach (Match m in matches)
+                {
+                    var inout = m.Groups[2].Value;
+                    var geomType = m.Groups[4].Value;
+                    var param = new ParsedShader.Function.Parameter();
+                    param.type = m.Groups[5].Value;
+                    if (m.Groups[6].Value != "")
+                    {
+                        string s = m.Groups[6].Value;
+                        param.type += $"<{s.Substring(s.IndexOf('<') + 1, s.IndexOf('>') - s.IndexOf('<') - 1).Trim()}>";
+                    }
+                    param.name = m.Groups[8].Value;
+                    param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : -1;
+                    param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
+                    param.isInput = inout != "out";
+                    param.isOutput = inout == "out" || inout == "inout";
+                    func.parameters.Add(param);
+                }
+                while (source[lineIndex + 1].StartsWith("#"))
+                {
+                    lineIndex++;
+                }
+                if (source[lineIndex + 1] == "{" || line.EndsWith(";"))
+                {
+                    var m = Regex.Match(line, @"\)\s*:\s*(\w+)");
+                    if (m.Success)
+                    {
+                        returnParam.semantic = m.Groups[1].Value;
+                    }
+                    break;
+                }
+                line = source[++lineIndex];
+            }
+            return func;
         }
 
         public static List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
@@ -1648,7 +1676,37 @@ namespace d4rkpl4y3r
             }
         }
 
-        private static Regex variableDeclaration = new Regex(@"^(uniform\s+)?(\w+)\s+(\w+)(\s*,\s*(\w+))*\s*;", RegexOptions.Compiled);
+        private static (string type, List<string> names) ParseVariableDeclaration(string line)
+        {
+            if (line[line.Length - 1] != ';')
+                return (null, null);
+            int index = 0;
+            string identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (identifier == "uniform")
+            {
+                identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+            }
+            if (identifier == null || identifier == "return")
+                return (null, null);
+            string type = identifier;
+            identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (identifier == null)
+                return (null, null);
+            var names = new List<string>() { identifier };
+            while (line[index] == ',')
+            {
+                index++;
+                while (char.IsWhiteSpace(line[index]))
+                    index++;
+                identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+                if (identifier == null)
+                    return (null, null);
+                names.Add(identifier);
+            }
+            if (line[index] != ';')
+                return (null, null);
+            return (type, names);
+        }
 
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
@@ -1712,13 +1770,11 @@ namespace d4rkpl4y3r
             }
             else
             {
-                var match = variableDeclaration.Match(line);
-                if (match.Success && match.Groups[2].Value != "return")
+                var match = ParseVariableDeclaration(line);
+                if (match.type != null)
                 {
-                    var type = match.Groups[2].Value;
-                    var names = match.Groups[5].Captures.Cast<Capture>().Select(c => c.Value).ToList();
-                    names.Add(match.Groups[3].Value);
-                    foreach (var name in names)
+                    var type = match.type;
+                    foreach (var name in match.names)
                     {
                         if (type == "SamplerState" && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
                         {

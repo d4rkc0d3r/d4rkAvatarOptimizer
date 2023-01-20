@@ -1,6 +1,7 @@
 ## Next Version
 ### Changes
 * Instead of doing a `AssetDatabase.Refresh()` to import the optimized shaders it now uses `ImportAsset()` inside a `StartAssetEditing()` and `StopAssetEditing()` block. This saves a tiny bit of time.
+* Replaced two heavily used regex with string and char operations. This saves a tiny bit of time.
 
 ### Bug Fixes
 * Fix that the optimizer would try to merge textures with different mip count.
