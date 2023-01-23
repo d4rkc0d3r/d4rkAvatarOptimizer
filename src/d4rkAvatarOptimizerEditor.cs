@@ -771,7 +771,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
-            .Where(b => !b.enabled)
+            .Where(b => b != null && !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
         
@@ -783,7 +783,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             .Where(c => !usedPhysBoneColliders.Contains(c)));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
-            .SelectMany(t => t.GetComponents<Component>().Where(c => !(c is Transform))));
+            .SelectMany(t => t.GetComponents<Component>().Where(c => c != null && !(c is Transform))));
 
         var exclusions = GetAllExcludedTransforms();
         alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));

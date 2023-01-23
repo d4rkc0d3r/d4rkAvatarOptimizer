@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 * Fix that the optimizer would try to merge textures with different mip count.
+* Fix crash when the avatar has a component with a missing script on it.
 
 ## v1.8
 ### Features
