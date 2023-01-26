@@ -456,7 +456,7 @@ namespace d4rkpl4y3r
             return true;
         }
 
-        public static ParsedShader.Property ParseProperty(string line, List<string> tags)
+        public static ParsedShader.Property ParseProperty(string line, List<string> tags, bool clearTagsOnPropertyParse = true)
         {
             string modifiedLine = line;
             int openBracketIndex = line.IndexOf('[');
@@ -546,7 +546,8 @@ namespace d4rkpl4y3r
                     output.type = ParsedShader.Property.Type.TextureCubeArray;
                     output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
                 }
-                tags.Clear();
+                if (clearTagsOnPropertyParse)
+                    tags.Clear();
                 return output;
             }
             return null;
@@ -1847,6 +1848,9 @@ namespace d4rkpl4y3r
         {
             output = new List<string>();
             var tags = new List<string>();
+            var propertyBlock = new List<string>();
+            int propertyBlockInsertionIndex = 0;
+            int propertyBlockStartParseIndex = 0; 
             int lineIndex = 0;
             while (lineIndex < parsedShader.lines.Count)
             {
@@ -1865,12 +1869,14 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     break;
                 }
-                else if (line == "{" && meshToggleCount > 1)
+                else if (line == "{")
                 {
                     output.Add(line);
+                    propertyBlockStartParseIndex = lineIndex;
+                    propertyBlockInsertionIndex = output.Count;
                     for (int i = 0; i < meshToggleCount; i++)
                     {
-                        output.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
+                        propertyBlock.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
                     }
                     foreach (var animatedProperty in animatedPropertyValues)
                     {
@@ -1884,28 +1890,9 @@ namespace d4rkpl4y3r
                         }
                         for (int i = 0; i < meshToggleCount; i++)
                         {
-                            output.Add($"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}(\"{prop.name} {i}\", {type}) = {defaultValue}");
+                            propertyBlock.Add($"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}(\"{prop.name} {i}\", {type}) = {defaultValue}");
                         }
                     }
-                }
-                else
-                {
-                    if (texturesToMerge.Count > 0)
-                    {
-                        var prop = ShaderAnalyzer.ParseProperty(line, tags);
-                        if (texturesToMerge.Contains(prop?.name))
-                        {
-                            int index = line.LastIndexOf("2D");
-                            line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
-                            if (prop.name == "_MainTex")
-                                line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
-                        }
-                    }
-                    line = Regex.Replace(line, @"\[\w*Toggle(?:Off)?(?:\(\w+\))?\]", "[ToggleUI]");
-                    line = Regex.Replace(line, @"\[KeywordEnum\([^)]+\)\]", "");
-                    line = line.Replace("[ThryShaderOptimizerLockButton]", "");
-                    line = line.Replace("_ShaderOptimizer", "_ShaderOptimizerIsDisabled");
-                    output.Add(line);
                 }
             }
             int passID = -1;
@@ -1935,6 +1922,35 @@ namespace d4rkpl4y3r
                     output.Add(endSymbol);
                 }
             }
+            tags.Clear();
+            for (lineIndex = propertyBlockStartParseIndex; lineIndex < parsedShader.lines.Count; lineIndex++)
+            {
+                string line = parsedShader.lines[lineIndex];
+                if (line == "}")
+                    break;
+                var prop = ShaderAnalyzer.ParseProperty(line, tags, false);
+                if (prop == null)
+                    continue;
+                line = line.Substring(line.IndexOf(prop.name));
+                if (prop.name == "_ShaderOptimizer")
+                    line = line.Replace("_ShaderOptimizer", "_ShaderOptimizerIsDisabled");
+                if (texturesToMerge.Contains(prop.name))
+                {
+                    int index = line.LastIndexOf("2D");
+                    line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                    if (prop.name == "_MainTex")
+                        line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
+                }
+                foreach (var tag in tags)
+                {
+                    if (tag.Length > 5 || (tag.ToLowerInvariant() != "hdr" && tag.ToLowerInvariant() != "gamma"))
+                        continue;
+                    propertyBlock.Add($"[{tag}]");
+                }
+                propertyBlock.Add(line);
+                tags.Clear();
+            }
+            output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
             return output;
         }
     }
