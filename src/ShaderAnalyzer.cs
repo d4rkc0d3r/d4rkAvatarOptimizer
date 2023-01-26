@@ -1549,7 +1549,7 @@ namespace d4rkpl4y3r
 
         private void InjectPropertyArrays(ParsedShader.Pass pass)
         {
-            output.Add("#pragma skip_variants DYNAMICLIGHTMAP_ON LIGHTMAP_ON LIGHTMAP_SHADOW_MIXING DIRLIGHTMAP_COMBINED SHADOWS_SHADOWMASK");
+            pragmaOutput.Add("#pragma skip_variants DYNAMICLIGHTMAP_ON LIGHTMAP_ON LIGHTMAP_SHADOW_MIXING DIRLIGHTMAP_COMBINED SHADOWS_SHADOWMASK");
             if (meshToggleCount > 1)
             {
                 output.Add("cbuffer CBd4rkAvatarOptimizer");
@@ -1857,17 +1857,21 @@ namespace d4rkpl4y3r
                         output.Add(line);
                     }
                 }
-                else if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
-                        && (line.StartsWith("#pragma") && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+")))
+                else if (line.StartsWith("#pragma"))
                 {
-                    pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
-                }
-                else if (!line.StartsWith("#pragma") || !Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
-                {
-                    if (line.StartsWith("#pragma"))
+                    if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
+                        &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
+                    {
+                        pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                    }
+                    else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
+                    {
                         pragmaOutput.Add(line);
-                    else
-                        output.Add(line);
+                    }
+                }
+                else
+                {
+                    output.Add(line);
                 }
             }
         }
@@ -1911,7 +1915,7 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     propertyBlockStartParseIndex = lineIndex;
                     propertyBlockInsertionIndex = output.Count;
-                    for (int i = 0; i < meshToggleCount; i++)
+                    for (int i = 0; meshToggleCount > 1 && i < meshToggleCount; i++)
                     {
                         propertyBlock.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
                     }
