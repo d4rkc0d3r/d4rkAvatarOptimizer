@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using d4rkpl4y3r.Util;
+using System.Security.Cryptography;
 
 namespace d4rkpl4y3r
 {
@@ -918,6 +919,8 @@ namespace d4rkpl4y3r
     public class ShaderOptimizer
     {
         private List<string> output;
+        private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
+        private List<string> pragmaOutput;
         private ParsedShader parsedShader;
         private int meshToggleCount;
         private Dictionary<string, string> staticPropertyValues;
@@ -933,7 +936,7 @@ namespace d4rkpl4y3r
 
         private ShaderOptimizer() {}
 
-        public static List<string> Run(ParsedShader source,
+        public static List<(string name, List<string> lines)> Run(ParsedShader source,
             Dictionary<string, string> staticPropertyValues = null,
             int meshToggleCount = 0,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
@@ -962,10 +965,9 @@ namespace d4rkpl4y3r
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
-            List<string> output = null;
             try
             {
-                output = optimizer.Run();
+                optimizer.Run();
             }
             catch (System.Exception e)
             {
@@ -977,7 +979,10 @@ namespace d4rkpl4y3r
                 Thread.CurrentThread.CurrentCulture = oldCulture;
                 Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
-            return output;
+            var outputFiles = new List<(string name, List<string> lines)>();
+            outputFiles.Add(("Shader", optimizer.output));
+            outputFiles.AddRange(optimizer.outputIncludes);
+            return outputFiles;
         }
 
         private void InjectArrayPropertyInitialization()
@@ -1817,12 +1822,24 @@ namespace d4rkpl4y3r
                 else if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
                         && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
                 {
-                    output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                    pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                 }
                 else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
                 {
-                    output.Add(line);
+                    if (line.StartsWith("#pragma"))
+                        pragmaOutput.Add(line);
+                    else
+                        output.Add(line);
                 }
+            }
+        }
+
+        private string GetMD5Hash(List<string> lines)
+        {
+            using (var md5 = MD5.Create())
+            {
+                md5.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)));
+                return string.Join("", md5.Hash.Select(b => b.ToString("x2")));
             }
         }
 
@@ -1903,12 +1920,18 @@ namespace d4rkpl4y3r
                     var pass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
                     texturesToCallSoTheSamplerDoesntDisappear.Clear();
+                    pragmaOutput = output;
+                    output = new List<string>();
                     InjectPropertyArrays(pass);
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     while (parsedShader.lines[++lineIndex] != endSymbol)
                     {
                         ParseCodeLines(parsedShader.lines, ref lineIndex, pass);
                     }
+                    var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
+                    outputIncludes.Add((includeName, output));
+                    output = pragmaOutput;
+                    output.Add($"#include \"{includeName}\"");
                     output.Add(endSymbol);
                 }
             }

@@ -136,6 +136,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
+    private static List<string> optimizedMaterialImportPaths = new List<string>();
     private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
@@ -1160,7 +1161,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             setShaderKeywords[i] = parsedShader[i].shaderFeatureKeyWords.Where(k => source[0].IsKeywordEnabled(k)).ToList();
         }
 
-        var optimizedShader = new List<string>[sources.Count];
+        var optimizedShader = new List<(string name, List<string> lines)>[sources.Count];
         Profiler.StartSection("ShaderOptimizer.Run()");
         Parallel.For(0, sources.Count, i =>
         {
@@ -1190,8 +1191,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             name = source[0].name + " " + name;
             var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
             name = System.IO.Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[i][0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"//" + optimizedShader[i][0];
-            System.IO.File.WriteAllLines(shaderFilePath, optimizedShader[i]);
+            optimizedShader[i][0].lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"//" + optimizedShader[i][0].lines[0];
+            foreach (var opt in optimizedShader[i])
+            {
+                var filePath = shaderFilePath;
+                if (opt.name != "Shader")
+                {
+                    filePath = trashBinPath + opt.name;
+                }
+                System.IO.File.WriteAllLines(filePath, opt.lines);
+                optimizedMaterialImportPaths.Add(filePath);
+            }
             var optimizedMaterial = Instantiate(source[0]);
             foreach (var keyword in setShaderKeywords[i])
             {
@@ -1234,9 +1244,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         try
         {
             AssetDatabase.StartAssetEditing();
-            foreach(var mat in optimizedMaterials)
+            foreach(var importPath in optimizedMaterialImportPaths)
             {
-                AssetDatabase.ImportAsset(trashBinPath + mat.name + ".shader");
+                AssetDatabase.ImportAsset(importPath);
             }
         }
         finally
@@ -2528,6 +2538,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         DisplayProgressBar("Clear TrashBin Folder", 0.1f);
         ClearTrashBin();
         optimizedMaterials.Clear();
+        optimizedMaterialImportPaths.Clear();
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
