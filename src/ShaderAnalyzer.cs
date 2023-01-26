@@ -1820,11 +1820,11 @@ namespace d4rkpl4y3r
                     }
                 }
                 else if (((pass.geometry != null && meshToggleCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
-                        && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
+                        && (line.StartsWith("#pragma") && Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+")))
                 {
                     pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                 }
-                else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
+                else if (!line.StartsWith("#pragma") || !Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
                 {
                     if (line.StartsWith("#pragma"))
                         pragmaOutput.Add(line);
