@@ -192,7 +192,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
             return;
         }
 
-        parsedShader = ShaderAnalyzer.Parse(material?.shader ?? shader);
+        parsedShader = ShaderAnalyzer.Parse(material == null ? shader : material.shader);
 
         if (parsedShader == null)
             return;

@@ -456,101 +456,138 @@ namespace d4rkpl4y3r
             return true;
         }
 
-        public static ParsedShader.Property ParseProperty(string line, List<string> tags, bool clearTagsOnPropertyParse = true)
+        public static (string name, string stringLiteral, string type, string defaultValue)?
+        ParsePropertyRaw(string line, List<string> tags)
         {
-            string modifiedLine = line;
-            int openBracketIndex = line.IndexOf('[');
-            while (openBracketIndex != -1)
+            int charIndex = 0;
+            int startTagIndex = 0;
+            int endTagIndex = 0;
+            string name = null;
+            while (charIndex < line.Length)
             {
-                int closeBracketIndex = modifiedLine.IndexOf(']') + 1;
-                if (closeBracketIndex != 0)
+                char c = line[charIndex];
+                if (c == '[')
                 {
-                    tags.Add(modifiedLine.Substring(openBracketIndex + 1, closeBracketIndex - openBracketIndex - 2));
-                    modifiedLine = modifiedLine.Substring(0, openBracketIndex)
-                        + modifiedLine.Substring(closeBracketIndex);
-                    openBracketIndex = modifiedLine.IndexOf('[');
+                    startTagIndex = charIndex;
+                    while (charIndex < line.Length && line[charIndex] != ']')
+                    {
+                        charIndex++;
+                    }
+                    tags.Add(line.Substring(startTagIndex + 1, charIndex - startTagIndex - 1));
+                    endTagIndex = charIndex + 1;
                 }
-                else
+                else if (c == '(')
                 {
+                    name = line.Substring(endTagIndex, charIndex - endTagIndex);
                     break;
                 }
+                charIndex++;
             }
-            modifiedLine = modifiedLine.Trim();
-            int parentheses = modifiedLine.IndexOf('(');
-            if (parentheses != -1)
+            if (name == null)
             {
-                var output = new ParsedShader.Property();
-                output.name = modifiedLine.Substring(0, parentheses).TrimEnd();
-                int quoteIndex = modifiedLine.IndexOf('"', parentheses);
-                quoteIndex = FindEndOfStringLiteral(modifiedLine, quoteIndex + 1);
-                int colonIndex = modifiedLine.IndexOf(',', quoteIndex + 1);
-                modifiedLine = modifiedLine.Substring(colonIndex + 1).TrimStart().ToLowerInvariant();
-                output.defaultValue = modifiedLine.Substring(modifiedLine.IndexOf('=') + 1).TrimStart();
-                if (modifiedLine.StartsWith("range") || modifiedLine.StartsWith("float"))
-                {
-                    output.type = ParsedShader.Property.Type.Float;
-                    if (output.defaultValue.StartsWith("("))
-                    {
-                        output.type = ParsedShader.Property.Type.Vector;
-                        output.defaultValue = "float4" + output.defaultValue;
-                    }
-                }
-                else if (modifiedLine.StartsWith("vector"))
+                return null;
+            }
+            int quoteIndexStart = line.IndexOf('"', charIndex);
+            int quoteIndexEnd = FindEndOfStringLiteral(line, quoteIndexStart + 1);
+            if (quoteIndexStart == -1 || quoteIndexEnd == -1)
+            {
+                return null;
+            }
+            string stringLiteral = line.Substring(quoteIndexStart, quoteIndexEnd - quoteIndexStart + 1);
+            int commaIndex = line.IndexOf(',', quoteIndexEnd);
+            if (commaIndex == -1)
+            {
+                return null;
+            }
+            int equalsIndex = line.LastIndexOf('=');
+            if (equalsIndex == -1)
+            {
+                return null;
+            }
+            int parenthesesCloseIndex = line.LastIndexOf(')', equalsIndex, equalsIndex - commaIndex);
+            if (parenthesesCloseIndex == -1)
+            {
+                return null;
+            }
+            string type = line.Substring(commaIndex + 1, parenthesesCloseIndex - commaIndex - 1).Trim();
+            string defaultValue = line.Substring(equalsIndex + 1).Trim();
+            return (name.Trim(), stringLiteral, type, defaultValue);
+        }
+
+        public static ParsedShader.Property ParseProperty(string line, List<string> tags, bool clearTagsOnPropertyParse = true)
+        {
+            var prop = ParsePropertyRaw(line, tags);
+            if (prop == null)
+            {
+                return null;
+            }
+            var output = new ParsedShader.Property();
+            output.name = prop.Value.name;
+            string typeDefinition = prop.Value.type.ToLowerInvariant();
+            output.defaultValue = prop.Value.defaultValue;
+            if (typeDefinition.StartsWith("range") || typeDefinition.StartsWith("float"))
+            {
+                output.type = ParsedShader.Property.Type.Float;
+                if (output.defaultValue.StartsWith("("))
                 {
                     output.type = ParsedShader.Property.Type.Vector;
                     output.defaultValue = "float4" + output.defaultValue;
                 }
-                else if (modifiedLine.StartsWith("int"))
-                {
-                    output.type = ParsedShader.Property.Type.Int;
-                }
-                else if (modifiedLine.StartsWith("color"))
-                {
-                    output.type = tags.Any(t => t.ToLowerInvariant() == "hdr") ? ParsedShader.Property.Type.ColorHDR : ParsedShader.Property.Type.Color;
-                    output.defaultValue = "float4" + output.defaultValue;
-                }
-                else if (modifiedLine.StartsWith("2darray"))
-                {
-                    output.type = ParsedShader.Property.Type.Texture2DArray;
-                }
-                else if (modifiedLine.StartsWith("2d"))
-                {
-                    output.type = ParsedShader.Property.Type.Texture2D;
-                    var d = output.defaultValue.Substring(1);
-                    d = d.Substring(0, d.IndexOf('"'));
-                    switch (d)
-                    {
-                        case "white": output.defaultValue = "float4(1,1,1,1)"; break;
-                        case "black": output.defaultValue = "float4(0,0,0,1)"; break;
-                        case "red": output.defaultValue = "float4(1,0,0,1)"; break;
-                        case "lineargrey":
-                        case "lineargray": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
-                        case "bump": output.defaultValue = "float4(0.5,0.5,1,1)"; break;
-                        case "grey":
-                        case "gray":
-                        default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
-                    }
-                }
-                else if (modifiedLine.StartsWith("3d"))
-                {
-                    output.type = ParsedShader.Property.Type.Texture3D;
-                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-                }
-                else if (modifiedLine.StartsWith("cube"))
-                {
-                    output.type = ParsedShader.Property.Type.TextureCube;
-                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-                }
-                else if (modifiedLine.StartsWith("cubearray"))
-                {
-                    output.type = ParsedShader.Property.Type.TextureCubeArray;
-                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-                }
-                if (clearTagsOnPropertyParse)
-                    tags.Clear();
-                return output;
             }
-            return null;
+            else if (typeDefinition.StartsWith("vector"))
+            {
+                output.type = ParsedShader.Property.Type.Vector;
+                output.defaultValue = "float4" + output.defaultValue;
+            }
+            else if (typeDefinition.StartsWith("int"))
+            {
+                output.type = ParsedShader.Property.Type.Int;
+            }
+            else if (typeDefinition.StartsWith("color"))
+            {
+                output.type = tags.Any(t => t.ToLowerInvariant() == "hdr") ? ParsedShader.Property.Type.ColorHDR : ParsedShader.Property.Type.Color;
+                output.defaultValue = "float4" + output.defaultValue;
+            }
+            else if (typeDefinition.StartsWith("2darray"))
+            {
+                output.type = ParsedShader.Property.Type.Texture2DArray;
+            }
+            else if (typeDefinition.StartsWith("2d"))
+            {
+                output.type = ParsedShader.Property.Type.Texture2D;
+                var d = output.defaultValue.Substring(1);
+                d = d.Substring(0, d.IndexOf('"'));
+                switch (d)
+                {
+                    case "white": output.defaultValue = "float4(1,1,1,1)"; break;
+                    case "black": output.defaultValue = "float4(0,0,0,1)"; break;
+                    case "red": output.defaultValue = "float4(1,0,0,1)"; break;
+                    case "lineargrey":
+                    case "lineargray": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
+                    case "bump": output.defaultValue = "float4(0.5,0.5,1,1)"; break;
+                    case "grey":
+                    case "gray":
+                    default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
+                }
+            }
+            else if (typeDefinition.StartsWith("3d"))
+            {
+                output.type = ParsedShader.Property.Type.Texture3D;
+                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+            }
+            else if (typeDefinition.StartsWith("cube"))
+            {
+                output.type = ParsedShader.Property.Type.TextureCube;
+                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+            }
+            else if (typeDefinition.StartsWith("cubearray"))
+            {
+                output.type = ParsedShader.Property.Type.TextureCubeArray;
+                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+            }
+            if (clearTagsOnPropertyParse)
+                tags.Clear();
+            return output;
         }
 
         private static Regex functionParameter = new Regex(
@@ -1928,26 +1965,27 @@ namespace d4rkpl4y3r
                 string line = parsedShader.lines[lineIndex];
                 if (line == "}")
                     break;
-                var prop = ShaderAnalyzer.ParseProperty(line, tags, false);
-                if (prop == null)
+                var parsedProperty = ShaderAnalyzer.ParsePropertyRaw(line, tags);
+                if (parsedProperty == null)
                     continue;
-                line = line.Substring(line.IndexOf(prop.name));
+                var prop = parsedProperty.Value;
                 if (prop.name == "_ShaderOptimizer")
-                    line = line.Replace("_ShaderOptimizer", "_ShaderOptimizerIsDisabled");
+                    prop.name = "_ShaderOptimizerIsDisabled";
                 if (texturesToMerge.Contains(prop.name))
                 {
-                    int index = line.LastIndexOf("2D");
-                    line = line.Substring(0, index) + "2DArray" + line.Substring(index + 2);
+                    int index = prop.type.LastIndexOf("2D");
+                    prop.type = prop.type.Substring(0, index) + "2DArray" + prop.type.Substring(index + 2);
                     if (prop.name == "_MainTex")
-                        line = line.Replace("_MainTex", "_MainTexButNotQuiteSoThatUnityDoesntCry");
+                        prop.name = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                 }
+                string tagString = "";
                 foreach (var tag in tags)
                 {
                     if (tag.Length > 5 || (tag.ToLowerInvariant() != "hdr" && tag.ToLowerInvariant() != "gamma"))
                         continue;
-                    propertyBlock.Add($"[{tag}]");
+                    tagString += $"[{tag}] ";
                 }
-                propertyBlock.Add(line);
+                propertyBlock.Add($"{tagString}{prop.name}({prop.stringLiteral}, {prop.type}) = {prop.defaultValue}");
                 tags.Clear();
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
