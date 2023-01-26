@@ -517,21 +517,47 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             fixedMotions[clip] = FixAnimationClipPaths(clip);
         }
+
+        string[] layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
+        string[] layerPaths = new string[avDescriptor.baseAnimationLayers.Length];
+        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        {
+            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+            if (layer == null)
+                continue;
+            layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{layer.name}(OptimizedCopy).controller";
+            layerPaths[i] = AssetDatabase.GetAssetPath(layer);
+        }
+        
+        Profiler.StartSection("AssetDatabase.CopyAsset()");
+        try
+        {
+            AssetDatabase.StartAssetEditing();
+            for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+            {
+                if (layerPaths[i] == null)
+                    continue;
+                AssetDatabase.CopyAsset(layerPaths[i], layerCopyPaths[i]);
+            }
+        }
+        finally
+        {
+            AssetDatabase.StopAssetEditing();
+        }
+        Profiler.EndSection();
         
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
         {
             var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
             if (layer == null)
                 continue;
-            Profiler.StartSection("AssetDatabase.CopyAsset()");
-            string path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + layer.name + "(OptimizedCopy).controller");
-            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(layer), path);
-            var newLayer = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            Profiler.StartSection("AssetDatabase.LoadAssetAtPath<AnimatorController>()");
+            var newLayer = AssetDatabase.LoadAssetAtPath<AnimatorController>(layerCopyPaths[i]);
             Profiler.EndSection();
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
-                state.motion = FixMotion(state.motion, fixedMotions, path, dummyAnimationToFillEmptyStates);
+                state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i], dummyAnimationToFillEmptyStates);
             }
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
@@ -1255,12 +1281,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         Profiler.EndSection();
 
-        foreach(var mat in optimizedMaterials)
+        for (int i = 0; i < optimizedMaterials.Count; i++)
         {
-            DisplayProgressBar($"Loading optimized shader {mat.name}");
+            var mat = optimizedMaterials[i];
+            DisplayProgressBar($"Loading optimized shader {mat.name}", 0.7f + 0.2f * (i / (float)optimizedMaterials.Count));
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
+            Profiler.StartNextSection("mat.shader = shader");
             int renderQueue = mat.renderQueue;
-            mat.shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
+            mat.shader = shader;
             mat.renderQueue = renderQueue;
             Profiler.StartNextSection("SetTextureArrayProperties");
             if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
