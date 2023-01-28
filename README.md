@@ -20,10 +20,9 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 
 You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
 Finally you can try to make a bug report and maybe I'll be able to fix it.  
-For that select the material and export it as `.unitypackage`.
-You can find it in the `d4rkAvatarOptimizer/TrashBin` folder:  
+For that export the `d4rkAvatarOptimizer/TrashBin` folder as a unity package like so:  
 ![Export Material](./ExampleImages/exportMaterial0.png)  
-Then in the next dialog select only the material and shader files in the TrashBin folder like so:  
+Then in the next dialog uncheck the "Include dependencies" checkbox and click "Export":  
 ![Export Material](./ExampleImages/exportMaterial1.png)  
 Once you have the `.unitypackage` file, please make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues).
 

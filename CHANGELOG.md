@@ -1,7 +1,10 @@
-## Next Version
+## v1.9
+### Features
+* Multiple performance improvements that reduce the time it takes to optimize an avatar by a factor of around 2x.
+
 ### Changes
 * Instead of doing a `AssetDatabase.Refresh()` to import the optimized shaders it now uses `ImportAsset()` inside a `StartAssetEditing()` and `StopAssetEditing()` block. This saves a tiny bit of time.
-* Replaced two heavily used regex with string and char operations. This saves a tiny bit of time.
+* Replaced two heavily used regex with string and char operations. This saves a bit of time.
 * Moved most of the generated shader code into include files. This saves a lot of time when importing the shaders.
 * Strip `[Drawer]` attributes from the generated shader code. This saves a significant amount of time when assigning the shader to a material.
 
