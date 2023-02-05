@@ -1973,8 +1973,8 @@ namespace d4rkpl4y3r
                 if (parsedProperty == null)
                     continue;
                 var prop = parsedProperty.Value;
-                if (prop.name == "_ShaderOptimizer")
-                    prop.name = "_ShaderOptimizerIsDisabled";
+                if (prop.name.StartsWith("_ShaderOptimizer"))
+                    continue;
                 if (texturesToMerge.Contains(prop.name))
                 {
                     int index = prop.type.LastIndexOf("2D");

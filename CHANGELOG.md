@@ -1,3 +1,7 @@
+## Next Version
+### Bug Fixes
+* Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
+
 ## v1.9
 ### Features
 * Multiple performance improvements that reduce the time it takes to optimize an avatar by a factor of around 2x.
