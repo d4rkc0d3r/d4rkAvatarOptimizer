@@ -3004,6 +3004,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
         }
 
+        // if not found we are probably in an VCC version of the sdk which removed the whitelist method
+        // use VRC.SDK3.Validation.AvatarValidation.FindIllegalComponents(target) t get a list of components and call DestroyImmediate on them
+        // also VCC sdks are in a different assembly
+        var findIllegalComponents = Type.GetType("VRC.SDK3.Validation.AvatarValidation, VRC.SDK3A")
+            ?.GetMethod("FindIllegalComponents", BindingFlags.Static | BindingFlags.Public);
+        if (findIllegalComponents != null)
+        {
+            var illegalComponents = findIllegalComponents.Invoke(null, new object[] { target }) as IEnumerable<Component>;
+            foreach (var component in illegalComponents)
+            {
+                DestroyImmediate(component);
+            }
+            return;
+        }
+
         Debug.LogWarning("Could not find RemoveIllegalComponents method");
     }
     
