@@ -2620,6 +2620,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private GameObject[] gameObjectsWithToggleAnimationsCache = null;
     private Texture2D[] crunchedTexturesCache = null;
     private Texture2D[] nonBC5NormalMapsCache = null;
+    private string[] animatedMaterialPropertyPathsCache = null;
 
     private void ClearUICaches()
     {
@@ -2630,6 +2631,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         gameObjectsWithToggleAnimationsCache = null;
         crunchedTexturesCache = null;
         nonBC5NormalMapsCache = null;
+        animatedMaterialPropertyPathsCache = null;
     }
 
     private void OnSelectionChange()
@@ -2793,6 +2795,19 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private string[] AnimatedMaterialPropertyPaths
+    {
+        get
+        {
+            if (animatedMaterialPropertyPathsCache == null)
+            {
+                animatedMaterialPropertyPathsCache = FindAllAnimatedMaterialProperties()
+                    .SelectMany(kv => kv.Value.Select(prop => $"{kv.Key}.{prop}")).ToArray();
+            }
+            return animatedMaterialPropertyPathsCache;
+        }
+    }
+
     public bool IsLockedIn(Material material)
     {
         if (material == null)
@@ -2872,6 +2887,18 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 Selection.objects = array;
             }
+        }
+    }
+
+    public void DrawDebugList(string[] array)
+    {
+        foreach (var obj in array)
+        {
+            EditorGUILayout.LabelField(obj);
+        }
+        if (array.Length == 0)
+        {
+            EditorGUILayout.LabelField("---");
         }
     }
 
@@ -3280,6 +3307,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     EditorGUILayout.LabelField("---");
                 }
+                Profiler.EndSection();
+            }
+            if (Foldout("Animated Material Property Paths", ref settings.DebugShowAnimatedMaterialPropertyPaths))
+            {
+                Profiler.StartSection("Animated Material Property Paths");
+                DrawDebugList(AnimatedMaterialPropertyPaths);
                 Profiler.EndSection();
             }
             if (Foldout("Game Objects with Toggle Animation", ref settings.DebugShowGameObjectsWithToggle))
