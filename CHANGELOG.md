@@ -1,6 +1,7 @@
 ## Next Version
 ### Features
 * Add debug view to show all animated material property paths.
+* Don't inject animated property arrays for merged material properties where none of the original meshes had that property animated.
 
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.

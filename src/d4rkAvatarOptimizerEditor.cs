@@ -141,6 +141,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
     private static Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+    private static Dictionary<string, HashSet<string>> fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
@@ -1006,9 +1007,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         return name + " " + count;
     }
 
-    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path)
+    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path, List<List<string>> originalMeshPaths = null)
     {
-        if (!animatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
+        if (!fusedAnimatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
             usedMaterialProps = new HashSet<string>();
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
@@ -1172,6 +1173,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 foreach (var propName in usedMaterialProps)
                 {
+                    if (originalMeshPaths != null)
+                    {
+                        bool skipProp = true;
+                        foreach (var originalPath in originalMeshPaths[i])
+                        {
+                            if (animatedMaterialProperties.TryGetValue(originalPath, out var props))
+                            {
+                                if (props.Contains(propName) || props.Contains(propName + ".x") || props.Contains(propName + ".r"))
+                                {
+                                    skipProp = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (skipProp)
+                            continue;
+                    }
                     if (parsedShader[i].propertyTable.TryGetValue(propName, out var prop))
                     {
                         string type = "float4";
@@ -1321,7 +1339,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
 
             if (settings.KeepMaterialPropertyAnimationsSeparate
-                && animatedMaterialProperties.TryGetValue(GetPathToRoot(meshRenderer), out var animatedProperties))
+                && fusedAnimatedMaterialProperties.TryGetValue(GetPathToRoot(meshRenderer), out var animatedProperties))
             {
                 foreach (var mat in meshRenderer.sharedMaterials)
                 {
@@ -1742,8 +1760,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 meshRenderer.sharedMesh = newMesh;
             }
 
+            var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => materialSlotRemap[(meshPath, slot.index)].path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, GetPathToRoot(meshRenderer));
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths);
         }
     }
 
@@ -1777,6 +1796,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
+        fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
         int combinedMeshID = 0;
         foreach (var combinableMeshes in combinableSkinnedMeshList)
         {
@@ -2143,9 +2163,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     if (animatedMaterialPropertiesToAdd.Count > 0)
                     {
-                        if (!animatedMaterialProperties.TryGetValue(newPath, out animatedProperties))
+                        if (!fusedAnimatedMaterialProperties.TryGetValue(newPath, out animatedProperties))
                         {
-                            animatedMaterialProperties[newPath] = animatedProperties = new HashSet<string>();
+                            fusedAnimatedMaterialProperties[newPath] = animatedProperties = new HashSet<string>();
                         }
                         animatedProperties.UnionWith(animatedMaterialPropertiesToAdd);
                     }
