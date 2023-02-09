@@ -1007,10 +1007,17 @@ public class d4rkAvatarOptimizerEditor : Editor
         return name + " " + count;
     }
 
-    private static Material[] CreateOptimizedMaterials(List<List<Material>> sources, int meshToggleCount, string path, List<List<string>> originalMeshPaths = null)
+    private static Material[] CreateOptimizedMaterials(
+        List<List<Material>> sources,
+        int meshToggleCount,
+        string path,
+        List<List<string>> originalMeshPaths = null,
+        List<(int minMeshIndex, int maxMeshIndex)> minMaxMeshIndices = null)
     {
         if (!fusedAnimatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
             usedMaterialProps = new HashSet<string>();
+        if (minMaxMeshIndices == null)
+            minMaxMeshIndices = sources.Select(s => (0, meshToggleCount - 1)).ToList();
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
         var setShaderKeywords = new List<string>[sources.Count];
@@ -1215,6 +1222,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                     parsedShader[i],
                     replace[i],
                     meshToggleCount,
+                    minMaxMeshIndices[i].minMeshIndex,
+                    minMaxMeshIndices[i].maxMeshIndex,
                     arrayPropertyValues[i],
                     texturesToCheckNull[i],
                     texturesToMerge[i],
@@ -1622,6 +1631,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var matchedSlots = FindAllMergeAbleMaterials(new [] { meshRenderer });
             var uniqueMatchedSlots = matchedSlots.Select(list => list.Select(slot => list.First(slot2 => slot.material == slot2.material)).Distinct().ToList()).ToList();
+            var minMaxMeshIndices = new List<(int minMeshIndex, int maxMeshIndex)>();
 
             var sourceVertices = mesh.vertices;
             var sourceIndices = mesh.triangles;
@@ -1650,6 +1660,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             for (int i = 0; i < matchedSlots.Count; i++)
             {
+                int minMeshIndex = meshCount;
+                int maxMeshIndex = 0;
                 var indexList = new List<int>();
                 for (int k = 0; k < matchedSlots[i].Count; k++)
                 {
@@ -1684,10 +1696,13 @@ public class d4rkAvatarOptimizerEditor : Editor
                             targetTangents.Add(sourceTangents[oldIndex]);
                             targetWeights.Add(sourceWeights[oldIndex]);
                             targetOldVertexIndex.Add(oldIndex);
+                            minMeshIndex = Math.Min(minMeshIndex, (int)sourceUv[0][oldIndex].z);
+                            maxMeshIndex = Math.Max(maxMeshIndex, (int)sourceUv[0][oldIndex].z);
                         }
                     }
                 }
                 targetIndices.Add(indexList);
+                minMaxMeshIndices.Add((minMeshIndex, maxMeshIndex));
             }
 
             {
@@ -1762,7 +1777,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => materialSlotRemap[(meshPath, slot.index)].path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths);
+            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, minMaxMeshIndices);
         }
     }
 
