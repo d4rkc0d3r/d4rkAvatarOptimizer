@@ -605,15 +605,19 @@ public class d4rkAvatarOptimizerEditor : Editor
         var mergedMeshes = FindPossibleSkinnedMeshMerges();
         optimizedSlotSwapMaterials.Clear();
         var exclusions = GetAllExcludedTransforms();
+        fusedAnimatedMaterialProperties = FindAllAnimatedMaterialProperties();
         foreach (var entry in slotSwapMaterials)
         {
-            int meshToggleCount = 0;
-            var current = GetTransformFromPath(entry.Key.path).GetComponent<Renderer>();
-            if (exclusions.Contains(current.transform))
+            var current = GetTransformFromPath(entry.Key.path);
+            if (current == null || exclusions.Contains(current) || current.GetComponent<Renderer>() == null)
                 continue;
-            if (current != null)
+            int mergedMeshCount = 1;
+            int meshIndex = 0;
+            var currentMergedMeshes = mergedMeshes.FirstOrDefault(list => list.Any(renderer => renderer.transform == current));
+            if (currentMergedMeshes != null)
             {
-                meshToggleCount = mergedMeshes.FirstOrDefault(list => list.Any(renderer => renderer == current))?.Count ?? 0;
+                mergedMeshCount = currentMergedMeshes.Count;
+                meshIndex = currentMergedMeshes.FindIndex(renderer => renderer.transform == current);
             }
             if (!optimizedSlotSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
             {
@@ -624,7 +628,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
                     var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
-                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, meshToggleCount, entry.Key.path)[0];
+                    var pathWrapper = new List<List<string>>() { new List<string>() { entry.Key.path } };
+                    var minMaxMeshIndexWrapper = new List<(int, int)>() { (meshIndex, meshIndex) };
+                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, entry.Key.path, pathWrapper, minMaxMeshIndexWrapper)[0];
                 }
             }
         }
