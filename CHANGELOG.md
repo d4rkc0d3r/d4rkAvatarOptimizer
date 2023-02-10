@@ -7,6 +7,7 @@
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
 * Fix `RemoveIllegalComponents()` being broken when the sdk was imported via VCC.
+* Change signaling value to 0xFF555554 instead of 0xFF555555 since the animation system seems to round to nearest even.
 
 ## v1.9
 ### Features
