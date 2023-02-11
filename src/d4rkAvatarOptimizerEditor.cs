@@ -600,8 +600,6 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void OptimizeMaterialSwapMaterials()
     {
-        slotSwapMaterials = FindAllMaterialSwapMaterials();
-        optimizedSlotSwapMaterials.Clear();
         var exclusions = GetAllExcludedTransforms();
         foreach (var entry in slotSwapMaterials)
         {
@@ -1674,9 +1672,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedSlots[i].Select((slot, index) => (slot, index)).First(t => t.slot.material == matchedSlots[i][k].material).index;
-                    var originalSlot = materialSlotRemap[(meshPath, matchedSlots[i][k].index)];
-                    AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
-                        (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
                     int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedSlots[i][k].index);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
@@ -1784,7 +1779,23 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => materialSlotRemap[(meshPath, slot.index)].path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            meshRenderer.sharedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, minMaxMeshIndices);
+            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, minMaxMeshIndices);
+
+            for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
+            {
+                if (uniqueMatchedMaterials[i].Count != 1 || uniqueMatchedMaterials[i][0] == null)
+                    continue;
+                var originalSlot = materialSlotRemap[(meshPath, matchedSlots[i][0].index)];
+                AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
+                    (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
+                if (!optimizedSlotSwapMaterials.TryGetValue(originalSlot, out var optimizedSwapMaterials))
+                {
+                    optimizedSlotSwapMaterials[originalSlot] = optimizedSwapMaterials = new Dictionary<Material, Material>();
+                }
+                optimizedSwapMaterials[uniqueMatchedMaterials[i][0]] = optimizedMaterials[i];
+            }
+
+            meshRenderer.sharedMaterials = optimizedMaterials;
         }
     }
 
@@ -2603,6 +2614,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         ClearTrashBin();
         optimizedMaterials.Clear();
         optimizedMaterialImportPaths.Clear();
+        optimizedSlotSwapMaterials.Clear();
         newAnimationPaths.Clear();
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
