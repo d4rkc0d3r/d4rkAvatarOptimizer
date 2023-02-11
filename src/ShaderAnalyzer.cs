@@ -1048,7 +1048,7 @@ namespace d4rkpl4y3r
                 string value = localMeshCount > 1
                     ? $"d4rkAvatarOptimizer{name}[d4rkAvatarOptimizer_MeshID]"
                     : $"d4rkAvatarOptimizer{name}_ArrayIndex{minMeshIndex}";
-                output.Add($"{name} = asuint({value}.x + d4rkAvatarOptimizer_Zero) == 0xFF555554 ? {name} : {value};");
+                output.Add($"{name} = isnan(asfloat(asuint({value}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {value};");
             }
         }
 

@@ -603,7 +603,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         optimizedSlotSwapMaterials.Clear();
         var exclusions = GetAllExcludedTransforms();
-        fusedAnimatedMaterialProperties = FindAllAnimatedMaterialProperties();
         foreach (var entry in slotSwapMaterials)
         {
             var current = GetTransformFromPath(entry.Key.path);
@@ -1375,13 +1374,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                         for (int mID = 0; mID < meshCount; mID++)
                         {
                             var propArrayName = $"{propName}_ArrayIndex{mID}";
+                            var signal = System.Single.NaN;
                             if (isVector || isColor)
                             {
-                                mat.SetVector(propArrayName, props.GetVector(propArrayName));
+                                mat.SetVector(propArrayName, new Vector4(signal, signal, signal, signal));
                             }
                             else
                             {
-                                mat.SetFloat(propArrayName, props.GetFloat(propArrayName));
+                                mat.SetFloat(propArrayName, signal);
                             }
                         }
                     }
@@ -2163,15 +2163,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 if (settings.KeepMaterialPropertyAnimationsSeparate)
                                 {
                                     newPropertyName = $"material.d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
-                                    float signal = System.BitConverter.ToSingle(new byte[] {0x54, 0x55, 0x55, 0xFF}, 0);
-                                    if (isVector || isColor)
-                                    {
-                                        properties.SetVector($"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}", new Vector4(signal, signal, signal, signal));
-                                    }
-                                    else
-                                    {
-                                        properties.SetFloat($"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}", signal);
-                                    }
                                 }
                                 string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
                                 var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : isColor ? new [] { ".r", ".g", ".b", ".a" } : new [] { "" };
