@@ -137,6 +137,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private static List<Material> optimizedMaterials = new List<Material>();
     private static List<string> optimizedMaterialImportPaths = new List<string>();
+    private static List<List<string>> mergedMeshPaths = new List<List<string>>();
     private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
@@ -581,8 +582,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (!typeof(Renderer).IsAssignableFrom(binding.type)
                     || !binding.propertyName.StartsWith("m_Materials.Array.data["))
                     continue;
-                if (GetTransformFromPath(binding.path) == null)
-                    continue;
                 int start = binding.propertyName.IndexOf('[') + 1;
                 int end = binding.propertyName.IndexOf(']') - start;
                 int slot = int.Parse(binding.propertyName.Substring(start, end));
@@ -602,22 +601,23 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void OptimizeMaterialSwapMaterials()
     {
         slotSwapMaterials = FindAllMaterialSwapMaterials();
-        var mergedMeshes = FindPossibleSkinnedMeshMerges();
         optimizedSlotSwapMaterials.Clear();
         var exclusions = GetAllExcludedTransforms();
         fusedAnimatedMaterialProperties = FindAllAnimatedMaterialProperties();
         foreach (var entry in slotSwapMaterials)
         {
             var current = GetTransformFromPath(entry.Key.path);
-            if (current == null || exclusions.Contains(current) || current.GetComponent<Renderer>() == null)
+            if (exclusions.Contains(current))
                 continue;
             int mergedMeshCount = 1;
             int meshIndex = 0;
-            var currentMergedMeshes = mergedMeshes.FirstOrDefault(list => list.Any(renderer => renderer.transform == current));
+            string targetPath = entry.Key.path;
+            var currentMergedMeshes = mergedMeshPaths.FirstOrDefault(list => list.Any(path => path == entry.Key.path));
             if (currentMergedMeshes != null)
             {
                 mergedMeshCount = currentMergedMeshes.Count;
-                meshIndex = currentMergedMeshes.FindIndex(renderer => renderer.transform == current);
+                meshIndex = currentMergedMeshes.IndexOf(entry.Key.path);
+                targetPath = currentMergedMeshes[0];
             }
             if (!optimizedSlotSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
             {
@@ -627,10 +627,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
+                    DisplayProgressBar("Optimizing swap material: " + material.name);
                     var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
-                    var pathWrapper = new List<List<string>>() { new List<string>() { entry.Key.path } };
+                    var sourcePathWrapper = new List<List<string>>() { new List<string>() { entry.Key.path } };
                     var minMaxMeshIndexWrapper = new List<(int, int)>() { (meshIndex, meshIndex) };
-                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, entry.Key.path, pathWrapper, minMaxMeshIndexWrapper)[0];
+                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, targetPath, sourcePathWrapper, minMaxMeshIndexWrapper)[0];
                 }
             }
         }
@@ -1675,7 +1676,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     int internalMaterialID = uniqueMatchedSlots[i].Select((slot, index) => (slot, index)).First(t => t.slot.material == matchedSlots[i][k].material).index;
                     var originalSlot = materialSlotRemap[(meshPath, matchedSlots[i][k].index)];
                     AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
-                        (meshPath, $"m_Materials.Array.data[{targetIndices.Count}]", typeof(SkinnedMeshRenderer)));
+                        (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
                     int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedSlots[i][k].index);
                     int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
                     int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
@@ -1814,10 +1815,12 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void CombineSkinnedMeshes()
     {
         var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
+        mergedMeshPaths = combinableSkinnedMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+        animatedMaterialProperties = FindAllAnimatedMaterialProperties();
         int combinedMeshID = 0;
         foreach (var combinableMeshes in combinableSkinnedMeshList)
         {
@@ -2605,7 +2608,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         root = toOptimize;
         DisplayProgressBar("Parsing Shaders", 0.05f);
         ShaderAnalyzer.ParseAndCacheAllShaders(root, true);
-        DisplayProgressBar("Clear TrashBin Folder", 0.1f);
+        DisplayProgressBar("Clear TrashBin Folder", 0.15f);
         ClearTrashBin();
         optimizedMaterials.Clear();
         optimizedMaterialImportPaths.Clear();
@@ -2613,7 +2616,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
         convertedMeshRendererPaths.Clear();
-        DisplayProgressBar("Destroying unused components", 0.15f);
+        DisplayProgressBar("Destroying unused components", 0.19f);
         Profiler.StartSection("DestroyEditorOnlyGameObjects()");
         DestroyEditorOnlyGameObjects();
         Profiler.StartNextSection("DestroyUnusedComponents()");
@@ -2624,19 +2627,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         CalculateUsedBlendShapePaths();
         Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
         DeleteAllUnusedSkinnedMeshRenderers();
-        Profiler.StartNextSection("FindAllAnimatedMaterialProperties()");
-        DisplayProgressBar("Optimizing swap materials", 0.2f);
-        animatedMaterialProperties = FindAllAnimatedMaterialProperties();
-        Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
-        OptimizeMaterialSwapMaterials();
         Profiler.StartNextSection("CombineSkinnedMeshes()");
-        DisplayProgressBar("Combining meshes", 0.25f);
+        DisplayProgressBar("Combining meshes", 0.2f);
         CombineSkinnedMeshes();
         Profiler.StartNextSection("CreateTextureArrays()");
         CreateTextureArrays();
         Profiler.StartNextSection("CombineAndOptimizeMaterials()");
         DisplayProgressBar("Optimizing materials", 0.3f);
         CombineAndOptimizeMaterials();
+        Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
+        OptimizeMaterialSwapMaterials();
         Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
         OptimizeMaterialsOnNonSkinnedMeshes();
         Profiler.StartNextSection("SaveOptimizedMaterials()");
