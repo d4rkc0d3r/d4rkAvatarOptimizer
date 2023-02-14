@@ -961,8 +961,7 @@ namespace d4rkpl4y3r
         private List<string> pragmaOutput;
         private ParsedShader parsedShader;
         private int mergedMeshCount;
-        private int minMeshIndex;
-        private int maxMeshIndex;
+        private List<int> mergedMeshIndices;
         private int localMeshCount;
         private Dictionary<string, string> staticPropertyValues;
         private Dictionary<string, (string type, List<string> values)> arrayPropertyValues;
@@ -980,8 +979,7 @@ namespace d4rkpl4y3r
         public static List<(string name, List<string> lines)> Run(ParsedShader source,
             Dictionary<string, string> staticPropertyValues = null,
             int mergedMeshCount = 0,
-            int minMeshIndex = 0,
-            int maxMeshIndex = 0,
+            List<int> mergedMeshIndices = null,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
             Dictionary<string, string> texturesToNullCheck = null,
             HashSet<string> texturesToMerge = null,
@@ -990,6 +988,10 @@ namespace d4rkpl4y3r
         {
             if (source == null || !source.parsedCorrectly)
                 return null;
+            mergedMeshIndices = mergedMeshIndices ?? new List<int>();
+            if (mergedMeshIndices.Count == 0)
+                mergedMeshIndices.Add(0);
+            mergedMeshIndices = mergedMeshIndices.Distinct().OrderBy(i => i).ToList();
             var oldCulture = Thread.CurrentThread.CurrentCulture;
             var oldUICulture = Thread.CurrentThread.CurrentUICulture;
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -997,9 +999,8 @@ namespace d4rkpl4y3r
             var optimizer = new ShaderOptimizer
             {
                 mergedMeshCount = mergedMeshCount,
-                minMeshIndex = minMeshIndex,
-                maxMeshIndex = maxMeshIndex,
-                localMeshCount = maxMeshIndex - minMeshIndex + 1,
+                mergedMeshIndices = mergedMeshIndices,
+                localMeshCount = mergedMeshIndices.Last() - mergedMeshIndices.First() + 1,
                 staticPropertyValues = staticPropertyValues ?? new Dictionary<string, string>(),
                 arrayPropertyValues = arrayPropertyValues ?? new Dictionary<string, (string type, List<string> values)>(),
                 parsedShader = source,
@@ -1047,7 +1048,7 @@ namespace d4rkpl4y3r
                 string name = animatedProperty.Key;
                 string value = localMeshCount > 1
                     ? $"d4rkAvatarOptimizer{name}[d4rkAvatarOptimizer_MeshID]"
-                    : $"d4rkAvatarOptimizer{name}_ArrayIndex{minMeshIndex}";
+                    : $"d4rkAvatarOptimizer{name}_ArrayIndex{mergedMeshIndices.First()}";
                 output.Add($"{name} = isnan(asfloat(asuint({value}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {value};");
             }
         }
@@ -1213,12 +1214,12 @@ namespace d4rkpl4y3r
             InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
             if (mergedMeshCount > 1)
             {
-                output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z - {minMeshIndex};");
+                output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z - {mergedMeshIndices.First()};");
                 InjectDummyCBufferUsage(nullReturn);
                 if (localMeshCount > 1)
                     output.Add($"if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
                 else
-                    output.Add($"if (!_IsActiveMesh{minMeshIndex}) {nullReturn}");
+                    output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
             }
             if (arrayPropertyValues.Count > 0)
             {
@@ -1360,7 +1361,7 @@ namespace d4rkpl4y3r
                 if (localMeshCount > 1)
                     output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) return;");
                 else
-                    output.Add($"if (!_IsActiveMesh{minMeshIndex}) return;");
+                    output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) return;");
             }
             if (arrayPropertyValues.Count > 0)
             {
@@ -1547,7 +1548,7 @@ namespace d4rkpl4y3r
             output.Add("if (d4rkAvatarOptimizer_Zero)");
             output.Add("{");
             string val = "float d4rkAvatarOptimizer_val = _IsActiveMesh[d4rkAvatarOptimizer_MeshID]";
-            for (int i = minMeshIndex; i <= maxMeshIndex; i++)
+            foreach (int i in mergedMeshIndices)
             {
                 val += " + _IsActiveMesh" + i;
             }
@@ -1555,7 +1556,7 @@ namespace d4rkpl4y3r
             foreach (var animatedProperty in animatedPropertyValues.Keys)
             {
                 val = $"d4rkAvatarOptimizer_val += d4rkAvatarOptimizer{animatedProperty}[d4rkAvatarOptimizer_MeshID].x";
-                for (int i = minMeshIndex; i <= maxMeshIndex; i++)
+                foreach (int i in mergedMeshIndices)
                 {
                     val += $" + d4rkAvatarOptimizer{animatedProperty}_ArrayIndex{i}.x";
                 }
@@ -1574,9 +1575,9 @@ namespace d4rkpl4y3r
                 output.Add("{");
                 if (localMeshCount > 1)
                     output.Add("float _IsActiveMesh[" + localMeshCount + "] : packoffset(c0);");
-                for (int i = 0; i < localMeshCount; i++)
+                foreach (int i in mergedMeshIndices)
                 {
-                    output.Add($"float _IsActiveMesh{i + minMeshIndex} : packoffset(c{i});");
+                    output.Add($"float _IsActiveMesh{i} : packoffset(c{i - mergedMeshIndices.First()});");
                 }
                 int currentPackOffset = localMeshCount;
                 foreach (var animatedProperty in animatedPropertyValues)
@@ -1586,9 +1587,9 @@ namespace d4rkpl4y3r
                     type = Regex.Replace(type, "^(bool|int|uint)([1-4]?)$", "float$2");
                     if (localMeshCount > 1)
                         output.Add($"{type} {name}[{localMeshCount}] : packoffset(c{currentPackOffset});");
-                    for (int i = 0; i < localMeshCount; i++)
+                    foreach (int i in mergedMeshIndices)
                     {
-                        output.Add($"{type} {name}_ArrayIndex{i + minMeshIndex} : packoffset(c{currentPackOffset + i});");
+                        output.Add($"{type} {name}_ArrayIndex{i} : packoffset(c{currentPackOffset + i - mergedMeshIndices.First()});");
                     }
                     currentPackOffset += localMeshCount;
                 }
@@ -1935,7 +1936,8 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     propertyBlockStartParseIndex = lineIndex;
                     propertyBlockInsertionIndex = output.Count;
-                    for (int i = minMeshIndex; mergedMeshCount > 1 && i <= maxMeshIndex; i++)
+                    if (mergedMeshCount > 1)
+                    foreach (int i in mergedMeshIndices)
                     {
                         propertyBlock.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
                     }
@@ -1949,7 +1951,7 @@ namespace d4rkpl4y3r
                             defaultValue = "(0,0,0,0)";
                             type = "Vector";
                         }
-                        for (int i = minMeshIndex; i <= maxMeshIndex; i++)
+                        foreach (int i in mergedMeshIndices)
                         {
                             propertyBlock.Add($"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}(\"{prop.name} {i}\", {type}) = {defaultValue}");
                         }
