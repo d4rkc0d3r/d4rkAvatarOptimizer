@@ -1047,7 +1047,7 @@ namespace d4rkpl4y3r
             {
                 string name = animatedProperty.Key;
                 string value = localMeshCount > 1
-                    ? $"d4rkAvatarOptimizer{name}[d4rkAvatarOptimizer_MeshID]"
+                    ? $"{CBufferAliasArray[name].name}[{CBufferAliasArray[name].offset} + d4rkAvatarOptimizer_MeshID]"
                     : $"d4rkAvatarOptimizer{name}_ArrayIndex{mergedMeshIndices.First()}";
                 output.Add($"{name} = isnan(asfloat(asuint({value}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {value};");
             }
@@ -1517,11 +1517,7 @@ namespace d4rkpl4y3r
             }
             if (mergedMeshIndices.Count % 2 == 1)
             {
-                output.Add($"d4rkAvatarOptimizer_val += _IsActiveMesh{mergedMeshIndices[mergedMeshIndices.Count - 1]} * _IsActiveMesh[d4rkAvatarOptimizer_MeshID];");
-            }
-            else
-            {
-                output.Add($"d4rkAvatarOptimizer_val += _IsActiveMesh[d4rkAvatarOptimizer_MeshID];");
+                output.Add($"d4rkAvatarOptimizer_val += _IsActiveMesh{mergedMeshIndices[mergedMeshIndices.Count - 1]};");
             }
             foreach (var animatedProperty in animatedPropertyValues.Keys)
             {
@@ -1532,13 +1528,13 @@ namespace d4rkpl4y3r
                 }
                 if (mergedMeshIndices.Count % 2 == 1)
                 {
-                    output.Add($"d4rkAvatarOptimizer_val += {propName}{mergedMeshIndices[mergedMeshIndices.Count - 1]}.x * d4rkAvatarOptimizer{animatedProperty}[d4rkAvatarOptimizer_MeshID].x;");
-                }
-                else
-                {
-                    output.Add($"d4rkAvatarOptimizer_val += d4rkAvatarOptimizer{animatedProperty}[d4rkAvatarOptimizer_MeshID].x;");
+                    output.Add($"d4rkAvatarOptimizer_val += {propName}{mergedMeshIndices[mergedMeshIndices.Count - 1]}.x;");
                 }
             }
+            var arrays = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]";
+            if (hasVectorCBufferAliasArray)
+                arrays += " * d4rkAvatarOptimizerAnimatedVectors[d4rkAvatarOptimizer_MeshID].x";
+            output.Add($"{arrays};");
             output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
             output.Add("}");
         }
@@ -1548,39 +1544,84 @@ namespace d4rkpl4y3r
             if (mergedMeshCount <= 1)
                 return;
             if (localMeshCount > 1)
-                output.Add($"if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
+                output.Add($"if (!d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
             else
                 output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
+        }
+
+        private bool hasVectorCBufferAliasArray = false;
+        private Dictionary<string, (string name, int offset)> CBufferAliasArray = new Dictionary<string, (string name, int offset)>();
+
+        private int AllocateCBufferRegisters(int index, HashSet<int> usedRegisters)
+        {
+            while(mergedMeshIndices.Any(i => usedRegisters.Contains(index + i - mergedMeshIndices.First())))
+            {
+                index++;
+            }
+            foreach (int i in mergedMeshIndices)
+            {
+                usedRegisters.Add(index + i - mergedMeshIndices.First());
+            }
+            return index;
         }
 
         private void InjectPropertyArrays(ParsedShader.Pass pass)
         {
             pragmaOutput.Add("#pragma skip_variants DYNAMICLIGHTMAP_ON LIGHTMAP_ON LIGHTMAP_SHADOW_MIXING DIRLIGHTMAP_COMBINED SHADOWS_SHADOWMASK");
+            hasVectorCBufferAliasArray = false;
+            CBufferAliasArray.Clear();
             if (mergedMeshCount > 1)
             {
-                output.Add("cbuffer CBd4rkAvatarOptimizer");
-                output.Add("{");
-                if (localMeshCount > 1)
-                    output.Add("float _IsActiveMesh[" + localMeshCount + "] : packoffset(c0);");
+                var usedScalarRegisters = new HashSet<int>();
+                var usedVectorRegisters = new HashSet<int>();
+                var scalarOutput = new List<string>();
+                var vectorOutput = new List<string>();
                 foreach (int i in mergedMeshIndices)
                 {
-                    output.Add($"float _IsActiveMesh{i} : packoffset(c{i - mergedMeshIndices.First()});");
+                    scalarOutput.Add($"float _IsActiveMesh{i} : packoffset(c{i - mergedMeshIndices.First()});");
                 }
-                int currentPackOffset = localMeshCount;
+                CBufferAliasArray.Add("_IsActiveMesh", ("d4rkAvatarOptimizerAnimatedScalars", 0));
+                int currentScalarPackOffset = AllocateCBufferRegisters(0, usedScalarRegisters);
+                int currentVectorPackOffset = 0;
                 foreach (var animatedProperty in animatedPropertyValues)
                 {
-                    string name = "d4rkAvatarOptimizer" + animatedProperty.Key;
+                    string name = animatedProperty.Key;
                     string type = animatedProperty.Value;
+                    var currentOutput = scalarOutput;
+                    var currentPackOffset = 0;
                     type = Regex.Replace(type, "^(bool|int|uint)([1-4]?)$", "float$2");
-                    if (localMeshCount > 1)
-                        output.Add($"{type} {name}[{localMeshCount}] : packoffset(c{currentPackOffset});");
+                    if (type[type.Length - 1] == '4')
+                    {
+                        hasVectorCBufferAliasArray = true;
+                        currentOutput = vectorOutput;
+                        currentPackOffset = currentVectorPackOffset = AllocateCBufferRegisters(currentVectorPackOffset, usedVectorRegisters);
+                        CBufferAliasArray.Add(name, ("d4rkAvatarOptimizerAnimatedVectors", currentPackOffset));
+                    }
+                    else
+                    {
+                        currentPackOffset = currentScalarPackOffset = AllocateCBufferRegisters(currentScalarPackOffset, usedScalarRegisters);
+                        CBufferAliasArray.Add(name, ("d4rkAvatarOptimizerAnimatedScalars", currentPackOffset));
+                    }
                     foreach (int i in mergedMeshIndices)
                     {
-                        output.Add($"{type} {name}_ArrayIndex{i} : packoffset(c{currentPackOffset + i - mergedMeshIndices.First()});");
+                        currentOutput.Add($"{type} d4rkAvatarOptimizer{name}_ArrayIndex{i} : packoffset(c{currentPackOffset + i - mergedMeshIndices.First()});");
                     }
-                    currentPackOffset += localMeshCount;
                 }
+                output.Add("cbuffer d4rkAvatarOptimizerAnimatedScalars");
+                output.Add("{");
+                if (localMeshCount > 1)
+                    output.Add($"float d4rkAvatarOptimizerAnimatedScalars[{usedScalarRegisters.Max() + 1}] : packoffset(c0);");
+                output.AddRange(scalarOutput);
                 output.Add("};");
+                if (hasVectorCBufferAliasArray)
+                {
+                    output.Add("cbuffer d4rkAvatarOptimizerAnimatedVectors");
+                    output.Add("{");
+                    if (localMeshCount > 1)
+                        output.Add($"float4 d4rkAvatarOptimizerAnimatedVectors[{usedVectorRegisters.Max() + 1}] : packoffset(c0);");
+                    output.AddRange(vectorOutput);
+                    output.Add("};");
+                }
             }
             var staticParamDefines = new HashSet<(string type, string name)>();
             staticParamDefines.UnionWith(

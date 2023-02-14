@@ -4,6 +4,7 @@
 * Don't inject animated property arrays for merged material properties where none of the original meshes had that property animated.
 * Calculate min and max mesh id for each merged material and only add animated property arrays for that range.
 * Only add the animated property based on the used mesh indices for the merged material.
+* Interleave animated property arrays in cbuffer to reduce the required cbuffer size.
 
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
