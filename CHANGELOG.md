@@ -11,6 +11,7 @@
 * Change signaling value to NaN. This fixes animated properties interpolating the signal value weirdly.
 * Create optimized swap materials after merging materials instead of before so that Texture2DArray and animated properties are correctly set.
 * Deduplicate optimized swap materials with the optimized material that is already in the mesh renderer.
+* Fix vertex shader not passing along mesh id to the geometry shader if the mesh id is disabled.
 
 ## v1.9
 ### Features

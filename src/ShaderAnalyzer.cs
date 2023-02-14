@@ -1197,7 +1197,11 @@ namespace d4rkpl4y3r
                 output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexWithWrapper(vertexInputWrapper d4rkAvatarOptimizer_vertexInput)");
                 output.Add("{");
                 InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexInput", true);
-                nullReturn = "return (vertexOutputWrapper)0;";
+                output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z - {mergedMeshIndices.First()};");
+                output.Add($"d4rkAvatarOptimizer_MaterialID = {inParam.name}.{vertexInUv0Member}.w;");
+                output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput = (vertexOutputWrapper)0;");
+                output.Add("d4rkAvatarOptimizer_vertexOutput.d4rkAvatarOptimizer_MeshMaterialID = d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
+                nullReturn = "return d4rkAvatarOptimizer_vertexOutput;";
             }
             else
             {
@@ -1210,22 +1214,15 @@ namespace d4rkpl4y3r
                     line = source[++sourceLineIndex];
                     output.Add(line);
                 }
+                if (mergedMeshCount > 1)
+                    output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z - {mergedMeshIndices.First()};");
+                if (arrayPropertyValues.Count > 0)
+                    output.Add($"d4rkAvatarOptimizer_MaterialID = {inParam.name}.{vertexInUv0Member}.w;");
             }
             InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
-            if (mergedMeshCount > 1)
-            {
-                output.Add($"d4rkAvatarOptimizer_MeshID = {inParam.name}.{vertexInUv0Member}.z - {mergedMeshIndices.First()};");
-                InjectDummyCBufferUsage(nullReturn);
-                if (localMeshCount > 1)
-                    output.Add($"if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
-                else
-                    output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
-            }
-            if (arrayPropertyValues.Count > 0)
-            {
-                output.Add($"d4rkAvatarOptimizer_MaterialID = {inParam.name}.{vertexInUv0Member}.w;");
-                InjectArrayPropertyInitialization();
-            }
+            InjectDummyCBufferUsage(nullReturn);
+            InjectIsActiveMeshCheck(nullReturn);
+            InjectArrayPropertyInitialization();
             InjectAnimatedPropertyInitialization();
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
@@ -1243,11 +1240,7 @@ namespace d4rkpl4y3r
                         if (isVoidReturn && needToPassOnMeshOrMaterialID)
                         {
                             output.Add("{");
-                            var outParamName = "d4rkAvatarOptimizer_vertexOutput";
-                            output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
                             InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
-                            output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
-                                + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
                             output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                             output.Add("}");
                         }
@@ -1260,31 +1253,13 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     braceDepth++;
                 }
-                else if (line.StartsWith("return"))
+                else if (needToPassOnMeshOrMaterialID && line.StartsWith("return"))
                 {
                     output.Add("{");
-                    var outParamName = "d4rkAvatarOptimizer_vertexOutput";
-                    if (!needToPassOnMeshOrMaterialID && isVoidReturn)
-                    {
-                        outParamName = outParam.name;
-                    }
-                    else if (needToPassOnMeshOrMaterialID)
-                    {
-                        output.Add("vertexOutputWrapper d4rkAvatarOptimizer_vertexOutput;");
-                        if (!isVoidReturn)
-                            output.Add("returnWrappedStruct = " + line.Substring("return ".Length));
-                        InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
-                    }
-                    else if (!isVoidReturn)
-                    {
-                        output.Add(outParam.type + " d4rkAvatarOptimizer_vertexOutput = " + line.Substring("return ".Length));
-                    }
-                    if (needToPassOnMeshOrMaterialID)
-                    {
-                        output.Add(outParamName + ".d4rkAvatarOptimizer_MeshMaterialID = "
-                            + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
-                    }
-                    output.Add((!needToPassOnMeshOrMaterialID && isVoidReturn) ? "return;" : "return d4rkAvatarOptimizer_vertexOutput;");
+                    if (!isVoidReturn)
+                        output.Add("returnWrappedStruct = " + line.Substring("return ".Length));
+                    InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
+                    output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                     output.Add("}");
                 }
                 else
@@ -1355,18 +1330,9 @@ namespace d4rkpl4y3r
                     output.Add(inParam.name + "[" + i + "] = d4rkAvatarOptimizer_inputWrapper[" + i + "].d4rkAvatarOptimizer_geometryInput;");
                 }
             }
-            if (mergedMeshCount > 1)
-            {
-                InjectDummyCBufferUsage("return;");
-                if (localMeshCount > 1)
-                    output.Add("if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) return;");
-                else
-                    output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) return;");
-            }
-            if (arrayPropertyValues.Count > 0)
-            {
-                InjectArrayPropertyInitialization();
-            }
+            InjectDummyCBufferUsage("return;");
+            InjectIsActiveMeshCheck("return;");
+            InjectArrayPropertyInitialization();
             InjectAnimatedPropertyInitialization();
             if (!usesOutputWrapper)
             {
@@ -1431,10 +1397,7 @@ namespace d4rkpl4y3r
                 InitializeOutputParameter(funcParams, output, true);
                 output.Add("d4rkAvatarOptimizer_MaterialID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID & 0xFFFF;");
                 output.Add("d4rkAvatarOptimizer_MeshID = d4rkAvatarOptimizer_fragmentInput.d4rkAvatarOptimizer_MeshMaterialID >> 16;");
-                if (animatedPropertyValues.Count > 0)
-                {
-                    InjectDummyCBufferUsage(nullReturn);
-                }
+                InjectDummyCBufferUsage(nullReturn);
                 InjectArrayPropertyInitialization();
                 InjectAnimatedPropertyInitialization();
             }
@@ -1578,6 +1541,16 @@ namespace d4rkpl4y3r
             }
             output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
             output.Add("}");
+        }
+
+        private void InjectIsActiveMeshCheck(string nullReturn)
+        {
+            if (mergedMeshCount <= 1)
+                return;
+            if (localMeshCount > 1)
+                output.Add($"if (!_IsActiveMesh[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
+            else
+                output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
         }
 
         private void InjectPropertyArrays(ParsedShader.Pass pass)
