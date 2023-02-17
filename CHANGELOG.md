@@ -6,6 +6,9 @@
 * Only add the animated property based on the used mesh indices for the merged material.
 * Interleave animated property arrays in cbuffer to reduce the required cbuffer size.
 
+### Changes
+* Show original mesh paths in the `_IsActiveMesh` properties of merged materials.
+
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
 * Fix `RemoveIllegalComponents()` being broken when the sdk was imported via VCC.

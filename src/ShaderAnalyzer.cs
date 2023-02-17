@@ -961,6 +961,7 @@ namespace d4rkpl4y3r
         private List<string> pragmaOutput;
         private ParsedShader parsedShader;
         private int mergedMeshCount;
+        private List<string> mergedMeshNames;
         private List<int> mergedMeshIndices;
         private int localMeshCount;
         private Dictionary<string, string> staticPropertyValues;
@@ -979,6 +980,7 @@ namespace d4rkpl4y3r
         public static List<(string name, List<string> lines)> Run(ParsedShader source,
             Dictionary<string, string> staticPropertyValues = null,
             int mergedMeshCount = 0,
+            List<string> mergedMeshNames = null,
             List<int> mergedMeshIndices = null,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
             Dictionary<string, string> texturesToNullCheck = null,
@@ -992,6 +994,8 @@ namespace d4rkpl4y3r
             if (mergedMeshIndices.Count == 0)
                 mergedMeshIndices.Add(0);
             mergedMeshIndices = mergedMeshIndices.Distinct().OrderBy(i => i).ToList();
+            if (mergedMeshNames == null)
+                mergedMeshNames = Enumerable.Range(0, mergedMeshCount).Select(i => "").ToList();
             var oldCulture = Thread.CurrentThread.CurrentCulture;
             var oldUICulture = Thread.CurrentThread.CurrentUICulture;
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -999,6 +1003,7 @@ namespace d4rkpl4y3r
             var optimizer = new ShaderOptimizer
             {
                 mergedMeshCount = mergedMeshCount,
+                mergedMeshNames = mergedMeshNames,
                 mergedMeshIndices = mergedMeshIndices,
                 localMeshCount = mergedMeshIndices.Last() - mergedMeshIndices.First() + 1,
                 staticPropertyValues = staticPropertyValues ?? new Dictionary<string, string>(),
@@ -1967,7 +1972,7 @@ namespace d4rkpl4y3r
                     if (mergedMeshCount > 1)
                     foreach (int i in mergedMeshIndices)
                     {
-                        propertyBlock.Add("_IsActiveMesh" + i + "(\"Generated Mesh Toggle " + i + "\", Float) = 1");
+                        propertyBlock.Add($"_IsActiveMesh{i}(\"_IsActiveMesh{i} {mergedMeshNames[i]}\", Float) = 1");
                     }
                     foreach (var animatedProperty in animatedPropertyValues)
                     {

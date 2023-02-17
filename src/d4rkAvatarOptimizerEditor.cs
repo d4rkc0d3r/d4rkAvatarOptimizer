@@ -1016,7 +1016,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         int meshToggleCount,
         string path,
         List<List<string>> originalMeshPaths = null,
-        List<List<int>> mergedMeshIndices = null)
+        List<List<int>> mergedMeshIndices = null,
+        List<string> allOriginalMeshPaths = null)
     {
         if (!fusedAnimatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
             usedMaterialProps = new HashSet<string>();
@@ -1226,6 +1227,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     parsedShader[i],
                     replace[i],
                     meshToggleCount,
+                    allOriginalMeshPaths,
                     mergedMeshIndices[i],
                     arrayPropertyValues[i],
                     texturesToCheckNull[i],
@@ -1776,7 +1778,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => materialSlotRemap[(meshPath, slot.index)].path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices);
+            var allOriginalMeshPaths = Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(i => materialSlotRemap[(meshPath, i)].path).Distinct().ToList();
+            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices, allOriginalMeshPaths);
 
             for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
             {
