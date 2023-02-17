@@ -1023,6 +1023,33 @@ public class d4rkAvatarOptimizerEditor : Editor
             usedMaterialProps = new HashSet<string>();
         if (mergedMeshIndices == null)
             mergedMeshIndices = sources.Select(s => Enumerable.Range(0, meshToggleCount).ToList()).ToList();
+        HashSet<(string name, bool isVector)> defaultAnimatedProperties = null;
+        if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1))
+        {
+            defaultAnimatedProperties = new HashSet<(string name, bool isVector)>();
+            for (int i = 0; i < allOriginalMeshPaths.Count; i++)
+            {
+                if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i], out var animatedProps))
+                {
+                    foreach (var prop in animatedProps)
+                    {
+                        string name = prop;
+                        bool isVector = name.EndsWith(".x") || name.EndsWith(".r");
+                        if (isVector)
+                        {
+                            name = name.Substring(0, name.Length - 2);
+                        }
+                        else if ((name.Length > 2 && name[name.Length - 2] == '.')
+                            || (!isVector && (animatedProps.Contains($"{name}.x") || animatedProps.Contains($"{name}.r"))))
+                        {
+                            continue;
+                        }
+                        defaultAnimatedProperties.Add(($"d4rkAvatarOptimizer{name}_ArrayIndex{i}", isVector));
+                    }
+                }
+                defaultAnimatedProperties.Add(($"_IsActiveMesh{i}", false));
+            }
+        }
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
         var setShaderKeywords = new List<string>[sources.Count];
@@ -1228,6 +1255,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     replace[i],
                     meshToggleCount,
                     allOriginalMeshPaths,
+                    i == 0 ? defaultAnimatedProperties : null,
                     mergedMeshIndices[i],
                     arrayPropertyValues[i],
                     texturesToCheckNull[i],

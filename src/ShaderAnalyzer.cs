@@ -962,6 +962,7 @@ namespace d4rkpl4y3r
         private ParsedShader parsedShader;
         private int mergedMeshCount;
         private List<string> mergedMeshNames;
+        private HashSet<(string name, bool isVector)> defaultAnimatedProperties;
         private List<int> mergedMeshIndices;
         private int localMeshCount;
         private Dictionary<string, string> staticPropertyValues;
@@ -981,6 +982,7 @@ namespace d4rkpl4y3r
             Dictionary<string, string> staticPropertyValues = null,
             int mergedMeshCount = 0,
             List<string> mergedMeshNames = null,
+            HashSet<(string name, bool isVector)> defaultAnimatedProperties = null,
             List<int> mergedMeshIndices = null,
             Dictionary<string, (string type, List<string> values)> arrayPropertyValues = null,
             Dictionary<string, string> texturesToNullCheck = null,
@@ -1004,6 +1006,7 @@ namespace d4rkpl4y3r
             {
                 mergedMeshCount = mergedMeshCount,
                 mergedMeshNames = mergedMeshNames,
+                defaultAnimatedProperties = defaultAnimatedProperties ?? new HashSet<(string name, bool isVector)>(),
                 mergedMeshIndices = mergedMeshIndices,
                 localMeshCount = mergedMeshIndices.Last() - mergedMeshIndices.First() + 1,
                 staticPropertyValues = staticPropertyValues ?? new Dictionary<string, string>(),
@@ -1969,10 +1972,13 @@ namespace d4rkpl4y3r
                     output.Add(line);
                     propertyBlockStartParseIndex = lineIndex;
                     propertyBlockInsertionIndex = output.Count;
+                    var alreadyAdded = new HashSet<string>();
                     if (mergedMeshCount > 1)
                     foreach (int i in mergedMeshIndices)
                     {
-                        propertyBlock.Add($"_IsActiveMesh{i}(\"_IsActiveMesh{i} {mergedMeshNames[i]}\", Float) = 1");
+                        var name = $"_IsActiveMesh{i}";
+                        propertyBlock.Add($"{name}(\"{name} {mergedMeshNames[i]}\", Float) = 1");
+                        alreadyAdded.Add(name);
                     }
                     foreach (var animatedProperty in animatedPropertyValues)
                     {
@@ -1986,8 +1992,24 @@ namespace d4rkpl4y3r
                         }
                         foreach (int i in mergedMeshIndices)
                         {
-                            propertyBlock.Add($"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}(\"{prop.name} {i}\", {type}) = {defaultValue}");
+                            var fullPropertyName = $"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}";
+                            propertyBlock.Add($"{fullPropertyName}(\"{prop.name} {i}\", {type}) = {defaultValue}");
+                            alreadyAdded.Add(fullPropertyName);
                         }
+                    }
+                    foreach (var defaultAnimatedProperty in defaultAnimatedProperties)
+                    {
+                        if (alreadyAdded.Contains(defaultAnimatedProperty.name))
+                            continue;
+                        string defaultValue = defaultAnimatedProperty.isVector ? "(0,0,0,0)" : "0";
+                        string type = defaultAnimatedProperty.isVector ? "Vector" : "Float";
+                        string name = defaultAnimatedProperty.name;
+                        if (name.StartsWith("_IsActiveMesh"))
+                        {
+                            int meshIndex = int.Parse(name.Substring("_IsActiveMesh".Length));
+                            name = $"_IsActiveMesh{meshIndex} {mergedMeshNames[meshIndex]}";
+                        }
+                        propertyBlock.Add($"{defaultAnimatedProperty.name}(\"{name}\", {type}) = {defaultValue}");
                     }
                 }
             }
