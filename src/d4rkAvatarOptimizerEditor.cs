@@ -1858,7 +1858,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
-        fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+        fusedAnimatedMaterialProperties = FindAllAnimatedMaterialProperties();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
         int combinedMeshID = 0;
         foreach (var combinableMeshes in combinableSkinnedMeshList)
