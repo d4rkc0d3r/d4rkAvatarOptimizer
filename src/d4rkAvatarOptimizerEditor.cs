@@ -1796,6 +1796,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                 }
 
+                Profiler.StartSection("Mesh.Optimize()");
+                newMesh.Optimize();
+                Profiler.EndSection();
+
                 CreateUniqueAsset(newMesh, newMesh.name + ".asset");
                 Profiler.StartSection("AssetDatabase.SaveAssets()");
                 AssetDatabase.SaveAssets();
