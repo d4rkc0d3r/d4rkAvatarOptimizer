@@ -1715,7 +1715,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                             newIndex = targetVertices.Count;
                             indexList.Add(newIndex);
                             indexMap[oldIndex] = newIndex;
-                            targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z, internalMaterialID));
+                            targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z + internalMaterialID, 0));
                             for (int a = 1; a < 8; a++)
                             {
                                 targetUv[a].Add(sourceUv[a][oldIndex]);
@@ -1726,7 +1726,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                             targetTangents.Add(sourceTangents[oldIndex]);
                             targetWeights.Add(sourceWeights[oldIndex]);
                             targetOldVertexIndex.Add(oldIndex);
-                            uniqueMeshIndices.Add((int)sourceUv[0][oldIndex].z);
+                            uniqueMeshIndices.Add((int)sourceUv[0][oldIndex].z >> 12);
                         }
                     }
                 }
@@ -1827,7 +1827,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-8f)
+    private static Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-6f)
     {
         value.x = Mathf.Abs(value.x) < threshold ? 0 : value.x;
         value.y = Mathf.Abs(value.y) < threshold ? 0 : value.y;
@@ -1996,7 +1996,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID, 0));
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID << 12, 0));
                     var boneWeight = sourceWeights[vertIndex];
                     Matrix4x4 toWorld = Matrix4x4.zero;
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0);

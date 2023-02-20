@@ -8,6 +8,7 @@
 
 ### Changes
 * Show original mesh paths in the `_IsActiveMesh` properties of merged materials.
+* Pack original meshID & materialID into uv0.z instead of having them separate in uv0.z & uv0.w. Miniscule VRAM savings.
 
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
