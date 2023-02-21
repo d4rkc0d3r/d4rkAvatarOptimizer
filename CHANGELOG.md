@@ -1,15 +1,16 @@
 ## Next Version
 ### Features
 * Add debug view to show all animated material property paths.
+* Several small improvements to the generated shaders and mesh layouts reducing the amount of VRAM used by the optimized avatar.
+
+### Changes
+* Show original mesh paths in the `_IsActiveMesh` properties of merged materials.
 * Don't inject animated property arrays for merged material properties where none of the original meshes had that property animated.
 * Calculate min and max mesh id for each merged material and only add animated property arrays for that range.
 * Only add the animated property based on the used mesh indices for the merged material.
 * Interleave animated property arrays in cbuffer to reduce the required cbuffer size.
-
-### Changes
-* Show original mesh paths in the `_IsActiveMesh` properties of merged materials.
-* Pack original meshID & materialID into uv0.z instead of having them separate in uv0.z & uv0.w. Miniscule VRAM savings.
-* Call `Mesh.Optimize()` on the merged mesh to reduce the amount of memory it takes up.
+* Pack original meshID & materialID into uv0.z instead of having them separate in uv0.z & uv0.w. Miniscule VRAM savings. [more](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/27)
+* Call `Mesh.Optimize()` on the merged mesh to reduce the amount of memory it takes up. [more](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/27)
 
 ### Bug Fixes
 * Delete shader properties that start with _ShaderOptimizer from the optimized shader. This is to prevent Kaj shader optimizer from trying to optimize the shader again.
