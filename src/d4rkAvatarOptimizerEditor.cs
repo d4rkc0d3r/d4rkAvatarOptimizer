@@ -21,6 +21,7 @@ using VRC.SDKBase.Validation.Performance;
 using Math = System.Math;
 using Type = System.Type;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
+using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 
 namespace d4rkpl4y3r.Util.Extensions
 {
@@ -83,6 +84,47 @@ namespace d4rkpl4y3r.Util.Extensions
                     foreach (var state in stateMachine.states.Select(s => s.state))
                     {
                         yield return state;
+                    }
+                }
+            }
+        }
+
+        public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorStateMachine stateMachine)
+        {
+            var queue = new Queue<AnimatorStateMachine>();
+            queue.Enqueue(stateMachine);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var subStateMachine in current.stateMachines)
+                {
+                    queue.Enqueue(subStateMachine.stateMachine);
+                }
+                foreach (var state in current.states.Select(s => s.state))
+                {
+                    yield return state;
+                }
+            }
+        }
+
+        public static IEnumerable<AnimationClip> EnumerateAllClips(this Motion motion)
+        {
+            if (motion is AnimationClip clip)
+            {
+                yield return clip;
+            }
+            else if (motion is BlendTree tree)
+            {
+                var childNodes = tree.children;
+                for (int i = 0; i < childNodes.Length; i++)
+                {
+                    if (childNodes[i].motion == null)
+                    {
+                        continue;
+                    }
+                    foreach (var childClip in childNodes[i].motion.EnumerateAllClips())
+                    {
+                        yield return childClip;
                     }
                 }
             }
@@ -567,6 +609,221 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.StartSection("AssetDatabase.SaveAssets()");
         AssetDatabase.SaveAssets();
         Profiler.EndSection();
+    }
+
+    private HashSet<(string path, Type type)> GetAllCurveBindings(AnimatorStateMachine stateMachine)
+    {
+        var result = new HashSet<(string, Type)>();
+        if (stateMachine == null)
+            return result;
+        foreach (var state in stateMachine.EnumerateAllStates())
+        {
+            if (state.motion == null)
+                continue;
+            foreach (var clip in state.motion.EnumerateAllClips())
+            {
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                foreach (var binding in bindings)
+                {
+                    result.Add(($"{binding.path}.{binding.propertyName}", binding.type));
+                }
+                bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+                foreach (var binding in bindings)
+                {
+                    result.Add(($"{binding.path}.{binding.propertyName}", binding.type));
+                }
+            }
+        }
+        return result;
+    }
+
+    private List<List<string>> AnalyzeFXLayerMergeAbility()
+    {
+        var fxLayer = GetFXLayer();
+        if (fxLayer == null)
+            return new List<List<string>>();
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return new List<List<string>>();
+
+        var errorMessages = fxLayer.layers.Select(layer => new List<string>()).ToList();
+
+        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            for (int j = 0; j < controller.layers.Length; j++)
+            {
+                var layer = controller.layers[j];
+                var stateMachine = layer.stateMachine;
+                if (stateMachine == null)
+                    continue;
+                var states = stateMachine.states;
+                foreach (var behaviour in stateMachine.behaviours.Union(states.SelectMany(s => s.state.behaviours)))
+                {
+                    if (behaviour is VRCAnimatorLayerControl layerControl)
+                    {
+                        if (layerControl.layer <= errorMessages.Count && layerControl.playable == BlendableLayer.FX)
+                        {
+                            var playableName = new string[] { "Base", "Additive", "Gesture", "Action", "FX" }[i];
+                            errorMessages[layerControl.layer].Add($"layer control from {playableName} {j} {layer.name}");
+                        }
+                    }
+                }
+            }
+        }
+
+        var fxLayerBindings = fxLayer.layers.Select(layer => GetAllCurveBindings(layer.stateMachine)).ToList();
+
+        for (int i = 0; i < fxLayer.layers.Length; i++)
+        {
+            var layer = fxLayer.layers[i];
+            var stateMachine = layer.stateMachine;
+            if (stateMachine == null)
+            {
+                errorMessages[i].Add("no state machine");
+                continue;
+            }
+            if (stateMachine.stateMachines.Length != 0)
+            {
+                errorMessages[i].Add($"{stateMachine.stateMachines.Length} sub state machines");
+            }
+            if (stateMachine.behaviours.Length != 0)
+            {
+                errorMessages[i].Add($"{stateMachine.behaviours.Length} state machine behaviours");
+            }
+            var states = stateMachine.states;
+            if (layer.defaultWeight != 1)
+            {
+                errorMessages[i].Add($"default weight {layer.defaultWeight}");
+            }
+            if (states.Length != 2)
+            {
+                errorMessages[i].Add($"{states.Length} states");
+                continue;
+            }
+            if (states.Any(s => s.state.behaviours.Length != 0))
+            {
+                errorMessages[i].Add($"{states.Sum(s => s.state.behaviours.Length)} state behaviours");
+            }
+            if (states.Any(s => s.state.transitions.Length != 1))
+            {
+                errorMessages[i].Add($"states with not exactly 1 transition");
+                continue;
+            }
+            if (states[0].state.transitions[0].destinationState != states[1].state || states[1].state.transitions[0].destinationState != states[0].state)
+            {
+                errorMessages[i].Add($"transition destination state is not the other state");
+                continue;
+            }
+            if (states.Any(s => s.state.transitions[0].hasExitTime && s.state.transitions[0].exitTime != 0.0f))
+            {
+                errorMessages[i].Add($"transition has exit time");
+            }
+            if (states.Any(s => s.state.transitions[0].conditions.Length != 1))
+            {
+                errorMessages[i].Add($"multiple transition conditions");
+                continue;
+            }
+            if (states[0].state.transitions[0].conditions[0].parameter != states[1].state.transitions[0].conditions[0].parameter)
+            {
+                errorMessages[i].Add($"transition condition parameter is not the same");
+                continue;
+            }
+            var param = fxLayer.parameters.FirstOrDefault(p => p.name == states[0].state.transitions[0].conditions[0].parameter);
+            if (param == null)
+            {
+                errorMessages[i].Add($"transition condition parameter is not found");
+                continue;
+            }
+            if (param.type != AnimatorControllerParameterType.Bool)
+            {
+                errorMessages[i].Add($"transition condition parameter is not bool");
+                continue;
+            }
+            if (states[0].state.transitions[0].conditions[0].mode == states[1].state.transitions[0].conditions[0].mode)
+            {
+                errorMessages[i].Add($"transition condition condition is the same");
+                continue;
+            }
+            for (int j = 0; j < fxLayer.layers.Length; j++)
+            {
+                if (i == j)
+                    continue;
+                foreach (var binding in fxLayerBindings[i])
+                {
+                    if (fxLayerBindings[j].Contains(binding))
+                    {
+                        errorMessages[i].Add($"{binding.path} ({binding.type.Name}) is used in {j} {fxLayer.layers[j].name}");
+                    }
+                }
+            }
+            bool onlyBoolBindings = true;
+            bool reliesOnWriteDefaults = false;
+            for (int j = 0; j < 2; j++)
+            {
+                var state = states[j].state;
+                if (state.motion == null)
+                {
+                    if (states[1 - j].state.motion == null)
+                    {
+                        errorMessages[i].Add($"both states have no motion");
+                        break;
+                    }
+                    else if (!states[1 - j].state.writeDefaultValues)
+                    {
+                        errorMessages[i].Add($"state {j} has no motion but {1 - j} does not have write defaults");
+                        break;
+                    }
+                    else
+                    {
+                        reliesOnWriteDefaults = true;
+                    }
+                    continue;
+                }
+                var clip = state.motion as AnimationClip;
+                if (clip == null)
+                {
+                    errorMessages[i].Add($"{state.name} is not an animation clip");
+                    continue;
+                }
+                if (state.timeParameterActive)
+                {
+                    errorMessages[i].Add($"{state.name} has motion time");
+                    continue;
+                }
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                foreach (var binding in bindings)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                    var initialValue = curve.keys[0].value;
+                    if (curve.keys.Any(k => k.value != initialValue))
+                    {
+                        errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is not a constant curve");
+                    }
+                    if (binding.propertyName != "m_Enabled" && binding.propertyName != "m_IsActive")
+                    {
+                        onlyBoolBindings = false;
+                    }
+                }
+                var objectBindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+                foreach (var binding in objectBindings)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                    errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is an object reference curve");
+                }
+            }
+            if (reliesOnWriteDefaults && !onlyBoolBindings)
+            {
+                errorMessages[i].Add($"relies on write defaults and animates something other than m_Enabled/m_IsActive");
+            }
+            if (states.Any(s => s.state.transitions[0].duration != 0.0f) && !onlyBoolBindings)
+            {
+                errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
+            }
+        }
+        return errorMessages;
     }
 
     private static Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
@@ -3160,6 +3417,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Different Render Queue", ref settings.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
+        Toggle("Merge Simple Toggles as BlendTree (Preview Only)", ref settings.MergeSimpleTogglesAsBlendTree);
         Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);
         Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
@@ -3261,6 +3519,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, AvatarPerformanceCategory.MeshCount);
             PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, AvatarPerformanceCategory.MaterialCount);
             Profiler.EndSection();
+
+            if (settings.MergeSimpleTogglesAsBlendTree)
+            {
+                Profiler.StartSection("AnalyzeFXLayerMergeAbility()");
+                var errorMessages = AnalyzeFXLayerMergeAbility();
+                Profiler.EndSection();
+                var result = new List<string>();
+                var fxLayer = GetFXLayer();
+                for (int i = 0; i < fxLayer.layers.Length; i++)
+                {
+                    result.Add($"[{(errorMessages[i].Count == 0 ? "OK" : "FAIL")}] {i} {fxLayer.layers[i].name}");
+                    result.AddRange(errorMessages[i].Distinct().Select(msg => $"    {msg}"));
+                }
+                DrawDebugList(result.ToArray());
+            }
 
             Profiler.StartSection("Show Merge Preview");
             foreach (var matched in MergedMaterialPreview)
