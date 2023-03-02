@@ -1,3 +1,7 @@
+## Next Version
+### Features
+* Add option to merge simple toggles in the fx layer into one big direct blend tree.
+
 ## v1.10
 ### Features
 * Add debug view to show all animated material property paths.

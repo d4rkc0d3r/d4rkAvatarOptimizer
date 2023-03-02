@@ -65,7 +65,7 @@ namespace d4rkpl4y3r.Util.Extensions
         }
     }
 
-    public static class AnimationControllerExtensions
+    public static class AnimatorControllerExtensions
     {
 
         public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
@@ -547,13 +547,59 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "/data/DummyAnimationToFillEmptyStates.anim");
         
-        var animations = new HashSet<AnimationClip>();
+        var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
+        var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
         {
-            var layer = avDescriptor.baseAnimationLayers[i].animatorController;
+            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
             if (layer == null)
                 continue;
-            animations.UnionWith(layer.animationClips);
+        }
+
+        var fxLayersToMerge = new List<int>();
+        var fxLayerMap = new Dictionary<int, int>();
+        if (settings.MergeSimpleTogglesAsBlendTree)
+        {
+            var errors = AnalyzeFXLayerMergeAbility();
+            int currentLayer = 0;
+            var fx = GetFXLayer();
+            for (int i = 0; i < fx.layers.Length; i++)
+            {
+                fxLayerMap[i] = currentLayer;
+                if (errors[i].Count > 0)
+                {
+                    currentLayer++;
+                    continue;
+                }
+                fxLayersToMerge.Add(i);
+            }
+            if (fxLayersToMerge.Count < 2)
+            {
+                fxLayersToMerge.Clear();
+                fxLayerMap.Clear();
+            }
+        }
+
+        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
+            optimizedControllers[i] = AnimatorOptimizer.Run(
+                controller,
+                layerCopyPaths[i],
+                i == 4 ? fxLayersToMerge : new List<int>(),
+                fxLayerMap);
+        }
+        AssetDatabase.SaveAssets();
+
+        var animations = new HashSet<AnimationClip>();
+        for (int i = 0; i < optimizedControllers.Length; i++)
+        {
+            if (optimizedControllers[i] == null)
+                continue;
+            animations.UnionWith(optimizedControllers[i].animationClips);
         }
 
         var fixedMotions = new Dictionary<Motion, Motion>();
@@ -561,43 +607,12 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             fixedMotions[clip] = FixAnimationClipPaths(clip);
         }
-
-        string[] layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
-        string[] layerPaths = new string[avDescriptor.baseAnimationLayers.Length];
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
-        {
-            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (layer == null)
-                continue;
-            layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{layer.name}(OptimizedCopy).controller";
-            layerPaths[i] = AssetDatabase.GetAssetPath(layer);
-        }
         
-        Profiler.StartSection("AssetDatabase.CopyAsset()");
-        try
+        for (int i = 0; i < optimizedControllers.Length; i++)
         {
-            AssetDatabase.StartAssetEditing();
-            for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
-            {
-                if (layerPaths[i] == null)
-                    continue;
-                AssetDatabase.CopyAsset(layerPaths[i], layerCopyPaths[i]);
-            }
-        }
-        finally
-        {
-            AssetDatabase.StopAssetEditing();
-        }
-        Profiler.EndSection();
-        
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
-        {
-            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (layer == null)
+            var newLayer = optimizedControllers[i];
+            if (newLayer == null)
                 continue;
-            Profiler.StartSection("AssetDatabase.LoadAssetAtPath<AnimatorController>()");
-            var newLayer = AssetDatabase.LoadAssetAtPath<AnimatorController>(layerCopyPaths[i]);
-            Profiler.EndSection();
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
@@ -611,7 +626,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
     }
 
-    private HashSet<(string path, Type type)> GetAllCurveBindings(AnimatorStateMachine stateMachine)
+    private static HashSet<(string path, Type type)> GetAllCurveBindings(AnimatorStateMachine stateMachine)
     {
         var result = new HashSet<(string, Type)>();
         if (stateMachine == null)
@@ -637,7 +652,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
-    private List<List<string>> AnalyzeFXLayerMergeAbility()
+    private static List<List<string>> AnalyzeFXLayerMergeAbility()
     {
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
@@ -3417,7 +3432,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Different Render Queue", ref settings.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
-        Toggle("Merge Simple Toggles as BlendTree (Preview Only)", ref settings.MergeSimpleTogglesAsBlendTree);
+        Toggle("Merge Simple Toggles as BlendTree", ref settings.MergeSimpleTogglesAsBlendTree);
         Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);
         Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref settings.UseRingFingerAsFootCollider);
