@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
 public class d4rkAvatarOptimizer : MonoBehaviour
 {
     public bool WritePropertiesAsStaticValues = true;
