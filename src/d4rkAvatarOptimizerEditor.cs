@@ -2969,6 +2969,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private Texture2D[] crunchedTexturesCache = null;
     private Texture2D[] nonBC5NormalMapsCache = null;
     private string[] animatedMaterialPropertyPathsCache = null;
+    private List<List<string>> fxLayerMergeErrorsCache = null;
 
     private void ClearUICaches()
     {
@@ -2980,6 +2981,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         crunchedTexturesCache = null;
         nonBC5NormalMapsCache = null;
         animatedMaterialPropertyPathsCache = null;
+        fxLayerMergeErrorsCache = null;
     }
 
     private void OnSelectionChange()
@@ -3007,6 +3009,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
             return mergedMaterialPreviewCache;
+        }
+    }
+
+    private List<List<string>> FXLayerMergeErrors
+    {
+        get
+        {
+            if (fxLayerMergeErrorsCache == null)
+            {
+                fxLayerMergeErrorsCache = AnalyzeFXLayerMergeAbility();
+                for (int i = 0; i < fxLayerMergeErrorsCache.Count; i++)
+                {
+                    fxLayerMergeErrorsCache[i] = fxLayerMergeErrorsCache[i].Distinct().ToList();
+                }
+            }
+            return fxLayerMergeErrorsCache;
         }
     }
 
@@ -3324,21 +3342,33 @@ public class d4rkAvatarOptimizerEditor : Editor
         return (PerformanceRating)level;
     }
 
-    private void PerfRankChangeLabel(string label, int oldValue, int newValue, AvatarPerformanceCategory category)
+    enum PerformanceCategory
+    {
+        SkinnedMeshCount,
+        MeshCount,
+        MaterialCount,
+        FXLayerCount,
+    }
+
+    private void PerfRankChangeLabel(string label, int oldValue, int newValue, PerformanceCategory category)
     {
         var oldRating = PerformanceRating.VeryPoor;
         var newRating = PerformanceRating.VeryPoor;
         switch (category)
         {
-            case AvatarPerformanceCategory.SkinnedMeshCount:
+            case PerformanceCategory.SkinnedMeshCount:
                 oldRating = GetPerfRank(oldValue, new int[] {1, 2, 8, 16, int.MaxValue});
                 newRating = GetPerfRank(newValue, new int[] {1, 2, 8, 16, int.MaxValue});
                 break;
-            case AvatarPerformanceCategory.MeshCount:
+            case PerformanceCategory.MeshCount:
                 oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 24, int.MaxValue});
                 newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 24, int.MaxValue});
                 break;
-            case AvatarPerformanceCategory.MaterialCount:
+            case PerformanceCategory.MaterialCount:
+                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 32, int.MaxValue});
+                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 32, int.MaxValue});
+                break;
+            case PerformanceCategory.FXLayerCount:
                 oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 32, int.MaxValue});
                 newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 32, int.MaxValue});
                 break;
@@ -3492,68 +3522,60 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.Separator();
         GUI.enabled = true;
 
-        if (Foldout("Show Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
+        Profiler.StartSection("Show Perf Rank Change");
+        var exclusions = GetAllExcludedTransforms();
+        var particleSystemCount = root.GetComponentsInChildren<ParticleSystem>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        int meshCount = root.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+            .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
+        int optimizedSkinnedMeshCount = 0;
+        int optimizedMeshCount = 0;
+        int optimizedTotalMaterialCount = 0;
+        foreach (var matched in MergedMaterialPreview)
         {
-            Profiler.StartSection("Show Perf Rank Change");
-            var exclusions = GetAllExcludedTransforms();
-            var particleSystemCount = root.GetComponentsInChildren<ParticleSystem>(true)
-                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-            int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-            int meshCount = root.GetComponentsInChildren<MeshRenderer>(true)
-                .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-            int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true)
-                .Where(r => !r.gameObject.CompareTag("EditorOnly"))
-                .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
-            int optimizedSkinnedMeshCount = 0;
-            int optimizedMeshCount = 0;
-            int optimizedTotalMaterialCount = 0;
-            foreach (var matched in MergedMaterialPreview)
+            var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
+            if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
             {
-                var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
-                if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
-                {
-                    optimizedSkinnedMeshCount++;
-                    if (exclusions.Contains(renderers[0].transform))
-                        optimizedTotalMaterialCount += renderers[0].GetSharedMesh().subMeshCount;
-                    else
-                        optimizedTotalMaterialCount += matched.Count;
-                }
-                else if (renderers[0] is MeshRenderer)
-                {
-                    optimizedMeshCount++;
-                    var mesh = renderers[0].GetSharedMesh();
-                    optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
-                }
-                else // ParticleSystemRenderer
-                {
-                    optimizedTotalMaterialCount += 1;
-                }
+                optimizedSkinnedMeshCount++;
+                if (exclusions.Contains(renderers[0].transform))
+                    optimizedTotalMaterialCount += renderers[0].GetSharedMesh().subMeshCount;
+                else
+                    optimizedTotalMaterialCount += matched.Count;
             }
-            PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshCount, optimizedSkinnedMeshCount, AvatarPerformanceCategory.SkinnedMeshCount);
-            PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, AvatarPerformanceCategory.MeshCount);
-            PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, AvatarPerformanceCategory.MaterialCount);
-            Profiler.EndSection();
-
-            if (settings.MergeSimpleTogglesAsBlendTree)
+            else if (renderers[0] is MeshRenderer)
             {
-                Profiler.StartSection("AnalyzeFXLayerMergeAbility()");
-                var errorMessages = AnalyzeFXLayerMergeAbility();
-                Profiler.EndSection();
-                var result = new List<string>();
-                var fxLayer = GetFXLayer();
-                for (int i = 0; i < fxLayer.layers.Length; i++)
-                {
-                    result.Add($"[{(errorMessages[i].Count == 0 ? "OK" : "FAIL")}] {i} {fxLayer.layers[i].name}");
-                    result.AddRange(errorMessages[i].Distinct().Select(msg => $"    {msg}"));
-                }
-                DrawDebugList(result.ToArray());
+                optimizedMeshCount++;
+                var mesh = renderers[0].GetSharedMesh();
+                optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
             }
+            else // ParticleSystemRenderer
+            {
+                optimizedTotalMaterialCount += 1;
+            }
+        }
+        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshCount, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
+        PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, PerformanceCategory.MeshCount);
+        PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
+        if (GetFXLayer() != null)
+        {
+            var mergedLayerCount = settings.MergeSimpleTogglesAsBlendTree ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
+            var layerCount = GetFXLayer().layers.Length;
+            PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
+        }
+        Profiler.EndSection();
 
+        EditorGUILayout.Separator();
+
+        if (Foldout("Show Mesh & Material Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
+        {
             Profiler.StartSection("Show Merge Preview");
             foreach (var matched in MergedMaterialPreview)
             {
-                EditorGUILayout.Space(8);
                 for (int i = 0; i < matched.Count; i++)
                 {
                     for (int j = 0; j < matched[i].Count; j++)
@@ -3562,8 +3584,37 @@ public class d4rkAvatarOptimizerEditor : Editor
                         DrawMatchedMaterialSlot(matched[i][j], indent);
                     }
                 }
+                EditorGUILayout.Space(8);
             }
             Profiler.EndSection();
+        }
+
+        EditorGUILayout.Separator();
+
+        if (settings.MergeSimpleTogglesAsBlendTree && GetFXLayer() != null)
+        {
+            if (Foldout("Show FX Layer Merge Errors", ref settings.ShowFXLayerMergeErrors))
+            {
+                Profiler.StartSection("Show FX Layer Merge Errors");
+                var errorMessages = FXLayerMergeErrors;
+                var fxLayer = GetFXLayer();
+                for (int i = 0; i < errorMessages.Count; i++)
+                {
+                    var name = fxLayer.layers[i].name;
+                    
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
+                    EditorGUILayout.LabelField($"{i}{fxLayer.layers[i].name}");
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUI.indentLevel+=2;
+                    foreach (var error in errorMessages[i])
+                    {
+                        EditorGUILayout.LabelField(error);
+                    }
+                    EditorGUI.indentLevel-=2;
+                }
+                Profiler.EndSection();
+            }
         }
 
         EditorGUILayout.Separator();
