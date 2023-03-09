@@ -10,10 +10,10 @@ using System.Threading;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using d4rkpl4y3r.Util;
+using d4rkpl4y3r.AvatarOptimizer.Util;
 using System.Security.Cryptography;
 
-namespace d4rkpl4y3r
+namespace d4rkpl4y3r.AvatarOptimizer
 {
     public class ParsedShader
     {

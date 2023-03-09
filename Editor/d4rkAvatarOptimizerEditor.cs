@@ -11,9 +11,9 @@ using UnityEngine.Animations;
 using UnityEngine.SceneManagement;
 using UnityEditor.Animations;
 using UnityEditor;
-using d4rkpl4y3r;
-using d4rkpl4y3r.Util;
-using d4rkpl4y3r.Util.Extensions;
+using d4rkpl4y3r.AvatarOptimizer;
+using d4rkpl4y3r.AvatarOptimizer.Util;
+using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using VRC.Dynamics;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase.Validation.Performance;
@@ -23,7 +23,7 @@ using Type = System.Type;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 
-namespace d4rkpl4y3r.Util.Extensions
+namespace d4rkpl4y3r.AvatarOptimizer.Extensions
 {
     public static class RendererExtensions
     {
@@ -143,27 +143,30 @@ namespace d4rkpl4y3r.Util.Extensions
     }
 }
 
-public struct MaterialSlot
+namespace d4rkpl4y3r.AvatarOptimizer
 {
-    public Renderer renderer;
-    public int index;
-    public Material material
+    public struct MaterialSlot
     {
-        get { return renderer.sharedMaterials[index]; }
-    }
-    public MaterialSlot(Renderer renderer, int index)
-    {
-        this.renderer = renderer;
-        this.index = index;
-    }
-    public static MaterialSlot[] GetAllSlotsFrom(Renderer renderer)
-    {
-        var result = new MaterialSlot[renderer.sharedMaterials.Length];
-        for (int i = 0; i < result.Length; i++)
+        public Renderer renderer;
+        public int index;
+        public Material material
         {
-            result[i] = new MaterialSlot(renderer, i);
+            get { return renderer.sharedMaterials[index]; }
         }
-        return result;
+        public MaterialSlot(Renderer renderer, int index)
+        {
+            this.renderer = renderer;
+            this.index = index;
+        }
+        public static MaterialSlot[] GetAllSlotsFrom(Renderer renderer)
+        {
+            var result = new MaterialSlot[renderer.sharedMaterials.Length];
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = new MaterialSlot(renderer, i);
+            }
+            return result;
+        }
     }
 }
 
@@ -545,7 +548,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor == null)
             return;
 
-        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "/data/DummyAnimationToFillEmptyStates.anim");
+        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "Editor/Assets/DummyAnimationToFillEmptyStates.anim");
         
         var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
         var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
@@ -3446,6 +3449,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         scriptPath = path.Substring(0, path.LastIndexOf('/'));
         scriptPath = scriptPath.Substring(0, scriptPath.LastIndexOf('/'));
+        EditorGUILayout.LabelField("Path: " + scriptPath);
 
         Toggle("Write Properties as Static Values", ref settings.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref settings.MergeSkinnedMeshes);

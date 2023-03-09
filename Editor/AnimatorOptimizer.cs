@@ -9,7 +9,7 @@ using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 
-namespace d4rkpl4y3r
+namespace d4rkpl4y3r.AvatarOptimizer
 {
     // based on https://github.com/VRLabs/Avatars-3.0-Manager/blob/main/Editor/AnimatorCloner.cs
     public class AnimatorOptimizer

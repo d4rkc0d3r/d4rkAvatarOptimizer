@@ -1,6 +1,7 @@
 ## Next Version
 ### Features
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.
+* Optimizer is now a VPM & UPM compatible package.
 
 ## v1.10
 ### Features

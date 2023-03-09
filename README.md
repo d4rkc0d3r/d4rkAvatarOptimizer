@@ -21,15 +21,15 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
 Finally you can try to make a bug report and maybe I'll be able to fix it.  
 For that export the `d4rkAvatarOptimizer/TrashBin` folder as a unity package like so:  
-![Export Material](./ExampleImages/exportMaterial0.png)  
+![Export Material](./Documentation~/img/exportMaterial0.png)  
 Then in the next dialog uncheck the "Include dependencies" checkbox and click "Export":  
-![Export Material](./ExampleImages/exportMaterial1.png)  
+![Export Material](./Documentation~/img/exportMaterial1.png)  
 Once you have the `.unitypackage` file, please make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues).
 
 ## UI Options Documentation
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
-![Example Screenshot](./ExampleImages/example0.png)
+![Example Screenshot](./Documentation~/img/example0.png)
 ## Write Properties as Static Values
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
