@@ -3,6 +3,9 @@
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.
 * Optimizer is now a VPM & UPM compatible package.
 
+### Bug Fixes
+* Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.
+
 ## v1.10
 ### Features
 * Add debug view to show all animated material property paths.

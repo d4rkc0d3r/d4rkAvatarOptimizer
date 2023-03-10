@@ -2691,12 +2691,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var collider = avDescriptor.collider_footL;
         collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height *= 0.5f;
-        collider.height -= collider.radius;
+        collider.height -= collider.radius * 0.5f;
         var parent = new GameObject("leftFootColliderRoot");
         parent.transform.parent = collider.transform;
         parent.transform.localRotation = collider.rotation;
-        parent.transform.localPosition = collider.position + collider.rotation * (-collider.height * Vector3.up);
+        parent.transform.localPosition = collider.position + collider.rotation * (-(collider.height * 0.5f) * Vector3.up);
         parent.transform.localScale = Vector3.one;
         var leaf = new GameObject("leftFootColliderLeaf");
         leaf.transform.parent = parent.transform;
@@ -2708,12 +2707,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         collider = avDescriptor.collider_footR;
         collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height *= 0.5f;
-        collider.height -= collider.radius;
+        collider.height -= collider.radius * 0.5f;
         parent = new GameObject("rightFootColliderRoot");
         parent.transform.parent = collider.transform;
         parent.transform.localRotation = collider.rotation;
-        parent.transform.localPosition = collider.position + collider.rotation * (-collider.height * Vector3.up);
+        parent.transform.localPosition = collider.position + collider.rotation * (-(collider.height * 0.5f) * Vector3.up);
         parent.transform.localScale = Vector3.one;
         leaf = new GameObject("rightFootColliderLeaf");
         leaf.transform.parent = parent.transform;
