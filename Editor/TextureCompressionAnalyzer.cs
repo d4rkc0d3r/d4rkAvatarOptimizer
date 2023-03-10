@@ -414,6 +414,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
             assetRootPath = path.Substring(0, path.LastIndexOf('/'));
             assetRootPath = assetRootPath.Substring(0, assetRootPath.LastIndexOf('/'));
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
+            if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
+            {
+                assetRootPath = "Assets/d4rkAvatarOptimizer";
+                if (!AssetDatabase.IsValidFolder(assetRootPath))
+                {
+                    AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
+                }
+            }   
             if (GUILayout.Button($"Clear Cache ({AssetDatabase.GetSubFolders(assetRootPath + "/TextureAnalyzer").Length})"))
             {
                 AssetDatabase.DeleteAsset(assetRootPath + "/TextureAnalyzer");

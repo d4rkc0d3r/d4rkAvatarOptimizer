@@ -175,7 +175,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static GameObject root;
     private static d4rkAvatarOptimizer settings;
-    private static string scriptPath = "Assets/d4rkAvatarOptimizer";
+    private static string packageRootPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
@@ -214,9 +214,19 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
-        trashBinPath = scriptPath + "/TrashBin/";
-        AssetDatabase.DeleteAsset(scriptPath + "/TrashBin");
-        AssetDatabase.CreateFolder(scriptPath, "TrashBin");
+        trashBinPath = packageRootPath + "/TrashBin/";
+        var trashBinRoot = packageRootPath;
+        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(AssetDatabase.GetAssetPath(MonoScript.FromMonoBehaviour(settings)));
+        if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
+        {
+            trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
+            if (!AssetDatabase.IsValidFolder("Assets/d4rkAvatarOptimizer"))
+            {
+                AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
+            }
+        }
+        AssetDatabase.DeleteAsset(trashBinRoot + "/TrashBin");
+        AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
         assetBundlePath = null;
         Profiler.EndSection();
     }
@@ -548,7 +558,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor == null)
             return;
 
-        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(scriptPath + "Editor/Assets/DummyAnimationToFillEmptyStates.anim");
+        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(packageRootPath + "Editor/Assets/DummyAnimationToFillEmptyStates.anim");
         
         var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
         var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
@@ -3444,9 +3454,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
-        scriptPath = path.Substring(0, path.LastIndexOf('/'));
-        scriptPath = scriptPath.Substring(0, scriptPath.LastIndexOf('/'));
-        EditorGUILayout.LabelField("Path: " + scriptPath);
+        packageRootPath = path.Substring(0, path.LastIndexOf('/'));
+        packageRootPath = packageRootPath.Substring(0, packageRootPath.LastIndexOf('/'));
+        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
 
         Toggle("Write Properties as Static Values", ref settings.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref settings.MergeSkinnedMeshes);
