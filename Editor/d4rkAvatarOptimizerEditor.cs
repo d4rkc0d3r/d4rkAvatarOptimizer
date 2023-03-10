@@ -900,7 +900,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     DisplayProgressBar("Optimizing swap material: " + material.name);
                     var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
-                    var sourcePathWrapper = new List<List<string>>() { new List<string>() { entry.Key.path } };
+                    var sourcePathWrapper = new List<List<string>>() { Enumerable.Repeat(entry.Key.path, mergedMeshCount).ToList() };
                     var mergedMeshIndexWrapper = new List<List<int>>() { new List<int>() { meshIndex } };
                     optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, targetPath, sourcePathWrapper, mergedMeshIndexWrapper)[0];
                 }
