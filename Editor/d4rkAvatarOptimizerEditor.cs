@@ -214,17 +214,17 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
-        trashBinPath = packageRootPath + "/TrashBin/";
         var trashBinRoot = packageRootPath;
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(AssetDatabase.GetAssetPath(MonoScript.FromMonoBehaviour(settings)));
         if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
         {
-            trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
+            trashBinRoot = "Assets/d4rkAvatarOptimizer";
             if (!AssetDatabase.IsValidFolder("Assets/d4rkAvatarOptimizer"))
             {
                 AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
             }
         }
+        trashBinPath = trashBinRoot + "/TrashBin/";
         AssetDatabase.DeleteAsset(trashBinRoot + "/TrashBin");
         AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
         assetBundlePath = null;
