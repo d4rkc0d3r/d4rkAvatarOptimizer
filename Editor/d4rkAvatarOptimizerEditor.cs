@@ -561,12 +561,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var fxLayersToMerge = new List<int>();
         var fxLayerMap = new Dictionary<int, int>();
-        if (settings.MergeSimpleTogglesAsBlendTree)
+        if (settings.MergeSimpleTogglesAsBlendTree && GetFXLayer() != null)
         {
             var errors = AnalyzeFXLayerMergeAbility();
             int currentLayer = 0;
-            var fx = GetFXLayer();
-            for (int i = 0; i < fx.layers.Length; i++)
+            for (int i = 0; i < GetFXLayer().layers.Length; i++)
             {
                 fxLayerMap[i] = currentLayer;
                 if (errors[i].Count > 0)
