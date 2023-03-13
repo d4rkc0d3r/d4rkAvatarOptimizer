@@ -3497,6 +3497,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
+            #if MODULAR_AVATAR
+            nadena.dev.modular_avatar.core.editor.AvatarProcessor.ProcessAvatar(settings.gameObject);
+            #endif
+
             var oldCulture = Thread.CurrentThread.CurrentCulture;
             var oldUICulture = Thread.CurrentThread.CurrentUICulture;
             try
