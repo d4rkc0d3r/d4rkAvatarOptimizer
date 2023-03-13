@@ -2700,7 +2700,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var collider = avDescriptor.collider_footL;
         collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height -= collider.radius * 0.5f;
+        collider.height -= collider.radius * 2f;
         var parent = new GameObject("leftFootColliderRoot");
         parent.transform.parent = collider.transform;
         parent.transform.localRotation = collider.rotation;
@@ -2716,7 +2716,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         collider = avDescriptor.collider_footR;
         collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height -= collider.radius * 0.5f;
+        collider.height -= collider.radius * 2f;
         parent = new GameObject("rightFootColliderRoot");
         parent.transform.parent = collider.transform;
         parent.transform.localRotation = collider.rotation;
