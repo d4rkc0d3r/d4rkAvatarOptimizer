@@ -114,8 +114,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         TextureQuality.Metric sortMetric = TextureQuality.Metric.SSIM_mip0;
         Dictionary<TextureQuality.Metric, bool> enabledMetrics = new Dictionary<TextureQuality.Metric, bool>()
         {
-            { TextureQuality.Metric.PSNR_mip0, true },
-            { TextureQuality.Metric.PSNR_mip1, true },
+            { TextureQuality.Metric.PSNR_mip0, false },
+            { TextureQuality.Metric.PSNR_mip1, false },
             { TextureQuality.Metric.SSIM_mip0, true },
             { TextureQuality.Metric.SSIM_mip1, true },
         };

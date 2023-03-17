@@ -3,6 +3,9 @@
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.
 * Optimizer is now a VPM & UPM compatible package.
 
+### Changes
+* Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
+
 ### Bug Fixes
 * Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.
 * Fix crash when a material swap gets merged into a blob of meshes and its mesh index is non-zero. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/28)
