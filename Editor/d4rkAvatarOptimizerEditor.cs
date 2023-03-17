@@ -401,7 +401,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null)
+                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || Penetrators.Contains(renderer))
                     break;
                 if (exclusions.Contains(subList[0].transform))
                     continue;
@@ -1201,6 +1201,50 @@ public class d4rkAvatarOptimizerEditor : Editor
             return new HashSet<Transform>();
         var moving = FindAllMovingTransforms();
         return new HashSet<Transform>(root.transform.GetAllDescendants().Where(t => !moving.Contains(t)));
+    }
+
+    private static bool IsDPSPenetratorTipLight(Light light)
+    {
+        return light.type == LightType.Point && light.renderMode == LightRenderMode.ForceVertex
+            && light.color.r < 0.01 && light.color.g < 0.01 && light.color.b < 0.01
+            && light.range % 0.1 - 0.09 < 0.001;
+    }
+
+    private static bool IsDPSPenetratorRoot(Transform t)
+    {
+        if (t == null)
+            return false;
+        if (t.GetComponentsInChildren<Light>(true).Count(IsDPSPenetratorTipLight) != 1)
+            return false;
+        if (t.GetComponentsInChildren<MeshRenderer>(true).Count() != 1)
+            return false;
+        var meshRenderer = t.GetComponentsInChildren<MeshRenderer>(true).First();
+        if (meshRenderer.sharedMaterials.Length == 0)
+            return false;
+        var material = meshRenderer.sharedMaterials[0];
+        if (material == null)
+            return false;
+        return material.HasProperty("_Length");
+    }
+
+    private static HashSet<MeshRenderer> FindAllPenetrators()
+    {
+        var penetratorTipLights = root.GetComponentsInChildren<Light>(true)
+            .Where(l => IsDPSPenetratorTipLight(l)).ToList();
+        var penetrators = new HashSet<MeshRenderer>();
+        foreach (var light in penetratorTipLights)
+        {
+            var candidate = light.transform;
+            while (candidate != null && !IsDPSPenetratorRoot(candidate))
+            {
+                candidate = candidate.parent;
+            }
+            if (IsDPSPenetratorRoot(candidate))
+            {
+                penetrators.Add(candidate.GetComponentsInChildren<MeshRenderer>(true).First());
+            }
+        }
+        return penetrators;
     }
 
     private static Texture2DArray CombineTextures(List<Texture2D> textures)
@@ -2933,6 +2977,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         texArrayPropertiesToSet.Clear();
         keepTransforms.Clear();
         convertedMeshRendererPaths.Clear();
+        penetratorsCache = FindAllPenetrators();
         DisplayProgressBar("Destroying unused components", 0.19f);
         Profiler.StartSection("DestroyEditorOnlyGameObjects()");
         DestroyEditorOnlyGameObjects();
@@ -2981,6 +3026,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     private string[] animatedMaterialPropertyPathsCache = null;
     private List<List<string>> fxLayerMergeErrorsCache = null;
 
+    private static HashSet<MeshRenderer> penetratorsCache = null;
+
     private void ClearUICaches()
     {
         mergedMaterialPreviewCache = null;
@@ -2992,6 +3039,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         nonBC5NormalMapsCache = null;
         animatedMaterialPropertyPathsCache = null;
         fxLayerMergeErrorsCache = null;
+        penetratorsCache = null;
     }
 
     private void OnSelectionChange()
@@ -3123,6 +3171,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 crunchedTexturesCache = textures.ToArray();
             }
             return crunchedTexturesCache;
+        }
+    }
+
+    private static HashSet<MeshRenderer> Penetrators
+    {
+        get
+        {
+            if (penetratorsCache == null)
+            {
+                penetratorsCache = FindAllPenetrators();
+            }
+            return penetratorsCache;
         }
     }
 
@@ -3704,6 +3764,12 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Where(mat => IsLockedIn(mat)).ToArray();
                 DrawDebugList(list);
+                Profiler.EndSection();
+            }
+            if (Penetrators.Count > 0 & Foldout("Penetrators", ref settings.DebugShowPenetrators))
+            {
+                Profiler.StartSection("Penetrators");
+                DrawDebugList(Penetrators.ToArray());
                 Profiler.EndSection();
             }
             if (Foldout("Unused Components", ref settings.DebugShowUnusedComponents))

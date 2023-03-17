@@ -30,6 +30,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowCrunchedTextures = true;
     public bool DebugShowNonBC5NormalMaps = true;
     public bool DebugShowLockedInMaterials = true;
+    public bool DebugShowPenetrators = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
     public bool DebugShowMaterialSwaps = true;

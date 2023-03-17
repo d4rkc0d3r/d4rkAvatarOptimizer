@@ -5,6 +5,7 @@
 
 ### Changes
 * Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
+* Detect DPS penetrators and stop them from getting merged into other meshes.
 
 ### Bug Fixes
 * Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.
