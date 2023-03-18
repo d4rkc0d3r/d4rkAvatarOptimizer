@@ -1977,15 +1977,15 @@ public class d4rkAvatarOptimizerEditor : Editor
     
     private static void CombineAndOptimizeMaterials()
     {
-        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var exclusions = GetAllExcludedTransforms();
-        foreach (var meshRenderer in skinnedMeshRenderers)
+        var skinnedMeshRenderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            .Where(smr => !exclusions.Contains(smr.transform) && smr.sharedMesh != null).ToArray();
+        for (int meshRenderIndex = 0; meshRenderIndex < skinnedMeshRenderers.Length; meshRenderIndex++)
         {
+            var meshRenderer = skinnedMeshRenderers[meshRenderIndex];
             var mesh = meshRenderer.sharedMesh;
-            if (mesh == null || exclusions.Contains(meshRenderer.transform))
-                continue;
             
-            DisplayProgressBar("Combining mesh: " + meshRenderer.name);
+            DisplayProgressBar($"Combining materials on {meshRenderer.name} ({meshRenderIndex + 1}/{skinnedMeshRenderers.Length})");
 
             var props = new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(props);
@@ -2207,25 +2207,24 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void CombineSkinnedMeshes()
     {
-        var combinableSkinnedMeshList = FindPossibleSkinnedMeshMerges();
-        mergedMeshPaths = combinableSkinnedMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
+        var combinableMeshList = FindPossibleSkinnedMeshMerges();
+        mergedMeshPaths = combinableMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         fusedAnimatedMaterialProperties = FindAllAnimatedMaterialProperties();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
-        int combinedMeshID = 0;
-        foreach (var combinableMeshes in combinableSkinnedMeshList)
+        var combinableSkinnedMeshList = combinableMeshList
+            .Select(l => l.Select(m => m as SkinnedMeshRenderer).Where(m => m != null).ToList())
+            .Where(l => l.Count > 0)
+            .Where(l => l[0].sharedMesh != null)
+            .Where(l => l.All(m => !exclusions.Contains(m.transform)))
+            .ToArray();
+        int totalMeshCount = combinableSkinnedMeshList.Sum(l => l.Count);
+        int currentMeshCount = 0;
+        for (int combinedMeshID = 0; combinedMeshID < combinableSkinnedMeshList.Length; combinedMeshID++)
         {
-            var combinableSkinnedMeshes = combinableMeshes.Select(m => m as SkinnedMeshRenderer).Where(m => m != null).ToList();
-            if (combinableSkinnedMeshes.Count < 1)
-                continue;
-            if (combinableMeshes.Any(m => exclusions.Contains(m.transform)))
-                continue;
-            if (combinableSkinnedMeshes[0].sharedMesh == null)
-                continue;
-
-            DisplayProgressBar($"Combining mesh {combinableMeshes[0].name}");
+            var combinableSkinnedMeshes = combinableSkinnedMeshList[combinedMeshID];
 
             var targetBones = new List<Transform>();
             var targetBoneMap = new Dictionary<Transform, int>();
@@ -2250,6 +2249,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             int meshID = 0;
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
+                DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
+
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
@@ -2640,8 +2641,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
-
-            combinedMeshID++;
         }
     }
 
