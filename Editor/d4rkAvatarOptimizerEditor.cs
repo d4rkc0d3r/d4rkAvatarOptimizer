@@ -7,6 +7,7 @@ using System.Threading;
 using System.Globalization;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Animations;
 using UnityEngine.SceneManagement;
 using UnityEditor.Animations;
@@ -2004,14 +2005,30 @@ public class d4rkAvatarOptimizerEditor : Editor
                 sourceUv[i] = sourceUv[i].Count != sourceVertices.Length ? Enumerable.Range(0, sourceVertices.Length).Select(r => Vector4.zero).ToList() : sourceUv[i];
             }
             var sourceColor = mesh.colors;
+            var sourceColor32 = mesh.colors32;
             var sourceNormals = mesh.normals;
             var sourceTangents = mesh.tangents;
             var sourceWeights = mesh.boneWeights;
 
             var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
             var targetColor = new List<Color>();
-            if (sourceColor.Length != sourceVertices.Length)
+            var targetColor32 = new List<Color32>();
+            if (mesh.HasVertexAttribute(VertexAttribute.Color))
+            {
+                if (mesh.GetVertexAttributeFormat(VertexAttribute.Color) == VertexAttributeFormat.UNorm8)
+                {
+                    targetColor = null;
+                }
+                else
+                {
+                    targetColor32 = null;
+                }
+            }
+            else
+            {
                 targetColor = null;
+                targetColor32 = null;
+            }
             var targetVertices = new List<Vector3>();
             var targetIndices = new List<List<int>>();
             var targetNormals = new List<Vector3>();
@@ -2049,6 +2066,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                                 targetUv[a].Add(sourceUv[a][oldIndex]);
                             }
                             targetColor?.Add(sourceColor[oldIndex]);
+                            targetColor32?.Add(sourceColor32[oldIndex]);
                             targetVertices.Add(sourceVertices[oldIndex]);
                             targetNormals.Add(sourceNormals[oldIndex]);
                             targetTangents.Add(sourceTangents[oldIndex]);
@@ -2074,6 +2092,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 if (targetColor != null && targetColor.Any(c => !c.Equals(Color.white)))
                 {
                     newMesh.colors = targetColor.ToArray();
+                }
+                else if (targetColor32 != null && targetColor32.Any(c => !c.Equals(new Color32(255, 255, 255, 255))))
+                {
+                    newMesh.colors32 = targetColor32.ToArray();
                 }
                 for (int i = 0; i < 8; i++)
                 {
@@ -2209,6 +2231,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             var targetBoneMap = new Dictionary<Transform, int>();
             var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
             var targetColor = new List<Color>();
+            var targetColor32 = new List<Color32>();
+            bool useColor32 = true;
             var targetVertices = new List<Vector3>();
             var targetIndices = new List<List<int>>();
             var targetNormals = new List<Vector3>();
@@ -2288,14 +2312,26 @@ public class d4rkAvatarOptimizerEditor : Editor
                         targetUv[i].AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Vector4.zero));
                     }
                 }
-                var sourceColor = mesh.colors;
-                if (sourceColor.Length == sourceVertices.Length)
+
+                if (mesh.HasVertexAttribute(VertexAttribute.Color))
                 {
-                    targetColor.AddRange(mesh.colors);
+                    if (mesh.GetVertexAttributeFormat(VertexAttribute.Color) == VertexAttributeFormat.UNorm8)
+                    {
+                        var colors = mesh.colors32;
+                        targetColor32.AddRange(colors);
+                        targetColor.AddRange(colors.Select(s => (Color)s));
+                    }
+                    else
+                    {
+                        var colors = mesh.colors;
+                        targetColor.AddRange(colors);
+                        useColor32 = false;
+                    }
                 }
                 else
                 {
                     targetColor.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Color.white));
+                    targetColor32.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => new Color32(255, 255, 255, 255)));
                 }
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
@@ -2401,9 +2437,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             combinedMesh.SetVertices(targetVertices);
             combinedMesh.bindposes = targetBindPoses.ToArray();
             combinedMesh.boneWeights = targetWeights.ToArray();
-            if (targetColor.Any(c => !c.Equals(Color.white)))
+            if (!useColor32 && targetColor.Any(c => !c.Equals(Color.white)))
             {
                 combinedMesh.colors = targetColor.ToArray();
+            }
+            else if (useColor32 && targetColor32.Any(c => !c.Equals(new Color32(255, 255, 255, 255))))
+            {
+                combinedMesh.colors32 = targetColor32.ToArray();
             }
             for (int i = 0; i < 8; i++)
             {
