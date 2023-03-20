@@ -945,15 +945,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                     usedBlendShapes.Add(path + blendShapeName);
                 }
             }
-            if (avDescriptor.customEyeLookSettings.eyelidType
-                == VRCAvatarDescriptor.EyelidType.Blendshapes
-                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
+            if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
+                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null
+                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh.sharedMesh != null)
             {
                 var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
                 string path = GetPathToRoot(meshRenderer) + "/blendShape.";
                 foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
                 {
-                    if (blendShapeID >= 0)
+                    if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
                     {
                         usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
                         hasUsedBlendShapes.Add(meshRenderer);
