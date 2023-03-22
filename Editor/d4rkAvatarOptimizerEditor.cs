@@ -433,6 +433,25 @@ public class d4rkAvatarOptimizerEditor : Editor
             subList[0] = subList[index];
             subList[index] = oldFirst;
         }
+        for (int i = 0; i < matchedSkinnedMeshes.Count && settings.MergeStaticMeshesAsSkinned; i++)
+        {
+            var mergedMeshes = matchedSkinnedMeshes[i];
+            if (mergedMeshes.Count == 1)
+                continue;
+            var meshRenderers = mergedMeshes.Where(r => r is MeshRenderer).Cast<MeshRenderer>().ToList();
+            if (meshRenderers.Count == 0)
+                continue;
+            var mergedMaterialSlots = FindAllMergeAbleMaterials(mergedMeshes);
+            var meshRenderersWithMergedMaterials = new HashSet<MeshRenderer>(meshRenderers.Where(renderer =>
+                mergedMaterialSlots.Any(mergedSlots => mergedSlots.Any(slot => slot.renderer == renderer) && mergedSlots.Count > 1)));
+            var unhelpfullyMergedMeshRenderers = meshRenderers.Where(r => !meshRenderersWithMergedMaterials.Contains(r));
+            foreach (var meshRenderer in unhelpfullyMergedMeshRenderers)
+            {
+                var newSubList = new List<Renderer> { meshRenderer };
+                matchedSkinnedMeshes.Add(newSubList);
+                mergedMeshes.Remove(meshRenderer);
+            }
+        }
         return matchedSkinnedMeshes;
     }
     
