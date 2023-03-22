@@ -2923,6 +2923,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Its assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
+        if (Object.FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
+        {
+            EditorGUILayout.HelpBox(
+                "Seems like the last optimization attempt failed.\n" +
+                "You can try to delete the broken copy and try again with different settings or adding parts to the exclusion list.\n" +
+                "Click this message to find or create a bug report on github.", MessageType.Error);
+            if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+                Application.OpenURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues");
+        }
+
         var exclusions = GetAllExcludedTransforms();
 
         var allMaterials = root.GetComponentsInChildren<Renderer>(true)
