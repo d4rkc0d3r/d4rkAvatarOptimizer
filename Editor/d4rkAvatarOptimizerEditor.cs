@@ -1029,12 +1029,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         var fxLayer = GetFXLayer();
         if (avDescriptor == null || fxLayer == null)
             return mergeableBlendShapes;
+        var exclusions = GetAllExcludedTransforms();
         var validPaths = new HashSet<string>();
         foreach (var renderer in mergedMeshBlob)
         {
             var skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
             var mesh = skinnedMeshRenderer?.sharedMesh;
-            if (mesh == null)
+            if (mesh == null || exclusions.Contains(skinnedMeshRenderer.transform))
                 continue;
             string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
@@ -1123,6 +1124,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
         mergeableBlendShapes.RemoveAll(x => x.Count == 1);
+        mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).ToList()).ToList();
         return mergeableBlendShapes;
     }
 
