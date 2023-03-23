@@ -1054,7 +1054,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
         }
-        var ratios = new List<List<(string blendshape, float value)>>();
+        var ratios = new List<Dictionary<string, float>>();
         foreach (var clip in fxLayer.animationClips)
         {
             var blendShapes = new List<(string path, EditorCurveBinding binding)>();
@@ -1073,13 +1073,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             foreach (var key in keyframes)
             {
-                var blendShapeValues = new List<(string blendshape, float value)>();
+                var blendShapeValues = new Dictionary<string, float>();
                 foreach (var blendShape in blendShapes)
                 {
                     var curve = AnimationUtility.GetEditorCurve(clip, blendShape.binding);
-                    blendShapeValues.Add((blendShape.path, curve.Evaluate(key)));
+                    blendShapeValues[blendShape.path] = curve.Evaluate(key);
                 }
-                blendShapeValues = blendShapeValues.OrderBy(x => x.blendshape).ToList();
                 NormalizeBlendShapeValues(blendShapeValues);
                 if (!ratios.Any(list => list.SequenceEqual(blendShapeValues)))
                     ratios.Add(blendShapeValues);
@@ -1121,28 +1120,52 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, List<(string blendshape, float value)> list)
+    private static void NormalizeBlendShapeValues(Dictionary<string, float> blendShapeValues)
     {
-        int candidateIndex = list.FindIndex(x => x.blendshape == blendshape);
-        var intersection = list.Where(x => subList.Any(y => y.blendshape == x.blendshape)).ToList();
-        if (intersection.Count == 0 && candidateIndex == -1)
+        var maxValue = blendShapeValues.Max(x => x.Value);
+        if (maxValue == 0 || maxValue == 1)
+            return;
+        foreach (var key in blendShapeValues.Keys.ToList())
+        {
+            blendShapeValues[key] /= maxValue;
+        }
+    }
+
+    private static bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, Dictionary<string, float> list)
+    {
+        int intersectionCount = 0;
+        float intersectionMax = 0;
+        for (int i = 0; i < subList.Count; i++)
+        {
+            if (list.TryGetValue(subList[i].blendshape, out var match))
+            {
+                intersectionCount++;
+                intersectionMax = Mathf.Max(intersectionMax, match);
+            }
+            else if (intersectionCount > 0)
+            {
+                return false;
+            }
+        }
+        bool hasCandidate = list.ContainsKey(blendshape);
+        if (intersectionCount == 0 && !hasCandidate)
             return true;
-        if (intersection.Count != subList.Count || candidateIndex == -1)
+        if (intersectionCount != subList.Count || !hasCandidate)
             return false;
-        var intersectionMax = intersection.Max(x => x.value);
         if (intersectionMax == 0)
             return true;
-        if (list[candidateIndex].value == 0)
+        var candidateValue = list[blendshape];
+        if (candidateValue == 0)
             return false;
         for (int i = 0; i < subList.Count; i++)
         {
-            var match = intersection.First(x => x.blendshape == subList[i].blendshape);
-            if (Mathf.Abs(subList[i].value - match.value / intersectionMax) > 0.01f)
+            var match = list[subList[i].blendshape];
+            if (Mathf.Abs(subList[i].value - match / intersectionMax) > 0.01f)
                 return false;
         }
         if (value < 0)
-            value = list[candidateIndex].value / intersectionMax;
-        else if (Mathf.Abs(value - list[candidateIndex].value / intersectionMax) > 0.01f)
+            value = candidateValue / intersectionMax;
+        else if (Mathf.Abs(value - candidateValue / intersectionMax) > 0.01f)
             return false;
         return true;
     }
