@@ -1022,14 +1022,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static List<List<(string blendshape, float value)>> FindMergeableBlendShapes()
+    private static List<List<(string blendshape, float value)>> FindMergeableBlendShapes(IEnumerable<Renderer> mergedMeshBlob)
     {
         var mergeableBlendShapes = new List<List<(string blendshape, float value)>>();
         var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
         var fxLayer = GetFXLayer();
         if (avDescriptor == null || fxLayer == null)
             return mergeableBlendShapes;
-        var unmergeableBlendShapes = new HashSet<string>();
+        var validPaths = new HashSet<string>();
+        foreach (var renderer in mergedMeshBlob)
+        {
+            var skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
+            var mesh = skinnedMeshRenderer?.sharedMesh;
+            if (mesh == null)
+                continue;
+            string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
+            for (int i = 0; i < mesh.blendShapeCount; i++)
+            {
+                if (mesh.GetBlendShapeFrameCount(i) == 1)
+                {
+                    validPaths.Add(path + mesh.GetBlendShapeName(i));
+                }
+            }
+        }
+        if (validPaths.Count == 0)
+            return mergeableBlendShapes;
         if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
             && avDescriptor.VisemeSkinnedMesh != null)
         {
@@ -1037,7 +1054,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             string path = GetPathToRoot(meshRenderer) + "/blendShape.";
             foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
             {
-                unmergeableBlendShapes.Add(path + blendShapeName);
+                validPaths.Remove(path + blendShapeName);
             }
         }
         if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
@@ -1050,7 +1067,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
                 {
-                    unmergeableBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                    validPaths.Remove(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
                 }
             }
         }
@@ -1065,7 +1082,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     || !binding.propertyName.StartsWith("blendShape."))
                     continue;
                 var path = $"{binding.path}/{binding.propertyName}";
-                if (unmergeableBlendShapes.Contains(path))
+                if (!validPaths.Contains(path))
                     continue;
                 blendShapes.Add((path, binding));
                 var curve = AnimationUtility.GetEditorCurve(clip, binding);
@@ -3634,30 +3651,26 @@ public class d4rkAvatarOptimizerEditor : Editor
         MeshCount,
         MaterialCount,
         FXLayerCount,
+        BlendShapeCount,
     }
+
+    static Dictionary<PerformanceCategory, int[]> _perfLevels = new Dictionary<PerformanceCategory, int[]>()
+    {
+        { PerformanceCategory.SkinnedMeshCount, new int[] {1, 2, 8, 16, int.MaxValue} },
+        { PerformanceCategory.MeshCount, new int[] {4, 8, 16, 24, int.MaxValue} },
+        { PerformanceCategory.MaterialCount, new int[] {4, 8, 16, 32, int.MaxValue} },
+        { PerformanceCategory.FXLayerCount, new int[] {4, 8, 16, 32, int.MaxValue} },
+        { PerformanceCategory.BlendShapeCount, new int[] {32, 48, 64, 128, int.MaxValue} },
+    };
 
     private void PerfRankChangeLabel(string label, int oldValue, int newValue, PerformanceCategory category)
     {
         var oldRating = PerformanceRating.VeryPoor;
         var newRating = PerformanceRating.VeryPoor;
-        switch (category)
+        if (_perfLevels.ContainsKey(category))
         {
-            case PerformanceCategory.SkinnedMeshCount:
-                oldRating = GetPerfRank(oldValue, new int[] {1, 2, 8, 16, int.MaxValue});
-                newRating = GetPerfRank(newValue, new int[] {1, 2, 8, 16, int.MaxValue});
-                break;
-            case PerformanceCategory.MeshCount:
-                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 24, int.MaxValue});
-                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 24, int.MaxValue});
-                break;
-            case PerformanceCategory.MaterialCount:
-                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 32, int.MaxValue});
-                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 32, int.MaxValue});
-                break;
-            case PerformanceCategory.FXLayerCount:
-                oldRating = GetPerfRank(oldValue, new int[] {4, 8, 16, 32, int.MaxValue});
-                newRating = GetPerfRank(newValue, new int[] {4, 8, 16, 32, int.MaxValue});
-                break;
+            oldRating = GetPerfRank(oldValue, _perfLevels[category]);
+            newRating = GetPerfRank(newValue, _perfLevels[category]);
         }
 
         EditorGUILayout.BeginHorizontal();
@@ -3749,6 +3762,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Different Render Queue", ref settings.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
+        Toggle("Merge Same Ratio Blend Shapes", ref settings.MergeSameRatioBlendShapes);
         Toggle("Merge Simple Toggles as BlendTree", ref settings.MergeSimpleTogglesAsBlendTree);
         Toggle("Delete Unused Components", ref settings.DeleteUnusedComponents);
         Toggle("Delete Unused Game Objects", ref settings.DeleteUnusedGameObjects);
@@ -3813,19 +3827,37 @@ public class d4rkAvatarOptimizerEditor : Editor
         var exclusions = GetAllExcludedTransforms();
         var particleSystemCount = root.GetComponentsInChildren<ParticleSystem>(true)
             .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-        int skinnedMeshCount = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        var skinnedMeshes = root.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).ToList();
         int meshCount = root.GetComponentsInChildren<MeshRenderer>(true)
             .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
         int totalMaterialCount = root.GetComponentsInChildren<Renderer>(true)
             .Where(r => !r.gameObject.CompareTag("EditorOnly"))
             .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
+        var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
+            if (r.sharedMesh == null)
+                return new string[0];
+            return Enumerable.Range(0, r.sharedMesh.blendShapeCount)
+                .Select(i => $"{GetPathToRoot(r.transform)}/blendShape.{r.sharedMesh.GetBlendShapeName(i)}");
+        }));
+        var optimizedBlendShapePaths = new HashSet<string>(totalBlendShapePaths);
         int optimizedSkinnedMeshCount = 0;
         int optimizedMeshCount = 0;
         int optimizedTotalMaterialCount = 0;
+        var mergeableBlendShapes = new List<List<(string blendshape, float value)>>();
         foreach (var matched in MergedMaterialPreview)
         {
             var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
+            if (settings.MergeSameRatioBlendShapes)
+            {
+                var mergedBlendShapes = FindMergeableBlendShapes(renderers);
+                foreach (var list in mergedBlendShapes)
+                {
+                    for (int i = 1; i < list.Count; i++)
+                        optimizedBlendShapePaths.Remove(list[i].blendshape);
+                }
+                mergeableBlendShapes.AddRange(mergedBlendShapes);
+            }
             if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
             {
                 optimizedSkinnedMeshCount++;
@@ -3845,7 +3877,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 optimizedTotalMaterialCount += 1;
             }
         }
-        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshCount, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
+        optimizedBlendShapePaths.IntersectWith(usedBlendShapes);
+        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
         PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, PerformanceCategory.MeshCount);
         PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
         if (GetFXLayer() != null)
@@ -3854,11 +3887,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             var layerCount = GetFXLayer().layers.Length;
             PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
         }
+        PerfRankChangeLabel("Blend Shapes", totalBlendShapePaths.Count, optimizedBlendShapePaths.Count, PerformanceCategory.BlendShapeCount);
         Profiler.EndSection();
 
         EditorGUILayout.Separator();
 
-        var mergeableBlendShapes = FindMergeableBlendShapes();
         foreach (var mergedBlob in mergeableBlendShapes)
         {
             EditorGUI.indentLevel++;
