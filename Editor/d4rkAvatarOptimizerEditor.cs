@@ -1022,6 +1022,131 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    private static List<List<(string blendshape, float value)>> FindMergeableBlendShapes()
+    {
+        var mergeableBlendShapes = new List<List<(string blendshape, float value)>>();
+        var avDescriptor = root.GetComponent<VRCAvatarDescriptor>();
+        var fxLayer = GetFXLayer();
+        if (avDescriptor == null || fxLayer == null)
+            return mergeableBlendShapes;
+        var unmergeableBlendShapes = new HashSet<string>();
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
+            && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+            {
+                unmergeableBlendShapes.Add(path + blendShapeName);
+            }
+        }
+        if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh.sharedMesh != null)
+        {
+            var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+            {
+                if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
+                {
+                    unmergeableBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
+                }
+            }
+        }
+        var ratios = new List<List<(string blendshape, float value)>>();
+        foreach (var clip in fxLayer.animationClips)
+        {
+            var blendShapes = new List<(string path, EditorCurveBinding binding)>();
+            var keyframes = new HashSet<float>();
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                if (binding.type != typeof(SkinnedMeshRenderer)
+                    || !binding.propertyName.StartsWith("blendShape."))
+                    continue;
+                var path = $"{binding.path}/{binding.propertyName}";
+                if (unmergeableBlendShapes.Contains(path))
+                    continue;
+                blendShapes.Add((path, binding));
+                var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                keyframes.UnionWith(curve.keys.Select(x => x.time));
+            }
+            foreach (var key in keyframes)
+            {
+                var blendShapeValues = new List<(string blendshape, float value)>();
+                foreach (var blendShape in blendShapes)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, blendShape.binding);
+                    blendShapeValues.Add((blendShape.path, curve.Evaluate(key)));
+                }
+                blendShapeValues = blendShapeValues.OrderBy(x => x.blendshape).ToList();
+                NormalizeBlendShapeValues(blendShapeValues);
+                if (!ratios.Any(list => list.SequenceEqual(blendShapeValues)))
+                    ratios.Add(blendShapeValues);
+            }
+            foreach (var blendshape in blendShapes)
+            {
+                if (!mergeableBlendShapes.Any(x => x[0].blendshape == blendshape.path))
+                    mergeableBlendShapes.Add(new List<(string blendshape, float value)>() { (blendshape.path, 1) });
+            }
+        }
+        for (int i = 0; i < mergeableBlendShapes.Count - 1; i++)
+        {
+            for (int j = i + 1; j < mergeableBlendShapes.Count; j++)
+            {
+                var subList = mergeableBlendShapes[i];
+                var candidate = mergeableBlendShapes[j][0].blendshape;
+                float value = -1;
+                if (ratios.All(x => TryAddBlendShapeToSubList(subList, candidate, ref value, x)) && value != -1)
+                {
+                    subList.Add((candidate, value));
+                    NormalizeBlendShapeValues(subList);
+                    mergeableBlendShapes.RemoveAt(j);
+                    j--;
+                }
+            }
+        }
+        mergeableBlendShapes.RemoveAll(x => x.Count == 1);
+        return mergeableBlendShapes;
+    }
+
+    private static void NormalizeBlendShapeValues(List<(string blendshape, float value)> blendShapeValues)
+    {
+        var maxValue = blendShapeValues.Max(x => x.value);
+        if (maxValue == 0 || maxValue == 1)
+            return;
+        for (int i = 0; i < blendShapeValues.Count; i++)
+        {
+            blendShapeValues[i] = (blendShapeValues[i].blendshape, blendShapeValues[i].value / maxValue);
+        }
+    }
+
+    private static bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, List<(string blendshape, float value)> list)
+    {
+        int candidateIndex = list.FindIndex(x => x.blendshape == blendshape);
+        var intersection = list.Where(x => subList.Any(y => y.blendshape == x.blendshape)).ToList();
+        if (intersection.Count == 0 && candidateIndex == -1)
+            return true;
+        if (intersection.Count != subList.Count || candidateIndex == -1)
+            return false;
+        var intersectionMax = intersection.Max(x => x.value);
+        if (intersectionMax == 0)
+            return true;
+        if (list[candidateIndex].value == 0)
+            return false;
+        for (int i = 0; i < subList.Count; i++)
+        {
+            var match = intersection.First(x => x.blendshape == subList[i].blendshape);
+            if (Mathf.Abs(subList[i].value - match.value / intersectionMax) > 0.01f)
+                return false;
+        }
+        if (value < 0)
+            value = list[candidateIndex].value / intersectionMax;
+        else if (Mathf.Abs(value - list[candidateIndex].value / intersectionMax) > 0.01f)
+            return false;
+        return true;
+    }
+
     private static Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties()
     {
         var map = new Dictionary<string, HashSet<string>>();
@@ -3709,6 +3834,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
 
         EditorGUILayout.Separator();
+
+        var mergeableBlendShapes = FindMergeableBlendShapes();
+        foreach (var mergedBlob in mergeableBlendShapes)
+        {
+            EditorGUI.indentLevel++;
+            foreach (var shape in mergedBlob)
+            {
+                EditorGUILayout.LabelField(shape.blendshape, shape.value.ToString());
+            }
+            EditorGUI.indentLevel--;
+            EditorGUILayout.Separator();
+        }
 
         if (Foldout("Show Mesh & Material Merge Preview", ref settings.ShowMeshAndMaterialMergePreview))
         {
