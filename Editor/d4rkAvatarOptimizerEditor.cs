@@ -3849,6 +3849,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         packageRootPath = path.Substring(0, path.LastIndexOf('/'));
         packageRootPath = packageRootPath.Substring(0, packageRootPath.LastIndexOf('/'));
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField($"<size=20>d4rkpl4y3r's Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+        EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
+        EditorGUILayout.Space();
 
         Toggle("Write Properties as Static Values", ref settings.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref settings.MergeSkinnedMeshes);
