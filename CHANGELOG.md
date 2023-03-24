@@ -4,6 +4,8 @@
 * Optimizer is now a VPM & UPM compatible package.
 * A crash in the optimize function will now show an error message that when clicked opens a link to the github issue tracker.
 * Add option to merge blendshapes that get animated in a fixed ratio to each other.
+* Remove blendshapes that only have animations animating them to 0 if the initial weight on the mesh is also 0.
+* Show change in total blendshape count under the perf rank change section.
 
 ### Changes
 * Texture Compression Analyzer now only shows SSIM by default to reduce clutter.

@@ -982,16 +982,31 @@ public class d4rkAvatarOptimizerEditor : Editor
             var fxLayer = GetFXLayer();
             if (fxLayer != null)
             {
-                foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+                foreach (var clip in fxLayer.animationClips)
                 {
-                    if (binding.type != typeof(SkinnedMeshRenderer)
-                        || !binding.propertyName.StartsWith("blendShape."))
-                        continue;
-                    usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-                    var t = GetTransformFromPath(binding.path);
-                    if (t != null)
+                    foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                     {
-                        hasUsedBlendShapes.Add(t.GetComponent<SkinnedMeshRenderer>());
+                        if (binding.type != typeof(SkinnedMeshRenderer)
+                            || !binding.propertyName.StartsWith("blendShape."))
+                            continue;
+                        var t = GetTransformFromPath(binding.path);
+                        if (t == null)
+                            continue;
+                        var smr = t.GetComponent<SkinnedMeshRenderer>();
+                        if (smr == null)
+                            continue;
+                        var mesh = smr.sharedMesh;
+                        if (mesh == null)
+                            continue;
+                        var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
+                        var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
+                        if (blendShapeID < 0)
+                            continue;
+                        var keyframes = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                        if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
+                            continue;
+                        usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
+                        hasUsedBlendShapes.Add(smr);
                     }
                 }
             }
