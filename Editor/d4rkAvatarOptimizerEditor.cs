@@ -1040,7 +1040,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
-                if (mesh.GetBlendShapeFrameCount(i) == 1)
+                if (mesh.GetBlendShapeFrameCount(i) == 1 && skinnedMeshRenderer.GetBlendShapeWeight(i) == 0)
                 {
                     validPaths.Add(path + mesh.GetBlendShapeName(i));
                 }
@@ -2650,48 +2650,99 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
 
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
-            int vertexOffset = 0;
             var usedBlendShapeNames = new HashSet<string>();
             var blendShapeMeshIDtoNewName = new Dictionary<(int meshID, int blendShapeID), string>();
-            meshID = 0;
-            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            var combinableMeshPaths = new HashSet<string>(combinableSkinnedMeshes.Select(s => GetPathToRoot(s)));
+            var meshPathToID = combinableSkinnedMeshes.Select((s, i) => (GetPathToRoot(s), i)).ToDictionary(s => s.Item1, s => s.Item2);
+            var usedBlendShapesInCombinedMesh = new HashSet<string>(
+                usedBlendShapes.Where(s => combinableMeshPaths.Contains(s.Substring(0, s.IndexOf("/blendShape.")))));
+            var allMergedBlendShapes = new List<List<(string blendshape, float weight)>>();
+            if (settings.MergeSameRatioBlendShapes)
             {
-                var mesh = skinnedMesh.sharedMesh;
-                string path = GetPathToRoot(skinnedMesh) + "/blendShape.";
-                for (int i = 0; i < mesh.blendShapeCount; i++)
+                allMergedBlendShapes.AddRange(FindMergeableBlendShapes(combinableSkinnedMeshes));
+                var usedBlendShapesInMergedBlobs = new HashSet<string>(allMergedBlendShapes.SelectMany(s => s).Select(s => s.blendshape));
+                allMergedBlendShapes.AddRange(usedBlendShapesInCombinedMesh.Where(s => !usedBlendShapesInMergedBlobs.Contains(s)).Select(s => new List<(string blendshape, float weight)> { (s, 1) }));
+            }
+            else
+            {
+                allMergedBlendShapes.AddRange(usedBlendShapesInCombinedMesh.Select(s => new List<(string blendshape, float weight)> { (s, 1) }));
+            }
+            var vertexOffset = new List<int>() {0};
+            for (int i = 0; i < combinableSkinnedMeshes.Count - 1; i++)
+            {
+                vertexOffset.Add(vertexOffset[i] + combinableSkinnedMeshes[i].sharedMesh.vertexCount);
+            }
+            foreach (var mergedBlendShapes in allMergedBlendShapes)
+            {
+                if (mergedBlendShapes.Count == 1)
                 {
-                    var oldName = mesh.GetBlendShapeName(i);
-                    if (!usedBlendShapes.Contains(path + oldName))
-                        continue;
+                    var path = mergedBlendShapes[0].blendshape.Substring(0, mergedBlendShapes[0].blendshape.IndexOf("/blendShape."));
+                    var skinnedMesh = GetTransformFromPath(path).GetComponent<SkinnedMeshRenderer>();
+                    var mesh = skinnedMesh.sharedMesh;
+                    var oldName = mergedBlendShapes[0].blendshape.Substring(path.Length + 12);
                     var name = GenerateUniqueName(oldName, usedBlendShapeNames);
-                    blendShapeMeshIDtoNewName[(meshID, i)] = name;
-                    blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(i);
+                    meshID = meshPathToID[path];
+                    var blendShapeID = mesh.GetBlendShapeIndex(oldName);
+                    blendShapeMeshIDtoNewName[(meshID, blendShapeID)] = name;
+                    blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(blendShapeID);
                     AddAnimationPathChange(
-                        (GetPathToRoot(skinnedMesh), "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
+                        (path, "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
                         (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
-                    for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
+                    for (int j = 0; j < mesh.GetBlendShapeFrameCount(blendShapeID); j++)
                     {
                         var sourceDeltaVertices = new Vector3[mesh.vertexCount];
                         var sourceDeltaNormals = new Vector3[mesh.vertexCount];
                         var sourceDeltaTangents = new Vector3[mesh.vertexCount];
-                        mesh.GetBlendShapeFrameVertices(i, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
+                        mesh.GetBlendShapeFrameVertices(blendShapeID, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
                         var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
                         var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
                         var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
                         for (int k = 0; k < mesh.vertexCount; k++)
                         {
-                            int vertIndex = k + vertexOffset;
+                            int vertIndex = k + vertexOffset[meshID];
                             var toWorld = sourceToWorld[vertIndex];
                             targetDeltaVertices[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaVertices[k]));
                             targetDeltaNormals[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaNormals[k]));
                             targetDeltaTangents[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaTangents[k]));
                         }
-                        var weight = mesh.GetBlendShapeFrameWeight(i, j);
+                        var weight = mesh.GetBlendShapeFrameWeight(blendShapeID, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
                     }
                 }
-                vertexOffset += mesh.vertexCount;
-                meshID++;
+                else
+                {
+                    var oldPath = mergedBlendShapes[0].blendshape.Substring(0, mergedBlendShapes[0].blendshape.IndexOf("/blendShape."));
+                    var oldName = mergedBlendShapes[0].blendshape.Substring(mergedBlendShapes[0].blendshape.IndexOf("/blendShape.") + 12);
+                    var name = GenerateUniqueName(oldName, usedBlendShapeNames);
+                    AddAnimationPathChange(
+                        (oldPath, "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
+                        (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
+                    var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
+                    var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
+                    var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
+                    foreach (var toMerge in mergedBlendShapes)
+                    {
+                        var path = toMerge.blendshape.Substring(0, toMerge.blendshape.IndexOf("/blendShape."));
+                        var skinnedMesh = GetTransformFromPath(path).GetComponent<SkinnedMeshRenderer>();
+                        var mesh = skinnedMesh.sharedMesh;
+                        var blendShapeID = mesh.GetBlendShapeIndex(toMerge.blendshape.Substring(path.Length + 12));
+                        meshID = meshPathToID[path];
+                        blendShapeMeshIDtoNewName[(meshID, blendShapeID)] = name;
+                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
+                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
+                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        mesh.GetBlendShapeFrameVertices(blendShapeID, 0, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
+                        for (int k = 0; k < mesh.vertexCount; k++)
+                        {
+                            int vertIndex = k + vertexOffset[meshID];
+                            var toWorld = sourceToWorld[vertIndex];
+                            targetDeltaVertices[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaVertices[k]) * toMerge.weight);
+                            targetDeltaNormals[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaNormals[k]) * toMerge.weight);
+                            targetDeltaTangents[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaTangents[k]) * toMerge.weight);
+                        }
+                    }
+                    combinedMesh.AddBlendShapeFrame(name, 100, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
+                }
             }
             Profiler.EndSection();
             

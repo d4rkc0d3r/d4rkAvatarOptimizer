@@ -3,6 +3,7 @@
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.
 * Optimizer is now a VPM & UPM compatible package.
 * A crash in the optimize function will now show an error message that when clicked opens a link to the github issue tracker.
+* Add option to merge blendshapes that get animated in a fixed ratio to each other.
 
 ### Changes
 * Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
