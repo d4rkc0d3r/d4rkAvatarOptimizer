@@ -578,7 +578,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (avDescriptor == null)
             return;
 
-        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(packageRootPath + "Editor/Assets/DummyAnimationToFillEmptyStates.anim");
+        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(packageRootPath + "/Editor/Assets/DummyAnimationToFillEmptyStates.anim");
         
         var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
         var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
