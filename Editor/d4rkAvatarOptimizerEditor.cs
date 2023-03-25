@@ -1046,6 +1046,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return mergeableBlendShapes;
         var exclusions = GetAllExcludedTransforms();
         var validPaths = new HashSet<string>();
+        var ratios = new List<Dictionary<string, float>>() { new Dictionary<string, float>() };
         foreach (var renderer in mergedMeshBlob)
         {
             var skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
@@ -1055,9 +1056,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
-                if (mesh.GetBlendShapeFrameCount(i) == 1 && skinnedMeshRenderer.GetBlendShapeWeight(i) == 0)
+                if (mesh.GetBlendShapeFrameCount(i) == 1)
                 {
                     validPaths.Add(path + mesh.GetBlendShapeName(i));
+                    ratios[0][path + mesh.GetBlendShapeName(i)] = skinnedMeshRenderer.GetBlendShapeWeight(i);
                 }
             }
         }
@@ -1087,7 +1089,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
         }
-        var ratios = new List<Dictionary<string, float>>();
         foreach (var clip in fxLayer.animationClips)
         {
             var blendShapes = new List<(string path, EditorCurveBinding binding)>();
