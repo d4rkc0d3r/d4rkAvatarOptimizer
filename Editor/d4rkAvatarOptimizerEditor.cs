@@ -3619,10 +3619,10 @@ public class d4rkAvatarOptimizerEditor : Editor
     private bool Foldout(string label, ref bool value)
     {
         bool output = EditorGUILayout.Foldout(value, label);
+        if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            output = !value;
         if (value != output)
-        {
             ClearUICaches();
-        }
         return value = output;
     }
 
@@ -4110,7 +4110,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(list);
                 Profiler.EndSection();
             }
-            if (Penetrators.Count > 0 & Foldout("Penetrators", ref settings.DebugShowPenetrators))
+            if (Penetrators.Count > 0 && Foldout("Penetrators", ref settings.DebugShowPenetrators))
             {
                 Profiler.StartSection("Penetrators");
                 DrawDebugList(Penetrators.ToArray());
