@@ -23,7 +23,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool ShowExcludedTransforms = false;
     public List<Transform> ExcludeTransforms = new List<Transform>();
     public bool ShowMeshAndMaterialMergePreview = true;
-    public bool ShowFXLayerMergeErrors = true;
+    public bool ShowFXLayerMergeResults = true;
+    public bool ShowFXLayerMergeErrors = false;
     public bool ShowDebugInfo = false;
     public bool DebugShowUnparsableMaterials = true;
     public bool DebugShowUnmergableMaterials = true;

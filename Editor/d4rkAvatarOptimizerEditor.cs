@@ -4034,9 +4034,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (settings.MergeSimpleTogglesAsBlendTree && GetFXLayer() != null)
         {
-            if (Foldout("Show FX Layer Merge Errors", ref settings.ShowFXLayerMergeErrors))
+            if (Foldout("Show FX Layer Merge Result", ref settings.ShowFXLayerMergeResults))
             {
                 Profiler.StartSection("Show FX Layer Merge Errors");
+                Toggle("Show Detailed Errors", ref settings.ShowFXLayerMergeErrors);
                 var errorMessages = FXLayerMergeErrors;
                 var fxLayer = GetFXLayer();
                 for (int i = 0; i < errorMessages.Count; i++)
@@ -4047,12 +4048,15 @@ public class d4rkAvatarOptimizerEditor : Editor
                     EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
                     EditorGUILayout.LabelField($"{i}{fxLayer.layers[i].name}");
                     EditorGUILayout.EndHorizontal();
-                    EditorGUI.indentLevel+=2;
-                    foreach (var error in errorMessages[i])
+                    if (settings.ShowFXLayerMergeErrors)
                     {
-                        EditorGUILayout.LabelField(error);
+                        EditorGUI.indentLevel+=2;
+                        foreach (var error in errorMessages[i])
+                        {
+                            EditorGUILayout.LabelField(error);
+                        }
+                        EditorGUI.indentLevel-=2;
                     }
-                    EditorGUI.indentLevel-=2;
                 }
                 Profiler.EndSection();
             }
