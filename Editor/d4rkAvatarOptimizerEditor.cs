@@ -1141,8 +1141,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
         mergeableBlendShapes.RemoveAll(x => x.Count == 1);
-        mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).ToList()).ToList();
-        return mergeableBlendShapes;
+        return mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).ToList()).ToList();
     }
 
     private static void NormalizeBlendShapeValues(List<(string blendshape, float value)> blendShapeValues)
