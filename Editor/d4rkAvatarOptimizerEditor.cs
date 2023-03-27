@@ -619,11 +619,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (controller == null)
                 continue;
             layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
-            optimizedControllers[i] = AnimatorOptimizer.Run(
-                controller,
-                layerCopyPaths[i],
-                i == 4 ? fxLayersToMerge : new List<int>(),
-                fxLayerMap);
+            optimizedControllers[i] = i == 4
+                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayersToMerge, fxLayerMap)
+                : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
         }
         AssetDatabase.SaveAssets();
 

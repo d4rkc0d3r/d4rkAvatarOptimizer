@@ -27,14 +27,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             this.target = target;
             this.source = source;
+            assetPath = AssetDatabase.GetAssetPath(target);
         }
 
-        public static AnimatorController Copy(AnimatorController source, string path)
+        public static AnimatorController Copy(AnimatorController source, string path, Dictionary<int, int> fxLayerMap)
         {
-            var target = new AnimatorController();
-            target.name = $"{source.name}(OptimizedCopy)";
-            AssetDatabase.CreateAsset(target, path);
-            return new AnimatorOptimizer(target, source).Run();
+            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(source), path);
+            var target = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            target.name = $"{source.name}(Optimized)";
+            var optimizer = new AnimatorOptimizer(target, source);
+            optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
+            optimizer.FixAllLayerControlBehaviours();
+            return target;
         }
 
         public static AnimatorController Run(AnimatorController source, string path, List<int> layersToMerge, Dictionary<int, int> fxLayerMap)
@@ -50,8 +54,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private AnimatorController Run()
         {
-            assetPath = AssetDatabase.GetAssetPath(target);
-
             for (int i = 0; i < source.layers.Length; i++)
             {
                 if (layersToMerge.Contains(i))
@@ -107,6 +109,50 @@ namespace d4rkpl4y3r.AvatarOptimizer
             EditorUtility.SetDirty(target);
 
             return target;
+        }
+
+        private void FixAllLayerControlBehaviours()
+        {
+            for (int i = 0; i < target.layers.Length; i++)
+            {
+                FixLayerControlBehavioursInStateMachine(target.layers[i].stateMachine);
+            }
+            EditorUtility.SetDirty(target);
+        }
+
+        private void FixLayerControlBehavioursInStateMachine(AnimatorStateMachine stateMachine)
+        {
+            var behaviours = stateMachine.behaviours;
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                FixLayerControlBehaviour(behaviours[i]);
+            }
+            var stateMachines = stateMachine.stateMachines;
+            for (int i = 0; i < stateMachines.Length; i++)
+            {
+                FixLayerControlBehavioursInStateMachine(stateMachines[i].stateMachine);
+            }
+            var states = stateMachine.states;
+            for (int i = 0; i < states.Length; i++)
+            {
+                behaviours = states[i].state.behaviours;
+                for (int j = 0; j < behaviours.Length; j++)
+                {
+                    FixLayerControlBehaviour(behaviours[j]);
+                }
+            }
+        }
+
+        private void FixLayerControlBehaviour(StateMachineBehaviour behaviour)
+        {
+            if (behaviour is VRC_AnimatorLayerControl layerControl)
+            {
+                if (layerControl.playable == BlendableLayer.FX && fxLayerMap.TryGetValue(layerControl.layer, out int newLayer))
+                {
+                    layerControl.layer = newLayer;
+                    EditorUtility.SetDirty(layerControl);
+                }
+            }
         }
 
         private AnimationClip CloneAndFlipCurves(AnimationClip clip)
