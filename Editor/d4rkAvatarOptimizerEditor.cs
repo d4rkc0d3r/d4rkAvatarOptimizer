@@ -3931,7 +3931,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         GUI.enabled = Validate();
         Profiler.EndSection();
 
-        if (GUILayout.Button("Create Optimized Copy"))
+        if (GUILayout.Button("<size=18>Create Optimized Copy</size>", new GUIStyle(GUI.skin.button) { richText = true }))
         {
             Profiler.enabled = settings.ProfileTimeUsed;
             Profiler.Reset();
