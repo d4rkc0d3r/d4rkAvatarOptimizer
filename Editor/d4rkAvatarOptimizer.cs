@@ -15,7 +15,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeBackFaceCullingWithCullingOff = false;
     public bool MergeDifferentRenderQueue = false;
     public bool DeleteUnusedComponents = true;
-    public bool DeleteUnusedGameObjects = true;
+    public bool DeleteUnusedGameObjects = false;
     public bool MergeSimpleTogglesAsBlendTree = false;
     public bool MergeSameRatioBlendShapes = true;
     public bool UseRingFingerAsFootCollider = false;
