@@ -394,6 +394,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var renderers = root.GetComponentsInChildren<Renderer>(true);
         var matchedSkinnedMeshes = new List<List<Renderer>>();
         var exclusions = GetAllExcludedTransforms();
+        var penetrators = FindAllPenetrators();
         foreach (var renderer in renderers)
         {
             if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer) || renderer.sharedMaterials.Length == 0)
@@ -402,7 +403,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             bool foundMatch = false;
             foreach (var subList in matchedSkinnedMeshes)
             {
-                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || Penetrators.Contains(renderer))
+                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || penetrators.Contains(renderer))
                     break;
                 if (exclusions.Contains(subList[0].transform))
                     continue;
@@ -3290,54 +3291,68 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void Optimize(GameObject toOptimize)
     {
-        root = toOptimize;
-        DisplayProgressBar("Parsing Shaders", 0.05f);
-        ShaderAnalyzer.ParseAndCacheAllShaders(root, true);
-        DisplayProgressBar("Clear TrashBin Folder", 0.15f);
-        ClearTrashBin();
-        optimizedMaterials.Clear();
-        optimizedMaterialImportPaths.Clear();
-        optimizedSlotSwapMaterials.Clear();
-        newAnimationPaths.Clear();
-        texArrayPropertiesToSet.Clear();
-        keepTransforms.Clear();
-        convertedMeshRendererPaths.Clear();
-        penetratorsCache = FindAllPenetrators();
-        DisplayProgressBar("Destroying unused components", 0.19f);
-        Profiler.StartSection("DestroyEditorOnlyGameObjects()");
-        DestroyEditorOnlyGameObjects();
-        Profiler.StartNextSection("DestroyUnusedComponents()");
-        DestroyUnusedComponents();
-        Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
-        ConvertStaticMeshesToSkinnedMeshes();
-        Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
-        CalculateUsedBlendShapePaths();
-        Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
-        DeleteAllUnusedSkinnedMeshRenderers();
-        Profiler.StartNextSection("CombineSkinnedMeshes()");
-        DisplayProgressBar("Combining meshes", 0.2f);
-        CombineSkinnedMeshes();
-        Profiler.StartNextSection("CreateTextureArrays()");
-        CreateTextureArrays();
-        Profiler.StartNextSection("CombineAndOptimizeMaterials()");
-        DisplayProgressBar("Optimizing materials", 0.3f);
-        CombineAndOptimizeMaterials();
-        Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
-        OptimizeMaterialSwapMaterials();
-        Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
-        OptimizeMaterialsOnNonSkinnedMeshes();
-        Profiler.StartNextSection("SaveOptimizedMaterials()");
-        DisplayProgressBar("Reload optimized materials", 0.60f);
-        SaveOptimizedMaterials();
-        Profiler.StartNextSection("DestroyUnusedGameObjects()");
-        DisplayProgressBar("Destroying unused GameObjects", 0.90f);
-        DestroyUnusedGameObjects();
-        Profiler.StartNextSection("FixAllAnimationPaths()");
-        DisplayProgressBar("Fixing animation paths", 0.95f);
-        FixAllAnimationPaths();
-        Profiler.EndSection();
-        DisplayProgressBar("Done", 1.0f);
-        MoveRingFingerColliderToFeet();
+        var oldCulture = Thread.CurrentThread.CurrentCulture;
+        var oldUICulture = Thread.CurrentThread.CurrentUICulture;
+        try
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            root = toOptimize;
+            settings = root.GetComponent<d4rkAvatarOptimizer>();
+            DisplayProgressBar("Parsing Shaders", 0.05f);
+            ShaderAnalyzer.ParseAndCacheAllShaders(root, true);
+            DisplayProgressBar("Clear TrashBin Folder", 0.15f);
+            ClearTrashBin();
+            optimizedMaterials.Clear();
+            optimizedMaterialImportPaths.Clear();
+            optimizedSlotSwapMaterials.Clear();
+            newAnimationPaths.Clear();
+            texArrayPropertiesToSet.Clear();
+            keepTransforms.Clear();
+            convertedMeshRendererPaths.Clear();
+            DisplayProgressBar("Destroying unused components", 0.19f);
+            Profiler.StartSection("DestroyEditorOnlyGameObjects()");
+            DestroyEditorOnlyGameObjects();
+            Profiler.StartNextSection("DestroyUnusedComponents()");
+            DestroyUnusedComponents();
+            Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
+            ConvertStaticMeshesToSkinnedMeshes();
+            Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
+            CalculateUsedBlendShapePaths();
+            Profiler.StartNextSection("DeleteAllUnusedSkinnedMeshRenderers()");
+            DeleteAllUnusedSkinnedMeshRenderers();
+            Profiler.StartNextSection("CombineSkinnedMeshes()");
+            DisplayProgressBar("Combining meshes", 0.2f);
+            CombineSkinnedMeshes();
+            Profiler.StartNextSection("CreateTextureArrays()");
+            CreateTextureArrays();
+            Profiler.StartNextSection("CombineAndOptimizeMaterials()");
+            DisplayProgressBar("Optimizing materials", 0.3f);
+            CombineAndOptimizeMaterials();
+            Profiler.StartNextSection("OptimizeMaterialSwapMaterials()");
+            OptimizeMaterialSwapMaterials();
+            Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
+            OptimizeMaterialsOnNonSkinnedMeshes();
+            Profiler.StartNextSection("SaveOptimizedMaterials()");
+            DisplayProgressBar("Reload optimized materials", 0.60f);
+            SaveOptimizedMaterials();
+            Profiler.StartNextSection("DestroyUnusedGameObjects()");
+            DisplayProgressBar("Destroying unused GameObjects", 0.90f);
+            DestroyUnusedGameObjects();
+            Profiler.StartNextSection("FixAllAnimationPaths()");
+            DisplayProgressBar("Fixing animation paths", 0.95f);
+            FixAllAnimationPaths();
+            Profiler.EndSection();
+            DisplayProgressBar("Done", 1.0f);
+            MoveRingFingerColliderToFeet();
+            DestroyImmediate(settings);
+        }
+        finally
+        {
+            Thread.CurrentThread.CurrentCulture = oldCulture;
+            Thread.CurrentThread.CurrentUICulture = oldUICulture;
+            EditorUtility.ClearProgressBar();
+        }
     }
 
     private GameObject lastSelected = null;
@@ -3352,7 +3367,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private List<List<string>> fxLayerMergeErrorsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
 
-    private static HashSet<MeshRenderer> penetratorsCache = null;
+    private HashSet<MeshRenderer> penetratorsCache = null;
 
     private void ClearUICaches()
     {
@@ -3534,7 +3549,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private static HashSet<MeshRenderer> Penetrators
+    private HashSet<MeshRenderer> Penetrators
     {
         get
         {
@@ -3918,36 +3933,23 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (GUILayout.Button("Create Optimized Copy"))
         {
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
-            try
-            {
-                Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-                Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-                Profiler.enabled = settings.ProfileTimeUsed;
-                Profiler.Reset();
-                DisplayProgressBar("Copy Avatar", 0);
-                AssignNewAvatarIDIfEmpty();
-                var copy = Instantiate(settings.gameObject);
-                SceneManager.MoveGameObjectToScene(copy, settings.gameObject.scene);
-                copy.name = settings.gameObject.name + "(BrokenCopy)";
-                DestroyImmediate(copy.GetComponent<d4rkAvatarOptimizer>());
-                if (copy.GetComponent<VRCAvatarDescriptor>() != null)
-                    RemoveIllegalComponents(copy);
-                Optimize(copy);
-                copy.name = settings.gameObject.name + "(OptimizedCopy)";
-                copy.SetActive(true);
-                settings.gameObject.SetActive(false);
-                Selection.objects = new Object[] { copy };
-                Profiler.PrintTimeUsed();
-                Profiler.Reset();
-            }
-            finally
-            {
-                Thread.CurrentThread.CurrentCulture = oldCulture;
-                Thread.CurrentThread.CurrentUICulture = oldUICulture;
-                EditorUtility.ClearProgressBar();
-            }
+            Profiler.enabled = settings.ProfileTimeUsed;
+            Profiler.Reset();
+            DisplayProgressBar("Copy Avatar", 0);
+            AssignNewAvatarIDIfEmpty();
+            var copy = Instantiate(settings.gameObject);
+            SceneManager.MoveGameObjectToScene(copy, settings.gameObject.scene);
+            copy.name = settings.gameObject.name + "(BrokenCopy)";
+            Optimize(copy);
+            if (copy.GetComponent<VRCAvatarDescriptor>() != null)
+                RemoveIllegalComponents(copy);
+            settings = (d4rkAvatarOptimizer)target;
+            copy.name = settings.gameObject.name + "(OptimizedCopy)";
+            copy.SetActive(true);
+            settings.gameObject.SetActive(false);
+            Selection.objects = new Object[] { copy };
+            Profiler.PrintTimeUsed();
+            Profiler.Reset();
             return;
         }
 
