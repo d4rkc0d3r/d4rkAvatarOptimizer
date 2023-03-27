@@ -3169,6 +3169,29 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var exclusions = GetAllExcludedTransforms();
 
+        var animatorsExcludingRoot = root.GetComponentsInChildren<Animator>(true)
+            .Where(a => a.gameObject != root.gameObject)
+            .Where(a => !exclusions.Contains(a.transform))
+            .Where(a => a.runtimeAnimatorController != null)
+            .ToArray();
+
+        if (animatorsExcludingRoot.Length > 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Some animators exist that are not on the root object.\n" +
+                "The optimizer only supports animators in the custom playable layers in the avatar descriptor.\n" +
+                "If the optimized copy is broken, try to add the animators to the exclusion list.", MessageType.Warning);
+            if (GUILayout.Button("Auto add extra animators to exclusion list"))
+            {
+                foreach (var animator in animatorsExcludingRoot)
+                {
+                    settings.ExcludeTransforms.Add(animator.transform);
+                }
+                settings.ShowExcludedTransforms = true;
+                ClearUICaches();
+            }
+        }
+
         var allMaterials = root.GetComponentsInChildren<Renderer>(true)
             .Where(r => !exclusions.Contains(r.transform))
             .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
@@ -3180,28 +3203,28 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (correctlyParsedMaterials.Length != allMaterials.Length)
         {
             EditorGUILayout.HelpBox(
-                "One or more materials could not be parsed.\n" +
+                "Some materials could not be parsed.\n" +
                 "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if (settings.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
         {
             EditorGUILayout.HelpBox(
-                "One or more materials do not support merging.\n" +
+                "Some materials do not support merging.\n" +
                 "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if (settings.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
         {
             EditorGUILayout.HelpBox(
-                "One or more materials do not support merging textures.\n" +
+                "Some materials do not support merging textures.\n" +
                 "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
         if ((settings.MergeDifferentPropertyMaterials || settings.MergeSkinnedMeshes) && allMaterials.Any(m => IsLockedIn(m)))
         {
             EditorGUILayout.HelpBox(
-                "One or more materials are locked in.\n" +
+                "Some materials are locked in.\n" +
                 "It is recommended to unlock them so they can be merged.\n" +
                 "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
@@ -3209,7 +3232,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures && CrunchedTextures.Length > 0)
         {
             EditorGUILayout.HelpBox(
-                "One or more textures are crunch compressed.\n" +
+                "Some textures are crunch compressed.\n" +
                 "Crunch compressed textures cannot be merged.\n" +
                 "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
@@ -3217,7 +3240,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (NonBC5NormalMaps.Length > 0)
         {
             EditorGUILayout.HelpBox(
-                "One or more normal maps are not BC5 compressed.\n" +
+                "Some normal maps are not BC5 compressed.\n" +
                 "BC5 compressed normal maps are highest quality for the same VRAM size as the other compression options.\n" +
                 "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.", MessageType.Info);
             if (GUILayout.Button($"Convert all ({NonBC5NormalMaps.Length}) normal maps to BC5"))
@@ -3245,7 +3268,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (hasExtraMaterialSlots)
         {
             EditorGUILayout.HelpBox(
-                "One or more renderers have more material slots than sub meshes.\n" + 
+                "Some renderers have more material slots than sub meshes.\n" + 
                 "Those extra materials & polys are not counted by VRChats performance system. " + 
                 "After optimizing those extra slots and polys will get baked as real ones.\n" + 
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);

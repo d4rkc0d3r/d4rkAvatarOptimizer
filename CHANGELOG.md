@@ -6,6 +6,7 @@
 * Add option to merge blendshapes that get animated in a fixed ratio to each other.
 * Remove blendshapes that only have animations animating them to 0 if the initial weight on the mesh is also 0.
 * Show change in total blendshape count under the perf rank change section.
+* Add warning if the avatar has extra animators. The optimizer only supports the custom playable layers.
 
 ### Changes
 * Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
