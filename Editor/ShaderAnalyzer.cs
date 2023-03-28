@@ -1921,7 +1921,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                     }
-                    else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature"))
+                    else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
                     {
                         pragmaOutput.Add(line);
                     }
