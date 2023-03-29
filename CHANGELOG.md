@@ -15,6 +15,7 @@
 * Foldouts can now be toggled by clicking on the label text too.
 * Delete unused GameObjects is now disabled by default.
 * Remove `#pragma skip_optimizations` from the generated shaders.
+* Progress bar updates continuously while shaders get parsed.
 
 ### Bug Fixes
 * Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.

@@ -67,7 +67,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             DisplayProgressBar("Parsing Shaders", 0.01f);
-            ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true);
+            ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.01f + 0.14f * done / total));
             DisplayProgressBar("Clear TrashBin Folder", 0.15f);
             ClearTrashBin();
             optimizedMaterials.Clear();
