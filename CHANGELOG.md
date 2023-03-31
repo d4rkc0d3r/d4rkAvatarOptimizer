@@ -7,13 +7,14 @@
 * Remove blendshapes that only have animations animating them to 0 if the initial weight on the mesh is also 0.
 * Show change in total blendshape count under the perf rank change section.
 * Add warning if the avatar has extra animators. The optimizer only supports the custom playable layers.
+* Add warning if the avatar has layer masks in the animators and the delete unused gameobjects option is enabled.
 
 ### Changes
 * Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
 * Detect DPS penetrators and stop them from getting merged into other meshes.
 * Merge static meshes as skinned meshes now only merges if it results in a decrease in material count.
 * Foldouts can now be toggled by clicking on the label text too.
-* Delete unused GameObjects is now disabled by default.
+* Delete unused GameObjects is now disabled by default if the avatar has any layer masks in the animators.
 * Remove `#pragma skip_optimizations` from the generated shaders.
 * Progress bar updates continuously while shaders get parsed.
 * Remove `Merge Regardless of Blend Shapes` option since in Unity 2021 and forward there is no penalty for merging meshes with blendshapes.

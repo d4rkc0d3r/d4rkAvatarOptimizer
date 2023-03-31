@@ -261,6 +261,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
+        if (optimizer.DeleteUnusedGameObjects && optimizer.UsesAnyLayerMasks())
+        {
+            EditorGUILayout.HelpBox(
+                "Animator layer masks are not supported when deleting unused game objects.\n" +
+                "If the optimized copy is broken, try to disable the option.", MessageType.Warning);
+        }
+
         var allMaterials = optimizer.GetComponentsInChildren<Renderer>(true)
             .Where(r => !exclusions.Contains(r.transform))
             .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
@@ -357,7 +364,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         pm.AssignId();
     }
 
-    private GameObject lastSelected = null;
+    private d4rkAvatarOptimizer lastSelected = null;
     private List<List<List<MaterialSlot>>> mergedMaterialPreviewCache = null;
     private Transform[] unmovingBonesCache = null;
     private Component[] unusedComponentsCache = null;
@@ -388,11 +395,16 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private void OnSelectionChange()
     {
-        if (lastSelected == optimizer.gameObject)
+        if (lastSelected == optimizer)
             return;
-        lastSelected = optimizer.gameObject;
-        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected, false);
+        lastSelected = optimizer;
+        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected.gameObject, false);
         ClearUICaches();
+        if (optimizer.DoAutoSettings)
+        {
+            optimizer.DoAutoSettings = false;
+            optimizer.DeleteUnusedGameObjects = !optimizer.UsesAnyLayerMasks();
+        }
     }
 
     private List<List<List<MaterialSlot>>> MergedMaterialPreview
@@ -910,7 +922,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
         Toggle("Merge Simple Toggles as BlendTree", ref optimizer.MergeSimpleTogglesAsBlendTree);
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
-        Toggle("Delete Unused Game Objects", ref optimizer.DeleteUnusedGameObjects);
+        Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);
         Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
 

@@ -23,6 +23,7 @@ using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 [HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
 public class d4rkAvatarOptimizer : MonoBehaviour
 {
+    public bool DoAutoSettings = true;
     public bool WritePropertiesAsStaticValues = true;
     public bool MergeSkinnedMeshes = true;
     public bool MergeStaticMeshesAsSkinned = true;
@@ -300,6 +301,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             source.type = typeof(MeshRenderer);
             newAnimationPaths[source] = target;
         }
+    }
+
+    public bool UsesAnyLayerMasks()
+    {
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return false;
+        var playableLayers = avDescriptor.baseAnimationLayers.Union(avDescriptor.specialAnimationLayers).ToArray();
+        foreach (var playableLayer in playableLayers)
+        {
+            var controller = playableLayer.animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            foreach (var layer in controller.layers)
+            {
+                if (layer.avatarMask != null)
+                    return true;
+            }
+        }
+        return false;
     }
 
     private HashSet<SkinnedMeshRenderer> FindAllUnusedSkinnedMeshRenderers()
