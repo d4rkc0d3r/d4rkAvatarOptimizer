@@ -897,7 +897,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
         EditorGUI.indentLevel++;
         Toggle("Merge Static Meshes as Skinned", ref optimizer.MergeStaticMeshesAsSkinned);
-        Toggle("Merge Regardless of Blend Shapes", ref optimizer.ForceMergeBlendShapeMissMatch);
         Toggle("Keep Material Animations Separate", ref optimizer.KeepMaterialPropertyAnimationsSeparate);
         EditorGUI.indentLevel--;
         GUI.enabled = true;

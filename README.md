@@ -43,8 +43,6 @@ Can't merge meshes that have any tessellation or surface shaders.
 ## Merge Static Meshes as Skinned
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
-## Merge Regardless of Blend Shapes
-With this setting active the optimizer will merge meshes that have blend shapes with meshes that don't. Only use this if you have a small model since skinning with blend shapes is much more expensive than without.
 ## Keep Material Animations Separate
 This makes sure that animated properties from one mesh don't animate the property on materials from a different mesh if their meshes got merged.
 Can break since it creates a lot of constant buffer variables.

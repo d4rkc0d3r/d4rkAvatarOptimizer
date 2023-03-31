@@ -26,7 +26,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool WritePropertiesAsStaticValues = true;
     public bool MergeSkinnedMeshes = true;
     public bool MergeStaticMeshesAsSkinned = true;
-    public bool ForceMergeBlendShapeMissMatch = false;
     public bool KeepMaterialPropertyAnimationsSeparate = true;
     public bool MergeDifferentPropertyMaterials = true;
     public bool MergeSameDimensionTextures = true;
@@ -279,8 +278,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (!IsCombinableRenderer(candidate))
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
-            return false;
-        if (!ForceMergeBlendShapeMissMatch && (hasUsedBlendShapes.Contains(list[0]) ^ hasUsedBlendShapes.Contains(candidate)))
             return false;
         var paths = list.Select(smr => GetPathToRoot(smr.transform.parent)).ToList();
         var t = candidate.transform;
