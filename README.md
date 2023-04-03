@@ -25,6 +25,8 @@ Once you have done that make a bug report on the [issue tracker](https://github.
 
 ![Export Material](./Documentation~/img/exportVPMasUnityPackage.png)  
 
+If the file is too large you have to manually find the `TrashBin` folder in your file system and only zip all `.mat`, `.shader` and `.cginc` files.
+
 ## UI Options Documentation
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
