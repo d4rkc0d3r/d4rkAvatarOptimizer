@@ -930,6 +930,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     usedBlendShapes.Add(path + blendShapeName);
                 }
             }
+            if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape
+                && avDescriptor.VisemeSkinnedMesh != null)
+            {
+                var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+                usedBlendShapes.Add(path + avDescriptor.MouthOpenBlendShapeName);
+            }
             if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh.sharedMesh != null)
@@ -1045,6 +1052,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 validPaths.Remove(path + blendShapeName);
             }
+        }
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape
+            && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            validPaths.Remove(path + avDescriptor.MouthOpenBlendShapeName);
         }
         if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
             && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null

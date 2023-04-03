@@ -24,6 +24,7 @@
 * Fix crash when a material swap gets merged into a blob of meshes and its mesh index is non-zero. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/28)
 * Fix always converting vertex colors to full float32 instead of using unorm8 if it was already unorm8.
 * Fix crash when eye look blendshape IDs were greater or equal than the actual number of blendshapes.
+* Fix jaw flap blendshape getting deleted.
 
 ## v1.10
 ### Features
