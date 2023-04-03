@@ -122,13 +122,22 @@ Shows all materials that can't be merged if their properties differ.
 ### Unmergable Texture Materials
 Shows all materials that can't be merged if their textures differ.
 ### Crunched Textures
-Shows all textures that got crunch compressed.
+Shows all textures that got crunch compressed. Crunch compressed textures can't be merged into Texture2DArrays and as such can prevent materials from being merged.
+### NonBC5 Normal Maps
+Shows all textures that are used as normal maps but don't use the BC5 compression format. BC5 normal maps have higher quality than DXT5 & BC7 normal maps while using the same amount of VRAM.
+### Locked in Materials
+Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
+The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.
+### Penetrators
+Shows all meshes that the optimizer detected as DPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
-Lists all game objects that are disabled and never get enabled by animations.
+Shows all game objects that are disabled and never get enabled by animations.
 ### Material Swaps
 Shows all materials that can be swapped into a material slot with an animation.
+### Animated Material Property Paths
+Shows all material properties with their game object path that are animated.
 ### Game Objects with Toggle Animation
 Shows all game objects that have a toggle animation in the fx layer.
 ### Unmoving Bones
