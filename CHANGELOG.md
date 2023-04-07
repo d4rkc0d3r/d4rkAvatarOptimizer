@@ -17,7 +17,6 @@
 * Delete unused GameObjects is now disabled by default if the avatar has any layer masks in the animators.
 * Remove `#pragma skip_optimizations` from the generated shaders.
 * Progress bar updates continuously while shaders get parsed.
-* Remove `Merge Regardless of Blend Shapes` option since in Unity 2021 and forward there is no penalty for merging meshes with blendshapes.
 
 ### Bug Fixes
 * Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.
