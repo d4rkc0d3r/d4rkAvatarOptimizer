@@ -12,6 +12,21 @@ The optimizer relies on creating custom variations of your shaders that support 
 For toggles that means all meshes that get merged will always be visible. If you use the option [Merge Same Dimension Textures](#merge-same-dimension-textures) and different textures in the `_MainTex` property get merged, those textures will show up as a white material like [here](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17) when shaders are blocked.  
 Since it relies on custom shaders, the optimizer also won't work for quest avatars.
 
+## Installation
+To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.github.io/vpm-repos/main.json` as a custom repository.
+1. Open VCC
+2. Click Settings in the bottom left
+3. Click the Packages tab at the top
+4. Click Add Repository in the top right
+5. Paste the url into the text field and click Add
+6. Click I understand, Add Repository in the popup after reading its contents
+7. Activate the checkbox next to the repository you just added
+
+After that you can add and update the optimizer like any other packages in your VCC projects.
+
+![Add Repository](./Documentation~/img/addRepoToVCC.png)
+
+
 ## Why my Shader Pink?
 
 Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. You could try other shaders, for example:
