@@ -1,0 +1,18 @@
+{
+  "name": "d4rkpl4y3r.d4rkavataroptimizer.Editor",
+  "references": [
+    "VRC.SDK3A",
+    "VRC.SDK3A.Editor",
+    "VRC.SDKBase",
+    "VRC.SDKBase.Editor",
+    "d4rkpl4y3r.d4rkavataroptimizer"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "defineConstraints": [],
+  "optionalUnityReferences": []
+}

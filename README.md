@@ -20,16 +20,17 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 
 You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
 Finally you can try to make a bug report and maybe I'll be able to fix it.  
-For that export the `d4rkAvatarOptimizer/TrashBin` folder as a unity package like so:  
-![Export Material](./ExampleImages/exportMaterial0.png)  
-Then in the next dialog uncheck the "Include dependencies" checkbox and click "Export":  
-![Export Material](./ExampleImages/exportMaterial1.png)  
-Once you have the `.unitypackage` file, please make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues).
+To do that you need to export the optimizer package folder that contains the optimized shaders. You can do that by right clicking on `d4rkAvatarOptimizer` in the project view under `Packages` and selecting `Export VPM as UnityPackage`.  
+Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.unitypackage` file.
+
+![Export Material](./Documentation~/img/exportVPMasUnityPackage.png)  
+
+If the file is too large you have to manually find the `TrashBin` folder in your file system and only zip all `.mat`, `.shader` and `.cginc` files.
 
 ## UI Options Documentation
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
-![Example Screenshot](./ExampleImages/example0.png)
+![Example Screenshot](./Documentation~/img/example0.png)
 ## Write Properties as Static Values
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
@@ -42,7 +43,7 @@ Skinned meshes that are on different layers (eg UIMenu) from each other will not
 Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
 Can't merge meshes that have any tessellation or surface shaders.  
 ## Merge Static Meshes as Skinned
-Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well.  
+Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
 ## Merge Regardless of Blend Shapes
 With this setting active the optimizer will merge meshes that have blend shapes with meshes that don't. Only use this if you have a small model since skinning with blend shapes is much more expensive than without.
@@ -73,6 +74,12 @@ Can't merge materials if:
 Merges materials even if their culling properties differ. Forces culling to off.
 ## Merge Different Render Queue
 Merges materials even if their render queue differs.
+## Merge Same Ratio Blend Shapes
+This option tries to merge blend shapes that always get animated in the same ratio.  
+For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.
+## Merge Simple Toggles as BlendTree
+Tries to find layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
+You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
 ## Delete Unused Components
 Deletes all components that are turned off and never get enabled by animations. It also deletes phys bone colliders that are not referenced by any used phys bone components.
 ## Delete Unused Game Objects
@@ -97,12 +104,17 @@ In addition to the selected optimizations there are some optimizations that are 
 * Add dummy animation to animator states that have no animation specified.
 * Remove illegal avatar components.
 * Remove everything with the EditorOnly tag.
-## Show Merge Preview
+## Show Mesh & Material Merge Preview
 Shows a preview of how meshes and materials would get merged.
+Here you can see an example of this which will be referenced in this section:
 
-First it shows the original and post merge counts and performance ranks for skinned meshes, meshes & material slots.
+![Mesh & Material Merge Preview](Documentation~/img/exampleMeshMaterialMergePreview.png)
 
-Then in the detailed view, resulting meshes are separated by spaces. Materials that get merged together are indented. In the example image you can see that Body/Eyes would get merged with Body/FaceSkin.
+In this detailed view the resulting meshes are separated by spaces. Materials that get merged together are indented. In the example you can see 3 resulting meshes. You can also see that `Body/FaceSkin` and `Body/Eyes` get merged into one material while `Body/FaceAlpha` is still its own material.
+## Show FX Layer Merge Result
+In this section you can see which layers in the FXLayer got recognized as a simple toggle layer and which ones didn't. The VRChat performance rank icons of Excellent are used for detected toggles while the Very Poor icon is used for layers that couldn't be merged.
+
+The option Show Detailed Errors will show you the reasons why the optimizer rejected a layer as a simple toggle.
 ## Show Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
 ### Unparsable Materials
@@ -112,13 +124,22 @@ Shows all materials that can't be merged if their properties differ.
 ### Unmergable Texture Materials
 Shows all materials that can't be merged if their textures differ.
 ### Crunched Textures
-Shows all textures that got crunch compressed.
+Shows all textures that got crunch compressed. Crunch compressed textures can't be merged into Texture2DArrays and as such can prevent materials from being merged.
+### NonBC5 Normal Maps
+Shows all textures that are used as normal maps but don't use the BC5 compression format. BC5 normal maps have higher quality than DXT5 & BC7 normal maps while using the same amount of VRAM.
+### Locked in Materials
+Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
+The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.
+### Penetrators
+Shows all meshes that the optimizer detected as DPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
-Lists all game objects that are disabled and never get enabled by animations.
+Shows all game objects that are disabled and never get enabled by animations.
 ### Material Swaps
 Shows all materials that can be swapped into a material slot with an animation.
+### Animated Material Property Paths
+Shows all material properties with their game object path that are animated.
 ### Game Objects with Toggle Animation
 Shows all game objects that have a toggle animation in the fx layer.
 ### Unmoving Bones

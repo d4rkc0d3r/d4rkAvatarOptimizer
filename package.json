@@ -1,0 +1,18 @@
+{
+  "name": "d4rkpl4y3r.d4rkavataroptimizer",
+  "displayName": "d4rkAvatarOptimizer",
+  "version": "2.0.0",
+  "unity": "2019.4",
+  "description": "An optimizer aiming to reduce mesh & material count and more of VRChat 3.0 avatars.",
+  "dependencies": {},
+  "url": "",
+  "gitDependencies": {},
+  "vpmDependencies": {
+    "com.vrchat.avatars": "3.1.11"
+  },
+  "legacyFolders": {
+    "Assets\\d4rkAvatarOptimizer": ""
+  },
+  "legacyFiles": {},
+  "hideInEditor": false
+}

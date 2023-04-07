@@ -4,10 +4,6 @@
 [Bb]uild/
 [Bb]uilds/
 Assets/AssetStoreTools*
-TrashBin/*
-TrashBin.meta
-TextureAnalyzer/*
-TextureAnalyzer.meta
 
 # Visual Studio cache directory
 .vs/
@@ -39,5 +35,9 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
-README.md.meta
-LICENSE.meta
+
+# d4rkAvatarOptimizer specific stuff
+TrashBin/*
+TrashBin.meta
+TextureAnalyzer/*
+TextureAnalyzer.meta

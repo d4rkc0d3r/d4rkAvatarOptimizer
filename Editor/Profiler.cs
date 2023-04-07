@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 
-namespace d4rkpl4y3r.Util
+namespace d4rkpl4y3r.AvatarOptimizer.Util
 {
     static class Profiler
     {

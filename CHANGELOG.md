@@ -1,6 +1,29 @@
-## Next Version
+## v2.0.0
 ### Features
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.
+* Optimizer is now a VPM & UPM compatible package.
+* A crash in the optimize function will now show an error message that when clicked opens a link to the github issue tracker.
+* Add option to merge blendshapes that get animated in a fixed ratio to each other.
+* Remove blendshapes that only have animations animating them to 0 if the initial weight on the mesh is also 0.
+* Show change in total blendshape count under the perf rank change section.
+* Add warning if the avatar has extra animators. The optimizer only supports the custom playable layers.
+* Add warning if the avatar has layer masks in the animators and the delete unused gameobjects option is enabled.
+
+### Changes
+* Texture Compression Analyzer now only shows SSIM by default to reduce clutter.
+* Detect DPS penetrators and stop them from getting merged into other meshes.
+* Merge static meshes as skinned meshes now only merges if it results in a decrease in material count.
+* Foldouts can now be toggled by clicking on the label text too.
+* Delete unused GameObjects is now disabled by default if the avatar has any layer masks in the animators.
+* Remove `#pragma skip_optimizations` from the generated shaders.
+* Progress bar updates continuously while shaders get parsed.
+
+### Bug Fixes
+* Fix ring finger to foot collider having half the size from VRChat update 2023.1.2.
+* Fix crash when a material swap gets merged into a blob of meshes and its mesh index is non-zero. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/28)
+* Fix always converting vertex colors to full float32 instead of using unorm8 if it was already unorm8.
+* Fix crash when eye look blendshape IDs were greater or equal than the actual number of blendshapes.
+* Fix jaw flap blendshape getting deleted.
 
 ## v1.10
 ### Features
