@@ -1,3 +1,7 @@
+## Next Version
+### Bug Fixes
+* Apparently `sampler` is also a way to declare a `SamplerState`. So now the optimizer also replaces those.
+
 ## v2.0.0
 ### Features
 * Add option to merge simple toggles in the fx layer into one big direct blend tree.

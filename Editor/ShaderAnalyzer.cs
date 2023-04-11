@@ -1883,7 +1883,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var type = match.type;
                     foreach (var name in match.names)
                     {
-                        if (type == "SamplerState" && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                        bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWith("sampler");
+                        if (isTextureSamplerState && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
                         {
                             if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
                             {
@@ -1901,7 +1902,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         else if (!arrayPropertyValues.ContainsKey(name)
                             && !animatedPropertyValues.ContainsKey(name)
                             && !texturesToReplaceCalls.Contains(name)
-                            && !(type == "SamplerState" && name.StartsWith("sampler") && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
+                            && !(isTextureSamplerState && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
                         {
                             output.Add(type + " " + name + ";");
                         }
