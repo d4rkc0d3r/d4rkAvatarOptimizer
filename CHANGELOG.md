@@ -1,6 +1,7 @@
 ## Next Version
 ### Bug Fixes
 * Apparently `sampler` is also a way to declare a `SamplerState`. So now the optimizer also replaces those.
+* Parse and ignore const keyword in shader function parameters.
 
 ## v2.0.0
 ### Features

@@ -1081,7 +1081,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+)?)");
+                var match = Regex.Match(line, @"^((in|out|inout)\s+)?(?:const\s)?\s*(\w+\s+\w+(\s*:\s*\w+)?)");
                 if (match.Success)
                 {
                     if (isInput ^ match.Groups[2].Value != "out")
@@ -1108,7 +1108,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                var match = Regex.Match(line, @"^((in|out|inout)\s+)?(?:const\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (match.Success)
                 {
                     var type = match.Groups[3].Value;
@@ -1142,7 +1142,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+\s+\w+(\s*:\s*\w+))?");
+                var match = Regex.Match(line, @"^((in|out|inout)\s+)?(?:const\s)?\s*(\w+\s+\w+(\s*:\s*\w+))?");
                 if (match.Success)
                 {
                     if (match.Groups[2].Value == "out")
@@ -1164,7 +1164,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                     continue;
                 }
-                var match = Regex.Match(line, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
+                var match = Regex.Match(line, @"^((in|out|inout)\s+)?(?:const\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (match.Success)
                 {
                     if (match.Groups[2].Value == "out")
