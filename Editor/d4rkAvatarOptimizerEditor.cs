@@ -926,6 +926,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         GUI.enabled = true;
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
         Toggle("Merge Simple Toggles as BlendTree", ref optimizer.MergeSimpleTogglesAsBlendTree);
+        Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
         Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);

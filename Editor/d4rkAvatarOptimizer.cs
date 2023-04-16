@@ -33,6 +33,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSameDimensionTextures = true;
     public bool MergeBackFaceCullingWithCullingOff = false;
     public bool MergeDifferentRenderQueue = false;
+    public bool KeepMMDBlendShapes = false;
     public bool DeleteUnusedComponents = true;
     public bool DeleteUnusedGameObjects = false;
     public bool MergeSimpleTogglesAsBlendTree = true;
@@ -145,6 +146,66 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private static Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
+    // blendshape names come from https://www.deviantart.com/xoriu/art/MMD-Facial-Expressions-Chart-341504917
+    private static HashSet<string> MMDBlendShapes = new HashSet<string>()
+    {
+        "まばたき", "Blink",
+        "笑い", "Smile",
+        "ウィンク", "Wink",
+        "ウィンク右", "Wink-a",
+        "ウィンク２", "Wink-b",
+        "ｳｨﾝｸ２右", "Wink-c",
+        "なごみ", "Howawa",
+        "はぅ", "> <",
+        "びっくり", "Ha!!!",
+        "じと目", "Jito-eye",
+        "ｷﾘｯ", "Kiri-eye",
+        "はちゅ目", "O O",
+        "星目", "EyeStar",
+        "はぁと", "EyeHeart",
+        "瞳小", "EyeSmall",
+        "瞳縦潰れ", "EyeSmall-v",
+        "光下", "EyeUnderli",
+        "恐ろしい子！", "EyeFunky",
+        "ハイライト消", "EyeHi-off",
+        "映り込み消", "EyeRef-off",
+        "喜び", "Joy",
+        "わぉ?!", "Wao?!",
+        "なごみω", "Howawa ω",
+        "悲しむ", "Wail",
+        "敵意", "Hostility",
+        "あ", "a",
+        "い", "i",
+        "う", "u",
+        "え", "e",
+        "お", "o",
+        "あ２", "a 2",
+        "ん", "n",
+        "▲", "Mouse_1",
+        "∧", "Mouse_2",
+        "□", "□",
+        "ワ", "Wa",
+        "ω", "Omega",
+        "ω□", "ω□",
+        "にやり", "Niyari",
+        "にやり２", "Niyari2",
+        "にっこり", "Smile",
+        "ぺろっ", "Pero",
+        "てへぺろ", "Bero-tehe",
+        "てへぺろ２", "Bero-tehe2",
+        "口角上げ", "MouseUP",
+        "口角下げ", "MouseDW",
+        "口横広げ", "MouseWD",
+        "歯無し上", "ToothAnon",
+        "歯無し下", "ToothBnon",
+        "真面目", "Serious",
+        "困る", "Trouble",
+        "にこり", "Smily",
+        "怒り", "Get angry",
+        "上", "UP",
+        "下", "Down",
+    };
+
     private static float progressBar = 0;
 
     private void DisplayProgressBar(string text)
@@ -992,21 +1053,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var mesh = skinnedMeshRenderer.sharedMesh;
             if (mesh == null)
                 continue;
-            var blendShapeIDs = new List<int>();
-            blendShapesToBake[skinnedMeshRenderer] = blendShapeIDs;
+            var blendShapeIDsToBake = new List<int>();
+            blendShapesToBake[skinnedMeshRenderer] = blendShapeIDsToBake;
             string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
-                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + mesh.GetBlendShapeName(i)))
+                var name = mesh.GetBlendShapeName(i);
+                if (KeepMMDBlendShapes && MMDBlendShapes.Contains(name))
+                {
+                    usedBlendShapes.Add(path + name);
+                    hasUsedBlendShapes.Add(skinnedMeshRenderer);
+                    continue;
+                }
+                if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + name))
                 {
                     if (mesh.GetBlendShapeFrameCount(i) > 1)
                     {
-                        usedBlendShapes.Add(path + mesh.GetBlendShapeName(i));
+                        usedBlendShapes.Add(path + name);
                         hasUsedBlendShapes.Add(skinnedMeshRenderer);
                     }
                     else
                     {
-                        blendShapeIDs.Add(i);
+                        blendShapeIDsToBake.Add(i);
                     }
                 }
             }
@@ -1037,10 +1105,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             string path = GetPathToRoot(skinnedMeshRenderer) + "/blendShape.";
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
+                var name = mesh.GetBlendShapeName(i);
+                if (KeepMMDBlendShapes && MMDBlendShapes.Contains(name))
+                    continue;
                 if (mesh.GetBlendShapeFrameCount(i) == 1)
                 {
-                    validPaths.Add(path + mesh.GetBlendShapeName(i));
-                    ratios[0][path + mesh.GetBlendShapeName(i)] = skinnedMeshRenderer.GetBlendShapeWeight(i);
+                    validPaths.Add(path + name);
+                    ratios[0][path + name] = skinnedMeshRenderer.GetBlendShapeWeight(i);
                 }
             }
         }

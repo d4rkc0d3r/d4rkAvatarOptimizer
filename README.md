@@ -95,6 +95,8 @@ For example you have two animations. The first animates `A` to 100, `B` to 50 an
 ## Merge Simple Toggles as BlendTree
 Tries to find layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
+## Keep MMD Blend Shapes
+When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
 ## Delete Unused Components
 Deletes all components that are turned off and never get enabled by animations. It also deletes phys bone colliders that are not referenced by any used phys bone components.
 ## Delete Unused Game Objects

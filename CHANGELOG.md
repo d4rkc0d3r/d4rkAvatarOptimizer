@@ -1,4 +1,7 @@
 ## Next Version
+### Features
+* Add option to keep MMD blendshapes intact. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/32)
+
 ### Bug Fixes
 * Apparently `sampler` is also a way to declare a `SamplerState`. So now the optimizer also replaces those.
 * Parse and ignore const keyword in shader function parameters.
