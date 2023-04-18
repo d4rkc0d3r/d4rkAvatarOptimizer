@@ -1,4 +1,4 @@
-## Next Version
+## v2.1.0
 ### Features
 * Add option to keep MMD blendshapes intact. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/32)
 
