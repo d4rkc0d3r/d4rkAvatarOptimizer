@@ -358,7 +358,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         var avDescriptor = optimizer.GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return;
-        var pm = optimizer.gameObject.GetOrAddComponent<VRC.Core.PipelineManager>();
+        var pm = optimizer.GetComponent<VRC.Core.PipelineManager>();
+        if (pm == null)
+        {
+            pm = optimizer.gameObject.AddComponent<VRC.Core.PipelineManager>();
+        }
         if (!string.IsNullOrEmpty(pm.blueprintId))
             return;
         pm.AssignId();

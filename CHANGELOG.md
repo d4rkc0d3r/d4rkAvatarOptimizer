@@ -1,3 +1,7 @@
+## v2.1.1
+### Bug Fixes
+* Fix VRChat beta sdk incompatibility because of `GameObject.GetOrAddComponent()` moving namespaces.
+
 ## v2.1.0
 ### Features
 * Add option to keep MMD blendshapes intact. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/32)
