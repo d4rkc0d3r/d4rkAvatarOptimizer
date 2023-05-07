@@ -1,9 +1,7 @@
-﻿#if UNITY_EDITOR
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEditor;
 
 namespace d4rkpl4y3r.AvatarOptimizer.Util
 {
@@ -85,4 +83,3 @@ namespace d4rkpl4y3r.AvatarOptimizer.Util
         }
     }
 }
-#endif

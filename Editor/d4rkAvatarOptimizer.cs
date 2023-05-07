@@ -1,10 +1,12 @@
-﻿#if UNITY_EDITOR
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using VRC.SDKBase;
+
+#if UNITY_EDITOR
 using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
-using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Animations;
 using UnityEditor;
@@ -19,11 +21,13 @@ using Math = System.Math;
 using Type = System.Type;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
+#endif
 
 [HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
-public class d4rkAvatarOptimizer : MonoBehaviour
+public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
 {
     public bool DoAutoSettings = true;
+    public bool OptimizeOnUpload = true;
     public bool WritePropertiesAsStaticValues = true;
     public bool MergeSkinnedMeshes = true;
     public bool MergeStaticMeshesAsSkinned = true;
@@ -59,6 +63,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowAnimatedMaterialPropertyPaths = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
+
+    public struct MaterialSlot
+    {
+        public Renderer renderer;
+        public int index;
+        public Material material
+        {
+            get { return renderer.sharedMaterials[index]; }
+        }
+        public MaterialSlot(Renderer renderer, int index)
+        {
+            this.renderer = renderer;
+            this.index = index;
+        }
+        public static MaterialSlot[] GetAllSlotsFrom(Renderer renderer)
+        {
+            var result = new MaterialSlot[renderer.sharedMaterials.Length];
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = new MaterialSlot(renderer, i);
+            }
+            return result;
+        }
+    }
+
+#if UNITY_EDITOR
 
     public void Optimize()
     {
@@ -3151,5 +3181,5 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             convertedMeshRendererPaths.Add(GetPathToRoot(obj));
         }
     }
-}
 #endif
+}

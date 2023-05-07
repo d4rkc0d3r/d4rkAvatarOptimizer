@@ -1,3 +1,6 @@
+## Next Version
+* Add option to apply optimization on upload instead of creating a copy of the avatar.
+
 ## v2.1.1
 ### Bug Fixes
 * Fix VRChat beta sdk incompatibility because of `GameObject.GetOrAddComponent()` moving namespaces.

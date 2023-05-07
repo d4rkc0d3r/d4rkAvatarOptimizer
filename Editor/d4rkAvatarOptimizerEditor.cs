@@ -13,159 +13,348 @@ using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase.Validation.Performance;
 
 using Type = System.Type;
-
-namespace d4rkpl4y3r.AvatarOptimizer.Extensions
-{
-    public static class RendererExtensions
-    {
-        public static Mesh GetSharedMesh(this Renderer renderer)
-        {
-            if (renderer is SkinnedMeshRenderer)
-            {
-                return (renderer as SkinnedMeshRenderer).sharedMesh;
-            }
-            else if (renderer.TryGetComponent<MeshFilter>(out var filter))
-            {
-                return filter.sharedMesh;
-            }
-            else
-            {
-                return null;
-            }
-        }
-    }
-
-    public static class TransformExtensions
-    {
-        public static IEnumerable<Transform> GetAllDescendants(this Transform transform)
-        {
-            var stack = new Stack<Transform>();
-            foreach (Transform child in transform)
-            {
-                stack.Push(child);
-            }
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                yield return current;
-                foreach (Transform child in current)
-                {
-                    stack.Push(child);
-                }
-            }
-        }
-    }
-
-    public static class AnimatorControllerExtensions
-    {
-
-        public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
-        {
-            var queue = new Queue<AnimatorStateMachine>();
-            foreach (var layer in controller.layers)
-            {
-                queue.Enqueue(layer.stateMachine);
-                while (queue.Count > 0)
-                {
-                    var stateMachine = queue.Dequeue();
-                    foreach (var subStateMachine in stateMachine.stateMachines)
-                    {
-                        queue.Enqueue(subStateMachine.stateMachine);
-                    }
-                    foreach (var state in stateMachine.states.Select(s => s.state))
-                    {
-                        yield return state;
-                    }
-                }
-            }
-        }
-
-        public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorStateMachine stateMachine)
-        {
-            var queue = new Queue<AnimatorStateMachine>();
-            queue.Enqueue(stateMachine);
-            while (queue.Count > 0)
-            {
-                var current = queue.Dequeue();
-                foreach (var subStateMachine in current.stateMachines)
-                {
-                    queue.Enqueue(subStateMachine.stateMachine);
-                }
-                foreach (var state in current.states.Select(s => s.state))
-                {
-                    yield return state;
-                }
-            }
-        }
-
-        public static IEnumerable<AnimationClip> EnumerateAllClips(this Motion motion)
-        {
-            if (motion is AnimationClip clip)
-            {
-                yield return clip;
-            }
-            else if (motion is BlendTree tree)
-            {
-                var childNodes = tree.children;
-                for (int i = 0; i < childNodes.Length; i++)
-                {
-                    if (childNodes[i].motion == null)
-                    {
-                        continue;
-                    }
-                    foreach (var childClip in childNodes[i].motion.EnumerateAllClips())
-                    {
-                        yield return childClip;
-                    }
-                }
-            }
-        }
-    }
-
-    public static class Vector3Extensions
-    {
-        public static Vector3 Multiply(this Vector3 vec, float x, float y, float z)
-        {
-            vec.x *= x;
-            vec.y *= y;
-            vec.z *= z;
-            return vec;
-        }
-    }
-}
-
-namespace d4rkpl4y3r.AvatarOptimizer
-{
-    public struct MaterialSlot
-    {
-        public Renderer renderer;
-        public int index;
-        public Material material
-        {
-            get { return renderer.sharedMaterials[index]; }
-        }
-        public MaterialSlot(Renderer renderer, int index)
-        {
-            this.renderer = renderer;
-            this.index = index;
-        }
-        public static MaterialSlot[] GetAllSlotsFrom(Renderer renderer)
-        {
-            var result = new MaterialSlot[renderer.sharedMaterials.Length];
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = new MaterialSlot(renderer, i);
-            }
-            return result;
-        }
-    }
-}
+using MaterialSlot = d4rkAvatarOptimizer.MaterialSlot;
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer optimizer;
     private static Material nullMaterial = null;
+    
+    public override void OnInspectorGUI()
+    {
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android)
+        {
+            EditorGUILayout.HelpBox("Quest avatars don't support custom shaders. As such this tool can't work for Quest.", MessageType.Error);
+            return;
+        }
+        optimizer = (d4rkAvatarOptimizer)target;
+        OnSelectionChange();
+        if (nullMaterial == null)
+        {
+            nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            nullMaterial.name = "(null material slot)";
+        }
+
+        var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
+        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField($"<size=20>d4rkpl4y3r's Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+        EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
+        EditorGUILayout.Space();
+
+        Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
+        Toggle("Write Properties as Static Values", ref optimizer.WritePropertiesAsStaticValues);
+        GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
+        EditorGUI.indentLevel++;
+        Toggle("Merge Static Meshes as Skinned", ref optimizer.MergeStaticMeshesAsSkinned);
+        Toggle("Merge Regardless of Blend Shapes", ref optimizer.ForceMergeBlendShapeMissMatch);
+        Toggle("Keep Material Animations Separate", ref optimizer.KeepMaterialPropertyAnimationsSeparate);
+        EditorGUI.indentLevel--;
+        GUI.enabled = true;
+        GUI.enabled = Toggle("Merge Different Property Materials", ref optimizer.MergeDifferentPropertyMaterials);
+        EditorGUI.indentLevel++;
+        Toggle("Merge Same Dimension Textures", ref optimizer.MergeSameDimensionTextures);
+        Toggle("Merge Cull Back with Cull Off", ref optimizer.MergeBackFaceCullingWithCullingOff);
+        Toggle("Merge Different Render Queue", ref optimizer.MergeDifferentRenderQueue);
+        EditorGUI.indentLevel--;
+        GUI.enabled = true;
+        Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
+        Toggle("Merge Simple Toggles as BlendTree", ref optimizer.MergeSimpleTogglesAsBlendTree);
+        Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
+        Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
+        Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
+        Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);
+        Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
+
+        if (optimizer.ExcludeTransforms == null)
+            optimizer.ExcludeTransforms = new List<Transform>();
+        if (Foldout($"Exclusions ({optimizer.ExcludeTransforms.Count})", ref optimizer.ShowExcludedTransforms))
+        {
+            EditorGUI.indentLevel++;
+            DynamicTransformList(ref optimizer.ExcludeTransforms);
+            EditorGUI.indentLevel--;
+        }
+
+        Profiler.enabled = optimizer.ProfileTimeUsed;
+        Profiler.Reset();
+
+        Profiler.StartSection("Validate");
+        GUI.enabled = Validate();
+        Profiler.EndSection();
+
+        if (GUILayout.Button("<size=18>Create Optimized Copy</size>", new GUIStyle(GUI.skin.button) { richText = true }))
+        {
+            Profiler.enabled = optimizer.ProfileTimeUsed;
+            Profiler.Reset();
+            AssignNewAvatarIDIfEmpty();
+            var copy = Instantiate(optimizer.gameObject);
+            SceneManager.MoveGameObjectToScene(copy, optimizer.gameObject.scene);
+            copy.name = optimizer.gameObject.name + "(BrokenCopy)";
+            copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
+            if (copy.GetComponent<VRCAvatarDescriptor>() != null)
+                RemoveIllegalComponents(copy);
+            copy.name = optimizer.gameObject.name + "(OptimizedCopy)";
+            copy.SetActive(true);
+            optimizer.gameObject.SetActive(false);
+            Selection.objects = new Object[] { copy };
+            Profiler.PrintTimeUsed();
+            Profiler.Reset();
+            return;
+        }
+
+        EditorGUILayout.Separator();
+        GUI.enabled = true;
+
+        Profiler.StartSection("Show Perf Rank Change");
+        var exclusions = optimizer.GetAllExcludedTransforms();
+        var particleSystemCount = optimizer.GetComponentsInChildren<ParticleSystem>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        var skinnedMeshes = optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).ToList();
+        int meshCount = optimizer.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
+        int totalMaterialCount = optimizer.GetComponentsInChildren<Renderer>(true)
+            .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+            .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
+        var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
+            if (r.sharedMesh == null)
+                return new string[0];
+            return Enumerable.Range(0, r.sharedMesh.blendShapeCount)
+                .Select(i => $"{optimizer.GetPathToRoot(r.transform)}/blendShape.{r.sharedMesh.GetBlendShapeName(i)}");
+        }));
+        int optimizedSkinnedMeshCount = 0;
+        int optimizedMeshCount = 0;
+        int optimizedTotalMaterialCount = 0;
+        foreach (var matched in MergedMaterialPreview)
+        {
+            var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
+            if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
+            {
+                optimizedSkinnedMeshCount++;
+                if (exclusions.Contains(renderers[0].transform))
+                    optimizedTotalMaterialCount += renderers[0].GetSharedMesh().subMeshCount;
+                else
+                    optimizedTotalMaterialCount += matched.Count;
+            }
+            else if (renderers[0] is MeshRenderer)
+            {
+                optimizedMeshCount++;
+                var mesh = renderers[0].GetSharedMesh();
+                optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
+            }
+            else // ParticleSystemRenderer
+            {
+                optimizedTotalMaterialCount += 1;
+            }
+        }
+        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
+        PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, PerformanceCategory.MeshCount);
+        PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
+        if (optimizer.GetFXLayer() != null)
+        {
+            var mergedLayerCount = optimizer.MergeSimpleTogglesAsBlendTree ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
+            var layerCount = optimizer.GetFXLayer().layers.Length;
+            PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
+        }
+        PerfRankChangeLabel("Blend Shapes", totalBlendShapePaths.Count, KeptBlendShapePaths.Count, PerformanceCategory.BlendShapeCount);
+        Profiler.EndSection();
+
+        EditorGUILayout.Separator();
+
+        if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview))
+        {
+            Profiler.StartSection("Show Merge Preview");
+            foreach (var matched in MergedMaterialPreview)
+            {
+                for (int i = 0; i < matched.Count; i++)
+                {
+                    for (int j = 0; j < matched[i].Count; j++)
+                    {
+                        int indent = j == 0 ? 0 : 1;
+                        DrawMatchedMaterialSlot(matched[i][j], indent);
+                    }
+                }
+                EditorGUILayout.Space(8);
+            }
+            Profiler.EndSection();
+        }
+
+        EditorGUILayout.Separator();
+
+        if (optimizer.MergeSimpleTogglesAsBlendTree && optimizer.GetFXLayer() != null)
+        {
+            if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults))
+            {
+                Profiler.StartSection("Show FX Layer Merge Errors");
+                Toggle("Show Detailed Errors", ref optimizer.ShowFXLayerMergeErrors);
+                var errorMessages = FXLayerMergeErrors;
+                var fxLayer = optimizer.GetFXLayer();
+                for (int i = 0; i < errorMessages.Count; i++)
+                {
+                    var name = fxLayer.layers[i].name;
+                    
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
+                    EditorGUILayout.LabelField($"{i}{fxLayer.layers[i].name}");
+                    EditorGUILayout.EndHorizontal();
+                    if (optimizer.ShowFXLayerMergeErrors)
+                    {
+                        EditorGUI.indentLevel+=2;
+                        foreach (var error in errorMessages[i])
+                        {
+                            EditorGUILayout.LabelField(error);
+                        }
+                        EditorGUI.indentLevel-=2;
+                    }
+                }
+                Profiler.EndSection();
+            }
+        }
+
+        EditorGUILayout.Separator();
+
+        if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
+        {
+            EditorGUI.indentLevel++;
+            if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
+            {
+                Profiler.StartSection("Unparsable Materials");
+                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => !(t.Item2 != null && t.Item2.parsedCorrectly))
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat?.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox((shader?.name ?? "Missing shader") + "\n" +
+                        (parsed?.errorMessage ?? "Missing shader can't be parsed."),
+                        MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat?.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
+                Profiler.EndSection();
+            }
+            if (Foldout("Unmergable Materials", ref optimizer.DebugShowUnmergableMaterials))
+            {
+                Profiler.StartSection("Unmergable Materials");
+                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => (t.Item2 != null && t.Item2.parsedCorrectly && !t.Item2.CanMerge()))
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeReason(), MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
+                Profiler.EndSection();
+            }
+            if (Foldout("Unmergable Texture Materials", ref optimizer.DebugShowUnmergableTextureMaterials))
+            {
+                Profiler.StartSection("Unmergable Texture Materials");
+                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
+                    .Where(t => (t.Item2 != null && t.Item2.CanMerge() && !t.Item2.CanMergeTextures()))
+                    .Select(t => t.mat).ToArray();
+                foreach (var shader in list.Select(mat => mat.shader).Distinct())
+                {
+                    var parsed = ShaderAnalyzer.Parse(shader);
+                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeTexturesReason(), MessageType.Info);
+                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
+                    DrawDebugList(materialsWithThisShader);
+                }
+            }
+            if (Foldout("Crunched Textures", ref optimizer.DebugShowCrunchedTextures))
+            {
+                Profiler.StartSection("Crunched Textures");
+                DrawDebugList(CrunchedTextures);
+                Profiler.EndSection();
+            }
+            if (Foldout("NonBC5 Normal Maps", ref optimizer.DebugShowNonBC5NormalMaps))
+            {
+                Profiler.StartSection("NonBC5 Normal Maps");
+                DrawDebugList(NonBC5NormalMaps);
+                Profiler.EndSection();
+            }
+            if (Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
+            {
+                Profiler.StartSection("Locked in Materials");
+                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Where(mat => IsLockedIn(mat)).ToArray();
+                DrawDebugList(list);
+                Profiler.EndSection();
+            }
+            if (Penetrators.Count > 0 && Foldout("Penetrators", ref optimizer.DebugShowPenetrators))
+            {
+                Profiler.StartSection("Penetrators");
+                DrawDebugList(Penetrators.ToArray());
+                Profiler.EndSection();
+            }
+            if (Foldout("Unused Components", ref optimizer.DebugShowUnusedComponents))
+            {
+                Profiler.StartSection("Unused Components");
+                DrawDebugList(UnusedComponents);
+                Profiler.EndSection();
+            }
+            if (Foldout("Always Disabled Game Objects", ref optimizer.DebugShowAlwaysDisabledGameObjects))
+            {
+                Profiler.StartSection("Always Disabled Game Objects");
+                DrawDebugList(AlwaysDisabledGameObjects);
+                Profiler.EndSection();
+            }
+            if (Foldout("Material Swaps", ref optimizer.DebugShowMaterialSwaps))
+            {
+                Profiler.StartSection("Material Swaps");
+                var map = optimizer.FindAllMaterialSwapMaterials();
+                foreach (var pair in map)
+                {
+                    EditorGUILayout.LabelField(pair.Key.path + " -> " + pair.Key.index);
+                    EditorGUI.indentLevel++;
+                    DrawDebugList(pair.Value.ToArray());
+                    EditorGUI.indentLevel--;
+                }
+                if (map.Count == 0)
+                {
+                    EditorGUILayout.LabelField("---");
+                }
+                Profiler.EndSection();
+            }
+            if (Foldout("Animated Material Property Paths", ref optimizer.DebugShowAnimatedMaterialPropertyPaths))
+            {
+                Profiler.StartSection("Animated Material Property Paths");
+                DrawDebugList(AnimatedMaterialPropertyPaths);
+                Profiler.EndSection();
+            }
+            if (Foldout("Game Objects with Toggle Animation", ref optimizer.DebugShowGameObjectsWithToggle))
+            {
+                Profiler.StartSection("Game Objects with Toggle Animation");
+                DrawDebugList(GameObjectsWithToggleAnimations);
+                Profiler.EndSection();
+            }
+            if (Foldout("Unmoving Bones", ref optimizer.DebugShowUnmovingBones))
+            {
+                Profiler.StartSection("Unmoving Bones");
+                DrawDebugList(UnmovingBones);
+                Profiler.EndSection();
+            }
+            EditorGUI.indentLevel--;
+        }
+        if (optimizer.ProfileTimeUsed)
+        {
+            EditorGUILayout.Separator();
+            var timeUsed = Profiler.FormatTimeUsed().Take(6).ToArray();
+            foreach (var time in timeUsed)
+            {
+                EditorGUILayout.LabelField(time);
+            }
+        }
+    }
     
     private bool Validate()
     {
@@ -889,340 +1078,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         Debug.LogWarning("Could not find RemoveIllegalComponents method");
-    }
-    
-    public override void OnInspectorGUI()
-    {
-        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android)
-        {
-            EditorGUILayout.HelpBox("Quest avatars don't support custom shaders. As such this tool can't work for Quest.", MessageType.Error);
-            return;
-        }
-        optimizer = (d4rkAvatarOptimizer)target;
-        OnSelectionChange();
-        if (nullMaterial == null)
-        {
-            nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
-            nullMaterial.name = "(null material slot)";
-        }
-
-        var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
-        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField($"<size=20>d4rkpl4y3r's Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleCenter });
-        EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
-        EditorGUILayout.Space();
-
-        Toggle("Write Properties as Static Values", ref optimizer.WritePropertiesAsStaticValues);
-        GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
-        EditorGUI.indentLevel++;
-        Toggle("Merge Static Meshes as Skinned", ref optimizer.MergeStaticMeshesAsSkinned);
-        Toggle("Merge Regardless of Blend Shapes", ref optimizer.ForceMergeBlendShapeMissMatch);
-        Toggle("Keep Material Animations Separate", ref optimizer.KeepMaterialPropertyAnimationsSeparate);
-        EditorGUI.indentLevel--;
-        GUI.enabled = true;
-        GUI.enabled = Toggle("Merge Different Property Materials", ref optimizer.MergeDifferentPropertyMaterials);
-        EditorGUI.indentLevel++;
-        Toggle("Merge Same Dimension Textures", ref optimizer.MergeSameDimensionTextures);
-        Toggle("Merge Cull Back with Cull Off", ref optimizer.MergeBackFaceCullingWithCullingOff);
-        Toggle("Merge Different Render Queue", ref optimizer.MergeDifferentRenderQueue);
-        EditorGUI.indentLevel--;
-        GUI.enabled = true;
-        Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
-        Toggle("Merge Simple Toggles as BlendTree", ref optimizer.MergeSimpleTogglesAsBlendTree);
-        Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
-        Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
-        Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
-        Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);
-        Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
-
-        if (optimizer.ExcludeTransforms == null)
-            optimizer.ExcludeTransforms = new List<Transform>();
-        if (Foldout($"Exclusions ({optimizer.ExcludeTransforms.Count})", ref optimizer.ShowExcludedTransforms))
-        {
-            EditorGUI.indentLevel++;
-            DynamicTransformList(ref optimizer.ExcludeTransforms);
-            EditorGUI.indentLevel--;
-        }
-
-        Profiler.enabled = optimizer.ProfileTimeUsed;
-        Profiler.Reset();
-
-        Profiler.StartSection("Validate");
-        GUI.enabled = Validate();
-        Profiler.EndSection();
-
-        if (GUILayout.Button("<size=18>Create Optimized Copy</size>", new GUIStyle(GUI.skin.button) { richText = true }))
-        {
-            Profiler.enabled = optimizer.ProfileTimeUsed;
-            Profiler.Reset();
-            AssignNewAvatarIDIfEmpty();
-            var copy = Instantiate(optimizer.gameObject);
-            SceneManager.MoveGameObjectToScene(copy, optimizer.gameObject.scene);
-            copy.name = optimizer.gameObject.name + "(BrokenCopy)";
-            copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
-            if (copy.GetComponent<VRCAvatarDescriptor>() != null)
-                RemoveIllegalComponents(copy);
-            copy.name = optimizer.gameObject.name + "(OptimizedCopy)";
-            copy.SetActive(true);
-            optimizer.gameObject.SetActive(false);
-            Selection.objects = new Object[] { copy };
-            Profiler.PrintTimeUsed();
-            Profiler.Reset();
-            return;
-        }
-
-        EditorGUILayout.Separator();
-        GUI.enabled = true;
-
-        Profiler.StartSection("Show Perf Rank Change");
-        var exclusions = optimizer.GetAllExcludedTransforms();
-        var particleSystemCount = optimizer.GetComponentsInChildren<ParticleSystem>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-        var skinnedMeshes = optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).ToList();
-        int meshCount = optimizer.GetComponentsInChildren<MeshRenderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-        int totalMaterialCount = optimizer.GetComponentsInChildren<Renderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly"))
-            .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
-        var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
-            if (r.sharedMesh == null)
-                return new string[0];
-            return Enumerable.Range(0, r.sharedMesh.blendShapeCount)
-                .Select(i => $"{optimizer.GetPathToRoot(r.transform)}/blendShape.{r.sharedMesh.GetBlendShapeName(i)}");
-        }));
-        int optimizedSkinnedMeshCount = 0;
-        int optimizedMeshCount = 0;
-        int optimizedTotalMaterialCount = 0;
-        foreach (var matched in MergedMaterialPreview)
-        {
-            var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
-            if (renderers.Any(r => r is SkinnedMeshRenderer) || renderers.Length > 1)
-            {
-                optimizedSkinnedMeshCount++;
-                if (exclusions.Contains(renderers[0].transform))
-                    optimizedTotalMaterialCount += renderers[0].GetSharedMesh().subMeshCount;
-                else
-                    optimizedTotalMaterialCount += matched.Count;
-            }
-            else if (renderers[0] is MeshRenderer)
-            {
-                optimizedMeshCount++;
-                var mesh = renderers[0].GetSharedMesh();
-                optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
-            }
-            else // ParticleSystemRenderer
-            {
-                optimizedTotalMaterialCount += 1;
-            }
-        }
-        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
-        PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, PerformanceCategory.MeshCount);
-        PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
-        if (optimizer.GetFXLayer() != null)
-        {
-            var mergedLayerCount = optimizer.MergeSimpleTogglesAsBlendTree ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
-            var layerCount = optimizer.GetFXLayer().layers.Length;
-            PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
-        }
-        PerfRankChangeLabel("Blend Shapes", totalBlendShapePaths.Count, KeptBlendShapePaths.Count, PerformanceCategory.BlendShapeCount);
-        Profiler.EndSection();
-
-        EditorGUILayout.Separator();
-
-        if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview))
-        {
-            Profiler.StartSection("Show Merge Preview");
-            foreach (var matched in MergedMaterialPreview)
-            {
-                for (int i = 0; i < matched.Count; i++)
-                {
-                    for (int j = 0; j < matched[i].Count; j++)
-                    {
-                        int indent = j == 0 ? 0 : 1;
-                        DrawMatchedMaterialSlot(matched[i][j], indent);
-                    }
-                }
-                EditorGUILayout.Space(8);
-            }
-            Profiler.EndSection();
-        }
-
-        EditorGUILayout.Separator();
-
-        if (optimizer.MergeSimpleTogglesAsBlendTree && optimizer.GetFXLayer() != null)
-        {
-            if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults))
-            {
-                Profiler.StartSection("Show FX Layer Merge Errors");
-                Toggle("Show Detailed Errors", ref optimizer.ShowFXLayerMergeErrors);
-                var errorMessages = FXLayerMergeErrors;
-                var fxLayer = optimizer.GetFXLayer();
-                for (int i = 0; i < errorMessages.Count; i++)
-                {
-                    var name = fxLayer.layers[i].name;
-                    
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
-                    EditorGUILayout.LabelField($"{i}{fxLayer.layers[i].name}");
-                    EditorGUILayout.EndHorizontal();
-                    if (optimizer.ShowFXLayerMergeErrors)
-                    {
-                        EditorGUI.indentLevel+=2;
-                        foreach (var error in errorMessages[i])
-                        {
-                            EditorGUILayout.LabelField(error);
-                        }
-                        EditorGUI.indentLevel-=2;
-                    }
-                }
-                Profiler.EndSection();
-            }
-        }
-
-        EditorGUILayout.Separator();
-
-        if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
-        {
-            EditorGUI.indentLevel++;
-            if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
-            {
-                Profiler.StartSection("Unparsable Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => !(t.Item2 != null && t.Item2.parsedCorrectly))
-                    .Select(t => t.mat).ToArray();
-                foreach (var shader in list.Select(mat => mat?.shader).Distinct())
-                {
-                    var parsed = ShaderAnalyzer.Parse(shader);
-                    EditorGUILayout.HelpBox((shader?.name ?? "Missing shader") + "\n" +
-                        (parsed?.errorMessage ?? "Missing shader can't be parsed."),
-                        MessageType.Info);
-                    var materialsWithThisShader = list.Where(mat => mat?.shader == shader).ToArray();
-                    DrawDebugList(materialsWithThisShader);
-                }
-                Profiler.EndSection();
-            }
-            if (Foldout("Unmergable Materials", ref optimizer.DebugShowUnmergableMaterials))
-            {
-                Profiler.StartSection("Unmergable Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => (t.Item2 != null && t.Item2.parsedCorrectly && !t.Item2.CanMerge()))
-                    .Select(t => t.mat).ToArray();
-                foreach (var shader in list.Select(mat => mat.shader).Distinct())
-                {
-                    var parsed = ShaderAnalyzer.Parse(shader);
-                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeReason(), MessageType.Info);
-                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
-                    DrawDebugList(materialsWithThisShader);
-                }
-                Profiler.EndSection();
-            }
-            if (Foldout("Unmergable Texture Materials", ref optimizer.DebugShowUnmergableTextureMaterials))
-            {
-                Profiler.StartSection("Unmergable Texture Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
-                    .Where(t => (t.Item2 != null && t.Item2.CanMerge() && !t.Item2.CanMergeTextures()))
-                    .Select(t => t.mat).ToArray();
-                foreach (var shader in list.Select(mat => mat.shader).Distinct())
-                {
-                    var parsed = ShaderAnalyzer.Parse(shader);
-                    EditorGUILayout.HelpBox(shader.name + "\n" + parsed.CantMergeTexturesReason(), MessageType.Info);
-                    var materialsWithThisShader = list.Where(mat => mat.shader == shader).ToArray();
-                    DrawDebugList(materialsWithThisShader);
-                }
-            }
-            if (Foldout("Crunched Textures", ref optimizer.DebugShowCrunchedTextures))
-            {
-                Profiler.StartSection("Crunched Textures");
-                DrawDebugList(CrunchedTextures);
-                Profiler.EndSection();
-            }
-            if (Foldout("NonBC5 Normal Maps", ref optimizer.DebugShowNonBC5NormalMaps))
-            {
-                Profiler.StartSection("NonBC5 Normal Maps");
-                DrawDebugList(NonBC5NormalMaps);
-                Profiler.EndSection();
-            }
-            if (Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
-            {
-                Profiler.StartSection("Locked in Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Where(mat => IsLockedIn(mat)).ToArray();
-                DrawDebugList(list);
-                Profiler.EndSection();
-            }
-            if (Penetrators.Count > 0 && Foldout("Penetrators", ref optimizer.DebugShowPenetrators))
-            {
-                Profiler.StartSection("Penetrators");
-                DrawDebugList(Penetrators.ToArray());
-                Profiler.EndSection();
-            }
-            if (Foldout("Unused Components", ref optimizer.DebugShowUnusedComponents))
-            {
-                Profiler.StartSection("Unused Components");
-                DrawDebugList(UnusedComponents);
-                Profiler.EndSection();
-            }
-            if (Foldout("Always Disabled Game Objects", ref optimizer.DebugShowAlwaysDisabledGameObjects))
-            {
-                Profiler.StartSection("Always Disabled Game Objects");
-                DrawDebugList(AlwaysDisabledGameObjects);
-                Profiler.EndSection();
-            }
-            if (Foldout("Material Swaps", ref optimizer.DebugShowMaterialSwaps))
-            {
-                Profiler.StartSection("Material Swaps");
-                var map = optimizer.FindAllMaterialSwapMaterials();
-                foreach (var pair in map)
-                {
-                    EditorGUILayout.LabelField(pair.Key.path + " -> " + pair.Key.index);
-                    EditorGUI.indentLevel++;
-                    DrawDebugList(pair.Value.ToArray());
-                    EditorGUI.indentLevel--;
-                }
-                if (map.Count == 0)
-                {
-                    EditorGUILayout.LabelField("---");
-                }
-                Profiler.EndSection();
-            }
-            if (Foldout("Animated Material Property Paths", ref optimizer.DebugShowAnimatedMaterialPropertyPaths))
-            {
-                Profiler.StartSection("Animated Material Property Paths");
-                DrawDebugList(AnimatedMaterialPropertyPaths);
-                Profiler.EndSection();
-            }
-            if (Foldout("Game Objects with Toggle Animation", ref optimizer.DebugShowGameObjectsWithToggle))
-            {
-                Profiler.StartSection("Game Objects with Toggle Animation");
-                DrawDebugList(GameObjectsWithToggleAnimations);
-                Profiler.EndSection();
-            }
-            if (Foldout("Unmoving Bones", ref optimizer.DebugShowUnmovingBones))
-            {
-                Profiler.StartSection("Unmoving Bones");
-                DrawDebugList(UnmovingBones);
-                Profiler.EndSection();
-            }
-            EditorGUI.indentLevel--;
-        }
-        if (optimizer.ProfileTimeUsed)
-        {
-            EditorGUILayout.Separator();
-            var timeUsed = Profiler.FormatTimeUsed().Take(6).ToArray();
-            foreach (var time in timeUsed)
-            {
-                EditorGUILayout.LabelField(time);
-            }
-        }
     }
 }
 #endif
