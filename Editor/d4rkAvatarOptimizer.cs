@@ -509,6 +509,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
             var unhelpfullyMergedMeshRenderers = meshRenderers.Where(r => !meshRenderersWithMergedMaterials.Contains(r));
             foreach (var meshRenderer in unhelpfullyMergedMeshRenderers)
             {
+                if (mergedMeshes.Count == 1)
+                    break;
                 var newSubList = new List<Renderer> { meshRenderer };
                 matchedSkinnedMeshes.Add(newSubList);
                 mergedMeshes.Remove(meshRenderer);
