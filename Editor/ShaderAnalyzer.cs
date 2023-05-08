@@ -441,6 +441,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     int firstQuote = trimmedLine.IndexOf('"');
                     int lastQuote = trimmedLine.LastIndexOf('"');
+                    if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+                    {
+                        firstQuote = trimmedLine.IndexOf('<');
+                        lastQuote = trimmedLine.LastIndexOf('>');
+                    }
+                    if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+                    {
+                        throw new ParserException("Invalid #include directive.");
+                    }
                     string includePath = trimmedLine.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
                     if (includePath.StartsWith("/Assets/"))
                     {
