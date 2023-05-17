@@ -2553,7 +2553,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                     if (sourceBones[i] == null)
                         sourceBones[i] = rootBone;
                 }
-                var toWorldArray = Enumerable.Range(0, skinnedMesh.bones.Length).Select(i =>
+                var bindPoseCount = mesh.bindposes.Length;
+                if (sourceBones.Length != bindPoseCount)
+                {
+                    Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
+                    bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
+                }
+                var toWorldArray = Enumerable.Range(0, bindPoseCount).Select(i =>
                     sourceBones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
                     ).ToArray();
                 var aabb = skinnedMesh.localBounds;
@@ -2567,7 +2573,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, 1) + aabb.center));
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, -1) + aabb.center));
                 
-                if (sourceWeights.Length != sourceVertices.Length)
+                if (sourceWeights.Length != sourceVertices.Length || bindPoseCount == 0)
                 {
                     var defaultWeight = new BoneWeight
                     {
@@ -2584,6 +2590,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                     sourceBones = new Transform[1] { skinnedMesh.transform };
                     toWorldArray = new Matrix4x4[1] { skinnedMesh.transform.localToWorldMatrix };
                     keepTransforms.Add(skinnedMesh.transform);
+                    bindPoseCount = 1;
                 }
 
                 for (int i = 1; i < 8; i++)
@@ -2653,6 +2660,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                 {
                     targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID << 12, 0));
                     var boneWeight = sourceWeights[vertIndex];
+                    boneWeight.boneIndex0 = boneWeight.boneIndex0 >= bindPoseCount ? 0 : boneWeight.boneIndex0;
+                    boneWeight.boneIndex1 = boneWeight.boneIndex1 >= bindPoseCount ? 0 : boneWeight.boneIndex1;
+                    boneWeight.boneIndex2 = boneWeight.boneIndex2 >= bindPoseCount ? 0 : boneWeight.boneIndex2;
+                    boneWeight.boneIndex3 = boneWeight.boneIndex3 >= bindPoseCount ? 0 : boneWeight.boneIndex3;
                     Matrix4x4 toWorld = Matrix4x4.zero;
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0);
                     toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
