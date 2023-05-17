@@ -248,7 +248,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
             if (showShaderLabParamsOnly && prop.shaderLabParams.Count == 0)
                 continue;
             shownProperties++;
-            EditorGUILayout.LabelField(prop.name, "" + prop.type +
+            EditorGUILayout.LabelField(prop.name, (prop.hasGammaTag ? "[gamma] " : "") + prop.type +
                 (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : "")
                 + " = " + prop.defaultValue);
         }

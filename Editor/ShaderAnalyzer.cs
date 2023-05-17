@@ -37,6 +37,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public Type type = Type.Unknown;
             public HashSet<string> shaderLabParams = new HashSet<string>();
             public string defaultValue;
+            public bool hasGammaTag = false;
         }
         public class Function
         {
@@ -489,7 +490,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         charIndex++;
                     }
-                    tags.Add(line.Substring(startTagIndex + 1, charIndex - startTagIndex - 1));
+                    tags.Add(line.Substring(startTagIndex + 1, charIndex - startTagIndex - 1).Trim());
                     endTagIndex = charIndex + 1;
                 }
                 else if (c == '(')
@@ -601,6 +602,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.type = ParsedShader.Property.Type.TextureCubeArray;
                 output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
             }
+            output.hasGammaTag = tags.Any(t => t.ToLowerInvariant() == "gamma");
             if (clearTagsOnPropertyParse)
                 tags.Clear();
             return output;

@@ -1709,16 +1709,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
-                            propertyArray.values.Add("" + mat.GetFloat(prop.name));
-                        break;
-                        case ParsedShader.Property.Type.Vector:
-                            if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
-                            {
-                                propertyArray.type = "float4";
-                                propertyArray.values = new List<string>();
-                                arrayPropertyValues[i][prop.name] = propertyArray;
-                            }
-                            propertyArray.values.Add("float4" + mat.GetVector(prop.name).ToString("G"));
+                            var value = mat.GetFloat(prop.name);
+                            value = (prop.hasGammaTag) ? Mathf.GammaToLinearSpace(value) : value;
+                            propertyArray.values.Add($"{value}");
                         break;
                         case ParsedShader.Property.Type.Int:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
@@ -1731,6 +1724,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                         break;
                         case ParsedShader.Property.Type.Color:
                         case ParsedShader.Property.Type.ColorHDR:
+                        case ParsedShader.Property.Type.Vector:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "float4";
@@ -1738,7 +1732,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
                             var col = mat.GetColor(prop.name);
-                            col = prop.type == ParsedShader.Property.Type.ColorHDR ? col : col.linear;
+                            col = (prop.type == ParsedShader.Property.Type.Color || prop.hasGammaTag) ? col.linear : col;
                             propertyArray.values.Add($"float4({col.r}, {col.g}, {col.b}, {col.a})");
                             break;
                         case ParsedShader.Property.Type.Texture2D:
