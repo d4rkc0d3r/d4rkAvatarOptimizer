@@ -269,7 +269,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var ssimRenderTexture = new RenderTexture(
                 reference.width / (int)Mathf.Pow(2, mipLevel),
                 reference.height / (int)Mathf.Pow(2, mipLevel),
-                0, RenderTextureFormat.ARGBFloat);
+                0, RenderTextureFormat.RFloat);
             ssimRenderTexture.useMipMap = true;
             ssimRenderTexture.autoGenerateMips = false;
             ssimRenderTexture.Create();

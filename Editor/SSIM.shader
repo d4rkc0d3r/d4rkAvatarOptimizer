@@ -7,6 +7,7 @@
         [ToggleUI] _sRGB ("sRGB", Float) = 1
         [ToggleUI] _NormalMap ("Normal Map", Float) = 0
         [IntRange] _KernelSize ("Kernel Size", Range(2, 11)) = 8
+        [IntRange] _TargetMipBias ("Target Mip Bias", Range(0, 2)) = 0
     }
     SubShader
     {
@@ -41,6 +42,7 @@
             bool _sRGB;
             bool _NormalMap;
             float _KernelSize;
+            float _TargetMipBias;
 
             v2f vert (appdata v)
             {
@@ -67,37 +69,39 @@
                 return _sRGB ? srgb : color;
             }
 
-            float4 Sample(Texture2D tex, float2 uv)
+            float4 SampleGrad(Texture2D tex, float2 uv, float2 dx, float2 dy)
             {
-                return AdjustColorSpace(tex.Sample(linear_clamp_sampler, uv));
+                return AdjustColorSpace(tex.SampleGrad(linear_clamp_sampler, uv, dx, dy));
             }
 
             float frag (v2f i) : SV_Target
             {
                 _KernelSize = clamp(_KernelSize, 2, 11);
                 float2 uv = i.uv;
+                float2 dx = ddx(uv);
+                float2 dy = ddy(uv);
                 float2 pixelSize = 1 / _ScreenParams.xy;
                 float4 meanA = 0;
                 float4 meanB = 0;
-                float x, y;
-                for (y = 0; y < _KernelSize; y++)
-                for (x = 0; x < _KernelSize; x++)
+                float2 offset = 0;
+                for (offset.y = 0; offset.y < _KernelSize; offset.y++)
+                for (offset.x = 0; offset.x < _KernelSize; offset.x++)
                 {
-                    float2 sampleUV = uv + float2(x, y) * pixelSize;
-                    meanA += Sample(_Reference, sampleUV);
-                    meanB += Sample(_Target, sampleUV);
+                    float2 sampleUV = uv + (offset - floor(_KernelSize / 2)) * pixelSize;
+                    meanA += SampleGrad(_Reference, sampleUV, dx, dy);
+                    meanB += SampleGrad(_Target, sampleUV, dx * exp2(_TargetMipBias), dy * exp2(_TargetMipBias));
                 }
                 meanA /= _KernelSize * _KernelSize;
                 meanB /= _KernelSize * _KernelSize;
                 float4 varA = 0;
                 float4 varB = 0;
                 float4 covAB = 0;
-                for (y = 0; y < _KernelSize; y++)
-                for (x = 0; x < _KernelSize; x++)
+                for (offset.y = 0; offset.y < _KernelSize; offset.y++)
+                for (offset.x = 0; offset.x < _KernelSize; offset.x++)
                 {
-                    float2 sampleUV = uv + float2(x, y) * pixelSize;
-                    float4 a = Sample(_Reference, sampleUV);
-                    float4 b = Sample(_Target, sampleUV);
+                    float2 sampleUV = uv + (offset - floor(_KernelSize / 2)) * pixelSize;
+                    float4 a = SampleGrad(_Reference, sampleUV, dx, dy);
+                    float4 b = SampleGrad(_Target, sampleUV, dx * exp2(_TargetMipBias), dy * exp2(_TargetMipBias));
                     varA += (a - meanA) * (a - meanA);
                     varB += (b - meanB) * (b - meanB);
                     covAB += (a - meanA) * (b - meanB);
