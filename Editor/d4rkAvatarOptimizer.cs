@@ -1521,11 +1521,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
         return material.HasProperty("_Length");
     }
 
-    public HashSet<MeshRenderer> FindAllPenetrators()
+    private bool IsTPSPenetratorRoot(Transform t)
+    {
+        if (t == null)
+            return false;
+        if (t.GetComponentsInChildren<Renderer>(true).Count() != 1)
+            return false;
+        var meshRenderer = t.GetComponentsInChildren<Renderer>(true).First();
+        if (meshRenderer.sharedMaterials.Length == 0)
+            return false;
+        var material = meshRenderer.sharedMaterials[0];
+        if (material == null)
+            return false;
+        return material.HasProperty("_TPSPenetratorEnabled") && material.GetFloat("_TPSPenetratorEnabled") > 0.5f;
+    }
+
+    public HashSet<Renderer> FindAllPenetrators()
     {
         var penetratorTipLights = GetComponentsInChildren<Light>(true)
             .Where(l => IsDPSPenetratorTipLight(l)).ToList();
-        var penetrators = new HashSet<MeshRenderer>();
+        var penetrators = new HashSet<Renderer>();
         foreach (var light in penetratorTipLights)
         {
             var candidate = light.transform;
@@ -1538,6 +1553,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                 penetrators.Add(candidate.GetComponentsInChildren<MeshRenderer>(true).First());
             }
         }
+        penetrators.UnionWith(GetComponentsInChildren<Renderer>(true).Where(m => IsTPSPenetratorRoot(m.transform)));
         return penetrators;
     }
 

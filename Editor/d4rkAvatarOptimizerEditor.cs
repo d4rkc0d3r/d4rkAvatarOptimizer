@@ -588,7 +588,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private List<List<string>> fxLayerMergeErrorsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
 
-    private HashSet<MeshRenderer> penetratorsCache = null;
+    private HashSet<Renderer> penetratorsCache = null;
 
     private void ClearUICaches()
     {
@@ -780,7 +780,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private HashSet<MeshRenderer> Penetrators
+    private HashSet<Renderer> Penetrators
     {
         get
         {
