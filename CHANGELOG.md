@@ -2,6 +2,10 @@
 ### Features
 * Add option to apply optimization on upload instead of creating a copy of the avatar.
 
+### Changes
+* Improved the warning text for locked in materials / unlocked materials depending on the optimization mode.
+* Changed warnings for materials that can't merge to info boxes instead of warnings.
+
 ### Bug Fixes
 * Fix crash when the avatar has multiple non skinned meshes that try to get merged together without any material that can get merged or no skinned mesh in the merge target. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/34)
 * Fix parser not recognizing `#include` directives with `<>` instead of `""`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/35)

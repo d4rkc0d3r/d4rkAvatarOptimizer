@@ -56,6 +56,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
     public bool DebugShowCrunchedTextures = true;
     public bool DebugShowNonBC5NormalMaps = true;
     public bool DebugShowLockedInMaterials = true;
+    public bool DebugShowUnlockedMaterials = true;
     public bool DebugShowPenetrators = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;

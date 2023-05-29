@@ -281,12 +281,21 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(NonBC5NormalMaps);
                 Profiler.EndSection();
             }
-            if (Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
+            if (optimizer.WritePropertiesAsStaticValues && Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
             {
                 Profiler.StartSection("Locked in Materials");
                 var list = optimizer.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Where(mat => IsLockedIn(mat)).ToArray();
+                DrawDebugList(list);
+                Profiler.EndSection();
+            }
+            if (!optimizer.WritePropertiesAsStaticValues && Foldout("Unlocked Materials", ref optimizer.DebugShowUnlockedMaterials))
+            {
+                Profiler.StartSection("Unlocked Materials");
+                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(r => r.sharedMaterials).Distinct()
+                    .Where(mat => CanLockIn(mat) && !IsLockedIn(mat)).ToArray();
                 DrawDebugList(list);
                 Profiler.EndSection();
             }
@@ -476,21 +485,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             EditorGUILayout.HelpBox(
                 "Some materials do not support merging.\n" +
-                "Check the Debug Info foldout for more info.", MessageType.Warning);
+                "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                "Check the Debug Info foldout for more info.", MessageType.Info);
         }
 
         if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
         {
             EditorGUILayout.HelpBox(
                 "Some materials do not support merging textures.\n" +
-                "Check the Debug Info foldout for more info.", MessageType.Warning);
+                "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                "Check the Debug Info foldout for more info.", MessageType.Info);
         }
 
-        if ((optimizer.MergeDifferentPropertyMaterials || optimizer.MergeSkinnedMeshes) && allMaterials.Any(m => IsLockedIn(m)))
+        if (optimizer.MergeDifferentPropertyMaterials && optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => IsLockedIn(m)))
         {
             EditorGUILayout.HelpBox(
                 "Some materials are locked in.\n" +
-                "It is recommended to unlock them so they can be merged.\n" +
+                "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
+                "Check the Debug Info foldout for a full list.", MessageType.Info);
+        }
+
+        if (!optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => CanLockIn(m) && !IsLockedIn(m)))
+        {
+            EditorGUILayout.HelpBox(
+                "Potentially unlocked materials exist.\n" +
+                "Either lock the materials or enable Write Properties as Static Values.\n" +
                 "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
 
@@ -499,7 +518,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox(
                 "Some textures are crunch compressed.\n" +
                 "Crunch compressed textures cannot be merged.\n" +
-                "Check the Debug Info foldout for a full list.", MessageType.Warning);
+                "Check the Debug Info foldout for a full list.", MessageType.Info);
         }
 
         if (NonBC5NormalMaps.Length > 0)
@@ -829,6 +848,19 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
             return animatedMaterialPropertyPathsCache;
         }
+    }
+
+    public bool CanLockIn(Material material)
+    {
+        if (material == null)
+            return false;
+        if (material.HasProperty("_ShaderOptimizer"))
+            return true;
+        if (material.HasProperty("_ShaderOptimizerEnabled"))
+            return true;
+        if (material.HasProperty("__Baked"))
+            return true;
+        return false;
     }
 
     public bool IsLockedIn(Material material)
