@@ -1,4 +1,4 @@
-## Next Version
+## v2.2.0
 ### Features
 * Add option to apply optimization on upload instead of creating a copy of the avatar.
 
@@ -6,6 +6,8 @@
 * Improved the warning text for locked in materials / unlocked materials depending on the optimization mode.
 * Changed warnings for materials that can't merge to info boxes instead of warnings.
 * Add TPS support for penetrator detection.
+* No longer remove illegal components from the avatar.
+* Move Profile Time Used to the top of the debug info section.
 
 ### Bug Fixes
 * Fix crash when the avatar has multiple non skinned meshes that try to get merged together without any material that can get merged or no skinned mesh in the merge target. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/34)

@@ -65,7 +65,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
         Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
         Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);
-        Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
 
         if (optimizer.ExcludeTransforms == null)
             optimizer.ExcludeTransforms = new List<Transform>();
@@ -92,8 +91,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             SceneManager.MoveGameObjectToScene(copy, optimizer.gameObject.scene);
             copy.name = optimizer.gameObject.name + "(BrokenCopy)";
             copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
-            if (copy.GetComponent<VRCAvatarDescriptor>() != null)
-                RemoveIllegalComponents(copy);
             copy.name = optimizer.gameObject.name + "(OptimizedCopy)";
             copy.SetActive(true);
             optimizer.gameObject.SetActive(false);
@@ -216,6 +213,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
         {
+            Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
             EditorGUI.indentLevel++;
             if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
             {
@@ -481,6 +479,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Check the Debug Info foldout for more info.", MessageType.Warning);
         }
 
+        if (!optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => CanLockIn(m) && !IsLockedIn(m)))
+        {
+            EditorGUILayout.HelpBox(
+                "Potentially unlocked materials exist.\n" +
+                "Either lock the materials or enable Write Properties as Static Values.\n" +
+                "Check the Debug Info foldout for a full list.", MessageType.Warning);
+        }
+
         if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
         {
             EditorGUILayout.HelpBox(
@@ -502,15 +508,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox(
                 "Some materials are locked in.\n" +
                 "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
+                "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise." + 
                 "Check the Debug Info foldout for a full list.", MessageType.Info);
-        }
-
-        if (!optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => CanLockIn(m) && !IsLockedIn(m)))
-        {
-            EditorGUILayout.HelpBox(
-                "Potentially unlocked materials exist.\n" +
-                "Either lock the materials or enable Write Properties as Static Values.\n" +
-                "Check the Debug Info foldout for a full list.", MessageType.Warning);
         }
 
         if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 0)
@@ -537,6 +536,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     platformSettings.resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
                     platformSettings.overridden = true;
                     platformSettings.format = TextureImporterFormat.BC5;
+                    platformSettings.maxTextureSize = Mathf.Max(tex.width, tex.height);
                     importer.SetPlatformTextureSettings(platformSettings);
                     importer.SaveAndReimport();
                 }
@@ -1067,49 +1067,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
         EditorGUILayout.LabelField(label);
         EditorGUILayout.EndHorizontal();
-    }
-
-    private void RemoveIllegalComponents(GameObject target)
-    {
-        // call VRC.SDK3.Validation.AvatarValidation.RemoveIllegalComponents(target, true) with reflection if it exists
-        var RemoveIllegalComponents = Type.GetType("VRC.SDK3.Validation.AvatarValidation, Assembly-CSharp")
-            ?.GetMethod("RemoveIllegalComponents", BindingFlags.Static | BindingFlags.Public);
-        if (RemoveIllegalComponents != null)
-        {
-            RemoveIllegalComponents.Invoke(null, new object[] { target, true });
-            return;
-        }
-
-        // if not found use newer sdk method with reflection
-        // VRC.SDK3.Validation.AvatarValidation.GetComponentWhitelist()
-        // VRC.SDKBase.Validation.ValidationUtils.RemoveIllegalComponents(GameObject target, HashSet<Type> whitelist, bool retry, bool onlySceneObjects, bool logStripping)
-        var GetComponentWhitelist = Type.GetType("VRC.SDK3.Validation.AvatarValidation, Assembly-CSharp")
-            ?.GetMethod("GetComponentWhitelist", BindingFlags.Static | BindingFlags.NonPublic);
-        RemoveIllegalComponents = Type.GetType("VRC.SDKBase.Validation.ValidationUtils, Assembly-CSharp")
-            ?.GetMethod("RemoveIllegalComponents", BindingFlags.Static | BindingFlags.Public);
-        if (GetComponentWhitelist != null && RemoveIllegalComponents != null)
-        {
-            var whitelist = GetComponentWhitelist.Invoke(null, null) as HashSet<Type>;
-            RemoveIllegalComponents.Invoke(null, new object[] { target, whitelist, true, false, true });
-            return;
-        }
-
-        // if not found we are probably in an VCC version of the sdk which removed the whitelist method
-        // use VRC.SDK3.Validation.AvatarValidation.FindIllegalComponents(target) t get a list of components and call DestroyImmediate on them
-        // also VCC sdks are in a different assembly
-        var findIllegalComponents = Type.GetType("VRC.SDK3.Validation.AvatarValidation, VRC.SDK3A")
-            ?.GetMethod("FindIllegalComponents", BindingFlags.Static | BindingFlags.Public);
-        if (findIllegalComponents != null)
-        {
-            var illegalComponents = findIllegalComponents.Invoke(null, new object[] { target }) as IEnumerable<Component>;
-            foreach (var component in illegalComponents)
-            {
-                DestroyImmediate(component);
-            }
-            return;
-        }
-
-        Debug.LogWarning("Could not find RemoveIllegalComponents method");
     }
 }
 #endif

@@ -3,17 +3,24 @@ d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & mate
 
 ## How to Use
 1. Add the d4rkAvatarOptimizer component to your avatar root. It should go on the same object that your VRC Avatar Descriptor is on.
-2. Click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes.
-3. Upload this optimized copy of your original avatar to vrc.
-4. Delete the copy after you upload it to vrc.
+2. Upload the avatar to vrc. The optimizations will be applied before upload automatically with the default settings.
+
+Alternatively you can click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes. That way you can test the optimized version in editor to validate it works properly before uploading it. If everything works correctly you can then upload that optimized copy.
 
 ## Limitations
 The optimizer relies on creating custom variations of your shaders that support shader toggles. As such, your avatar might not show up correctly if your shaders are disabled.  
 For toggles that means all meshes that get merged will always be visible. If you use the option [Merge Same Dimension Textures](#merge-same-dimension-textures) and different textures in the `_MainTex` property get merged, those textures will show up as a white material like [here](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17) when shaders are blocked.  
-Since it relies on custom shaders, the optimizer also won't work for quest avatars.
+Since it relies on custom shaders, the optimizer also won't work for quest avatars at all.
 
 ## Installation
 To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.github.io/vpm-repos/main.json` as a custom repository.
+
+1. [Click here](https://d4rkc0d3r.github.io/vpm-repos/main_redirect.html)
+2. Allow the redirect to open with VCC
+3. VCC should now be open with a dialog asking you to add the repository
+4. Click I understand, Add Repository in the popup after reading its contents
+
+Alternatively you can do it manually:
 1. Open VCC
 2. Click Settings in the bottom left
 3. Click the Packages tab at the top
@@ -35,18 +42,20 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 
 You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
 Finally you can try to make a bug report and maybe I'll be able to fix it.  
-To do that you need to export the optimizer package folder that contains the optimized shaders. You can do that by right clicking on `d4rkAvatarOptimizer` in the project view under `Packages` and selecting `Export VPM as UnityPackage`.  
-Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.unitypackage` file.
+To do that you need to bundle up the optimized `.mat`, `.shader` & `.cginc` files. You can do that by right clicking on `d4rkAvatarOptimizer/TrashBin` in the project view under `Packages` and selecting `Show in Explorer`. A window with the folder selected should open. Go inside the folder and put the files into a `.zip` file. You don't need to include the `.asset` files as they can be very large and don't help when debugging the shaders.  
+Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.zip` file.
 
-![Export Material](./Documentation~/img/exportVPMasUnityPackage.png)  
-
-If the file is too large you have to manually find the `TrashBin` folder in your file system and only zip all `.mat`, `.shader` and `.cginc` files.
+![Show TrashBin in Explorer](./Documentation~/img/openTrashBinInExplorer.png)
 
 ## UI Options Documentation
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
 ![Example Screenshot](./Documentation~/img/example0.png)
+## Optimize on Upload
+Automatically optimizes the avatar before uploading it to vrc. This is non destructive, the avatar in your scene will stay as it is.
 ## Write Properties as Static Values
+This is very similar to what some shaders call locking in or baking.
+
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
 This enables the shader compiler to do more [constant folding](https://en.wikipedia.org/wiki/Constant_folding) and thus making the shader run faster.  
@@ -70,7 +79,7 @@ Merges materials with the same shader where properties can have different values
 If they do have different values the values will get written to a constant buffer.
 Material IDs get written to uv.w and used to access the correct value from that cbuffer.
 
-If your shader has a "lock in" or "bake" feature, make sure to not use it with this optimizer. Locked in shaders will have different actual shaders for each material, so they can't be combined. "Write Properties as Static Values" will take over the job of locking in the shaders.
+If your shader has a "lock in" or "bake" feature, make sure to not use it with this optimizer if you have "Write Properties as Static Values" enabled. Locked in shaders will have different actual shaders for each material, so they can't be combined. "Write Properties as Static Values" will take over the job of locking in the shaders.
 
 Can't merge materials if:
 * Shader is surface shader or has tessellation
@@ -111,7 +120,7 @@ You can exclude certain parts of the model from all optimizations. Any Transform
 Creates a copy of the avatar and performs the selected optimizations on the copy.
 Disables the original avatar so only the copy is active.  
 None of the original assets will be changed so even if the optimizer fails your avatar is still safe!  
-It also deletes the assets from the previous optimized copy. You should never change the optimized copy, it is only intended to be uploaded and then get deleted again.
+It also deletes the assets from the previous optimized copy. You should never change the optimized copy, it is only intended to be tested/uploaded and then get deleted again.
 
 In addition to the selected optimizations there are some optimizations that are always performed:
 * Remove unused shape keys with zero weight. Unused here means not a viseme nor referenced in any animation in the fx layer.
@@ -119,7 +128,6 @@ In addition to the selected optimizations there are some optimizations that are 
 * Merge identical material slots on skinned meshes.
 * Only reference bones if they have a non-zero weight on any vertex.
 * Add dummy animation to animator states that have no animation specified.
-* Remove illegal avatar components.
 * Remove everything with the EditorOnly tag.
 ## Show Mesh & Material Merge Preview
 Shows a preview of how meshes and materials would get merged.
@@ -148,7 +156,7 @@ Shows all textures that are used as normal maps but don't use the BC5 compressio
 Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
 The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.
 ### Penetrators
-Shows all meshes that the optimizer detected as DPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
+Shows all meshes that the optimizer detected as DPS or TPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
