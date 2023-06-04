@@ -1562,7 +1562,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
         Profiler.StartSection("CombineTextures()");
         bool isLinear = IsTextureLinear(textures[0]);
         var texArray = new Texture2DArray(textures[0].width, textures[0].height,
-            textures.Count, textures[0].format, true, isLinear);
+            textures.Count, textures[0].format, textures[0].mipmapCount > 1, isLinear);
         texArray.anisoLevel = textures[0].anisoLevel;
         texArray.wrapMode = textures[0].wrapMode;
         for (int i = 0; i < textures.Count; i++)
@@ -1620,7 +1620,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                 List<Texture2D> list = null;
                 foreach (var subList in textureArrayLists)
                 {
-                    if (subList[0].texelSize == texArray[0].texelSize && subList[0].format == texArray[0].format && IsTextureLinear(subList[0]) == IsTextureLinear(texArray[0]))
+                    if (CanCombineTextures(subList[0], texArray[0]))
                     {
                         list = subList;
                         break;

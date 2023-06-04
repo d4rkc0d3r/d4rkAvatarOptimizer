@@ -508,7 +508,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox(
                 "Some materials are locked in.\n" +
                 "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
-                "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise." + 
+                "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise.\n" + 
                 "Check the Debug Info foldout for a full list.", MessageType.Info);
         }
 

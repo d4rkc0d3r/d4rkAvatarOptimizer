@@ -1,3 +1,7 @@
+## v2.2.1
+### Bug Fixes
+* Fix error when trying to make Texture2DArray with mipmaps disabled.
+
 ## v2.2.0
 ### Features
 * Add option to apply optimization on upload instead of creating a copy of the avatar.
