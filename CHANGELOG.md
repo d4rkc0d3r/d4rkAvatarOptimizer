@@ -1,3 +1,7 @@
+## v2.2.2
+### Bug Fixes
+* Fix crash when the avatar has some viseme blendshapes set to `-none-`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/38)
+
 ## v2.2.1
 ### Bug Fixes
 * Fix error when trying to make Texture2DArray with mipmaps disabled.

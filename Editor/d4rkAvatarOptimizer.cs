@@ -2811,6 +2811,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                     var name = GenerateUniqueName(oldName, usedBlendShapeNames);
                     meshID = meshPathToID[path];
                     var blendShapeID = mesh.GetBlendShapeIndex(oldName);
+                    if (blendShapeID == -1)
+                        continue;
                     blendShapeMeshIDtoNewName[(meshID, blendShapeID)] = name;
                     blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(blendShapeID);
                     AddAnimationPathChange(
@@ -2854,6 +2856,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
                         var skinnedMesh = GetTransformFromPath(path).GetComponent<SkinnedMeshRenderer>();
                         var mesh = skinnedMesh.sharedMesh;
                         var blendShapeID = mesh.GetBlendShapeIndex(toMerge.blendshape.Substring(path.Length + 12));
+                        if (blendShapeID == -1)
+                            continue;
                         meshID = meshPathToID[path];
                         blendShapeMeshIDtoNewName[(meshID, blendShapeID)] = name;
                         var sourceDeltaVertices = new Vector3[mesh.vertexCount];
