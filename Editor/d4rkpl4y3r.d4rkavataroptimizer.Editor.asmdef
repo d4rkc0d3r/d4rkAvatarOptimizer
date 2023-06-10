@@ -13,6 +13,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.vrchat.avatars",
+            "expression": "3.1.13",
+            "define": "HAS_IEDITOR_ONLY"
+        }
+    ],
     "noEngineReferences": false
 }

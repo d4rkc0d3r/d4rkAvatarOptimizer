@@ -1,4 +1,5 @@
 ﻿#if UNITY_EDITOR
+#if HAS_IEDITOR_ONLY
 using System;
 using UnityEngine;
 using UnityEditor;
@@ -29,4 +30,5 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
     }
 }
+#endif
 #endif

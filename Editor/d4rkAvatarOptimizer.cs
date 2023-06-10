@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using VRC.SDKBase;
 
 #if UNITY_EDITOR
 using System.Threading;
@@ -24,7 +23,10 @@ using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 #endif
 
 [HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
-public class d4rkAvatarOptimizer : MonoBehaviour, IEditorOnly
+public class d4rkAvatarOptimizer : MonoBehaviour
+#if HAS_IEDITOR_ONLY
+, VRC.SDKBase.IEditorOnly
+#endif
 {
     public bool DoAutoSettings = true;
     public bool OptimizeOnUpload = true;

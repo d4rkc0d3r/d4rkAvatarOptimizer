@@ -43,7 +43,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
         EditorGUILayout.Space();
 
+        #if HAS_IEDITOR_ONLY
         Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
+        #else
+        GUI.enabled = false;
+        Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
+        GUI.enabled = true;
+        #endif
         Toggle("Write Properties as Static Values", ref optimizer.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
         EditorGUI.indentLevel++;
@@ -384,6 +390,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox("Put the optimizer on the original avatar, not the optimized copy.", MessageType.Error);
             return false;
         }
+
+        #if !HAS_IEDITOR_ONLY
+        EditorGUILayout.HelpBox("Your VRChat Avatar SDK is outdated.\n" +
+            "The version you are using does not support the \"Optimize on Upload\" feature.\n" +
+            "Please update your SDK to the latest version.", MessageType.Error);
+        #endif
 
         if (optimizer.UseRingFingerAsFootCollider)
         {
