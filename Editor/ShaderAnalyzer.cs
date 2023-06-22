@@ -297,7 +297,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
         {
             var fileName = Path.GetFileName(filePath);
-            if (fileName == "UnityCG.cginc" || fileName == "HLSLSupport.cginc" || fileName == "UnityShaderVariables.cginc")
+            var lower = fileName.ToLowerInvariant();
+            if (lower == "unitycg.cginc" || lower == "hlslsupport.cginc" || lower == "unityshadervariables.cginc" || lower == "unityinstancing.cginc")
                 return false; // don't inline include these ones since it leads to problems
             bool isTopLevelFile = false;
             if (alreadyIncludedFiles == null)
@@ -916,6 +917,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
                             {
                                 ParsePragma(program[programLineIndex], currentPass);
+                                if (program[programLineIndex].StartsWith("UNITY_INSTANCING_BUFFER_START"))
+                                {
+                                    throw new ParserException("Shader with instancing is not supported.");
+                                }
                             }
                             for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
                             {

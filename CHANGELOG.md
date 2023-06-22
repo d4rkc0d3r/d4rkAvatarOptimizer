@@ -1,3 +1,7 @@
+## v2.2.4
+### Bug Fixes
+* Detect if a shader has instancing support and throw a parser exception if it has. This prevents the optimizer from trying to optimize shaders that it can't handle.
+
 ## v2.2.3
 ### Bug Fixes
 * Fix crash with outdated VRC SDK. Disables the Optimize on Upload option and shows an error message instead. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/39)
