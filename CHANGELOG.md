@@ -1,3 +1,7 @@
+## v2.2.5
+### Bug Fixes
+* Fix crash when trying to create a file with invalid characters in the name. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/40)
+
 ## v2.2.4
 ### Bug Fixes
 * Detect if a shader has instancing support and throw a parser exception if it has. This prevents the optimizer from trying to optimize shaders that it can't handle.

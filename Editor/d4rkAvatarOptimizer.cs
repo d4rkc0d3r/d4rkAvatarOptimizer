@@ -280,6 +280,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
+        var invalids = System.IO.Path.GetInvalidFileNameChars();
+        var sanitizedName = string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
         bool assetIsBundleable = asset is Material || asset is AnimationClip;
         if (assetIsBundleable && assetBundlePath != null)
         {
@@ -287,7 +289,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         else
         {
-            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name);
+            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + sanitizedName);
             if (assetIsBundleable && assetBundlePath == null)
             {
                 assetBundlePath = path;
