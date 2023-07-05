@@ -137,11 +137,11 @@ In this detailed view the resulting meshes are separated by spaces. Materials th
 In this section you can see which layers in the FXLayer got recognized as a simple toggle layer and which ones didn't. The VRChat performance rank icons of Excellent are used for detected toggles while the Very Poor icon is used for layers that couldn't be merged.
 
 The option Show Detailed Errors will show you the reasons why the optimizer rejected a layer as a simple toggle.
-## Show Debug Info
+## Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
 ### Unparsable Materials
 Shows all materials that can't be parsed by the optimizer.  
-These materials stop the meshes they are int from getting merged with other meshes. It also disables the `Write Properties as Static Values` from getting applied to them.
+These materials stop the meshes they are in from getting merged with other meshes. It also disables the `Write Properties as Static Values` from getting applied to them.
 ### Unmergable Materials
 Shows all materials that can't be merged if their properties differ.  
 These materials could be parsed but use shader features that the optimizer can't handle. This stops the meshes they are in from getting merged with other meshes. Neither can they be merged with other materials that have different properties.

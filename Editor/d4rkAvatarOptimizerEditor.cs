@@ -943,7 +943,12 @@ public class d4rkAvatarOptimizerEditor : Editor
     private bool Toggle(string label, ref bool value)
     {
         bool output = value;
-        if (TooltipCache.TryGetValue(label, out var tooltip))
+        var tooltipKey = label;
+        if (tooltipKey.EndsWith(")") && !TooltipCache.ContainsKey(tooltipKey))
+        {
+            tooltipKey = tooltipKey.Substring(0, tooltipKey.LastIndexOf('(')).TrimEnd();
+        }
+        if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
         {
             output = EditorGUILayout.ToggleLeft(new GUIContent(label, string.Join("\n", tooltip.ToArray())), GUI.enabled ? value : false);
             var rect = GUILayoutUtility.GetLastRect();
@@ -969,7 +974,12 @@ public class d4rkAvatarOptimizerEditor : Editor
     private bool Foldout(string label, ref bool value)
     {
         bool output = value;
-        if (TooltipCache.TryGetValue(label, out var tooltip))
+        var tooltipKey = label;
+        if (tooltipKey.EndsWith(")") && !TooltipCache.ContainsKey(tooltipKey))
+        {
+            tooltipKey = tooltipKey.Substring(0, tooltipKey.LastIndexOf('(')).TrimEnd();
+        }
+        if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
         {
             output = EditorGUILayout.Foldout(value, new GUIContent(label, string.Join("\n", tooltip.ToArray())));
             var rect = GUILayoutUtility.GetLastRect();
