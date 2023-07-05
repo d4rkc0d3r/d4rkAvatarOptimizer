@@ -54,15 +54,14 @@ There are also some settings to tweak the optimization. You can read about their
 ## Optimize on Upload
 Automatically optimizes the avatar before uploading it to vrc. This is non destructive, the avatar in your scene will stay as it is.
 ## Write Properties as Static Values
-This is very similar to what some shaders call locking in or baking.
+This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader. If you don't use it you need to make sure to lock in or bake your shader before uploading it to vrc or running the optimizer.
 
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
 This enables the shader compiler to do more [constant folding](https://en.wikipedia.org/wiki/Constant_folding) and thus making the shader run faster.  
 Unfortunately the shader compiler is allowed to ignore NaNs while doing that so if a shader is not made with that in mind this might cause some issues.
 ## Merge Skinned Meshes
-The optimizer tries to merge different skinned meshes together.
-If some of those skinned mesh game objects get toggled with animations in the fxlayer it will add logic to the shader to toggle those sub meshes in shader instead.
+The optimizer tries to merge different skinned meshes together. If some of those skinned mesh game objects get toggled with animations in the fxlayer it will add logic to the shader to toggle those sub meshes in shader instead.
 Skinned meshes that are on different layers (eg UIMenu) from each other will not get merged.  
 Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
 Can't merge meshes that have any tessellation or surface shaders.  
@@ -75,9 +74,7 @@ With this setting active the optimizer will merge meshes that have blend shapes 
 This makes sure that animated properties from one mesh don't animate the property on materials from a different mesh if their meshes got merged.
 Can break since it creates a lot of constant buffer variables.
 ## Merge Different Property Materials
-Merges materials with the same shader where properties can have different values.
-If they do have different values the values will get written to a constant buffer.
-Material IDs get written to uv.w and used to access the correct value from that cbuffer.
+Merges materials with the same shader where properties can have different values. If they do have different values the values will get written to a constant buffer. Material IDs get written to uv.w and used to access the correct value from that cbuffer.
 
 If your shader has a "lock in" or "bake" feature, make sure to not use it with this optimizer if you have "Write Properties as Static Values" enabled. Locked in shaders will have different actual shaders for each material, so they can't be combined. "Write Properties as Static Values" will take over the job of locking in the shaders.
 
@@ -108,7 +105,7 @@ You can read about this technique [here](https://notes.sleightly.dev/dbt-combini
 When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
 ## Delete Unused Components
 Deletes all components that are turned off and never get enabled by animations. It also deletes phys bone colliders that are not referenced by any used phys bone components.
-## Delete Unused Game Objects
+## Delete Unused GameObjects
 Deletes all game objects that have no used components and are not referenced in any other used components. This also applies to bones referenced in skinned meshes as long as the bones aren't moved by animations, eye look settings or phys bone components. It re parents the children of the deleted game objects to their respective parents as well as transfers its weight to the parent.
 ## Use Ring Finger as Foot Collider
 Moves the ring finger collider to match the foot contact. This enables you to touch other players phys bones with your feet.
@@ -143,11 +140,14 @@ The option Show Detailed Errors will show you the reasons why the optimizer reje
 ## Show Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
 ### Unparsable Materials
-Shows all materials that can't be parsed by the optimizer.
+Shows all materials that can't be parsed by the optimizer.  
+These materials stop the meshes they are int from getting merged with other meshes. It also disables the `Write Properties as Static Values` from getting applied to them.
 ### Unmergable Materials
-Shows all materials that can't be merged if their properties differ.
+Shows all materials that can't be merged if their properties differ.  
+These materials could be parsed but use shader features that the optimizer can't handle. This stops the meshes they are in from getting merged with other meshes. Neither can they be merged with other materials that have different properties.
 ### Unmergable Texture Materials
-Shows all materials that can't be merged if their textures differ.
+Shows all materials that can't be merged if their textures differ.  
+These materials use shader features that prevent the optimizer from merging textures into a Texture2DArray.
 ### Crunched Textures
 Shows all textures that got crunch compressed. Crunch compressed textures can't be merged into Texture2DArrays and as such can prevent materials from being merged.
 ### NonBC5 Normal Maps
@@ -155,6 +155,9 @@ Shows all textures that are used as normal maps but don't use the BC5 compressio
 ### Locked in Materials
 Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
 The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.
+### Unlocked Materials
+Shows all materials that have a "lock in" or "bake" feature disabled which the optimizer detected.  
+With the `Write Properties as Static Values` option disabled you need to make sure to lock in or bake your materials in this list before optimization.
 ### Penetrators
 Shows all meshes that the optimizer detected as DPS or TPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
 ### Unused Components

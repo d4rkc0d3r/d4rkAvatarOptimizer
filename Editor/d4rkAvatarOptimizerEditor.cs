@@ -888,6 +888,49 @@ public class d4rkAvatarOptimizerEditor : Editor
         return false;
     }
 
+    private static Dictionary<string, List<string>> tooltipCache = null;
+    private Dictionary<string, List<string>> TooltipCache
+    {
+        get
+        {
+            if (tooltipCache == null)
+            {
+                tooltipCache = new Dictionary<string, List<string>>();
+                var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
+                path = path.Substring(0, path.LastIndexOf('/'));
+                using (var reader = new System.IO.StreamReader(path + "/../README.md"))
+                {
+                    string line;
+                    string currentTooltip = "DUMMY_SECTION";
+                    tooltipCache[currentTooltip] = new List<string>();
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (line.StartsWith("#") && line.IndexOf(' ') != -1)
+                        {
+                            int index = line.IndexOf(' ');
+                            currentTooltip = line.Substring(index + 1);
+                            tooltipCache[currentTooltip] = new List<string>();
+                        }
+                        else
+                        {
+                            tooltipCache[currentTooltip].Add(line);
+                        }
+                    }
+                }
+
+                // trim empty lines at start and end of the tooltips
+                foreach (var pair in tooltipCache)
+                {
+                    while (pair.Value.Count > 0 && string.IsNullOrWhiteSpace(pair.Value[0]))
+                        pair.Value.RemoveAt(0);
+                    while (pair.Value.Count > 0 && string.IsNullOrWhiteSpace(pair.Value[pair.Value.Count - 1]))
+                        pair.Value.RemoveAt(pair.Value.Count - 1);
+                }
+            }
+            return tooltipCache;
+        }
+    }
+
     private bool Button(string label)
     {
         GUILayout.BeginHorizontal();
@@ -899,7 +942,19 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Toggle(string label, ref bool value)
     {
-        bool output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
+        bool output = value;
+        if (TooltipCache.TryGetValue(label, out var tooltip))
+        {
+            output = EditorGUILayout.ToggleLeft(new GUIContent(label, string.Join("\n", tooltip.ToArray())), GUI.enabled ? value : false);
+            var rect = GUILayoutUtility.GetLastRect();
+            rect.x += rect.width - 20;
+            rect.width = 20;
+            GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
+        }
+        else
+        {
+            output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
+        }
         if (GUI.enabled)
         {
             if (value != output)
@@ -913,7 +968,20 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Foldout(string label, ref bool value)
     {
-        bool output = EditorGUILayout.Foldout(value, label);
+        bool output = value;
+        if (TooltipCache.TryGetValue(label, out var tooltip))
+        {
+            output = EditorGUILayout.Foldout(value, new GUIContent(label, string.Join("\n", tooltip.ToArray())));
+            var rect = GUILayoutUtility.GetLastRect();
+            rect.x += rect.width - 20;
+            rect.width = 20;
+            GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
+            GUI.Label(rect, new GUIContent("", string.Join("\n", tooltip.ToArray())));
+        }
+        else
+        {
+            output = EditorGUILayout.Foldout(value, label);
+        }
         if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
             output = !value;
         if (value != output)
