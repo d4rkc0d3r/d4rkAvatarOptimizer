@@ -39,7 +39,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField($"<size=20>d4rkpl4y3r's Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+        EditorGUILayout.LabelField($"<size=20>d4rk{(Screen.width > 450 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
         EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
         EditorGUILayout.Space();
 

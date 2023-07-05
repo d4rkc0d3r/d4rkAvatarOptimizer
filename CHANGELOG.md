@@ -2,6 +2,9 @@
 ### Features
 * Added tooltips to all toggles and foldouts. They are identical to the descriptions in the readme.
 
+### Changes
+* The title of the inspector now shows a shorter name when the window is too small to show the full name.
+
 ## v2.2.5
 ### Bug Fixes
 * Fix crash when trying to create a file with invalid characters in the name. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/40)
