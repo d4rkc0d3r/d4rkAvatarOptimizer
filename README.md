@@ -165,7 +165,8 @@ Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects
 Shows all game objects that are disabled and never get enabled by animations.
 ### Material Swaps
-Shows all materials that can be swapped into a material slot with an animation.
+Shows all materials that can be swapped into a material slot with an animation.  
+Any material slot affected by a material swap animation can't be merged with other material slots. Thus you should try to use material swap animations as little as possible to make full use of the optimizer.
 ### Animated Material Property Paths
 Shows all material properties with their game object path that are animated.
 ### Game Objects with Toggle Animation

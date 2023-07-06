@@ -1,6 +1,7 @@
 ## v2.3.0
 ### Features
 * Added tooltips to all toggles and foldouts. They are identical to the descriptions in the readme.
+* Added settings window to configure the default settings when adding the optimizer component to an avatar.
 
 ### Changes
 * The title of the inspector now shows a shorter name when the window is too small to show the full name.

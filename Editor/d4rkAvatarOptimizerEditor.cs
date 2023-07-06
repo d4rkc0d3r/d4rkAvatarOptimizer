@@ -39,9 +39,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField($"<size=20>d4rk{(Screen.width > 450 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
+        EditorGUI.indentLevel++;
+        EditorGUILayout.LabelField($"<size=20>d4rk{(Screen.width > 465 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
+        var settingsRect = GUILayoutUtility.GetLastRect();
         EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
-        EditorGUILayout.Space();
+        EditorGUI.indentLevel--;
+
+        settingsRect.width = 24;
+        settingsRect.height = 24;
+        bool pressedSettingsButton = GUI.Button(settingsRect, new GUIContent("", "Settings"));
+        GUI.DrawTexture(settingsRect, EditorGUIUtility.IconContent("Settings@2x").image);
+        if (pressedSettingsButton)
+        {
+            EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
+        }
 
         #if HAS_IEDITOR_ONLY
         Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
@@ -627,11 +638,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (optimizer.DoAutoSettings)
         {
             optimizer.DoAutoSettings = false;
-            optimizer.DeleteUnusedGameObjects = !optimizer.UsesAnyLayerMasks();
-            var triCount = optimizer.GetComponentsInChildren<Renderer>(true)
-                .Where(r => r.GetSharedMesh() != null)
-                .Sum(r => r.GetSharedMesh().triangles.Length / 3);
-            optimizer.ForceMergeBlendShapeMissMatch = triCount < 70000;
+            AvatarOptimizerSettings.ApplyDefaults(optimizer);
+            if (AvatarOptimizerSettings.IsAutoSetting("DeleteUnusedGameObjects"))
+            {
+                optimizer.DeleteUnusedGameObjects = !optimizer.UsesAnyLayerMasks();
+            }
+            if (AvatarOptimizerSettings.IsAutoSetting("ForceMergeBlendShapeMissMatch"))
+            {
+                var triCount = optimizer.GetComponentsInChildren<Renderer>(true)
+                    .Where(r => r.GetSharedMesh() != null)
+                    .Sum(r => r.GetSharedMesh().triangles.Length / 3);
+                optimizer.ForceMergeBlendShapeMissMatch = triCount < 70000;
+            }
         }
     }
 
