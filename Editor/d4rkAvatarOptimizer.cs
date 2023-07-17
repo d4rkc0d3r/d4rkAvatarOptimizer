@@ -2422,7 +2422,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 newMesh.bounds = mesh.bounds;
                 newMesh.SetNormals(targetNormals);
                 if (targetTangents.Any(t => t != Vector4.zero))
-                    newMesh.SetTangents(targetTangents);
+                    newMesh.SetTangents(targetTangents.Select(t => t == Vector4.zero ? new Vector4(1, 0, 0, 1) : t).ToArray());
                 newMesh.subMeshCount = matchedSlots.Count;
                 for (int i = 0; i < matchedSlots.Count; i++)
                 {

@@ -1,3 +1,7 @@
+## v2.3.1
+### Bug Fixes
+* Fix tangents being 0 if a mesh with no tangents gets merged with one that has tangents.
+
 ## v2.3.0
 ### Features
 * Added tooltips to all toggles and foldouts. They are identical to the descriptions in the readme.
