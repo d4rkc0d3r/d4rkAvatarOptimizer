@@ -32,10 +32,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static AnimatorController Copy(AnimatorController source, string path, Dictionary<int, int> fxLayerMap)
         {
-            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(source), path);
-            var target = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            var target = new AnimatorController();
             target.name = $"{source.name}(Optimized)";
+            AssetDatabase.CreateAsset(target, path);
             var optimizer = new AnimatorOptimizer(target, source);
+            optimizer.Copy();
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             optimizer.FixAllLayerControlBehaviours();
             return target;
@@ -50,6 +51,37 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizer.layersToMerge = new HashSet<int>(layersToMerge);
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             return optimizer.Run();
+        }
+
+        private AnimatorController Copy()
+        {
+            foreach (var p in source.parameters)
+            {
+                var newP = new AnimatorControllerParameter
+                {
+                    name = p.name,
+                    type = p.type,
+                    defaultBool = p.defaultBool,
+                    defaultFloat = p.defaultFloat,
+                    defaultInt = p.defaultInt
+                };
+                if (target.parameters.Count(x => x.name.Equals(newP.name)) == 0)
+                {
+                    target.AddParameter(newP);
+                }
+            }
+
+            for (int i = 0; i < source.layers.Length; i++)
+            {
+                AnimatorControllerLayer newL = CloneLayer(source.layers[i], i == 0);
+                newL.name = target.MakeUniqueLayerName(newL.name);
+                newL.stateMachine.name = newL.name;
+                target.AddLayer(newL);
+            }
+
+            EditorUtility.SetDirty(target);
+
+            return target;
         }
 
         private AnimatorController Run()
