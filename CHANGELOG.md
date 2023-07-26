@@ -1,3 +1,7 @@
+## v2.3.2
+### Bug Fixes
+* Fix animator copy when the animator is a sub asset. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/43)
+
 ## v2.3.1
 ### Bug Fixes
 * Fix tangents being 0 if a mesh with no tangents gets merged with one that has tangents.

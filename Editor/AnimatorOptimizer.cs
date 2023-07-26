@@ -32,6 +32,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static AnimatorController Copy(AnimatorController source, string path, Dictionary<int, int> fxLayerMap)
         {
+            if (AssetDatabase.IsSubAsset(source))
+            {
+                return Run(source, path, new List<int>(), fxLayerMap);
+            }
+            // I try to use CopyAsset for non FX layers as the other way broke falling animations with gogo loco
+            // however I can't use it if the source is a sub asset
             AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(source), path);
             var target = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
             target.name = $"{source.name}(Optimized)";
