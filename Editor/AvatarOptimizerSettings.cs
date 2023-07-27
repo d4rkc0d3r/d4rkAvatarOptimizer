@@ -9,6 +9,7 @@ using d4rkpl4y3r.AvatarOptimizer.Extensions;
 
 public class AvatarOptimizerSettings : EditorWindow
 {
+    #pragma warning disable 0414
     private static bool OptimizeOnUpload = true;
     private static bool WritePropertiesAsStaticValues = true;
     private static bool MergeSkinnedMeshes = true;
@@ -26,6 +27,8 @@ public class AvatarOptimizerSettings : EditorWindow
     private static int DeleteUnusedGameObjects = 2;
     private static bool UseRingFingerAsFootCollider = false;
     private static bool ProfileTimeUsed = false;
+    #pragma warning restore 0414
+
     private static readonly string PrefsPrefix = "d4rkpl4y3r_AvatarOptimizer_";
 
     private static Dictionary<string, string> FieldDisplayName = new Dictionary<string, string>() {

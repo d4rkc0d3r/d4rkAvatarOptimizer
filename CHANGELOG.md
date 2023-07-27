@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Fix animator copy when the animator is a sub asset. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/43)
 * Disable Create Optimized Copy button if the avatar has a VRCFury component. Also shows a warning explaining why. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/42)
+* Fix warning spam in console from "unused" properties in the setting editor.
 
 ## v2.3.1
 ### Bug Fixes
