@@ -581,6 +581,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
         }
 
+        bool hasVRCFuryComponent = optimizer.GetComponents<Component>().Any(c => c.GetType().Name == "VRCFury");
+        if (hasVRCFuryComponent)
+        {
+            EditorGUILayout.HelpBox(
+                "VRCFury is on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +
+                "To test in editor built a VRCFury test avatar and use the optimizer on that.\n" +
+                "For uploading just use the Optimize on Upload feature as that ensures fury and the optimizer get used in the correct order.", MessageType.Warning);
+            return false;
+        }
+
         return true;
     }
 
