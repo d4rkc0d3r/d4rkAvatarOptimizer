@@ -76,8 +76,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Different Render Queue", ref optimizer.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
+        Toggle("Optimize FX Layer", ref optimizer.OptimizeFXLayer);
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
-        Toggle("Merge Simple Toggles as BlendTree", ref optimizer.MergeSimpleTogglesAsBlendTree);
         Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
         Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
@@ -167,7 +167,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
         if (optimizer.GetFXLayer() != null)
         {
-            var mergedLayerCount = optimizer.MergeSimpleTogglesAsBlendTree ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
+            var mergedLayerCount = optimizer.OptimizeFXLayer ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
             var layerCount = optimizer.GetFXLayer().layers.Length;
             PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
         }
@@ -196,7 +196,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         EditorGUILayout.Separator();
 
-        if (optimizer.MergeSimpleTogglesAsBlendTree && optimizer.GetFXLayer() != null)
+        if (optimizer.OptimizeFXLayer && optimizer.GetFXLayer() != null)
         {
             if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults))
             {
@@ -726,6 +726,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 for (int i = 0; i < fxLayerMergeErrorsCache.Count; i++)
                 {
                     fxLayerMergeErrorsCache[i] = fxLayerMergeErrorsCache[i].Distinct().ToList();
+                }
+                var uselessLayers = optimizer.FindUselessFXLayers();
+                foreach (var layer in uselessLayers)
+                {
+                    fxLayerMergeErrorsCache[layer].Clear();
                 }
             }
             return fxLayerMergeErrorsCache;

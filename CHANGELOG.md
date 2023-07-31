@@ -1,4 +1,10 @@
 ## v2.4.0
+### Features
+* Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
+
+### Changes
+* Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".
+
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before it's connected VRCSpatialAudioSource.
 

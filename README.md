@@ -98,8 +98,9 @@ Merges materials even if their render queue differs.
 ## Merge Same Ratio Blend Shapes
 This option tries to merge blend shapes that always get animated in the same ratio.  
 For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.
-## Merge Simple Toggles as BlendTree
-Tries to find layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
+## Optimize FX Layer
+Deletes any layers in the FXLayer that have 0 weight and are not affected by any layer weight control. Also deletes layers that have no states and sub state machines.  
+Tries to find simple toggle layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
 ## Keep MMD Blend Shapes
 When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.

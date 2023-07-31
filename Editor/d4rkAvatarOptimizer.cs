@@ -42,7 +42,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool KeepMMDBlendShapes = false;
     public bool DeleteUnusedComponents = true;
     public bool DeleteUnusedGameObjects = false;
-    public bool MergeSimpleTogglesAsBlendTree = true;
+    public bool OptimizeFXLayer = true;
     public bool MergeSameRatioBlendShapes = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
@@ -659,22 +659,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var fxLayersToMerge = new List<int>();
+        var fxLayersToDestroy = new List<int>();
         var fxLayerMap = new Dictionary<int, int>();
-        if (MergeSimpleTogglesAsBlendTree && GetFXLayer() != null)
+        if (OptimizeFXLayer && GetFXLayer() != null)
         {
             var errors = AnalyzeFXLayerMergeAbility();
+            var uselessLayers = FindUselessFXLayers();
             int currentLayer = 0;
             for (int i = 0; i < GetFXLayer().layers.Length; i++)
             {
                 fxLayerMap[i] = currentLayer;
-                if (errors[i].Count > 0)
+                if (uselessLayers.Contains(i))
                 {
-                    currentLayer++;
+                    fxLayersToDestroy.Add(i);
                     continue;
                 }
-                fxLayersToMerge.Add(i);
+                if (errors[i].Count == 0)
+                {
+                    fxLayersToMerge.Add(i);
+                    continue;
+                }
+                currentLayer++;
             }
-            if (fxLayersToMerge.Count < 2)
+            if (fxLayersToMerge.Count < 2 && fxLayersToDestroy.Count == 0)
             {
                 fxLayersToMerge.Clear();
                 fxLayerMap.Clear();
@@ -688,7 +695,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
             optimizedControllers[i] = i == 4
-                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayersToMerge, fxLayerMap)
+                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy)
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
         }
         AssetDatabase.SaveAssets();
@@ -757,8 +764,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (fxLayer == null)
             return new List<List<string>>();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
-        if (avDescriptor == null)
-            return new List<List<string>>();
 
         var errorMessages = fxLayer.layers.Select(layer => new List<string>()).ToList();
 
@@ -938,6 +943,70 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         return errorMessages;
+    }
+
+    public HashSet<int> FindUselessFXLayers()
+    {
+        var fxLayer = GetFXLayer();
+        if (fxLayer == null)
+            return new HashSet<int>();
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+
+        var isAffectedByLayerWeightControl = new HashSet<int>();
+
+        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            for (int j = 0; j < controller.layers.Length; j++)
+            {
+                var stateMachine = controller.layers[j].stateMachine;
+                if (stateMachine == null)
+                    continue;
+                foreach (var behaviour in stateMachine.behaviours.Union(stateMachine.states.SelectMany(s => s.state.behaviours)))
+                {
+                    if (behaviour is VRCAnimatorLayerControl layerControl && layerControl.playable == BlendableLayer.FX)
+                    {
+                        isAffectedByLayerWeightControl.Add(layerControl.layer);
+                    }
+                }
+            }
+        }
+
+        var uselessLayers = new HashSet<int>();
+
+        for (int i = 0; i < fxLayer.layers.Length; i++)
+        {
+            var layer = fxLayer.layers[i];
+            var stateMachine = layer.stateMachine;
+            bool isNotFirstLayerOrSecondLayerCanBeFirst = i != 0 || (fxLayer.layers.Length >= 2 && fxLayer.layers[1].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(1));
+            if (stateMachine == null)
+            {
+                if (isNotFirstLayerOrSecondLayerCanBeFirst)
+                {
+                    uselessLayers.Add(i);
+                }
+                continue;
+            }
+            var hasBehaviours = stateMachine.behaviours.Length != 0 && stateMachine.states.Any(s => s.state.behaviours.Length != 0);
+            if (hasBehaviours)
+            {
+                continue;
+            }
+            if (layer.defaultWeight == 0 && i != 0 && !isAffectedByLayerWeightControl.Contains(i))
+            {
+                uselessLayers.Add(i);
+                continue;
+            }
+            if (isNotFirstLayerOrSecondLayerCanBeFirst && stateMachine.stateMachines.Length == 0 && stateMachine.states.Length == 0)
+            {
+                uselessLayers.Add(i);
+                continue;
+            }
+        }
+
+        return uselessLayers;
     }
 
     public Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()

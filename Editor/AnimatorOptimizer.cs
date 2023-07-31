@@ -21,6 +21,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private Dictionary<AnimatorStateMachine, AnimatorStateMachine> stateMachineMap = new Dictionary<AnimatorStateMachine, AnimatorStateMachine>();
         private Dictionary<int, int> fxLayerMap = new Dictionary<int, int>();
         private HashSet<int> layersToMerge = new HashSet<int>();
+        private HashSet<int> layersToDestroy = new HashSet<int>();
         private HashSet<string> parametersToChangeToFloat = new HashSet<string>();
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source)
@@ -34,7 +35,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (AssetDatabase.IsSubAsset(source))
             {
-                return Run(source, path, new List<int>(), fxLayerMap);
+                return Run(source, path, fxLayerMap, new List<int>(), new List<int>());
             }
             // I try to use CopyAsset for non FX layers as the other way broke falling animations with gogo loco
             // however I can't use it if the source is a sub asset
@@ -47,13 +48,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return target;
         }
 
-        public static AnimatorController Run(AnimatorController source, string path, List<int> layersToMerge, Dictionary<int, int> fxLayerMap)
+        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge, List<int> layersToDestroy)
         {
             var target = new AnimatorController();
             target.name = $"{source.name}(Optimized)";
             AssetDatabase.CreateAsset(target, path);
             var optimizer = new AnimatorOptimizer(target, source);
             optimizer.layersToMerge = new HashSet<int>(layersToMerge);
+            optimizer.layersToDestroy = new HashSet<int>(layersToDestroy);
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             return optimizer.Run();
         }
@@ -100,7 +102,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
             for (int i = 0; i < source.layers.Length; i++)
             {
-                if (layersToMerge.Contains(i))
+                if (layersToMerge.Contains(i) || layersToDestroy.Contains(i))
                 {
                     continue;
                 }

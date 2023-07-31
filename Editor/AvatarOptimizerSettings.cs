@@ -20,8 +20,8 @@ public class AvatarOptimizerSettings : EditorWindow
     private static bool MergeSameDimensionTextures = true;
     private static bool MergeBackFaceCullingWithCullingOff = false;
     private static bool MergeDifferentRenderQueue = false;
+    private static bool OptimizeFXLayer = true;
     private static bool MergeSameRatioBlendShapes = true;
-    private static bool MergeSimpleTogglesAsBlendTree = true;
     private static bool KeepMMDBlendShapes = false;
     private static bool DeleteUnusedComponents = true;
     private static int DeleteUnusedGameObjects = 2;
@@ -45,7 +45,7 @@ public class AvatarOptimizerSettings : EditorWindow
         {"KeepMMDBlendShapes", "Keep MMD Blend Shapes"},
         {"DeleteUnusedComponents", "Delete Unused Components"},
         {"DeleteUnusedGameObjects", "Delete Unused GameObjects"},
-        {"MergeSimpleTogglesAsBlendTree", "Merge Simple Toggles as Blend Tree"},
+        {"OptimizeFXLayer", "Optimize FX Layer"},
         {"MergeSameRatioBlendShapes", "Merge Same Ratio Blend Shapes"},
         {"UseRingFingerAsFootCollider", "Use Ring Finger as Foot Collider"},
         {"ProfileTimeUsed", "Profile Time Used"}
