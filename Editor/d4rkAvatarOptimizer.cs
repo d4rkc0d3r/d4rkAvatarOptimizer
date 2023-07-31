@@ -778,8 +778,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var stateMachine = layer.stateMachine;
                 if (stateMachine == null)
                     continue;
-                var states = stateMachine.states;
-                foreach (var behaviour in stateMachine.behaviours.Union(states.SelectMany(s => s.state.behaviours)))
+                foreach (var behaviour in stateMachine.EnumerateAllBehaviours())
                 {
                     if (behaviour is VRCAnimatorLayerControl layerControl)
                     {
@@ -964,7 +963,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var stateMachine = controller.layers[j].stateMachine;
                 if (stateMachine == null)
                     continue;
-                foreach (var behaviour in stateMachine.behaviours.Union(stateMachine.states.SelectMany(s => s.state.behaviours)))
+                foreach (var behaviour in stateMachine.EnumerateAllBehaviours())
                 {
                     if (behaviour is VRCAnimatorLayerControl layerControl && layerControl.playable == BlendableLayer.FX)
                     {
@@ -990,8 +989,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
                 continue;
             }
-            var hasBehaviours = stateMachine.behaviours.Length != 0 && stateMachine.states.Any(s => s.state.behaviours.Length != 0);
-            if (hasBehaviours)
+            if (stateMachine.EnumerateAllBehaviours().Any())
             {
                 lastNonUselessLayer = i;
                 continue;

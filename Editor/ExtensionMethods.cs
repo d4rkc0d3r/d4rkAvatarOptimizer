@@ -89,6 +89,31 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             }
         }
 
+        public static IEnumerable<StateMachineBehaviour> EnumerateAllBehaviours(this AnimatorStateMachine stateMachine)
+        {
+            var queue = new Queue<AnimatorStateMachine>();
+            queue.Enqueue(stateMachine);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var subStateMachine in current.stateMachines)
+                {
+                    queue.Enqueue(subStateMachine.stateMachine);
+                }
+                foreach (var behaviour in current.behaviours)
+                {
+                    yield return behaviour;
+                }
+                foreach (var state in current.states.Select(s => s.state))
+                {
+                    foreach (var behaviour in state.behaviours)
+                    {
+                        yield return behaviour;
+                    }
+                }
+            }
+        }
+
         public static IEnumerable<AnimationClip> EnumerateAllClips(this Motion motion)
         {
             if (motion is AnimationClip clip)
