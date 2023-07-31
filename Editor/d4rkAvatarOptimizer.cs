@@ -976,14 +976,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         var uselessLayers = new HashSet<int>();
 
-        for (int i = 0; i < fxLayer.layers.Length; i++)
+        int lastNonUselessLayer = fxLayer.layers.Length;
+        for (int i = fxLayer.layers.Length - 1; i >= 0; i--)
         {
             var layer = fxLayer.layers[i];
             var stateMachine = layer.stateMachine;
-            bool isNotFirstLayerOrSecondLayerCanBeFirst = i != 0 || (fxLayer.layers.Length >= 2 && fxLayer.layers[1].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(1));
+            bool isNotFirstLayerOrLastNonUselessLayerCanBeFirst = i != 0 || (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
             if (stateMachine == null)
             {
-                if (isNotFirstLayerOrSecondLayerCanBeFirst)
+                if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst)
                 {
                     uselessLayers.Add(i);
                 }
@@ -992,18 +993,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var hasBehaviours = stateMachine.behaviours.Length != 0 && stateMachine.states.Any(s => s.state.behaviours.Length != 0);
             if (hasBehaviours)
             {
+                lastNonUselessLayer = i;
                 continue;
             }
-            if (layer.defaultWeight == 0 && i != 0 && !isAffectedByLayerWeightControl.Contains(i))
+            if (i != 0 && layer.defaultWeight == 0 && !isAffectedByLayerWeightControl.Contains(i))
             {
                 uselessLayers.Add(i);
                 continue;
             }
-            if (isNotFirstLayerOrSecondLayerCanBeFirst && stateMachine.stateMachines.Length == 0 && stateMachine.states.Length == 0)
+            if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst && stateMachine.stateMachines.Length == 0 && stateMachine.states.Length == 0)
             {
                 uselessLayers.Add(i);
                 continue;
             }
+            lastNonUselessLayer = i;
         }
 
         return uselessLayers;
