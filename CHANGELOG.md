@@ -1,3 +1,7 @@
+## v2.4.0
+### Bug Fixes
+* Fix error message when trying to delete an unused AudioSource before it's connected VRCSpatialAudioSource.
+
 ## v2.3.2
 ### Bug Fixes
 * Fix animator copy when the animator is a sub asset. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/43)

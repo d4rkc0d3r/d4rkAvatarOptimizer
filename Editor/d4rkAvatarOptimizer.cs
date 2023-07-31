@@ -3053,6 +3053,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var list = FindAllUnusedComponents();
         foreach (var component in list)
         {
+            if (component == null)
+                continue;
+            if (component is AudioSource audio)
+            {
+                var vrcAudioSource = audio.GetComponent<VRCSpatialAudioSource>();
+                if (vrcAudioSource != null)
+                {
+                    DestroyImmediate(vrcAudioSource);
+                }
+            }
             DestroyImmediate(component);
         }
     }
