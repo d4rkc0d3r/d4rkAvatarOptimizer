@@ -20,19 +20,7 @@ To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.git
 3. VCC should now be open with a dialog asking you to add the repository
 4. Click I understand, Add Repository in the popup after reading its contents
 
-Alternatively you can do it manually:
-1. Open VCC
-2. Click Settings in the bottom left
-3. Click the Packages tab at the top
-4. Click Add Repository in the top right
-5. Paste the url into the text field and click Add
-6. Click I understand, Add Repository in the popup after reading its contents
-7. Activate the checkbox next to the repository you just added
-
 After that you can add and update the optimizer like any other packages in your VCC projects.
-
-![Add Repository](./Documentation~/img/addRepoToVCC.png)
-
 
 ## Why my Shader Pink?
 
@@ -99,7 +87,7 @@ Merges materials even if their render queue differs.
 This option tries to merge blend shapes that always get animated in the same ratio.  
 For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.
 ## Optimize FX Layer
-Deletes any layers in the FXLayer that have 0 weight and are not affected by any layer weight control. Also deletes layers that have no states and sub state machines.  
+Deletes any layers in the FXLayer that have 0 weight and are not affected by any layer weight control and have no state behaviours. Also deletes layers that have no states and sub state machines.  
 Tries to find simple toggle layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
 ## Keep MMD Blend Shapes

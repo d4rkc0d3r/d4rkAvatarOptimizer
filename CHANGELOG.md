@@ -6,7 +6,7 @@
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".
 
 ### Bug Fixes
-* Fix error message when trying to delete an unused AudioSource before it's connected VRCSpatialAudioSource.
+* Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
 
 ## v2.3.2
 ### Bug Fixes
