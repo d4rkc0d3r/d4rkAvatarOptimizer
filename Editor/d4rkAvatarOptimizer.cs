@@ -1829,7 +1829,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         case ParsedShader.Property.Type.Texture2D:
                             if (!arrayPropertyValues[i].TryGetValue("arrayIndex" + prop.name, out var textureArray))
                             {
-                                arrayPropertyValues[i]["arrayIndex" + prop.name] = ("int", new List<string>());
+                                arrayPropertyValues[i]["arrayIndex" + prop.name] = ("float", new List<string>());
                                 arrayPropertyValues[i]["shouldSample" + prop.name] = ("bool", new List<string>());
                             }
                             var tex = mat.GetTexture(prop.name);

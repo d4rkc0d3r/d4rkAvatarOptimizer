@@ -1067,8 +1067,32 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             foreach (var arrayProperty in arrayPropertyValues)
             {
-                string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
-                output.Add(arrayProperty.Key + " = " + name + "[d4rkAvatarOptimizer_MaterialID];");
+                var values = arrayProperty.Value.values;
+                var seenOnce = new HashSet<string>();
+                var seenMultiple = new HashSet<string>();
+                foreach (var value in values)
+                {
+                    if (seenOnce.Contains(value))
+                    {
+                        seenOnce.Remove(value);
+                        seenMultiple.Add(value);
+                    }
+                    else if (!seenMultiple.Contains(value))
+                    {
+                        seenOnce.Add(value);
+                    }
+                }
+                if (seenOnce.Count == 1 && seenMultiple.Count == 1)
+                {
+                    // all values but one are the same, so we can use a ternary operator
+                    int index = values.IndexOf(seenOnce.First());
+                    output.Add($"{arrayProperty.Key} = d4rkAvatarOptimizer_MaterialID == {index} ? {seenOnce.First()} : {seenMultiple.First()};");
+                }
+                else
+                {
+                    // we need to index into the array
+                    output.Add($"{arrayProperty.Key} = d4rkAvatarOptimizerArray{arrayProperty.Key}[d4rkAvatarOptimizer_MaterialID];");
+                }
             }
         }
 
@@ -1696,7 +1720,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 if (property.Key.StartsWith("arrayIndex") && texturesToMerge.Contains(property.Key.Substring(10)))
                 {
-                    output.Add("static int " + property.Key + " = " + property.Value + ";");
+                    output.Add("static float " + property.Key + " = " + property.Value + ";");
                 }
             }
             int textureWrapperCount = 0;

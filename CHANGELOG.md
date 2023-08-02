@@ -4,6 +4,9 @@
 
 ### Changes
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".
+* Small optimizations to the generated shaders:
+  * Changed type of Texture2DArray index from int to float eliminating a type conversion. 
+  * Use ternaries for merged material properties that have only one value that differs from the rest.
 
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
