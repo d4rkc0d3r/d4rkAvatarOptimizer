@@ -76,7 +76,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Merge Different Render Queue", ref optimizer.MergeDifferentRenderQueue);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
-        Toggle("Optimize FX Layer", ref optimizer.OptimizeFXLayer);
+        GUI.enabled = Toggle("Optimize FX Layer", ref optimizer.OptimizeFXLayer);
+        EditorGUI.indentLevel++;
+        Toggle("Combine Linear-ish Motion Time", ref optimizer.CombineLinearishMotionTimeAnimations);
+        EditorGUI.indentLevel--;
+        GUI.enabled = true;
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
         Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);

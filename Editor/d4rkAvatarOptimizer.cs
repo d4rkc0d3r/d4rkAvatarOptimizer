@@ -43,6 +43,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DeleteUnusedComponents = true;
     public bool DeleteUnusedGameObjects = false;
     public bool OptimizeFXLayer = true;
+    public bool CombineLinearishMotionTimeAnimations = false;
     public bool MergeSameRatioBlendShapes = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
@@ -811,60 +812,202 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 errorMessages[i].Add($"{stateMachine.behaviours.Length} state machine behaviours");
             }
-            var states = stateMachine.states;
             if (layer.defaultWeight != 1)
             {
                 errorMessages[i].Add($"default weight {layer.defaultWeight}");
             }
-            if (states.Length != 2)
+            var states = stateMachine.states;
+            if (states.Length == 0 || states.Length > 2)
             {
                 errorMessages[i].Add($"{states.Length} states");
                 continue;
             }
-            if (states.Any(s => s.state.behaviours.Length != 0))
+
+            if (states.Length == 2) // check for simple toggle layer
             {
-                errorMessages[i].Add($"{states.Sum(s => s.state.behaviours.Length)} state behaviours");
+                if (states.Any(s => s.state.behaviours.Length != 0))
+                {
+                    errorMessages[i].Add($"{states.Sum(s => s.state.behaviours.Length)} state behaviours");
+                }
+                if (states.Any(s => s.state.transitions.Length != 1))
+                {
+                    errorMessages[i].Add($"states with not exactly 1 transition");
+                    continue;
+                }
+                if (states[0].state.transitions[0].destinationState != states[1].state || states[1].state.transitions[0].destinationState != states[0].state)
+                {
+                    errorMessages[i].Add($"transition destination state is not the other state");
+                    continue;
+                }
+                if (states.Any(s => s.state.transitions[0].hasExitTime && s.state.transitions[0].exitTime != 0.0f))
+                {
+                    errorMessages[i].Add($"transition has exit time");
+                }
+                if (states.Any(s => s.state.transitions[0].conditions.Length != 1))
+                {
+                    errorMessages[i].Add($"multiple transition conditions");
+                    continue;
+                }
+                if (states[0].state.transitions[0].conditions[0].parameter != states[1].state.transitions[0].conditions[0].parameter)
+                {
+                    errorMessages[i].Add($"transition condition parameter is not the same");
+                    continue;
+                }
+                var param = fxLayer.parameters.FirstOrDefault(p => p.name == states[0].state.transitions[0].conditions[0].parameter);
+                if (param == null)
+                {
+                    errorMessages[i].Add($"transition condition parameter is not found");
+                    continue;
+                }
+                if (param.type != AnimatorControllerParameterType.Bool)
+                {
+                    errorMessages[i].Add($"transition condition parameter is not bool");
+                    continue;
+                }
+                if (states[0].state.transitions[0].conditions[0].mode == states[1].state.transitions[0].conditions[0].mode)
+                {
+                    errorMessages[i].Add($"transition condition condition is the same");
+                    continue;
+                }
+                bool onlyBoolBindings = true;
+                bool reliesOnWriteDefaults = false;
+                for (int j = 0; j < 2; j++)
+                {
+                    var state = states[j].state;
+                    if (state.motion == null)
+                    {
+                        if (states[1 - j].state.motion == null)
+                        {
+                            errorMessages[i].Add($"both states have no motion");
+                            break;
+                        }
+                        else if (!states[1 - j].state.writeDefaultValues)
+                        {
+                            errorMessages[i].Add($"state {j} has no motion but {1 - j} does not have write defaults");
+                            break;
+                        }
+                        else
+                        {
+                            reliesOnWriteDefaults = true;
+                        }
+                        continue;
+                    }
+                    var clip = state.motion as AnimationClip;
+                    if (clip == null)
+                    {
+                        errorMessages[i].Add($"{state.name} is not an animation clip");
+                        continue;
+                    }
+                    if (state.timeParameterActive)
+                    {
+                        errorMessages[i].Add($"{state.name} has motion time");
+                        continue;
+                    }
+                    var bindings = AnimationUtility.GetCurveBindings(clip);
+                    foreach (var binding in bindings)
+                    {
+                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                        var initialValue = curve.keys[0].value;
+                        if (curve.keys.Any(k => k.value != initialValue))
+                        {
+                            errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is not a constant curve");
+                        }
+                        if (binding.propertyName != "m_Enabled" && binding.propertyName != "m_IsActive")
+                        {
+                            onlyBoolBindings = false;
+                        }
+                    }
+                    var objectBindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+                    foreach (var binding in objectBindings)
+                    {
+                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                        errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is an object reference curve");
+                    }
+                }
+                if (reliesOnWriteDefaults && !onlyBoolBindings)
+                {
+                    errorMessages[i].Add($"relies on write defaults and animates something other than m_Enabled/m_IsActive");
+                }
+                if (states.Any(s => s.state.transitions[0].duration != 0.0f) && !onlyBoolBindings)
+                {
+                    errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
+                }
             }
-            if (states.Any(s => s.state.transitions.Length != 1))
+            
+            if (states.Length == 1) // check for linear-ish motion time layer
             {
-                errorMessages[i].Add($"states with not exactly 1 transition");
-                continue;
+                if (!CombineLinearishMotionTimeAnimations)
+                {
+                    errorMessages[i].Add($"no motion time combination enabled");
+                    continue;
+                }
+                var state = states[0].state;
+                if (state.motion == null)
+                {
+                    errorMessages[i].Add($"state has no motion");
+                    continue;
+                }
+                var clip = state.motion as AnimationClip;
+                if (clip == null)
+                {
+                    errorMessages[i].Add($"{state.name} is not an animation clip");
+                    continue;
+                }
+                if (!state.timeParameterActive)
+                {
+                    errorMessages[i].Add($"{state.name} has no motion time");
+                    continue;
+                }
+                if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Any())
+                {
+                    errorMessages[i].Add($"{state.name} has object reference curves");
+                    continue;
+                }
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                var keyframes = new HashSet<float>();
+                foreach (var binding in bindings)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                    keyframes.UnionWith(curve.keys.Select(k => k.time));
+                }
+                if (keyframes.Count < 2)
+                {
+                    errorMessages[i].Add($"{state.name} has less than 2 keyframes");
+                    continue;
+                }
+                var maxKeyframeTime = keyframes.Max();
+                var minKeyframeValues = new float[bindings.Length];
+                var maxKeyframeValues = new float[bindings.Length];
+                for (int j = 0; j < bindings.Length; j++)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, bindings[j]);
+                    minKeyframeValues[j] = curve.Evaluate(0);
+                    maxKeyframeValues[j] = curve.Evaluate(maxKeyframeTime);
+                }
+                bool error = false;
+                // evaluate if all curves are linear-ish interpolation between min and max keyframes values on all keyframes
+                for (int j = 0; j < bindings.Length && !error; j++)
+                {
+                    var epsilon = 0.01f * Mathf.Abs(maxKeyframeValues[j] - minKeyframeValues[j]);
+                    var curve = AnimationUtility.GetEditorCurve(clip, bindings[j]);
+                    foreach (var time in keyframes)
+                    {
+                        var value = curve.Evaluate(time);
+                        var interpolatedValue = Mathf.Lerp(minKeyframeValues[j], maxKeyframeValues[j], time / maxKeyframeTime);
+                        if (Mathf.Abs(value - interpolatedValue) > epsilon)
+                        {
+                            errorMessages[i].Add($"{state.name} {bindings[j].path}.{bindings[j].propertyName} ({bindings[j].type.Name}) is not a linear-ish interpolation");
+                            error = true;
+                            break;
+                        }
+                    }
+                }
+                if (error)
+                {
+                    continue;
+                }
             }
-            if (states[0].state.transitions[0].destinationState != states[1].state || states[1].state.transitions[0].destinationState != states[0].state)
-            {
-                errorMessages[i].Add($"transition destination state is not the other state");
-                continue;
-            }
-            if (states.Any(s => s.state.transitions[0].hasExitTime && s.state.transitions[0].exitTime != 0.0f))
-            {
-                errorMessages[i].Add($"transition has exit time");
-            }
-            if (states.Any(s => s.state.transitions[0].conditions.Length != 1))
-            {
-                errorMessages[i].Add($"multiple transition conditions");
-                continue;
-            }
-            if (states[0].state.transitions[0].conditions[0].parameter != states[1].state.transitions[0].conditions[0].parameter)
-            {
-                errorMessages[i].Add($"transition condition parameter is not the same");
-                continue;
-            }
-            var param = fxLayer.parameters.FirstOrDefault(p => p.name == states[0].state.transitions[0].conditions[0].parameter);
-            if (param == null)
-            {
-                errorMessages[i].Add($"transition condition parameter is not found");
-                continue;
-            }
-            if (param.type != AnimatorControllerParameterType.Bool)
-            {
-                errorMessages[i].Add($"transition condition parameter is not bool");
-                continue;
-            }
-            if (states[0].state.transitions[0].conditions[0].mode == states[1].state.transitions[0].conditions[0].mode)
-            {
-                errorMessages[i].Add($"transition condition condition is the same");
-                continue;
-            }
+
             for (int j = 0; j < fxLayer.layers.Length; j++)
             {
                 if (i == j)
@@ -876,69 +1019,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         errorMessages[i].Add($"{binding.path} ({binding.type.Name}) is used in {j} {fxLayer.layers[j].name}");
                     }
                 }
-            }
-            bool onlyBoolBindings = true;
-            bool reliesOnWriteDefaults = false;
-            for (int j = 0; j < 2; j++)
-            {
-                var state = states[j].state;
-                if (state.motion == null)
-                {
-                    if (states[1 - j].state.motion == null)
-                    {
-                        errorMessages[i].Add($"both states have no motion");
-                        break;
-                    }
-                    else if (!states[1 - j].state.writeDefaultValues)
-                    {
-                        errorMessages[i].Add($"state {j} has no motion but {1 - j} does not have write defaults");
-                        break;
-                    }
-                    else
-                    {
-                        reliesOnWriteDefaults = true;
-                    }
-                    continue;
-                }
-                var clip = state.motion as AnimationClip;
-                if (clip == null)
-                {
-                    errorMessages[i].Add($"{state.name} is not an animation clip");
-                    continue;
-                }
-                if (state.timeParameterActive)
-                {
-                    errorMessages[i].Add($"{state.name} has motion time");
-                    continue;
-                }
-                var bindings = AnimationUtility.GetCurveBindings(clip);
-                foreach (var binding in bindings)
-                {
-                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                    var initialValue = curve.keys[0].value;
-                    if (curve.keys.Any(k => k.value != initialValue))
-                    {
-                        errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is not a constant curve");
-                    }
-                    if (binding.propertyName != "m_Enabled" && binding.propertyName != "m_IsActive")
-                    {
-                        onlyBoolBindings = false;
-                    }
-                }
-                var objectBindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
-                foreach (var binding in objectBindings)
-                {
-                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                    errorMessages[i].Add($"{state.name} {binding.path}.{binding.propertyName} ({binding.type.Name}) is an object reference curve");
-                }
-            }
-            if (reliesOnWriteDefaults && !onlyBoolBindings)
-            {
-                errorMessages[i].Add($"relies on write defaults and animates something other than m_Enabled/m_IsActive");
-            }
-            if (states.Any(s => s.state.transitions[0].duration != 0.0f) && !onlyBoolBindings)
-            {
-                errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
             }
         }
         return errorMessages;

@@ -64,7 +64,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             for (int i = 0; i < source.layers.Length; i++)
             {
-                if (layersToMerge.Contains(i))
+                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length == 2)
                 {
                     parametersToChangeToFloat.Add(source.layers[i].stateMachine.states[0].state.transitions[0].conditions[0].parameter);
                 }
@@ -91,7 +91,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 var blendTreeDummyWeight = new AnimatorControllerParameter
                 {
-                    name = "d4rkAvatarOptimizer_MergedToggles_Weight",
+                    name = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     type = AnimatorControllerParameterType.Float,
                     defaultFloat = 1f,
                     defaultBool = true,
@@ -112,7 +112,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 target.AddLayer(newL);
             }
 
-            MergeToggleLayers();
+            MergeLayers();
 
             EditorUtility.SetDirty(target);
 
@@ -179,7 +179,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return newClip;
         }
 
-        private void MergeToggleLayers()
+        private AnimationClip CloneFromTime(AnimationClip clip, float time)
+        {
+            var newClip = GameObject.Instantiate(clip);
+            newClip.name = $"{clip.name}(From {time})";
+            newClip.ClearCurves();
+            newClip.hideFlags = HideFlags.HideInHierarchy;
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                AnimationUtility.SetEditorCurve(newClip, binding, new AnimationCurve(new Keyframe[] { new Keyframe(0, curve.Evaluate(time)) }));
+            }
+            AssetDatabase.AddObjectToAsset(newClip, assetPath);
+            return newClip;
+        }
+
+        private void MergeLayers()
         {
             if (layersToMerge.Count == 0)
             {
@@ -196,14 +211,33 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var i in layersToMerge)
             {
                 var layer = source.layers[i].stateMachine;
-                var param = layer.states[0].state.transitions[0].conditions[0].parameter;
-                var onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
-                var onClip = layer.states[onStateIndex].state.motion as AnimationClip;
-                var offClip = layer.states[1 - onStateIndex].state.motion as AnimationClip;
-                if (onClip == null)
-                    onClip = CloneAndFlipCurves(offClip);
-                if (offClip == null)
-                    offClip = CloneAndFlipCurves(onClip);
+                string param = null;
+                AnimationClip onClip = null;
+                AnimationClip offClip = null;
+                if (layer.states.Length == 2)
+                {
+                    param = layer.states[0].state.transitions[0].conditions[0].parameter;
+                    int onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
+                    onClip = layer.states[onStateIndex].state.motion as AnimationClip;
+                    offClip = layer.states[1 - onStateIndex].state.motion as AnimationClip;
+                    if (onClip == null)
+                        onClip = CloneAndFlipCurves(offClip);
+                    if (offClip == null)
+                        offClip = CloneAndFlipCurves(onClip);
+                }
+                else
+                {
+                    param = layer.states[0].state.timeParameter;
+                    float maxKeyframeTime = 0;
+                    var clip = layer.states[0].state.motion as AnimationClip;
+                    foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                    {
+                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                        maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
+                    }
+                    offClip = CloneFromTime(clip, 0);
+                    onClip = CloneFromTime(clip, maxKeyframeTime);
+                }
                 var layerTree = new BlendTree()
                 {
                     hideFlags = HideFlags.HideInHierarchy,
@@ -233,7 +267,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     position = new Vector2(400, currentHeight * 100),
                     motion = layerTree,
-                    directBlendParameter = "d4rkAvatarOptimizer_MergedToggles_Weight",
+                    directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     timeScale = 1f
                 });
                 currentHeight++;
@@ -242,7 +276,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             AssetDatabase.AddObjectToAsset(directBlendTree, assetPath);
             var state = new AnimatorState()
             {
-                name = "d4rkAvatarOptimizer_MergedToggles",
+                name = "d4rkAvatarOptimizer_MergedLayers",
                 writeDefaultValues = true,
                 hideFlags = HideFlags.HideInHierarchy,
                 motion = directBlendTree
@@ -250,7 +284,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             AssetDatabase.AddObjectToAsset(state, assetPath);
             var stateMachine = new AnimatorStateMachine()
             {
-                name = "d4rkAvatarOptimizer_MergedToggles",
+                name = "d4rkAvatarOptimizer_MergedLayers",
                 hideFlags = HideFlags.HideInHierarchy,
                 states = new ChildAnimatorState[1] {
                     new ChildAnimatorState()
@@ -267,7 +301,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 blendingMode = AnimatorLayerBlendingMode.Override,
                 defaultWeight = 1f,
                 iKPass = false,
-                name = target.MakeUniqueLayerName("d4rkAvatarOptimizer_MergedToggles"),
+                name = target.MakeUniqueLayerName("d4rkAvatarOptimizer_MergedLayers"),
                 syncedLayerAffectsTiming = false,
                 stateMachine = stateMachine
             });
