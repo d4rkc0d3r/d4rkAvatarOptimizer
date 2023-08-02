@@ -2617,7 +2617,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var targetBindPoses = new List<Matrix4x4>();
             var sourceToWorld = new List<Matrix4x4>();
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
-            var toLocal = (combinableSkinnedMeshes[0].rootBone ?? combinableSkinnedMeshes[0].transform).worldToLocalMatrix;
+            var toLocal = (combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone).worldToLocalMatrix;
 
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
@@ -2678,9 +2678,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         weight3 = 0
                     };
                     sourceWeights = Enumerable.Range(0, sourceVertices.Length).Select(s => defaultWeight).ToArray();
-                    sourceBones = new Transform[1] { skinnedMesh.transform };
-                    toWorldArray = new Matrix4x4[1] { skinnedMesh.transform.localToWorldMatrix };
-                    keepTransforms.Add(skinnedMesh.transform);
+                    sourceBones = new Transform[1] { rootBone.transform };
+                    toWorldArray = new Matrix4x4[1] { rootBone.transform.localToWorldMatrix };
+                    keepTransforms.Add(rootBone.transform);
                     bindPoseCount = 1;
                 }
 
