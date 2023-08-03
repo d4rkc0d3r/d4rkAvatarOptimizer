@@ -93,6 +93,8 @@ You can read about this technique [here](https://notes.sleightly.dev/dbt-combini
 ## Combine Motion Time Approximation
 This tries to combine layers that have a single motion time state into the direct blend tree.  
 It samples the original motion time at the snapping points of a radial puppet (0, 25, 50, 75, 100) and then uses those samples to approximate the motion time with a 1D blend tree.
+## Disable Phys Bones When Unused
+Creates animation curves for all phys bone components that are used by only one SkinnedMeshRenderer. Those curves get added to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag.
 ## Keep MMD Blend Shapes
 When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
 ## Delete Unused Components
@@ -152,6 +154,9 @@ Shows all materials that have a "lock in" or "bake" feature disabled which the o
 With the `Write Properties as Static Values` option disabled you need to make sure to lock in or bake your materials in this list before optimization.
 ### Penetrators
 Shows all meshes that the optimizer detected as DPS or TPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
+### Phys Bone Dependencies
+For each phys bone component this shows all components that use the affected transforms of the phys bone. Also lists all animations that animate the m_Enabled property.  
+Any phys bones listed here that have exactly one skinned mesh renderer listed in its list will add an animation curve to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag if the `Disable Phys Bones When Unused` option is enabled.
 ### Unused Components
 Shows all components that will get deleted by "Delete Unused Components".
 ### Always Disabled Game Objects

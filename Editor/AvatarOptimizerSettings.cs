@@ -22,6 +22,7 @@ public class AvatarOptimizerSettings : EditorWindow
     private static bool MergeDifferentRenderQueue = false;
     private static bool OptimizeFXLayer = true;
     private static bool CombineApproximateMotionTimeAnimations = false;
+    private static bool DisablePhysBonesWhenUnused = true;
     private static bool MergeSameRatioBlendShapes = true;
     private static bool KeepMMDBlendShapes = false;
     private static bool DeleteUnusedComponents = true;
@@ -48,6 +49,7 @@ public class AvatarOptimizerSettings : EditorWindow
         {"DeleteUnusedGameObjects", "Delete Unused GameObjects"},
         {"OptimizeFXLayer", "Optimize FX Layer"},
         {"CombineApproximateMotionTimeAnimations", "Combine Motion Time Approximation"},
+        {"DisablePhysBonesWhenUnused", "Disable Phys Bones When Unused"},
         {"MergeSameRatioBlendShapes", "Merge Same Ratio Blend Shapes"},
         {"UseRingFingerAsFootCollider", "Use Ring Finger as Foot Collider"},
         {"ProfileTimeUsed", "Profile Time Used"}

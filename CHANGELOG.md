@@ -3,6 +3,7 @@
 * Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
 * Add option to combine motion time layers as piece a wise linear 1D tree into the direct blend tree as well.
 * Show layer merge errors as tooltips in the "Show FX Layer Merge Results" section.
+* Add option to disable phys bones together with the skinned mesh they affect.
 
 ### Changes
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".

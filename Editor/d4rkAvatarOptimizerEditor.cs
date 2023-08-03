@@ -10,6 +10,7 @@ using d4rkpl4y3r.AvatarOptimizer;
 using d4rkpl4y3r.AvatarOptimizer.Util;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using VRC.SDK3.Avatars.Components;
+using VRC.Dynamics;
 using VRC.SDKBase.Validation.Performance;
 
 using Type = System.Type;
@@ -81,6 +82,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Combine Motion Time Approximation", ref optimizer.CombineApproximateMotionTimeAnimations);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
+        Toggle("Disable Phys Bones When Unused", ref optimizer.DisablePhysBonesWhenUnused);
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
         Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
         Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
@@ -323,6 +325,19 @@ public class d4rkAvatarOptimizerEditor : Editor
                 Profiler.StartSection("Penetrators");
                 DrawDebugList(Penetrators.ToArray());
                 Profiler.EndSection();
+            }
+            if (Foldout("Phys Bone Dependencies", ref optimizer.DebugShowPhysBoneDependencies))
+            {
+                Profiler.StartSection("Phys Bone Dependencies");
+                foreach (var pair in PhysBoneDependencies)
+                {
+                    if (pair.Key.gameObject.CompareTag("EditorOnly"))
+                        continue;
+                    EditorGUILayout.ObjectField(pair.Key, typeof(VRCPhysBoneBase), true);
+                    EditorGUI.indentLevel++;
+                    DrawDebugList(pair.Value.ToArray());
+                    EditorGUI.indentLevel--;
+                }
             }
             if (Foldout("Unused Components", ref optimizer.DebugShowUnusedComponents))
             {
@@ -624,6 +639,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private string[] animatedMaterialPropertyPathsCache = null;
     private List<List<string>> fxLayerMergeErrorsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
+    private Dictionary<VRCPhysBoneBase, HashSet<Object>> physBoneDependenciesCache = null;
 
     private HashSet<Renderer> penetratorsCache = null;
 
@@ -640,6 +656,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         fxLayerMergeErrorsCache = null;
         keptBlendShapePathsCache = null;
         penetratorsCache = null;
+        physBoneDependenciesCache = null;
     }
 
     private void OnSelectionChange()
@@ -896,6 +913,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .SelectMany(kv => kv.Value.Select(prop => $"{kv.Key}.{prop}")).ToArray();
             }
             return animatedMaterialPropertyPathsCache;
+        }
+    }
+
+    private Dictionary<VRCPhysBoneBase, HashSet<Object>> PhysBoneDependencies
+    {
+        get
+        {
+            if (physBoneDependenciesCache == null)
+            {
+                physBoneDependenciesCache = optimizer.FindAllPhysBoneDependencies();
+            }
+            return physBoneDependenciesCache;
         }
     }
 

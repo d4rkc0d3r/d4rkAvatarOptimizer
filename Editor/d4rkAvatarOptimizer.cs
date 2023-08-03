@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using VRC.SDK3.Dynamics.Contact.Components;
+using VRC.SDK3.Dynamics.PhysBone.Components;
 
 #if UNITY_EDITOR
 using System.Threading;
@@ -44,6 +46,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DeleteUnusedGameObjects = false;
     public bool OptimizeFXLayer = true;
     public bool CombineApproximateMotionTimeAnimations = false;
+    public bool DisablePhysBonesWhenUnused = true;
     public bool MergeSameRatioBlendShapes = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
@@ -61,6 +64,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowLockedInMaterials = true;
     public bool DebugShowUnlockedMaterials = true;
     public bool DebugShowPenetrators = true;
+    public bool DebugShowPhysBoneDependencies = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
     public bool DebugShowMaterialSwaps = true;
@@ -117,6 +121,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Profiler.StartSection("DestroyEditorOnlyGameObjects()");
             DestroyEditorOnlyGameObjects();
             Profiler.StartNextSection("DestroyUnusedComponents()");
+            physBonesToDisable = FindAllPhysBonesToDisable();
             DestroyUnusedComponents();
             Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
             ConvertStaticMeshesToSkinnedMeshes();
@@ -166,6 +171,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private static List<Material> optimizedMaterials = new List<Material>();
     private static List<string> optimizedMaterialImportPaths = new List<string>();
     private static List<List<string>> mergedMeshPaths = new List<List<string>>();
+    private static Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
     private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
     private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
@@ -545,17 +551,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return bones.Count - 1;
     }
 
-    private EditorCurveBinding FixAnimationBinding(EditorCurveBinding binding, ref bool changed)
+    private EditorCurveBinding FixAnimationBindingPath(EditorCurveBinding binding, ref bool changed)
     {
-        var currentPath = (binding.path, binding.propertyName, binding.type);
         var newBinding = binding;
-        if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
-        {
-            newBinding.path = modifiedPath.Item1;
-            newBinding.propertyName = modifiedPath.Item2;
-            newBinding.type = modifiedPath.Item3;
-            changed = true;
-        }
         if (transformFromOldPath.TryGetValue(newBinding.path, out var transform))
         {
             if (transform != null)
@@ -567,18 +565,49 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         return newBinding;
     }
+
+    private EditorCurveBinding FixAnimationBinding(EditorCurveBinding binding, ref bool changed)
+    {
+        var currentPath = (binding.path, binding.propertyName, binding.type);
+        var newBinding = binding;
+        if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
+        {
+            newBinding.path = modifiedPath.Item1;
+            newBinding.propertyName = modifiedPath.Item2;
+            newBinding.type = modifiedPath.Item3;
+            changed = true;
+        }
+        return FixAnimationBindingPath(newBinding, ref changed);
+    }
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
+
         var newClip = Instantiate(clip);
         newClip.ClearCurves();
         newClip.name = clip.name;
         bool changed = false;
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
-            var newBinding = FixAnimationBinding(binding, ref changed);
-            AnimationUtility.SetEditorCurve(newClip, newBinding,
-                AnimationUtility.GetEditorCurve(clip, binding));
+            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+            AnimationUtility.SetEditorCurve(newClip, FixAnimationBinding(binding, ref changed), curve);
+            bool addPhysBoneCurves = binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled";
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+            {
+                AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
+                addPhysBoneCurves = true;
+            }
+            if (addPhysBoneCurves && physBonesToDisable.ContainsKey(binding.path))
+            {
+                var physBoneBinding = binding;
+                physBoneBinding.propertyName = "m_Enabled";
+                physBoneBinding.type = typeof(VRCPhysBone);
+                foreach (var physBonePath in physBonesToDisable[binding.path])
+                {
+                    physBoneBinding.path = physBonePath;
+                    AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);
+                }
+            }
         }
         foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
         {
@@ -934,7 +963,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
             
-            if (states.Length == 1) // check for linear-ish motion time layer
+            if (states.Length == 1) // check for motion time layer
             {
                 if (!CombineApproximateMotionTimeAnimations)
                 {
@@ -942,11 +971,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     continue;
                 }
                 var state = states[0].state;
-                if (state.motion == null)
-                {
-                    errorMessages[i].Add($"state has no motion");
-                    continue;
-                }
                 var clip = state.motion as AnimationClip;
                 if (clip == null)
                 {
@@ -1057,6 +1081,166 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         return uselessLayers;
+    }
+
+    private HashSet<AnimationClip> GetAllUsedFXLayerAnimationClips()
+    {
+        var fxLayer = GetFXLayer();
+        if (fxLayer == null)
+            return new HashSet<AnimationClip>();
+        var unusedLayers = FindUselessFXLayers();
+        var usedClips = new HashSet<AnimationClip>();
+        for (int i = 0; i < fxLayer.layers.Length; i++)
+        {
+            var stateMachine = fxLayer.layers[i].stateMachine;
+            if (stateMachine == null || unusedLayers.Contains(i))
+                continue;
+            foreach (var state in stateMachine.EnumerateAllStates())
+            {
+                if (state.motion == null)
+                    continue;
+                usedClips.UnionWith(state.motion.EnumerateAllClips());
+            }
+        }
+        return usedClips;
+    }
+
+    public Dictionary<VRCPhysBoneBase, HashSet<Object>> FindAllPhysBoneDependencies()
+    {
+        var result = new Dictionary<VRCPhysBoneBase, HashSet<Object>>();
+        var physBonePath = new Dictionary<string, VRCPhysBoneBase>();
+        var physBones = GetComponentsInChildren<VRCPhysBoneBase>(true);
+        foreach (var physBone in physBones)
+        {
+            result.Add(physBone, new HashSet<Object>());
+            physBonePath[GetPathToRoot(physBone)] = physBone;
+        }
+        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        {
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                if (binding.propertyName == "m_Enabled" && typeof(VRCPhysBoneBase).IsAssignableFrom(binding.type) && physBonePath.TryGetValue(binding.path, out var physBone))
+                {
+                    result[physBone].Add(clip);
+                }
+            }
+        }
+        var transformToDependency = new Dictionary<Transform, HashSet<Object>>();
+        void AddDependency(Transform t, Object obj)
+        {
+            if (t == null)
+                return;
+            if (!transformToDependency.TryGetValue(t, out var dependencies))
+            {
+                transformToDependency[t] = dependencies = new HashSet<Object>();
+            }
+            dependencies.Add(obj);
+        }
+        foreach (var skinnedMesh in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            if (skinnedMesh.bones.Length == 0)
+            {
+                var root = skinnedMesh.rootBone != null ? skinnedMesh.rootBone : skinnedMesh.transform;
+                AddDependency(skinnedMesh.rootBone, skinnedMesh);
+                continue;
+            }
+            if (skinnedMesh.sharedMesh == null)
+                continue;
+            var bones = new HashSet<Transform>();
+            var meshBones = skinnedMesh.bones;
+            var boneWeights = skinnedMesh.sharedMesh.boneWeights;
+            for (int i = 0; i < boneWeights.Length; i++)
+            {
+                if (boneWeights[i].weight0 > 0)
+                    bones.Add(meshBones[boneWeights[i].boneIndex0]);
+                if (boneWeights[i].weight1 > 0)
+                    bones.Add(meshBones[boneWeights[i].boneIndex1]);
+                if (boneWeights[i].weight2 > 0)
+                    bones.Add(meshBones[boneWeights[i].boneIndex2]);
+                if (boneWeights[i].weight3 > 0)
+                    bones.Add(meshBones[boneWeights[i].boneIndex3]);
+            }
+            foreach (var bone in bones)
+            {
+                AddDependency(bone, skinnedMesh);
+            }
+        }
+        foreach (var constraint in GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
+        {
+            for (int i = 0; i < constraint.sourceCount; i++)
+            {
+                AddDependency(constraint.GetSource(i).sourceTransform, constraint as Object);
+            }
+            AddDependency((constraint as LookAtConstraint)?.worldUpObject, constraint as Object);
+            AddDependency((constraint as AimConstraint)?.worldUpObject, constraint as Object);
+        }
+        foreach (var skinnedRenderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            AddDependency(skinnedRenderer.rootBone, skinnedRenderer);
+        }
+        foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+        {
+            AddDependency(renderer.probeAnchor, renderer);
+            AddDependency(renderer.transform, renderer);
+        }
+        foreach (var contact in GetComponentsInChildren<ContactBase>(true))
+        {
+            AddDependency(contact.GetRootTransform(), contact);
+        }
+        foreach (var physBone in physBones)
+        {
+            var root = physBone.GetRootTransform();
+            var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
+            var stack = new Stack<Transform>();
+            if (physBone.multiChildType == VRCPhysBoneBase.MultiChildType.Ignore && root.childCount > 1)
+            {
+                foreach (Transform child in root)
+                {
+                    stack.Push(child);
+                }
+            }
+            else
+            {
+                stack.Push(root);
+            }
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (exclusions.Contains(current))
+                    continue;
+                if (transformToDependency.TryGetValue(current, out var dependencies))
+                {
+                    result[physBone].UnionWith(dependencies);
+                }
+                foreach (Transform child in current)
+                {
+                    stack.Push(child);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public Dictionary<string, List<string>> FindAllPhysBonesToDisable()
+    {
+        var result = new Dictionary<string, List<string>>();
+        if (!DisablePhysBonesWhenUnused)
+            return result;
+        var physBoneDependencies = FindAllPhysBoneDependencies();
+        foreach(var entry in physBoneDependencies)
+        {
+            if (entry.Value.Count == 1 && entry.Value.First() is SkinnedMeshRenderer)
+            {
+                var targetPath = GetPathToRoot(entry.Value.First() as SkinnedMeshRenderer);
+                if (!result.TryGetValue(targetPath, out var physBones))
+                {
+                    result[targetPath] = physBones = new List<string>();
+                }
+                physBones.Add(GetPathToRoot(entry.Key));
+            }
+        }
+        return result;
     }
 
     public Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
@@ -3227,6 +3411,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         foreach (var renderer in GetComponentsInChildren<Renderer>(true))
         {
             used.Add(renderer.probeAnchor);
+        }
+
+        foreach (var contact in GetComponentsInChildren<ContactBase>(true))
+        {
+            used.Add(contact.GetRootTransform());
         }
 
         foreach (var obj in transform.GetAllDescendants())
