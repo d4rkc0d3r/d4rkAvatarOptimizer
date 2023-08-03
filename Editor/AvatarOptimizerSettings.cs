@@ -21,7 +21,7 @@ public class AvatarOptimizerSettings : EditorWindow
     private static bool MergeBackFaceCullingWithCullingOff = false;
     private static bool MergeDifferentRenderQueue = false;
     private static bool OptimizeFXLayer = true;
-    private static bool CombineLinearishMotionTimeAnimations = false;
+    private static bool CombineApproximateMotionTimeAnimations = false;
     private static bool MergeSameRatioBlendShapes = true;
     private static bool KeepMMDBlendShapes = false;
     private static bool DeleteUnusedComponents = true;
@@ -47,7 +47,7 @@ public class AvatarOptimizerSettings : EditorWindow
         {"DeleteUnusedComponents", "Delete Unused Components"},
         {"DeleteUnusedGameObjects", "Delete Unused GameObjects"},
         {"OptimizeFXLayer", "Optimize FX Layer"},
-        {"CombineLinearishMotionTimeAnimations", "Combine Linear-ish Motion Time"},
+        {"CombineApproximateMotionTimeAnimations", "Combine Motion Time Approximation"},
         {"MergeSameRatioBlendShapes", "Merge Same Ratio Blend Shapes"},
         {"UseRingFingerAsFootCollider", "Use Ring Finger as Foot Collider"},
         {"ProfileTimeUsed", "Profile Time Used"}

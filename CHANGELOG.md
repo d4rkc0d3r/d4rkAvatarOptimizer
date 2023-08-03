@@ -1,7 +1,7 @@
 ## v2.4.0
 ### Features
 * Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
-* Add option to combine linear-ish motion time layers into the direct blend tree as well.
+* Add option to combine motion time layers as piece a wise linear 1D tree into the direct blend tree as well.
 
 ### Changes
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".

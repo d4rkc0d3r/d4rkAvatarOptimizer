@@ -90,9 +90,9 @@ For example you have two animations. The first animates `A` to 100, `B` to 50 an
 Deletes any layers in the FXLayer that have 0 weight and are not affected by any layer weight control and have no state behaviours. Also deletes layers that have no states and sub state machines.  
 Tries to find simple toggle layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
-## Combine Linear-ish Motion Time
+## Combine Motion Time Approximation
 This tries to combine layers that have a single motion time state into the direct blend tree.  
-Only gets applied to curves where all key frames are a linear interpolation between time 0 and the last key frame. Specifically this ignores non linear influence of tangents, hence the "ish" in the name.
+It samples the original motion time at the snapping points of a radial puppet (0, 25, 50, 75, 100) and then uses those samples to approximate the motion time with a 1D blend tree.
 ## Keep MMD Blend Shapes
 When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
 ## Delete Unused Components

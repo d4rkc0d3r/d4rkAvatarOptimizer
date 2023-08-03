@@ -212,18 +212,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 var layer = source.layers[i].stateMachine;
                 string param = null;
-                AnimationClip onClip = null;
-                AnimationClip offClip = null;
+                var clips = new List<AnimationClip>();
                 if (layer.states.Length == 2)
                 {
                     param = layer.states[0].state.transitions[0].conditions[0].parameter;
                     int onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
-                    onClip = layer.states[onStateIndex].state.motion as AnimationClip;
-                    offClip = layer.states[1 - onStateIndex].state.motion as AnimationClip;
+                    var onClip = layer.states[onStateIndex].state.motion as AnimationClip;
+                    var offClip = layer.states[1 - onStateIndex].state.motion as AnimationClip;
                     if (onClip == null)
                         onClip = CloneAndFlipCurves(offClip);
                     if (offClip == null)
                         offClip = CloneAndFlipCurves(onClip);
+                    clips.Add(offClip);
+                    clips.Add(onClip);
                 }
                 else
                 {
@@ -235,8 +236,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var curve = AnimationUtility.GetEditorCurve(clip, binding);
                         maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
                     }
-                    offClip = CloneFromTime(clip, 0);
-                    onClip = CloneFromTime(clip, maxKeyframeTime);
+                    clips.Add(CloneFromTime(clip, 0));
+                    clips.Add(CloneFromTime(clip, 0.25f * maxKeyframeTime));
+                    clips.Add(CloneFromTime(clip, 0.5f * maxKeyframeTime));
+                    clips.Add(CloneFromTime(clip, 0.75f * maxKeyframeTime));
+                    clips.Add(CloneFromTime(clip, maxKeyframeTime));
                 }
                 var layerTree = new BlendTree()
                 {
@@ -247,25 +251,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     maxThreshold = 1f,
                     minThreshold = 0f,
                     blendParameter = param,
-                    children = new ChildMotion[2] {
-                        new ChildMotion()
-                        {
-                            position = new Vector2(550, currentHeight * 100),
-                            motion = offClip,
-                            timeScale = 1f
-                        },
-                        new ChildMotion()
-                        {
-                            position = new Vector2(550, currentHeight * 100 + 50),
-                            motion = onClip,
-                            timeScale = 1f
-                        }
-                    }
+                    children = clips.Select(x => new ChildMotion() { motion = x, timeScale = 1f }).ToArray()
                 };
                 AssetDatabase.AddObjectToAsset(layerTree, assetPath);
                 motions.Add(new ChildMotion()
                 {
-                    position = new Vector2(400, currentHeight * 100),
                     motion = layerTree,
                     directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     timeScale = 1f

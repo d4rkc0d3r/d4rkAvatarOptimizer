@@ -78,7 +78,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         GUI.enabled = true;
         GUI.enabled = Toggle("Optimize FX Layer", ref optimizer.OptimizeFXLayer);
         EditorGUI.indentLevel++;
-        Toggle("Combine Linear-ish Motion Time", ref optimizer.CombineLinearishMotionTimeAnimations);
+        Toggle("Combine Motion Time Approximation", ref optimizer.CombineApproximateMotionTimeAnimations);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
         Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);

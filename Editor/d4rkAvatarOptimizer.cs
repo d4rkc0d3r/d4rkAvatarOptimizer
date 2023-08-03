@@ -43,7 +43,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DeleteUnusedComponents = true;
     public bool DeleteUnusedGameObjects = false;
     public bool OptimizeFXLayer = true;
-    public bool CombineLinearishMotionTimeAnimations = false;
+    public bool CombineApproximateMotionTimeAnimations = false;
     public bool MergeSameRatioBlendShapes = true;
     public bool UseRingFingerAsFootCollider = false;
     public bool ProfileTimeUsed = false;
@@ -936,7 +936,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             
             if (states.Length == 1) // check for linear-ish motion time layer
             {
-                if (!CombineLinearishMotionTimeAnimations)
+                if (!CombineApproximateMotionTimeAnimations)
                 {
                     errorMessages[i].Add($"no motion time combination enabled");
                     continue;
@@ -973,37 +973,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (keyframes.Count < 2)
                 {
                     errorMessages[i].Add($"{state.name} has less than 2 keyframes");
-                    continue;
-                }
-                var maxKeyframeTime = keyframes.Max();
-                var minKeyframeValues = new float[bindings.Length];
-                var maxKeyframeValues = new float[bindings.Length];
-                for (int j = 0; j < bindings.Length; j++)
-                {
-                    var curve = AnimationUtility.GetEditorCurve(clip, bindings[j]);
-                    minKeyframeValues[j] = curve.Evaluate(0);
-                    maxKeyframeValues[j] = curve.Evaluate(maxKeyframeTime);
-                }
-                bool error = false;
-                // evaluate if all curves are linear-ish interpolation between min and max keyframes values on all keyframes
-                for (int j = 0; j < bindings.Length && !error; j++)
-                {
-                    var epsilon = 0.01f * Mathf.Abs(maxKeyframeValues[j] - minKeyframeValues[j]);
-                    var curve = AnimationUtility.GetEditorCurve(clip, bindings[j]);
-                    foreach (var time in keyframes)
-                    {
-                        var value = curve.Evaluate(time);
-                        var interpolatedValue = Mathf.Lerp(minKeyframeValues[j], maxKeyframeValues[j], time / maxKeyframeTime);
-                        if (Mathf.Abs(value - interpolatedValue) > epsilon)
-                        {
-                            errorMessages[i].Add($"{state.name} {bindings[j].path}.{bindings[j].propertyName} ({bindings[j].type.Name}) is not a linear-ish interpolation");
-                            error = true;
-                            break;
-                        }
-                    }
-                }
-                if (error)
-                {
                     continue;
                 }
             }
