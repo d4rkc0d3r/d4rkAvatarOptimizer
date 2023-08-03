@@ -214,7 +214,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
-                    EditorGUILayout.LabelField($"{i}{fxLayer.layers[i].name}");
+                    EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayer.layers[i].name}", string.Join("\n", errorMessages[i])));
                     EditorGUILayout.EndHorizontal();
                     if (optimizer.ShowFXLayerMergeErrors)
                     {
