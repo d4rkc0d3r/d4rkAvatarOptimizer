@@ -66,7 +66,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length == 2)
                 {
-                    parametersToChangeToFloat.Add(source.layers[i].stateMachine.states[0].state.transitions[0].conditions[0].parameter);
+                    parametersToChangeToFloat.UnionWith(source.layers[i].stateMachine.states.SelectMany(x => x.state.transitions).SelectMany(x => x.conditions).Select(x => x.parameter));
                 }
             }
 
