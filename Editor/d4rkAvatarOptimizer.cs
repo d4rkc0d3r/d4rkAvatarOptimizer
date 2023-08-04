@@ -836,10 +836,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (stateMachine.stateMachines.Length != 0)
             {
                 errorMessages[i].Add($"{stateMachine.stateMachines.Length} sub state machines");
+                continue;
             }
-            if (stateMachine.behaviours.Length != 0)
+            if (stateMachine.EnumerateAllBehaviours().Any())
             {
-                errorMessages[i].Add($"{stateMachine.behaviours.Length} state machine behaviours");
+                errorMessages[i].Add($"has state machine behaviours");
+                continue;
             }
             if (layer.defaultWeight != 1)
             {
@@ -852,57 +854,92 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             }
 
-            if (states.Length == 2) // check for simple toggle layer
+            if (states.Length == 2) // check for toggle layer
             {
-                if (states.Any(s => s.state.behaviours.Length != 0))
+                var param = states.SelectMany(s => s.state.transitions).SelectMany(t => t.conditions).Select(c => c.parameter).Distinct().ToList();
+                var matchedParams = param.Select(p => fxLayer.parameters.FirstOrDefault(p2 => p2.name == p)).ToList();
+                if (matchedParams.Any(p => p == null))
                 {
-                    errorMessages[i].Add($"{states.Sum(s => s.state.behaviours.Length)} state behaviours");
-                }
-                if (states.Any(s => s.state.transitions.Length != 1))
-                {
-                    errorMessages[i].Add($"states with not exactly 1 transition");
+                    errorMessages[i].Add($"some parameter not found");
                     continue;
                 }
-                if (states[0].state.transitions[0].destinationState != states[1].state || states[1].state.transitions[0].destinationState != states[0].state)
+                if (matchedParams.Any(p => p.type != AnimatorControllerParameterType.Bool))
                 {
-                    errorMessages[i].Add($"transition destination state is not the other state");
+                    errorMessages[i].Add($"some parameter is not bool");
                     continue;
                 }
-                if (states.Any(s => s.state.transitions[0].hasExitTime && s.state.transitions[0].exitTime != 0.0f))
+                if (states.Any(s => s.state.transitions.Length != 1)) // check for 2 bool toggle
                 {
-                    errorMessages[i].Add($"transition has exit time");
+                    if (states.Sum(s => s.state.transitions.Length) != 3)
+                    {
+                        errorMessages[i].Add($"not exactly 3 transitions");
+                        continue;
+                    }
+                    if (param.Count != 2)
+                    {
+                        errorMessages[i].Add($"not exactly 2 parameters");
+                        continue;
+                    }
+                    var singleTransitionState = states.First(s => s.state.transitions.Length == 1).state;
+                    var doubleTransitionState = states.First(s => s.state.transitions.Length == 2).state;
+                    if (singleTransitionState.transitions[0].conditions.Length != 2)
+                    {
+                        errorMessages[i].Add($"single transition has not exactly 2 conditions");
+                        continue;
+                    }
+                    if (doubleTransitionState.transitions.Any(t => t.conditions.Length != 1))
+                    {
+                        errorMessages[i].Add($"double transition has not exactly 1 condition");
+                        continue;
+                    }
+                    foreach (var condition in singleTransitionState.transitions[0].conditions)
+                    {
+                        var oppositeCondition = doubleTransitionState.transitions.FirstOrDefault(t => t.conditions[0].parameter == condition.parameter);
+                        if (oppositeCondition == null)
+                        {
+                            errorMessages[i].Add($"double transition {condition.parameter} does not have opposite condition");
+                            continue;
+                        }
+                        if (oppositeCondition.conditions[0].mode == condition.mode)
+                        {
+                            errorMessages[i].Add($"double transition {condition.parameter} has same condition mode as single transition");
+                            continue;
+                        }
+                    }
                 }
-                if (states.Any(s => s.state.transitions[0].conditions.Length != 1))
+                else // simple 1 bool toggle
                 {
-                    errorMessages[i].Add($"multiple transition conditions");
-                    continue;
-                }
-                if (states[0].state.transitions[0].conditions[0].parameter != states[1].state.transitions[0].conditions[0].parameter)
-                {
-                    errorMessages[i].Add($"transition condition parameter is not the same");
-                    continue;
-                }
-                var param = fxLayer.parameters.FirstOrDefault(p => p.name == states[0].state.transitions[0].conditions[0].parameter);
-                if (param == null)
-                {
-                    errorMessages[i].Add($"transition condition parameter is not found");
-                    continue;
-                }
-                if (param.type != AnimatorControllerParameterType.Bool)
-                {
-                    errorMessages[i].Add($"transition condition parameter is not bool");
-                    continue;
-                }
-                if (states[0].state.transitions[0].conditions[0].mode == states[1].state.transitions[0].conditions[0].mode)
-                {
-                    errorMessages[i].Add($"transition condition condition is the same");
-                    continue;
+                    if (states.Any(s => s.state.transitions[0].conditions.Length != 1))
+                    {
+                        errorMessages[i].Add($"multiple transition conditions");
+                        continue;
+                    }
+                    if (states[0].state.transitions[0].conditions[0].parameter != states[1].state.transitions[0].conditions[0].parameter)
+                    {
+                        errorMessages[i].Add($"transition condition parameter is not the same");
+                        continue;
+                    }
+                    if (states[0].state.transitions[0].conditions[0].mode == states[1].state.transitions[0].conditions[0].mode)
+                    {
+                        errorMessages[i].Add($"transition condition condition is the same");
+                        continue;
+                    }
                 }
                 bool onlyBoolBindings = true;
                 bool reliesOnWriteDefaults = false;
                 for (int j = 0; j < 2; j++)
                 {
                     var state = states[j].state;
+                    if (!state.transitions.All(t => t.destinationState == states[1 - j].state))
+                    {
+                        errorMessages[i].Add($"{state} transition destination state is not the other state");
+                        break;
+                    }
+                    if (state.transitions.Any(t => t.hasExitTime && t.exitTime != 0.0f))
+                    {
+                        errorMessages[i].Add($"{state} transition has exit time");
+                        break;
+                    }
                     if (state.motion == null)
                     {
                         if (states[1 - j].state.motion == null)
