@@ -1561,33 +1561,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (localMeshCount <= 1)
                 return;
-            output.Add("if (d4rkAvatarOptimizer_Zero)");
-            output.Add("{");
-            output.Add("float d4rkAvatarOptimizer_val = 0;");
-            for (int i = 0; i < mergedMeshIndices.Count - 1; i += 2)
+
+            var valuesToDummyUse = new Stack<string>();
+            valuesToDummyUse.Push("d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]");
+            if (hasVectorCBufferAliasArray)
+                valuesToDummyUse.Push("d4rkAvatarOptimizerAnimatedVectors[d4rkAvatarOptimizer_MeshID].x");
+            for (int i = 0; i < mergedMeshIndices.Count; i++)
             {
-                output.Add($"d4rkAvatarOptimizer_val += _IsActiveMesh{mergedMeshIndices[i]} * _IsActiveMesh{mergedMeshIndices[i + 1]};");
-            }
-            if (mergedMeshIndices.Count % 2 == 1)
-            {
-                output.Add($"d4rkAvatarOptimizer_val += _IsActiveMesh{mergedMeshIndices[mergedMeshIndices.Count - 1]};");
+                valuesToDummyUse.Push($"_IsActiveMesh{mergedMeshIndices[i]}");
             }
             foreach (var animatedProperty in animatedPropertyValues.Keys)
             {
                 string propName = $"d4rkAvatarOptimizer{animatedProperty}_ArrayIndex";
-                for (int i = 0; i < mergedMeshIndices.Count - 1; i += 2)
+                for (int i = 0; i < mergedMeshIndices.Count; i++)
                 {
-                    output.Add($"d4rkAvatarOptimizer_val += {propName}{mergedMeshIndices[i]}.x * {propName}{mergedMeshIndices[i + 1]}.x;");
-                }
-                if (mergedMeshIndices.Count % 2 == 1)
-                {
-                    output.Add($"d4rkAvatarOptimizer_val += {propName}{mergedMeshIndices[mergedMeshIndices.Count - 1]}.x;");
+                    valuesToDummyUse.Push($"{propName}{mergedMeshIndices[i]}.x");
                 }
             }
-            var arrays = "d4rkAvatarOptimizer_val += d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]";
-            if (hasVectorCBufferAliasArray)
-                arrays += " * d4rkAvatarOptimizerAnimatedVectors[d4rkAvatarOptimizer_MeshID].x";
-            output.Add($"{arrays};");
+
+            output.Add("if (d4rkAvatarOptimizer_Zero)");
+            output.Add("{");
+            output.Add($"float d4rkAvatarOptimizer_val = {valuesToDummyUse.Pop()};");
+            while (valuesToDummyUse.Count >= 2)
+            {
+                output.Add($"d4rkAvatarOptimizer_val += {valuesToDummyUse.Pop()} * {valuesToDummyUse.Pop()};");
+            }
+            if (valuesToDummyUse.Count == 1)
+            {
+                output.Add($"d4rkAvatarOptimizer_val += {valuesToDummyUse.Pop()};");
+            }
             output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
             output.Add("}");
         }
