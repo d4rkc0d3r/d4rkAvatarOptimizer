@@ -109,15 +109,21 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             Profiler.enabled = optimizer.ProfileTimeUsed;
             Profiler.Reset();
+            Profiler.StartSection("Assign New Avatar ID");
             AssignNewAvatarIDIfEmpty();
+            Profiler.StartNextSection("Instantiate(optimizer.gameObject)");
             var copy = Instantiate(optimizer.gameObject);
+            Profiler.StartNextSection("Move Copy to Scene");
             SceneManager.MoveGameObjectToScene(copy, optimizer.gameObject.scene);
+            Profiler.StartNextSection("Optimize Copy");
             copy.name = optimizer.gameObject.name + "(BrokenCopy)";
             copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
             copy.name = optimizer.gameObject.name + "(OptimizedCopy)";
+            Profiler.StartNextSection("Select Copy");
             copy.SetActive(true);
             optimizer.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
+            Profiler.EndSection();
             Profiler.PrintTimeUsed();
             Profiler.Reset();
             return;

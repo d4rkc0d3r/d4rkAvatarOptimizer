@@ -237,6 +237,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (shaderPath.EndsWith(".orlshader"))
             {
                 #if ORLSHADER_EXISTS
+                Profiler.StartSection("ORL.ShaderGenerator");
                 var fileName = Path.GetFileNameWithoutExtension(shaderName);
                 var shaderNameHash = "";
                 using (var md5 = MD5.Create())
@@ -246,7 +247,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 var trashBinPath = d4rkAvatarOptimizer.GetTrashBinPath();
                 var tempShaderPath = Path.Combine(trashBinPath, $"{fileName}_{shaderNameHash}.shader");
-                ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, tempShaderPath);
+                if (!File.Exists(tempShaderPath))
+                {
+                    ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, tempShaderPath);
+                }
                 try 
                 {
                     shaderFileLines = File.ReadAllLines(tempShaderPath);
@@ -257,6 +261,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     doneParsing = true;
                     parsedShader.errorMessage = e.Message;
                 }
+                Profiler.EndSection();
                 #else
                 parsedShader.parsedCorrectly = false;
                 doneParsing = true;

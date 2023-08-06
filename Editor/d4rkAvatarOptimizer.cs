@@ -152,10 +152,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Profiler.StartNextSection("FixAllAnimationPaths()");
             DisplayProgressBar("Fixing animation paths", 0.95f);
             FixAllAnimationPaths();
-            Profiler.EndSection();
+            Profiler.StartNextSection("MoveRingFingerColliderToFeet()");
             DisplayProgressBar("Done", 1.0f);
             MoveRingFingerColliderToFeet();
+            Profiler.StartNextSection("DestroyImmediate(this)");
             DestroyImmediate(this);
+            Profiler.EndSection();
         }
         finally
         {
