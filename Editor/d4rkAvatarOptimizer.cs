@@ -2125,7 +2125,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             }
                             var scale = mat.GetTextureScale(prop.name);
                             var offset = mat.GetTextureOffset(prop.name);
-                            propertyArray.values.Add("float4(" + scale.x + "," + scale.y + "," + offset.x + "," + offset.y + ")");
+                            propertyArray.values.Add($"float4({scale.x}, {scale.y}, {offset.x}, {offset.y})");
                             if (!arrayPropertyValues[i].TryGetValue(prop.name + "_TexelSize", out propertyArray))
                             {
                                 propertyArray.type = "float4";

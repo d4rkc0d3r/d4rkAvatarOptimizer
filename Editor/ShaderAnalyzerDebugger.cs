@@ -23,7 +23,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showParseErrors = true;
     private bool showUnmergable = true;
     private bool showCustomTextureDeclarations = true;
+    private bool showMultiIncludeFiles = true;
     private bool showErrorLess = true;
+    private Vector2 scrollPos;
 
     [MenuItem("Tools/d4rkpl4y3r/Shader Analyzer Debugger")]
     static void Init()
@@ -111,7 +113,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (prop.type == ParsedShader.Property.Type.ColorHDR)
                     replace[prop.name] = material.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
             }
-            var shadur = ShaderOptimizer.Run(parsedShader, replace);
+            ShaderOptimizer.Run(parsedShader, replace);
         }
 
         GUI.enabled = true;
@@ -119,6 +121,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         if (folder != null)
         {
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
             EditorGUILayout.LabelField("Total Shaders in Folder: " + shaders.Count);
             var parsedShaders = ShaderAnalyzer.ParseAndCacheAllShaders(shaders, false);
             var mismatchedCurlyBraces = parsedShaders.Where(s => s.mismatchedCurlyBraces).ToList();
@@ -176,6 +179,26 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
+            var hasMultiIncludeFiles = parsedShaders.Where(s => s.multiIncludeFileCount.Count > 0).ToList();
+            if (Foldout(ref showMultiIncludeFiles, $"Multi Include Files ({hasMultiIncludeFiles.Count})"))
+            {
+                EditorGUI.indentLevel++;
+                foreach (var shader in hasMultiIncludeFiles)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField($"Has {shader.multiIncludeFileCount.Count} multi include files");
+                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUI.indentLevel++;
+                    foreach (var file in shader.multiIncludeFileCount)
+                    {
+                        var fileName = Path.GetFileName(file.Key);
+                        EditorGUILayout.LabelField(new GUIContent($"{fileName}: {file.Value}", file.Key));
+                    }
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUI.indentLevel--;
+            }
             var errorLess = parsedShaders.Where(s => s.CanMerge() && !s.mismatchedCurlyBraces).ToList();
             if (Foldout(ref showErrorLess, $"Error Less ({errorLess.Count})"))
             {
@@ -189,6 +212,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
+            EditorGUILayout.EndScrollView();
             return;
         }
 
@@ -197,6 +221,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
         if (parsedShader == null)
             return;
 
+        scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
         GUILayout.Label(parsedShader.mismatchedCurlyBraces ? "Mismatched curly braces" : "No mismatched curly braces");
 
         GUILayout.Space(5);
@@ -259,6 +284,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             GUILayout.Label(parsedShader.lines[i]);
         }
+
+        EditorGUILayout.EndScrollView();
     }
 }
 #endif

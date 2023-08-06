@@ -11,6 +11,7 @@
 * Small optimizations to the generated shaders:
   * Changed type of Texture2DArray index from int to float eliminating a type conversion. 
   * Use ternaries for merged material properties that have only one value that differs from the rest.
+  * No longer include unity cg include files, instead directly include only UnityLightingCommon.cginc to get the _SpecColor declaration.
 
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.

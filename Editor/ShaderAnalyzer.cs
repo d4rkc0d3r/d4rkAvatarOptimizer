@@ -95,6 +95,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public string errorMessage = "";
         public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new List<string>();
+        public Dictionary<string, int> multiIncludeFileCount = new Dictionary<string, int>();
         public bool mismatchedCurlyBraces = false;
         public List<string> lines = new List<string>();
         public List<Property> properties = new List<Property>();
@@ -297,14 +298,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
         {
             var fileName = Path.GetFileName(filePath);
-            var lower = fileName.ToLowerInvariant();
-            if (lower == "unitycg.cginc" || lower == "hlslsupport.cginc" || lower == "unityshadervariables.cginc" || lower == "unityinstancing.cginc")
-                return false; // don't inline include these ones since it leads to problems
             bool isTopLevelFile = false;
             if (alreadyIncludedFiles == null)
             {
                 alreadyIncludedFiles = new List<string>();
                 isTopLevelFile = true;
+            }
+            if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")) && fileName != "UnityLightingCommon.cginc")
+            {
+                // we don't want to include and parse unity cg includes
+                return false;
             }
             if (--maxIncludes < 0)
             {
@@ -313,6 +316,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             filePath = Path.GetFullPath(filePath);
             if (alreadyIncludedFiles.Contains(filePath))
             {
+                if (!parsedShader.multiIncludeFileCount.ContainsKey(filePath))
+                    parsedShader.multiIncludeFileCount[filePath] = 0;
+                parsedShader.multiIncludeFileCount[filePath]++;
                 return true;
             }
             alreadyIncludedFiles.Add(filePath);
@@ -323,20 +329,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             catch (FileNotFoundException)
             {
-                // this is probably a unity include file, try to find it in the unity cginclude folder
-                var cgIncludePath = Path.Combine(EditorApplication.applicationContentsPath, "CGIncludes");
-                var cgIncludeFilePath = Path.GetFullPath(Path.Combine(cgIncludePath, fileName));
-                if (File.Exists(cgIncludeFilePath))
-                {
-                    maxIncludes++;
-                    return RecursiveParseFile(cgIncludeFilePath, processedLines, alreadyIncludedFiles);
-                }
-                else
-                {
-                    // include file that is not in the cginclude folder either
-                    Debug.LogWarning("Could not find include file: " + filePath);
-                    return false;
-                }
+                Debug.LogWarning("Could not find include file: " + filePath);
+                return false;
             }
             catch (DirectoryNotFoundException)
             {
@@ -434,6 +428,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM" ||trimmedLine == "HLSLINCLUDE" || trimmedLine == "HLSLPROGRAM"))
                 {
                     alreadyIncludedFiles.Clear();
+                    processedLines.Add(trimmedLine);
+                    // include UnityLightingCommon.cginc at the start of each code block since that declares _SpecColor and we don't want to just include all unity cg includes
+                    RecursiveParseFile(Path.Combine(EditorApplication.applicationContentsPath, "CGIncludes\\UnityLightingCommon.cginc"), processedLines, alreadyIncludedFiles);
+                    continue;
                 }
                 if (trimmedLine.StartsWith("UsePass"))
                 {
