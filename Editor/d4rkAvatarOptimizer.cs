@@ -591,12 +591,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             AnimationUtility.SetEditorCurve(newClip, FixAnimationBinding(binding, ref changed), curve);
-            bool addPhysBoneCurves = binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled";
-            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
-            {
-                AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
-                addPhysBoneCurves = true;
-            }
+            bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
+                || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
             if (addPhysBoneCurves && physBonesToDisable.ContainsKey(binding.path))
             {
                 var physBoneBinding = binding;
