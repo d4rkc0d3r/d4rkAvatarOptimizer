@@ -190,7 +190,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static List<ParsedShader> ParseAndCacheAllShaders(List<Shader> shaders, bool overrideAlreadyCached, System.Action<int, int> progressCallback = null)
         {
-            var analyzers = shaders
+            var analyzers = shaders.Distinct()
                 .Where(s => overrideAlreadyCached || !parsedShaderCache.ContainsKey(s.name))
                 .Select(s => new ShaderAnalyzer(s.name, AssetDatabase.GetAssetPath(s)))
                 .ToArray();
@@ -224,6 +224,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private int maxIncludes;
         private string filePath;
         private bool doneParsing;
+        private string[] shaderFileLines;
 
         private ShaderAnalyzer(string shaderName, string shaderPath)
         {
@@ -233,6 +234,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
             curlyBraceDepth = 0;
             maxIncludes = 1000;
             doneParsing = false;
+            if (shaderPath.EndsWith(".orlshader"))
+            {
+                #if ORLSHADER_EXISTS
+                var fileName = Path.GetFileNameWithoutExtension(shaderName);
+                var shaderNameHash = "";
+                using (var md5 = MD5.Create())
+                {
+                    md5.ComputeHash(Encoding.UTF8.GetBytes(shaderName));
+                    shaderNameHash = string.Join("", md5.Hash.Select(b => b.ToString("x2")));
+                }
+                var trashBinPath = d4rkAvatarOptimizer.GetTrashBinPath();
+                var tempShaderPath = Path.Combine(trashBinPath, $"{fileName}_{shaderNameHash}.shader");
+                ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, tempShaderPath);
+                try 
+                {
+                    shaderFileLines = File.ReadAllLines(tempShaderPath);
+                }
+                catch (IOException e)
+                {
+                    parsedShader.parsedCorrectly = false;
+                    doneParsing = true;
+                    parsedShader.errorMessage = e.Message;
+                }
+                #else
+                parsedShader.parsedCorrectly = false;
+                doneParsing = true;
+                parsedShader.errorMessage = "ORLShader Generator is not installed.";
+                #endif
+            }
         }
 
         private ParsedShader Parse()
@@ -297,53 +327,58 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
         {
-            var fileName = Path.GetFileName(filePath);
             bool isTopLevelFile = false;
+            string[] rawLines = null;
             if (alreadyIncludedFiles == null)
             {
                 alreadyIncludedFiles = new List<string>();
                 isTopLevelFile = true;
+                rawLines = shaderFileLines;
             }
-            if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")) && fileName != "UnityLightingCommon.cginc")
+            if (rawLines == null)
             {
-                // we don't want to include and parse unity cg includes
-                return false;
-            }
-            if (--maxIncludes < 0)
-            {
-                throw new ParserException("Reached max include depth");
-            }
-            filePath = Path.GetFullPath(filePath);
-            if (alreadyIncludedFiles.Contains(filePath))
-            {
-                if (!parsedShader.multiIncludeFileCount.ContainsKey(filePath))
-                    parsedShader.multiIncludeFileCount[filePath] = 0;
-                parsedShader.multiIncludeFileCount[filePath]++;
-                return true;
-            }
-            alreadyIncludedFiles.Add(filePath);
-            string[] rawLines = null;
-            try
-            {
-                rawLines = File.ReadAllLines(filePath);
-            }
-            catch (FileNotFoundException)
-            {
-                Debug.LogWarning("Could not find include file: " + filePath);
-                return false;
-            }
-            catch (DirectoryNotFoundException)
-            {
-                if (isTopLevelFile)
+                var fileName = Path.GetFileName(filePath);
+                if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")) && fileName != "UnityLightingCommon.cginc")
                 {
-                    // unity shader files are not assets in the project so we just throw the error again to mark
-                    // the parsed shader as failed to read
-                    throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
+                    // we don't want to include and parse unity cg includes
+                    return false;
                 }
-                // happens for example if audio link is not in the project but the shader has a reference to the include file
-                // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
-                Debug.LogWarning("Could not find directory for include file: " + filePath);
-                return false; 
+                if (--maxIncludes < 0)
+                {
+                    throw new ParserException("Reached max include depth");
+                }
+                filePath = Path.GetFullPath(filePath);
+                if (alreadyIncludedFiles.Contains(filePath))
+                {
+                    if (!parsedShader.multiIncludeFileCount.ContainsKey(filePath))
+                        parsedShader.multiIncludeFileCount[filePath] = 0;
+                    parsedShader.multiIncludeFileCount[filePath]++;
+                    return true;
+                }
+                alreadyIncludedFiles.Add(filePath);
+                try
+                {
+                    rawLines = File.ReadAllLines(filePath);
+                }
+                catch (FileNotFoundException)
+                {
+                    if (fileName != "UnityLightingCommon.cginc")
+                        Debug.LogWarning("Could not find include file: " + filePath);
+                    return false;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    if (isTopLevelFile)
+                    {
+                        // unity shader files are not assets in the project so we just throw the error again to mark
+                        // the parsed shader as failed to read
+                        throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
+                    }
+                    // happens for example if audio link is not in the project but the shader has a reference to the include file
+                    // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
+                    Debug.LogWarning("Could not find directory for include file: " + filePath);
+                    return false; 
+                }
             }
 
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)

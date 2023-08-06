@@ -106,10 +106,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-            DisplayProgressBar("Parsing Shaders", 0.01f);
-            ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.01f + 0.14f * done / total));
-            DisplayProgressBar("Clear TrashBin Folder", 0.15f);
+            DisplayProgressBar("Clear TrashBin Folder", 0.01f);
             ClearTrashBin();
+            DisplayProgressBar("Parsing Shaders", 0.05f);
+            Profiler.StartSection("ParseAndCacheAllShaders()");
+            ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
+            Profiler.StartNextSection("Clear Lists");
             optimizedMaterials.Clear();
             optimizedMaterialImportPaths.Clear();
             optimizedSlotSwapMaterials.Clear();
@@ -118,7 +120,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
             DisplayProgressBar("Destroying unused components", 0.19f);
-            Profiler.StartSection("DestroyEditorOnlyGameObjects()");
+            Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
             DestroyEditorOnlyGameObjects();
             Profiler.StartNextSection("DestroyUnusedComponents()");
             physBonesToDisable = FindAllPhysBonesToDisable();
@@ -258,6 +260,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         progressBar = progress;
         DisplayProgressBar(text);
+    }
+
+    public static string GetTrashBinPath()
+    {
+        var path = AssetDatabase.GUIDToAssetPath(AssetDatabase.FindAssets("d4rkAvatarOptimizer")[0]);
+        packageRootPath = path.Substring(0, path.LastIndexOf('/'));
+        packageRootPath = packageRootPath.Substring(0, packageRootPath.LastIndexOf('/'));
+        var trashBinRoot = packageRootPath;
+        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
+        if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
+        {
+            trashBinRoot = "Assets/d4rkAvatarOptimizer";
+            if (!AssetDatabase.IsValidFolder("Assets/d4rkAvatarOptimizer"))
+            {
+                AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
+            }
+        }
+        trashBinPath = trashBinRoot + "/TrashBin/";
+        if (!AssetDatabase.IsValidFolder(trashBinRoot + "/TrashBin"))
+        {
+            AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
+        }
+        return trashBinPath;
     }
 
     private void ClearTrashBin()

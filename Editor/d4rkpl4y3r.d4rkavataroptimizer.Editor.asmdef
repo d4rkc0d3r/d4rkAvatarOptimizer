@@ -4,7 +4,8 @@
         "VRC.SDK3A",
         "VRC.SDK3A.Editor",
         "VRC.SDKBase",
-        "VRC.SDKBase.Editor"
+        "VRC.SDKBase.Editor",
+        "ORL.ShaderGenerator"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -18,6 +19,11 @@
             "name": "com.vrchat.avatars",
             "expression": "3.1.13",
             "define": "HAS_IEDITOR_ONLY"
+        },
+        {
+            "name": "sh.orels.shaders.generator",
+            "expression": "6.1",
+            "define": "ORLSHADER_EXISTS"
         }
     ],
     "noEngineReferences": false

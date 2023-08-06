@@ -5,6 +5,7 @@
 * Show layer merge errors as tooltips in the "Show FX Layer Merge Results" section.
 * Add option to disable phys bones together with the skinned mesh they affect.
 * "Optimize FX Layer" can now also merge toggle layers that use two bools.
+* Add support for `.orlshader` files from [orels-Unity-Shaders](https://github.com/orels1/orels-Unity-Shaders/tree/main)
 
 ### Changes
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".

@@ -258,10 +258,12 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             GUILayout.Space(15);
             GUILayout.Label("Shader keywords(" + parsedShader.shaderFeatureKeyWords.Count + "):");
+            EditorGUI.indentLevel++;
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
-                EditorGUILayout.LabelField(material.IsKeywordEnabled(keyword) ? "enabled" : "disabled", keyword);
+                EditorGUILayout.ToggleLeft(keyword, material.IsKeywordEnabled(keyword));
             }
+            EditorGUI.indentLevel--;
         }
 
         GUILayout.Space(15);
