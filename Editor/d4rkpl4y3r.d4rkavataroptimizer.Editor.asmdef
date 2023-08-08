@@ -5,7 +5,9 @@
         "VRC.SDK3A.Editor",
         "VRC.SDKBase",
         "VRC.SDKBase.Editor",
-        "ORL.ShaderGenerator"
+        "ORL.ShaderGenerator",
+        "nadena.dev.modular-avatar.core",
+        "nadena.dev.modular-avatar.core.editor"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -24,6 +26,11 @@
             "name": "sh.orels.shaders.generator",
             "expression": "6.1",
             "define": "ORLSHADER_EXISTS"
+        },
+        {
+            "name": "nadena.dev.modular-avatar",
+            "expression": "1.6",
+            "define": "MODULAR_AVATAR_EXISTS"
         }
     ],
     "noEngineReferences": false
