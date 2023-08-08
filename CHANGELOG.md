@@ -18,6 +18,7 @@
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
 * Fix boneless skinned meshes ignoring the root bone property.
+* Fix inline if return statements in the vertex & geometry shader not getting parsed correctly.
 
 ## v2.3.2
 ### Bug Fixes

@@ -867,6 +867,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     line = line + " " + lines[++lineIndex];
                 }
+                var returnIndex = line.IndexOf("return");
+                if (returnIndex > 0 && line.Length > returnIndex + 6)
+                if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ')')
+                    && (line[returnIndex + 6] == ' ' || line[returnIndex + 6] == '\t' || line[returnIndex + 6] == ';') || line[returnIndex + 6] == '(')
+                {
+                    output.Add(line.Substring(0, returnIndex).TrimEnd());
+                    line = line.Substring(returnIndex);   
+                }
                 curlyBraceDepth += line == "{" ? 1 : (line == "}" ? -1 : 0);
                 output.Add(line);
             }
