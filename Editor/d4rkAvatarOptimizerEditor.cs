@@ -998,7 +998,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
         {
-            output = EditorGUILayout.Foldout(value, new GUIContent(label, string.Join("\n", tooltip.ToArray())));
+            output = EditorGUILayout.Foldout(value, new GUIContent(label, string.Join("\n", tooltip.ToArray())), true);
             var rect = GUILayoutUtility.GetLastRect();
             rect.x += rect.width - 20;
             rect.width = 20;
@@ -1007,10 +1007,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         else
         {
-            output = EditorGUILayout.Foldout(value, label);
+            output = EditorGUILayout.Foldout(value, label, true);
         }
-        if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
-            output = !value;
         if (value != output)
             ClearUICaches();
         return value = output;

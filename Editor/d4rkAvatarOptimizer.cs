@@ -1112,7 +1112,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_FindUselessFXLayers != null)
             return cache_FindUselessFXLayers;
         var fxLayer = GetFXLayer();
-        if (fxLayer == null)
+        if (fxLayer == null || !OptimizeFXLayer)
             return new HashSet<int>();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
 
@@ -1216,6 +1216,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         return cache_GetAllUsedFXLayerAnimationClips = usedClips;
+    }
+
+    private HashSet<EditorCurveBinding> cache_GetAllUsedFXLayerCurveBindings = null;
+    private HashSet<EditorCurveBinding> GetAllUsedFXLayerCurveBindings()
+    {
+        if (cache_GetAllUsedFXLayerCurveBindings != null)
+            return cache_GetAllUsedFXLayerCurveBindings;
+        var result = new HashSet<EditorCurveBinding>();
+        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        {
+            result.UnionWith(AnimationUtility.GetCurveBindings(clip));
+            result.UnionWith(AnimationUtility.GetObjectReferenceCurveBindings(clip));
+        }
+        return cache_GetAllUsedFXLayerCurveBindings = result;
     }
 
     private Dictionary<VRCPhysBoneBase, HashSet<Object>> cache_FindAllPhysBoneDependencies = null;
@@ -1368,7 +1382,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return result;
-        foreach (var clip in fxLayer.animationClips)
+        foreach (var clip in GetAllUsedFXLayerAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
@@ -1475,35 +1489,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
             }
-            var fxLayer = GetFXLayer();
-            if (fxLayer != null)
+            foreach (var clip in GetAllUsedFXLayerAnimationClips())
             {
-                foreach (var clip in fxLayer.animationClips)
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
-                    foreach (var binding in AnimationUtility.GetCurveBindings(clip))
-                    {
-                        if (binding.type != typeof(SkinnedMeshRenderer)
-                            || !binding.propertyName.StartsWith("blendShape."))
-                            continue;
-                        var t = GetTransformFromPath(binding.path);
-                        if (t == null)
-                            continue;
-                        var smr = t.GetComponent<SkinnedMeshRenderer>();
-                        if (smr == null)
-                            continue;
-                        var mesh = smr.sharedMesh;
-                        if (mesh == null)
-                            continue;
-                        var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
-                        var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
-                        if (blendShapeID < 0)
-                            continue;
-                        var keyframes = AnimationUtility.GetEditorCurve(clip, binding).keys;
-                        if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
-                            continue;
-                        usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-                        hasUsedBlendShapes.Add(smr);
-                    }
+                    if (binding.type != typeof(SkinnedMeshRenderer)
+                        || !binding.propertyName.StartsWith("blendShape."))
+                        continue;
+                    var t = GetTransformFromPath(binding.path);
+                    if (t == null)
+                        continue;
+                    var smr = t.GetComponent<SkinnedMeshRenderer>();
+                    if (smr == null)
+                        continue;
+                    var mesh = smr.sharedMesh;
+                    if (mesh == null)
+                        continue;
+                    var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
+                    var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
+                    if (blendShapeID < 0)
+                        continue;
+                    var keyframes = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                    if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
+                        continue;
+                    usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
+                    hasUsedBlendShapes.Add(smr);
                 }
             }
         }
@@ -1607,7 +1617,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        foreach (var clip in fxLayer.animationClips)
+        foreach (var clip in GetAllUsedFXLayerAnimationClips())
         {
             var blendShapes = new List<(string path, EditorCurveBinding binding)>();
             var keyframes = new HashSet<float>();
@@ -1731,7 +1741,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return map;
-        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        foreach (var binding in GetAllUsedFXLayerCurveBindings())
         {
             if (!binding.propertyName.StartsWith("material.") ||
                 (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
@@ -1759,7 +1769,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return togglePaths;
-        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        foreach (var binding in GetAllUsedFXLayerCurveBindings())
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 togglePaths.Add(binding.path);
@@ -1810,7 +1820,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (fxLayer == null)
             return new HashSet<Component>();
         var behaviourToggles = new HashSet<string>();
-        foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+        foreach (var binding in GetAllUsedFXLayerCurveBindings())
         {
             if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
             {
