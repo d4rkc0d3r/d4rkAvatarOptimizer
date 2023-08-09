@@ -132,9 +132,13 @@ Here you can see an example of this which will be referenced in this section:
 
 In this detailed view the resulting meshes are separated by spaces. Materials that get merged together are indented. In the example you can see 3 resulting meshes. You can also see that `Body/FaceSkin` and `Body/Eyes` get merged into one material while `Body/FaceAlpha` is still its own material.
 ## Show FX Layer Merge Result
-In this section you can see which layers in the FXLayer got recognized as a simple toggle layer and which ones didn't. The VRChat performance rank icons of Excellent are used for detected toggles while the Very Poor icon is used for layers that couldn't be merged.
+In this section you can see which layers in the FXLayer could get merged or deleted. The VRChat performance rank icon is used to indicate if a layer could be optimized:
+  * Excellent - Layer is useless and can be deleted.
+  * Good - Layer is a simple toggle and can be merged into a direct blend tree.
+  * Medium - Layer is a motion time state and can be approximated with a 1D blend tree.
+  * Very Poor - Layer can't be optimized.
 
-The option Show Detailed Errors will show you the reasons why the optimizer rejected a layer as a simple toggle.
+The option Show Detailed Errors will show you the reasons why the optimizer rejected a layer from being optimized.
 ## Debug Info
 Shows debug information about how the optimizer is understanding the avatar.
 ### Unparsable Materials

@@ -106,13 +106,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-            isOptimizing = true;
             DisplayProgressBar("Clear TrashBin Folder", 0.01f);
             ClearTrashBin();
             DisplayProgressBar("Parsing Shaders", 0.05f);
             Profiler.StartSection("ParseAndCacheAllShaders()");
             ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
-            Profiler.StartNextSection("Clear Lists");
+            Profiler.StartNextSection("Clear Caches");
             optimizedMaterials.Clear();
             optimizedMaterialImportPaths.Clear();
             optimizedSlotSwapMaterials.Clear();
@@ -120,6 +119,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             texArrayPropertiesToSet.Clear();
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
+            ClearCaches();
             DisplayProgressBar("Destroying unused components", 0.19f);
             Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
             DestroyEditorOnlyGameObjects();
@@ -170,7 +170,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private static string packageRootPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
-    private bool isOptimizing = false;
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -377,6 +376,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public string GetPathToRoot(Component component)
     {
         return GetTransformPathToRoot(component.transform);
+    }
+
+    public void ClearCaches()
+    {
+        var fields = GetType().GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        foreach (var field in fields)
+        {
+            if (field.Name.StartsWith("cache_"))
+            {
+                field.SetValue(this, null);
+            }
+        }
     }
 
     private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
@@ -718,6 +729,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayerMap = new Dictionary<int, int>();
         if (OptimizeFXLayer && GetFXLayer() != null)
         {
+            var nonErrors = new HashSet<string>() {"toggle", "motion time"};
             var errors = AnalyzeFXLayerMergeAbility();
             var uselessLayers = FindUselessFXLayers();
             int currentLayer = 0;
@@ -729,7 +741,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     fxLayersToDestroy.Add(i);
                     continue;
                 }
-                if (errors[i].Count == 0)
+                if (errors[i].All(e => nonErrors.Contains(e)))
                 {
                     fxLayersToMerge.Add(i);
                     continue;
@@ -813,8 +825,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return result;
     }
 
+    private List<List<string>> cache_AnalyzeFXLayerMergeAbility;
     public List<List<string>> AnalyzeFXLayerMergeAbility()
     {
+        if (cache_AnalyzeFXLayerMergeAbility != null)
+            return cache_AnalyzeFXLayerMergeAbility;
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new List<List<string>>();
@@ -848,9 +863,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var fxLayerBindings = fxLayer.layers.Select(layer => GetAllCurveBindings(layer.stateMachine)).ToList();
+        var uselessLayers = FindUselessFXLayers();
 
         for (int i = 0; i < fxLayer.layers.Length; i++)
         {
+            if (uselessLayers.Contains(i))
+            {
+                errorMessages[i].Add("useless");
+                continue;
+            }
             var layer = fxLayer.layers[i];
             var stateMachine = layer.stateMachine;
             if (stateMachine == null)
@@ -1023,6 +1044,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
                 }
+                errorMessages[i].Add($"toggle");
             }
             
             if (states.Length == 1) // check for motion time layer
@@ -1061,6 +1083,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     errorMessages[i].Add($"{state.name} has less than 2 keyframes");
                     continue;
                 }
+                errorMessages[i].Add($"motion time");
             }
 
             for (int j = 0; j < fxLayer.layers.Length; j++)
@@ -1076,15 +1099,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        return errorMessages;
+        for (int i = 0; i < errorMessages.Count; i++)
+        {
+            errorMessages[i] = errorMessages[i].Distinct().ToList();
+        }
+        return cache_AnalyzeFXLayerMergeAbility = errorMessages;
     }
 
-    private HashSet<int> uselessFXLayersResult = null;
-
+    private HashSet<int> cache_FindUselessFXLayers = null;
     public HashSet<int> FindUselessFXLayers()
     {
-        if (uselessFXLayersResult != null)
-            return uselessFXLayersResult;
+        if (cache_FindUselessFXLayers != null)
+            return cache_FindUselessFXLayers;
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<int>();
@@ -1164,14 +1190,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             lastNonUselessLayer = i;
         }
 
-        if (isOptimizing)
-            uselessFXLayersResult = uselessLayers;
-
-        return uselessLayers;
+        return cache_FindUselessFXLayers = uselessLayers;
     }
 
+    private HashSet<AnimationClip> cache_GetAllUsedFXLayerAnimationClips = null;
     private HashSet<AnimationClip> GetAllUsedFXLayerAnimationClips()
     {
+        if (cache_GetAllUsedFXLayerAnimationClips != null)
+            return cache_GetAllUsedFXLayerAnimationClips;
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<AnimationClip>();
@@ -1189,11 +1215,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 usedClips.UnionWith(state.motion.EnumerateAllClips());
             }
         }
-        return usedClips;
+        return cache_GetAllUsedFXLayerAnimationClips = usedClips;
     }
 
+    private Dictionary<VRCPhysBoneBase, HashSet<Object>> cache_FindAllPhysBoneDependencies = null;
     public Dictionary<VRCPhysBoneBase, HashSet<Object>> FindAllPhysBoneDependencies()
     {
+        if (cache_FindAllPhysBoneDependencies != null)
+            return cache_FindAllPhysBoneDependencies;
         var result = new Dictionary<VRCPhysBoneBase, HashSet<Object>>();
         var physBonePath = new Dictionary<string, VRCPhysBoneBase>();
         var physBones = GetComponentsInChildren<VRCPhysBoneBase>(true);
@@ -1306,7 +1335,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
-        return result;
+        return cache_FindAllPhysBoneDependencies = result;
     }
 
     public Dictionary<string, List<string>> FindAllPhysBonesToDisable()
@@ -1330,8 +1359,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return result;
     }
 
+    private Dictionary<(string path, int index), HashSet<Material>> cache_FindAllMaterialSwapMaterials;
     public Dictionary<(string path, int index), HashSet<Material>> FindAllMaterialSwapMaterials()
     {
+        if (cache_FindAllMaterialSwapMaterials != null)
+            return cache_FindAllMaterialSwapMaterials;
         var result = new Dictionary<(string path, int index), HashSet<Material>>();
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
@@ -1356,7 +1388,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 materials.UnionWith(curveMaterials);
             }
         }
-        return result;
+        return cache_FindAllMaterialSwapMaterials = result;
     }
 
     private void OptimizeMaterialSwapMaterials()
@@ -1690,8 +1722,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
+    private Dictionary<string, HashSet<string>> cache_FindAllAnimatedMaterialProperties;
     public Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties()
     {
+        if (cache_FindAllAnimatedMaterialProperties != null)
+            return cache_FindAllAnimatedMaterialProperties;
         var map = new Dictionary<string, HashSet<string>>();
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
@@ -1712,25 +1747,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             props.Add(propName);
         }
-        return map;
+        return cache_FindAllAnimatedMaterialProperties = map;
     }
 
+    private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
     public HashSet<string> FindAllGameObjectTogglePaths()
     {
+        if (cache_FindAllGameObjectTogglePaths != null)
+            return cache_FindAllGameObjectTogglePaths;
         var togglePaths = new HashSet<string>();
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
-            return new HashSet<string>();
+            return togglePaths;
         foreach (var binding in fxLayer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 togglePaths.Add(binding.path);
         }
-        return togglePaths;
+        return cache_FindAllGameObjectTogglePaths = togglePaths;
     }
 
+    private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
+        if (cache_FindAllAlwaysDisabledGameObjects != null)
+            return cache_FindAllAlwaysDisabledGameObjects;
         var togglePaths = FindAllGameObjectTogglePaths();
         var disabledGameObjects = new HashSet<Transform>();
         var queue = new Queue<Transform>();
@@ -1757,11 +1798,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        return disabledGameObjects;
+        return cache_FindAllAlwaysDisabledGameObjects = disabledGameObjects;
     }
 
+    private HashSet<Component> cache_FindAllUnusedComponents = null;
     public HashSet<Component> FindAllUnusedComponents()
     {
+        if (cache_FindAllUnusedComponents != null)
+            return cache_FindAllUnusedComponents;
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<Component>();
@@ -1792,11 +1836,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var exclusions = GetAllExcludedTransforms();
         alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));
 
-        return alwaysDisabledBehaviours;
+        return cache_FindAllUnusedComponents = alwaysDisabledBehaviours;
     }
 
+    private HashSet<Transform> cache_FindAllMovingTransforms = null;
     private HashSet<Transform> FindAllMovingTransforms()
     {
+        if (cache_FindAllMovingTransforms != null)
+            return cache_FindAllMovingTransforms;
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return new HashSet<Transform>();
@@ -1879,16 +1926,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             transforms.Add(constraint.transform);
         }
 
-        return transforms;
+        return cache_FindAllMovingTransforms = transforms;
     }
 
+    private HashSet<Transform> cache_FindAllUnmovingTransforms = null;
     public  HashSet<Transform> FindAllUnmovingTransforms()
     {
+        if (cache_FindAllUnmovingTransforms != null)
+            return cache_FindAllUnmovingTransforms;
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return new HashSet<Transform>();
         var moving = FindAllMovingTransforms();
-        return new HashSet<Transform>(transform.GetAllDescendants().Where(t => !moving.Contains(t)));
+        return cache_FindAllUnmovingTransforms = new HashSet<Transform>(transform.GetAllDescendants().Where(t => !moving.Contains(t)));
     }
 
     private bool IsDPSPenetratorTipLight(Light light)
@@ -1930,8 +1980,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return material.HasProperty("_TPSPenetratorEnabled") && material.GetFloat("_TPSPenetratorEnabled") > 0.5f;
     }
 
+    private HashSet<Renderer> cache_FindAllPenetrators = null;
     public HashSet<Renderer> FindAllPenetrators()
     {
+        if (cache_FindAllPenetrators != null)
+            return cache_FindAllPenetrators;
         var penetratorTipLights = GetComponentsInChildren<Light>(true)
             .Where(l => IsDPSPenetratorTipLight(l)).ToList();
         var penetrators = new HashSet<Renderer>();
@@ -1948,7 +2001,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         penetrators.UnionWith(GetComponentsInChildren<Renderer>(true).Where(m => IsTPSPenetratorRoot(m.transform)));
-        return penetrators;
+        return cache_FindAllPenetrators = penetrators;
     }
 
     private Texture2DArray CombineTextures(List<Texture2D> textures)
@@ -3406,15 +3459,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
     }
 
+    private HashSet<Transform> cache_GetAllExcludedTransforms;
     public HashSet<Transform> GetAllExcludedTransforms()
     {
+        if (cache_GetAllExcludedTransforms != null)
+            return cache_GetAllExcludedTransforms;
         var allExcludedTransforms = new HashSet<Transform>();
         foreach (var excludedTransform in ExcludeTransforms)
         {
             allExcludedTransforms.Add(excludedTransform);
             allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
         }
-        return allExcludedTransforms;
+        return cache_GetAllExcludedTransforms = allExcludedTransforms;
     }
 
     private void DestroyEditorOnlyGameObjects()

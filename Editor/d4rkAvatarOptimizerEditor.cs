@@ -179,9 +179,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
         if (optimizer.GetFXLayer() != null)
         {
-            var mergedLayerCount = optimizer.OptimizeFXLayer ? FXLayerMergeErrors.Count(e => e.Count == 0) : 0;
+            var nonErrors = new HashSet<string>() {"toggle", "motion time"};
+            var mergedLayerCount = optimizer.OptimizeFXLayer ? optimizer.AnalyzeFXLayerMergeAbility().Count(list => list.All(e => nonErrors.Contains(e))) : 0;
             var layerCount = optimizer.GetFXLayer().layers.Length;
-            PerfRankChangeLabel("FX Layers", layerCount, mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount, PerformanceCategory.FXLayerCount);
+            var optimizedLayerCount = mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount;
+            if (optimizer.OptimizeFXLayer)
+                optimizedLayerCount -= optimizer.FindUselessFXLayers().Count;
+            PerfRankChangeLabel("FX Layers", layerCount, optimizedLayerCount, PerformanceCategory.FXLayerCount);
         }
         PerfRankChangeLabel("Blend Shapes", totalBlendShapePaths.Count, KeptBlendShapePaths.Count, PerformanceCategory.BlendShapeCount);
         Profiler.EndSection();
@@ -214,20 +218,28 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 Profiler.StartSection("Show FX Layer Merge Errors");
                 Toggle("Show Detailed Errors", ref optimizer.ShowFXLayerMergeErrors);
-                var errorMessages = FXLayerMergeErrors;
+                var errorMessages = optimizer.AnalyzeFXLayerMergeAbility();
+                var uselessLayers = optimizer.FindUselessFXLayers();
                 var fxLayer = optimizer.GetFXLayer();
+                var nonErrors = new HashSet<string>() {"toggle", "motion time", "useless"};
                 for (int i = 0; i < errorMessages.Count; i++)
                 {
-                    var name = fxLayer.layers[i].name;
+                    var perfRating = PerformanceRating.VeryPoor;
+                    if (errorMessages[i].Count == 1 && errorMessages[i][0] == "toggle")
+                        perfRating = PerformanceRating.Good;
+                    else if (errorMessages[i].Count == 1 && errorMessages[i][0] == "motion time")
+                        perfRating = PerformanceRating.Medium;
+                    if (uselessLayers.Contains(i))
+                        perfRating = PerformanceRating.Excellent;
                     
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(errorMessages[i].Count > 0 ? PerformanceRating.VeryPoor : PerformanceRating.Excellent)), GUILayout.Width(15));
+                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(15));
                     EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayer.layers[i].name}", string.Join("\n", errorMessages[i])));
                     EditorGUILayout.EndHorizontal();
                     if (optimizer.ShowFXLayerMergeErrors)
                     {
                         EditorGUI.indentLevel+=2;
-                        foreach (var error in errorMessages[i])
+                        foreach (var error in errorMessages[i].Where(e => !nonErrors.Contains(e)))
                         {
                             EditorGUILayout.LabelField(error);
                         }
@@ -326,16 +338,16 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(list);
                 Profiler.EndSection();
             }
-            if (Penetrators.Count > 0 && Foldout("Penetrators", ref optimizer.DebugShowPenetrators))
+            if (optimizer.FindAllPenetrators().Count > 0 && Foldout("Penetrators", ref optimizer.DebugShowPenetrators))
             {
                 Profiler.StartSection("Penetrators");
-                DrawDebugList(Penetrators.ToArray());
+                DrawDebugList(optimizer.FindAllPenetrators().ToArray());
                 Profiler.EndSection();
             }
             if (Foldout("Phys Bone Dependencies", ref optimizer.DebugShowPhysBoneDependencies))
             {
                 Profiler.StartSection("Phys Bone Dependencies");
-                foreach (var pair in PhysBoneDependencies)
+                foreach (var pair in optimizer.FindAllPhysBoneDependencies())
                 {
                     if (pair.Key.gameObject.CompareTag("EditorOnly"))
                         continue;
@@ -348,13 +360,13 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unused Components", ref optimizer.DebugShowUnusedComponents))
             {
                 Profiler.StartSection("Unused Components");
-                DrawDebugList(UnusedComponents);
+                DrawDebugList(optimizer.FindAllUnusedComponents().ToArray());
                 Profiler.EndSection();
             }
             if (Foldout("Always Disabled Game Objects", ref optimizer.DebugShowAlwaysDisabledGameObjects))
             {
                 Profiler.StartSection("Always Disabled Game Objects");
-                DrawDebugList(AlwaysDisabledGameObjects);
+                DrawDebugList(optimizer.FindAllAlwaysDisabledGameObjects().ToArray());
                 Profiler.EndSection();
             }
             if (Foldout("Material Swaps", ref optimizer.DebugShowMaterialSwaps))
@@ -649,32 +661,22 @@ public class d4rkAvatarOptimizerEditor : Editor
     private d4rkAvatarOptimizer lastSelected = null;
     private List<List<List<MaterialSlot>>> mergedMaterialPreviewCache = null;
     private Transform[] unmovingBonesCache = null;
-    private Component[] unusedComponentsCache = null;
-    private Transform[] alwaysDisabledGameObjectsCache = null;
     private GameObject[] gameObjectsWithToggleAnimationsCache = null;
     private Texture2D[] crunchedTexturesCache = null;
     private Texture2D[] nonBC5NormalMapsCache = null;
     private string[] animatedMaterialPropertyPathsCache = null;
-    private List<List<string>> fxLayerMergeErrorsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
-    private Dictionary<VRCPhysBoneBase, HashSet<Object>> physBoneDependenciesCache = null;
-
-    private HashSet<Renderer> penetratorsCache = null;
 
     private void ClearUICaches()
     {
         mergedMaterialPreviewCache = null;
         unmovingBonesCache = null;
-        unusedComponentsCache = null;
-        alwaysDisabledGameObjectsCache = null;
         gameObjectsWithToggleAnimationsCache = null;
         crunchedTexturesCache = null;
         nonBC5NormalMapsCache = null;
         animatedMaterialPropertyPathsCache = null;
-        fxLayerMergeErrorsCache = null;
         keptBlendShapePathsCache = null;
-        penetratorsCache = null;
-        physBoneDependenciesCache = null;
+        optimizer.ClearCaches();
     }
 
     private void OnSelectionChange()
@@ -755,27 +757,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private List<List<string>> FXLayerMergeErrors
-    {
-        get
-        {
-            if (fxLayerMergeErrorsCache == null)
-            {
-                fxLayerMergeErrorsCache = optimizer.AnalyzeFXLayerMergeAbility();
-                for (int i = 0; i < fxLayerMergeErrorsCache.Count; i++)
-                {
-                    fxLayerMergeErrorsCache[i] = fxLayerMergeErrorsCache[i].Distinct().ToList();
-                }
-                var uselessLayers = optimizer.FindUselessFXLayers();
-                foreach (var layer in uselessLayers)
-                {
-                    fxLayerMergeErrorsCache[layer].Clear();
-                }
-            }
-            return fxLayerMergeErrorsCache;
-        }
-    }
-
     private Transform[] UnmovingBones
     {
         get
@@ -789,30 +770,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 unmovingBonesCache = bones.ToArray();
             }
             return unmovingBonesCache;
-        }
-    }
-
-    private Component[] UnusedComponents
-    {
-        get
-        {
-            if (unusedComponentsCache == null)
-            {
-                unusedComponentsCache = optimizer.FindAllUnusedComponents().ToArray();
-            }
-            return unusedComponentsCache;
-        }
-    }
-
-    private Transform[] AlwaysDisabledGameObjects
-    {
-        get
-        {
-            if (alwaysDisabledGameObjectsCache == null)
-            {
-                alwaysDisabledGameObjectsCache = optimizer.FindAllAlwaysDisabledGameObjects().ToArray();
-            }
-            return alwaysDisabledGameObjectsCache;
         }
     }
 
@@ -861,18 +818,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                 crunchedTexturesCache = textures.ToArray();
             }
             return crunchedTexturesCache;
-        }
-    }
-
-    private HashSet<Renderer> Penetrators
-    {
-        get
-        {
-            if (penetratorsCache == null)
-            {
-                penetratorsCache = optimizer.FindAllPenetrators();
-            }
-            return penetratorsCache;
         }
     }
 
@@ -931,18 +876,6 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .SelectMany(kv => kv.Value.Select(prop => $"{kv.Key}.{prop}")).ToArray();
             }
             return animatedMaterialPropertyPathsCache;
-        }
-    }
-
-    private Dictionary<VRCPhysBoneBase, HashSet<Object>> PhysBoneDependencies
-    {
-        get
-        {
-            if (physBoneDependenciesCache == null)
-            {
-                physBoneDependenciesCache = optimizer.FindAllPhysBoneDependencies();
-            }
-            return physBoneDependenciesCache;
         }
     }
 
