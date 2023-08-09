@@ -106,6 +106,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            isOptimizing = true;
             DisplayProgressBar("Clear TrashBin Folder", 0.01f);
             ClearTrashBin();
             DisplayProgressBar("Parsing Shaders", 0.05f);
@@ -169,6 +170,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private static string packageRootPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
+    private bool isOptimizing = false;
     private static HashSet<string> usedBlendShapes = new HashSet<string>();
     private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -310,7 +312,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         Profiler.EndSection();
     }
 
-    private static string assetBundlePath = null;
+    private string assetBundlePath = null;
     private void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
@@ -1077,8 +1079,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return errorMessages;
     }
 
+    private HashSet<int> uselessFXLayersResult = null;
+
     public HashSet<int> FindUselessFXLayers()
     {
+        if (uselessFXLayersResult != null)
+            return uselessFXLayersResult;
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new HashSet<int>();
@@ -1107,13 +1113,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var uselessLayers = new HashSet<int>();
+        var possibleBindings = new HashSet<(string path, string property, string type)>();
+        (string path, string property, string type) GetBinding(EditorCurveBinding binding)
+        {
+            return (binding.path, ""/*binding.propertyName*/, binding.type.FullName);
+        }
+        foreach (var current in transform.GetAllDescendants())
+        {
+            possibleBindings.UnionWith(AnimationUtility.GetAnimatableBindings(current.gameObject, gameObject).Select(GetBinding));
+        }
 
         int lastNonUselessLayer = fxLayer.layers.Length;
         for (int i = fxLayer.layers.Length - 1; i >= 0; i--)
         {
             var layer = fxLayer.layers[i];
             var stateMachine = layer.stateMachine;
-            bool isNotFirstLayerOrLastNonUselessLayerCanBeFirst = i != 0 || (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
+            bool isNotFirstLayerOrLastNonUselessLayerCanBeFirst = i != 0 ||
+                (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
             if (stateMachine == null)
             {
                 if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst)
@@ -1137,8 +1153,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 uselessLayers.Add(i);
                 continue;
             }
+            var layerBindings = stateMachine.EnumerateAllStates()
+                .SelectMany(s => s.motion == null ? new AnimationClip[0] : s.motion.EnumerateAllClips()).Distinct()
+                .SelectMany(c => AnimationUtility.GetCurveBindings(c).Select(GetBinding).Concat(AnimationUtility.GetObjectReferenceCurveBindings(c).Select(GetBinding)));
+            if (layerBindings.All(b => !possibleBindings.Contains(b)))
+            {
+                uselessLayers.Add(i);
+                continue;
+            }
             lastNonUselessLayer = i;
         }
+
+        if (isOptimizing)
+            uselessFXLayersResult = uselessLayers;
 
         return uselessLayers;
     }

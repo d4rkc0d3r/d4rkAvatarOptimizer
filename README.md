@@ -87,7 +87,11 @@ Merges materials even if their render queue differs.
 This option tries to merge blend shapes that always get animated in the same ratio.  
 For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.
 ## Optimize FX Layer
-Deletes any layers in the FXLayer that have 0 weight and are not affected by any layer weight control and have no state behaviours. Also deletes layers that have no states and sub state machines.  
+Deletes all layers in the FXLayer that are considered useless:
+  * Has no states or sub state machines.
+  * Has 0 weight and is not affected by any layer weight control and has no state behaviours.
+  * Has no state behaviours and only animates bindings that don't exist.
+  
 Tries to find simple toggle layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
 ## Combine Motion Time Approximation
