@@ -111,7 +111,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             DisplayProgressBar("Parsing Shaders", 0.05f);
             Profiler.StartSection("ParseAndCacheAllShaders()");
             ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
-            Profiler.StartNextSection("Clear Caches");
+            Profiler.StartNextSection("ClearCaches()");
             optimizedMaterials.Clear();
             optimizedMaterialImportPaths.Clear();
             optimizedSlotSwapMaterials.Clear();
@@ -1114,6 +1114,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayer = GetFXLayer();
         if (fxLayer == null || !OptimizeFXLayer)
             return new HashSet<int>();
+        Profiler.StartSection("FindUselessFXLayers()");
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
 
         var isAffectedByLayerWeightControl = new HashSet<int>();
@@ -1139,14 +1140,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var uselessLayers = new HashSet<int>();
-        var possibleBindings = new HashSet<(string path, string property, string type)>();
-        (string path, string property, string type) GetBinding(EditorCurveBinding binding)
+
+        var possibleBindingTypes = new Dictionary<string, HashSet<string>>();
+        bool IsPossibleBinding(EditorCurveBinding binding)
         {
-            return (binding.path, ""/*binding.propertyName*/, binding.type.FullName);
-        }
-        foreach (var current in transform.GetAllDescendants())
-        {
-            possibleBindings.UnionWith(AnimationUtility.GetAnimatableBindings(current.gameObject, gameObject).Select(GetBinding));
+            if (!possibleBindingTypes.TryGetValue(binding.path, out var possibleTypeNames))
+            {
+                possibleTypeNames = new HashSet<string>();
+                var transform = GetTransformFromPath(binding.path);
+                if (transform != null)
+                {
+                    // AnimationUtility.GetAnimatableBindings(transform.gameObject, gameObject)
+                    // is too slow, so we just check if the components mentioned in the bindings exist at that path
+                    possibleTypeNames.UnionWith(transform.GetComponents<Component>().Select(c => c.GetType().FullName));
+                    possibleTypeNames.Add(typeof(GameObject).FullName);
+                }
+                possibleBindingTypes[binding.path] = possibleTypeNames;
+            }
+            return possibleTypeNames.Contains(binding.type.FullName);
         }
 
         int lastNonUselessLayer = fxLayer.layers.Length;
@@ -1181,15 +1192,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             var layerBindings = stateMachine.EnumerateAllStates()
                 .SelectMany(s => s.motion == null ? new AnimationClip[0] : s.motion.EnumerateAllClips()).Distinct()
-                .SelectMany(c => AnimationUtility.GetCurveBindings(c).Select(GetBinding).Concat(AnimationUtility.GetObjectReferenceCurveBindings(c).Select(GetBinding)));
-            if (layerBindings.All(b => !possibleBindings.Contains(b)))
+                .SelectMany(c => AnimationUtility.GetCurveBindings(c).Concat(AnimationUtility.GetObjectReferenceCurveBindings(c)));
+            if (layerBindings.All(b => !IsPossibleBinding(b)))
             {
                 uselessLayers.Add(i);
                 continue;
             }
             lastNonUselessLayer = i;
         }
-
+        Profiler.EndSection();
         return cache_FindUselessFXLayers = uselessLayers;
     }
 
