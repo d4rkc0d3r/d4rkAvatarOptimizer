@@ -7,6 +7,7 @@
 * "Optimize FX Layer" can now also merge toggle layers that use two bools.
 * Add support for `.orlshader` files from [orels-Unity-Shaders](https://github.com/orels1/orels-Unity-Shaders/tree/main)
 * Add basic support for Modular Avatar by changing the callback order to -15 when Modular Avatar is detected.
+* "Delete Unused Components" now deletes phys bones whose dependencies all get deleted as well.
 
 ### Changes
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".

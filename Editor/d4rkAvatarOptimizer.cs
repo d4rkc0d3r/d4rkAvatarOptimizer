@@ -1353,6 +1353,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     result[physBone].UnionWith(dependencies);
                 }
+                result[physBone].UnionWith(current.GetComponents<Component>().Where(c => c != physBone && !(c is Transform)));
                 foreach (Transform child in current)
                 {
                     stack.Push(child);
@@ -1843,19 +1844,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(b => b != null && !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
+
+        alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
+            .SelectMany(t => t.GetComponents<Component>().Where(c => c != null && !(c is Transform))));
         
+        var exclusions = GetAllExcludedTransforms();
+
+        foreach(var entry in FindAllPhysBoneDependencies())
+        {
+            if (exclusions.Contains(entry.Key.transform))
+                continue;
+            var dependencies = entry.Value.Select(d => d as Component).Where(d => d != null);
+            if (dependencies.All(d => alwaysDisabledBehaviours.Contains(d)))
+            {
+                alwaysDisabledBehaviours.Add(entry.Key);
+            }
+        }
+
         var usedPhysBoneColliders = GetComponentsInChildren<VRCPhysBoneBase>(true)
-            .Where(pb => !alwaysDisabledBehaviours.Contains(pb))
+            .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
             .SelectMany(pb => pb.colliders);
 
         alwaysDisabledBehaviours.UnionWith(GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
             .Where(c => !usedPhysBoneColliders.Contains(c)));
 
-        alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
-            .SelectMany(t => t.GetComponents<Component>().Where(c => c != null && !(c is Transform))));
-
-        var exclusions = GetAllExcludedTransforms();
         alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));
+
+        var physBoneDependencies = FindAllPhysBoneDependencies();
 
         return cache_FindAllUnusedComponents = alwaysDisabledBehaviours;
     }

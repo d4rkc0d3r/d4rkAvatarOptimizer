@@ -102,7 +102,9 @@ Creates animation curves for all phys bone components that are used by only one 
 ## Keep MMD Blend Shapes
 When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
 ## Delete Unused Components
-Deletes all components that are turned off and never get enabled by animations. It also deletes phys bone colliders that are not referenced by any used phys bone components.
+* Deletes all components that are turned off and never get enabled by animations.
+* Deletes all phys bones whose dependencies got deleted in the previous step.
+* Deletes phys bone colliders that are not referenced by any used phys bone components.
 ## Delete Unused GameObjects
 Deletes all game objects that have no used components and are not referenced in any other used components. This also applies to bones referenced in skinned meshes as long as the bones aren't moved by animations, eye look settings or phys bone components. It re parents the children of the deleted game objects to their respective parents as well as transfers its weight to the parent.
 ## Use Ring Finger as Foot Collider
