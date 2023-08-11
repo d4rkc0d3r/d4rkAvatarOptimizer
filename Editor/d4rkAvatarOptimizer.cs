@@ -185,7 +185,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
-    private static HashSet<string> gameObjectTogglePaths = new HashSet<string>();
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
@@ -343,7 +342,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             if (t == null)
                 return null;
-            path = t.name + "/" + path;
+            path = $"{t.name}/{path}";
         }
         return path;
     }
@@ -440,14 +439,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (!ForceMergeBlendShapeMissMatch && (hasUsedBlendShapes.Contains(list[0]) ^ hasUsedBlendShapes.Contains(candidate)))
             return false;
-        var paths = list.Select(r => GetPathToRoot(r.transform.parent)).ToList();
-        var t = candidate.transform;
-        while ((t = t.parent) != transform)
+        bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
         {
-            var path = GetPathToRoot(t);
-            if (gameObjectTogglePaths.Contains(path) && paths.Any(p => !p.StartsWith(path)))
-                return false;
+            while ((t = t.parent) != transform)
+            {
+                var path = GetPathToRoot(t);
+                if (FindAllGameObjectTogglePaths().Contains(path) && otherPaths.All(p => !p.StartsWith(path)))
+                    return true;
+            }
+            return false;
         }
+        if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(list[0].transform, new string[] { GetPathToRoot(candidate.transform.parent) }))
+            return false;
+        if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(candidate.transform, list.Select(r => GetPathToRoot(r.transform.parent)).ToArray()))
+            return false;
         if (CanCombineRendererWithBasicMerge(list, candidate))
             return true;
         if (!MergeSkinnedMeshesWithShaderToggle)
@@ -608,7 +613,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public List<List<Renderer>> FindPossibleSkinnedMeshMerges()
     {
         var unused = FindAllUnusedComponents();
-        gameObjectTogglePaths = FindAllGameObjectTogglePaths();
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = GetComponentsInChildren<Renderer>(true);
         var matchedSkinnedMeshes = new List<List<Renderer>>();
@@ -638,6 +642,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 matchedSkinnedMeshes.Add(new List<Renderer> { renderer });
             }
         }
+        matchedSkinnedMeshes = matchedSkinnedMeshes
+            .OrderBy(subList => subList[0] is ParticleSystemRenderer ? 1 : 0)
+            .ThenByDescending(subList => subList.Count).ToList();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         foreach (var subList in matchedSkinnedMeshes)
         {
@@ -3728,7 +3735,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
-        used.UnionWith(gameObjectTogglePaths.Select(p => GetTransformFromPath(p)).Where(t => t != null));
+        used.UnionWith(FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)).Where(t => t != null));
 
         foreach (var exclusionOnMainAvatar in ExcludeTransforms)
         {

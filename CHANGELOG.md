@@ -25,6 +25,7 @@
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
 * Fix boneless skinned meshes ignoring the root bone property.
 * Fix inline if return statements in the vertex & geometry shader not getting parsed correctly.
+* Fix first mesh of a merged mesh block not checking if one of its parents has game object toggles.
 
 ## v2.3.2
 ### Bug Fixes
