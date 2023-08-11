@@ -49,18 +49,19 @@ For example `uniform float4 _Color;` will get changed to `static float4 _Color =
 This enables the shader compiler to do more [constant folding](https://en.wikipedia.org/wiki/Constant_folding) and thus making the shader run faster.  
 Unfortunately the shader compiler is allowed to ignore NaNs while doing that so if a shader is not made with that in mind this might cause some issues.
 ## Merge Skinned Meshes
-The optimizer tries to merge different skinned meshes together. If some of those skinned mesh game objects get toggled with animations in the fxlayer it will add logic to the shader to toggle those sub meshes in shader instead.
+The optimizer tries to merge different skinned meshes together.  
+This usually means meshes which always get animated in the same way will get merged.  
 Skinned meshes that are on different layers (eg UIMenu) from each other will not get merged.  
 Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
+## Use Shader Toggles
+Merges meshes even if their material properties get animated differently or if they get toggled separately from each other.  
+This will add logic to the shaders to ensure everything works correctly. Some shaders might not work correctly with this option enabled.  
 Can't merge meshes that have any tessellation or surface shaders.  
 ## Merge Static Meshes as Skinned
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
 ## Merge Regardless of Blend Shapes
 With this setting active the optimizer will merge meshes that have blend shapes with meshes that don't. Only use this if you have a small model since skinning with blend shapes is much more expensive than without.
-## Keep Material Animations Separate
-This makes sure that animated properties from one mesh don't animate the property on materials from a different mesh if their meshes got merged.
-Can break since it creates a lot of constant buffer variables.
 ## Merge Different Property Materials
 Merges materials with the same shader where properties can have different values. If they do have different values the values will get written to a constant buffer. Material IDs get written to uv.w and used to access the correct value from that cbuffer.
 

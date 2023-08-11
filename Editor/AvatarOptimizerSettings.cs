@@ -13,9 +13,9 @@ public class AvatarOptimizerSettings : EditorWindow
     private static bool OptimizeOnUpload = true;
     private static bool WritePropertiesAsStaticValues = true;
     private static bool MergeSkinnedMeshes = true;
+    private static bool MergeSkinnedMeshesWithShaderToggle = true;
     private static bool MergeStaticMeshesAsSkinned = true;
     private static int ForceMergeBlendShapeMissMatch = 2;
-    private static bool KeepMaterialPropertyAnimationsSeparate = true;
     private static bool MergeDifferentPropertyMaterials = true;
     private static bool MergeSameDimensionTextures = true;
     private static bool MergeBackFaceCullingWithCullingOff = false;
@@ -37,9 +37,9 @@ public class AvatarOptimizerSettings : EditorWindow
         {"OptimizeOnUpload", "Optimize on Upload"},
         {"WritePropertiesAsStaticValues", "Write Properties as Static Values"},
         {"MergeSkinnedMeshes", "Merge Skinned Meshes"},
+        {"MergeSkinnedMeshesWithShaderToggle", "Use Shader Toggles"},
         {"MergeStaticMeshesAsSkinned", "Merge Static Meshes as Skinned"},
         {"ForceMergeBlendShapeMissMatch", "Merge Regardless of Blend Shapes"},
-        {"KeepMaterialPropertyAnimationsSeparate", "Keep Material Animations Separate"},
         {"MergeDifferentPropertyMaterials", "Merge Different Property Materials"},
         {"MergeSameDimensionTextures", "Merge Same Dimension Textures"},
         {"MergeBackFaceCullingWithCullingOff", "Merge Cull Back with Cull Off"},

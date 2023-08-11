@@ -65,9 +65,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         Toggle("Write Properties as Static Values", ref optimizer.WritePropertiesAsStaticValues);
         GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
         EditorGUI.indentLevel++;
+        Toggle("Use Shader Toggles", ref optimizer.MergeSkinnedMeshesWithShaderToggle);
         Toggle("Merge Static Meshes as Skinned", ref optimizer.MergeStaticMeshesAsSkinned);
         Toggle("Merge Regardless of Blend Shapes", ref optimizer.ForceMergeBlendShapeMissMatch);
-        Toggle("Keep Material Animations Separate", ref optimizer.KeepMaterialPropertyAnimationsSeparate);
         EditorGUI.indentLevel--;
         GUI.enabled = true;
         GUI.enabled = Toggle("Merge Different Property Materials", ref optimizer.MergeDifferentPropertyMaterials);
@@ -555,7 +555,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Check the Debug Info foldout for more info.", MessageType.Info);
         }
 
-        if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
+        if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
         {
             EditorGUILayout.HelpBox(
                 "Some materials do not support merging textures.\n" +
@@ -572,7 +572,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Check the Debug Info foldout for a full list.", MessageType.Info);
         }
 
-        if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 0)
+        if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)
         {
             EditorGUILayout.HelpBox(
                 "Some textures are crunch compressed.\n" +

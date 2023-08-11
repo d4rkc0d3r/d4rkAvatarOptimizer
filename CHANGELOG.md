@@ -1,15 +1,20 @@
-## v2.4.0
+## v3.0.0
 ### Features
+* New mode to merge meshes without introducing shader toggles.
+  * When none of "Use Shader Toggles", "Write Properties as Static Values" or "Merge Different Property Materials" are enabled, the optimizer will no longer generate new shaders at all.
 * Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
 * Add option to combine motion time layers as a piecewise linear 1D tree into the direct blend tree as well.
 * Show layer merge errors as tooltips in the "Show FX Layer Merge Results" section.
 * Add option to disable phys bones together with the skinned mesh they affect.
 * "Optimize FX Layer" can now also merge toggle layers that use two bools.
 * Add support for `.orlshader` files from [orels-Unity-Shaders](https://github.com/orels1/orels-Unity-Shaders/tree/main)
-* Add basic support for Modular Avatar by changing the callback order to -15 when Modular Avatar is detected.
+* Add basic support for [Modular Avatar](https://github.com/bdunderscore/modular-avatar) by changing the callback order to -15 when Modular Avatar is detected.
 * "Delete Unused Components" now deletes phys bones whose dependencies all get deleted as well.
 
 ### Changes
+* "Merge Skinned Meshes" now only merges skinned meshes that get animated together.
+  * Added "Use Shader Toggles" option to enable the old behavior.
+* Deleted "Keep Material Animations Separate" option. It is now always enabled when "Use Shader Toggles" is enabled.
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".
 * Small optimizations to the generated shaders:
   * Changed type of Texture2DArray index from int to float eliminating a type conversion. 
