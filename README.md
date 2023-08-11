@@ -57,6 +57,8 @@ Skinned meshes that are disabled and have no animation to turn them on will get 
 Merges meshes even if their material properties get animated differently or if they get toggled separately from each other.  
 This will add logic to the shaders to ensure everything works correctly. Some shaders might not work correctly with this option enabled.  
 Can't merge meshes that have any tessellation or surface shaders.  
+
+Forces on "Write Properties as Static Values" if enabled.
 ## Merge Static Meshes as Skinned
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
@@ -72,6 +74,8 @@ Can't merge materials if:
 * A property that differs is used in shader lab code (eg `ZWrite [_ZWrite]`)
 * Materials have different Keywords set
 * Material slot is affected by a material swap animation
+
+Forces on "Write Properties as Static Values" if enabled.
 ## Merge Same Dimension Textures
 Merges materials if they use different textures if their width, height & compression format match.
 Creates a Texture2DArray from the original textures.

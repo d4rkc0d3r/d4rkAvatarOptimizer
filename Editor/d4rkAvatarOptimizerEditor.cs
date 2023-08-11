@@ -15,6 +15,7 @@ using VRC.SDKBase.Validation.Performance;
 
 using Type = System.Type;
 using MaterialSlot = d4rkAvatarOptimizer.MaterialSlot;
+using Settings = d4rkAvatarOptimizer.Settings;
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
@@ -55,39 +56,30 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
         }
 
-        #if HAS_IEDITOR_ONLY
-        Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
-        #else
-        GUI.enabled = false;
-        Toggle("Optimize on Upload", ref optimizer.OptimizeOnUpload);
-        GUI.enabled = true;
-        #endif
-        Toggle("Write Properties as Static Values", ref optimizer.WritePropertiesAsStaticValues);
-        GUI.enabled = Toggle("Merge Skinned Meshes", ref optimizer.MergeSkinnedMeshes);
+        ToggleOptimizerProperty(nameof(optimizer.OptimizeOnUpload));
+        ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
+        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshes));
         EditorGUI.indentLevel++;
-        Toggle("Use Shader Toggles", ref optimizer.MergeSkinnedMeshesWithShaderToggle);
-        Toggle("Merge Static Meshes as Skinned", ref optimizer.MergeStaticMeshesAsSkinned);
-        Toggle("Merge Regardless of Blend Shapes", ref optimizer.ForceMergeBlendShapeMissMatch);
+        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
+        ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
+        ToggleOptimizerProperty(nameof(optimizer.ForceMergeBlendShapeMissMatch));
         EditorGUI.indentLevel--;
-        GUI.enabled = true;
-        GUI.enabled = Toggle("Merge Different Property Materials", ref optimizer.MergeDifferentPropertyMaterials);
+        ToggleOptimizerProperty(nameof(optimizer.MergeDifferentPropertyMaterials));
         EditorGUI.indentLevel++;
-        Toggle("Merge Same Dimension Textures", ref optimizer.MergeSameDimensionTextures);
-        Toggle("Merge Cull Back with Cull Off", ref optimizer.MergeBackFaceCullingWithCullingOff);
-        Toggle("Merge Different Render Queue", ref optimizer.MergeDifferentRenderQueue);
+        ToggleOptimizerProperty(nameof(optimizer.MergeSameDimensionTextures));
+        ToggleOptimizerProperty(nameof(optimizer.MergeBackFaceCullingWithCullingOff));
+        ToggleOptimizerProperty(nameof(optimizer.MergeDifferentRenderQueue));
         EditorGUI.indentLevel--;
-        GUI.enabled = true;
-        GUI.enabled = Toggle("Optimize FX Layer", ref optimizer.OptimizeFXLayer);
+        ToggleOptimizerProperty(nameof(optimizer.OptimizeFXLayer));
         EditorGUI.indentLevel++;
-        Toggle("Combine Motion Time Approximation", ref optimizer.CombineApproximateMotionTimeAnimations);
+        ToggleOptimizerProperty(nameof(optimizer.CombineApproximateMotionTimeAnimations));
         EditorGUI.indentLevel--;
-        GUI.enabled = true;
-        Toggle("Disable Phys Bones When Unused", ref optimizer.DisablePhysBonesWhenUnused);
-        Toggle("Merge Same Ratio Blend Shapes", ref optimizer.MergeSameRatioBlendShapes);
-        Toggle("Keep MMD Blend Shapes", ref optimizer.KeepMMDBlendShapes);
-        Toggle("Delete Unused Components", ref optimizer.DeleteUnusedComponents);
-        Toggle("Delete Unused GameObjects", ref optimizer.DeleteUnusedGameObjects);
-        Toggle("Use Ring Finger as Foot Collider", ref optimizer.UseRingFingerAsFootCollider);
+        ToggleOptimizerProperty(nameof(optimizer.DisablePhysBonesWhenUnused));
+        ToggleOptimizerProperty(nameof(optimizer.MergeSameRatioBlendShapes));
+        ToggleOptimizerProperty(nameof(optimizer.KeepMMDBlendShapes));
+        ToggleOptimizerProperty(nameof(optimizer.DeleteUnusedComponents));
+        ToggleOptimizerProperty(nameof(optimizer.DeleteUnusedGameObjects));
+        ToggleOptimizerProperty(nameof(optimizer.UseRingFingerAsFootCollider));
 
         if (optimizer.ExcludeTransforms == null)
             optimizer.ExcludeTransforms = new List<Transform>();
@@ -217,7 +209,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults))
             {
                 Profiler.StartSection("Show FX Layer Merge Errors");
-                Toggle("Show Detailed Errors", ref optimizer.ShowFXLayerMergeErrors);
+                ToggleOptimizerProperty(nameof(optimizer.ShowFXLayerMergeErrors));
                 var errorMessages = optimizer.AnalyzeFXLayerMergeAbility();
                 var uselessLayers = optimizer.FindUselessFXLayers();
                 var fxLayer = optimizer.GetFXLayer();
@@ -254,7 +246,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
         {
-            Toggle("Profile Time Used", ref optimizer.ProfileTimeUsed);
+            ToggleOptimizerProperty(nameof(Settings.ProfileTimeUsed));
             EditorGUI.indentLevel++;
             if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
             {
@@ -957,17 +949,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         return result;
     }
 
-    private bool Toggle(string label, ref bool value)
+    private bool ToggleOptimizerProperty(string propertyName)
     {
-        bool output = value;
-        var tooltipKey = label;
-        if (tooltipKey.EndsWith(")") && !TooltipCache.ContainsKey(tooltipKey))
+        var property = typeof(d4rkAvatarOptimizer).GetProperty(propertyName);
+        if (property == null)
+            return false;
+        var value = (bool)property.GetValue(optimizer);
+        var output = value;
+        var displayName = d4rkAvatarOptimizer.GetDisplayName(propertyName);
+        var tooltipKey = displayName;
+        var guiEnabledState = GUI.enabled;
+        GUI.enabled = optimizer.CanChangeSetting(propertyName);
+        if (TooltipCache.ContainsKey(tooltipKey))
         {
-            tooltipKey = tooltipKey.Substring(0, tooltipKey.LastIndexOf('(')).TrimEnd();
-        }
-        if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
-        {
-            output = EditorGUILayout.ToggleLeft(new GUIContent(label, string.Join("\n", tooltip.ToArray())), GUI.enabled ? value : false);
+            output = EditorGUILayout.ToggleLeft(new GUIContent(displayName, string.Join("\n", tooltipCache[tooltipKey].ToArray())), value);
             var rect = GUILayoutUtility.GetLastRect();
             rect.x += rect.width - 20;
             rect.width = 20;
@@ -975,17 +970,15 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         else
         {
-            output = EditorGUILayout.ToggleLeft(label, GUI.enabled ? value : false);
+            output = EditorGUILayout.ToggleLeft(displayName, value);
         }
-        if (GUI.enabled)
+        GUI.enabled = guiEnabledState;
+        if (value != output)
         {
-            if (value != output)
-            {
-                ClearUICaches();
-            }
-            value = output;
+            ClearUICaches();
+            property.SetValue(optimizer, output);
         }
-        return value;
+        return output;
     }
 
     private bool Foldout(string label, ref bool value)

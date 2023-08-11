@@ -30,31 +30,136 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 , VRC.SDKBase.IEditorOnly
 #endif
 {
+    [System.Serializable]
+    public class Settings
+    {
+        public bool OptimizeOnUpload = true;
+        public bool WritePropertiesAsStaticValues = true;
+        public bool MergeSkinnedMeshes = true;
+        public bool MergeSkinnedMeshesWithShaderToggle = true;
+        public bool MergeStaticMeshesAsSkinned = true;
+        public int ForceMergeBlendShapeMissMatch = 2;
+        public bool MergeDifferentPropertyMaterials = true;
+        public bool MergeSameDimensionTextures = true;
+        public bool MergeBackFaceCullingWithCullingOff = false;
+        public bool MergeDifferentRenderQueue = false;
+        public bool KeepMMDBlendShapes = false;
+        public bool DeleteUnusedComponents = true;
+        public int DeleteUnusedGameObjects = 2;
+        public bool OptimizeFXLayer = true;
+        public bool CombineApproximateMotionTimeAnimations = false;
+        public bool DisablePhysBonesWhenUnused = true;
+        public bool MergeSameRatioBlendShapes = true;
+        public bool UseRingFingerAsFootCollider = false;
+        public bool ProfileTimeUsed = false;
+    }
+
+    public Settings settings = new Settings();
+
+    #if HAS_IEDITOR_ONLY
+    public bool OptimizeOnUpload { get { return settings.OptimizeOnUpload; } set { settings.OptimizeOnUpload = value; } }
+    #else
+    public bool OptimizeOnUpload { get { return false; } set { settings.OptimizeOnUpload = false; } }
+    #endif
+    public bool WritePropertiesAsStaticValues {
+        get { return settings.WritePropertiesAsStaticValues || MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials; }
+        set { settings.WritePropertiesAsStaticValues = value; } }
+    public bool MergeSkinnedMeshes { get { return settings.MergeSkinnedMeshes; } set { settings.MergeSkinnedMeshes = value; } }
+    public bool MergeSkinnedMeshesWithShaderToggle {
+        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
+        set { settings.MergeSkinnedMeshesWithShaderToggle = value; } }
+    public bool MergeStaticMeshesAsSkinned {
+        get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
+        set { settings.MergeStaticMeshesAsSkinned = value; } }
+    public bool ForceMergeBlendShapeMissMatch {
+        get { return settings.MergeSkinnedMeshes && settings.ForceMergeBlendShapeMissMatch != 0; }
+        set { settings.ForceMergeBlendShapeMissMatch = value ? 1 : 0; } }
+    public bool MergeDifferentPropertyMaterials { get { return settings.MergeDifferentPropertyMaterials; } set { settings.MergeDifferentPropertyMaterials = value; } }
+    public bool MergeSameDimensionTextures {
+        get { return settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures; }
+        set { settings.MergeSameDimensionTextures = value; } }
+    public bool MergeBackFaceCullingWithCullingOff {
+        get { return settings.MergeDifferentPropertyMaterials && settings.MergeBackFaceCullingWithCullingOff; }
+        set { settings.MergeBackFaceCullingWithCullingOff = value; } }
+    public bool MergeDifferentRenderQueue {
+        get { return settings.MergeDifferentPropertyMaterials && settings.MergeDifferentRenderQueue; }
+        set { settings.MergeDifferentRenderQueue = value; } }
+    public bool KeepMMDBlendShapes { get { return settings.KeepMMDBlendShapes; } set { settings.KeepMMDBlendShapes = value; } }
+    public bool DeleteUnusedComponents { get { return settings.DeleteUnusedComponents; } set { settings.DeleteUnusedComponents = value; } }
+    public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects != 0; } set { settings.DeleteUnusedGameObjects = value ? 1 : 0; } }
+    public bool OptimizeFXLayer { get { return settings.OptimizeFXLayer; } set { settings.OptimizeFXLayer = value; } }
+    public bool CombineApproximateMotionTimeAnimations {
+        get { return settings.OptimizeFXLayer && settings.CombineApproximateMotionTimeAnimations; }
+        set { settings.CombineApproximateMotionTimeAnimations = value; } }
+    public bool DisablePhysBonesWhenUnused { get { return settings.DisablePhysBonesWhenUnused; } set { settings.DisablePhysBonesWhenUnused = value; } }
+    public bool MergeSameRatioBlendShapes { get { return settings.MergeSameRatioBlendShapes; } set { settings.MergeSameRatioBlendShapes = value; } }
+    public bool UseRingFingerAsFootCollider { get { return settings.UseRingFingerAsFootCollider; } set { settings.UseRingFingerAsFootCollider = value; } }
+    public bool ProfileTimeUsed { get { return settings.ProfileTimeUsed; } set { settings.ProfileTimeUsed = value; } } 
+
+    public bool CanChangeSetting(string fieldName)
+    {
+        switch (fieldName)
+        {
+            case nameof(WritePropertiesAsStaticValues):
+                return !(MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials);
+            case nameof(MergeSkinnedMeshesWithShaderToggle):
+            case nameof(MergeStaticMeshesAsSkinned):
+            case nameof(ForceMergeBlendShapeMissMatch):
+                return settings.MergeSkinnedMeshes;
+            case nameof(MergeSameDimensionTextures):
+            case nameof(MergeBackFaceCullingWithCullingOff):
+            case nameof(MergeDifferentRenderQueue):
+                return settings.MergeDifferentPropertyMaterials;
+            case nameof(CombineApproximateMotionTimeAnimations):
+                return settings.OptimizeFXLayer;
+            #if !HAS_IEDITOR_ONLY
+            case nameof(OptimizeOnUpload):
+                return false;
+            #endif
+            default:
+                return true;
+        }
+    }
+
+    private static Dictionary<string, string> FieldDisplayName = new Dictionary<string, string>() {
+        {nameof(OptimizeOnUpload), "Optimize on Upload"},
+        {nameof(WritePropertiesAsStaticValues), "Write Properties as Static Values"},
+        {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
+        {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
+        {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
+        {nameof(ForceMergeBlendShapeMissMatch), "Merge Regardless of Blend Shapes"},
+        {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
+        {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
+        {nameof(MergeBackFaceCullingWithCullingOff), "Merge Cull Back with Cull Off"},
+        {nameof(MergeDifferentRenderQueue), "Merge Different Render Queue"},
+        {nameof(KeepMMDBlendShapes), "Keep MMD Blend Shapes"},
+        {nameof(DeleteUnusedComponents), "Delete Unused Components"},
+        {nameof(DeleteUnusedGameObjects), "Delete Unused GameObjects"},
+        {nameof(OptimizeFXLayer), "Optimize FX Layer"},
+        {nameof(CombineApproximateMotionTimeAnimations), "Combine Motion Time Approximation"},
+        {nameof(DisablePhysBonesWhenUnused), "Disable Phys Bones When Unused"},
+        {nameof(MergeSameRatioBlendShapes), "Merge Same Ratio Blend Shapes"},
+        {nameof(UseRingFingerAsFootCollider), "Use Ring Finger as Foot Collider"},
+        {nameof(ProfileTimeUsed), "Profile Time Used"},
+        {nameof(ShowFXLayerMergeErrors), "Show FX Layer Merge Errors"},
+    };
+
+    public static string GetDisplayName(string fieldName)
+    {
+        if (FieldDisplayName.ContainsKey(fieldName))
+        {
+            return FieldDisplayName[fieldName];
+        }
+        return fieldName;
+    }
+
     public bool DoAutoSettings = true;
-    public bool OptimizeOnUpload = true;
-    public bool WritePropertiesAsStaticValues = true;
-    public bool MergeSkinnedMeshes = true;
-    public bool MergeSkinnedMeshesWithShaderToggle = true;
-    public bool MergeStaticMeshesAsSkinned = true;
-    public bool ForceMergeBlendShapeMissMatch = false;
-    public bool MergeDifferentPropertyMaterials = true;
-    public bool MergeSameDimensionTextures = true;
-    public bool MergeBackFaceCullingWithCullingOff = false;
-    public bool MergeDifferentRenderQueue = false;
-    public bool KeepMMDBlendShapes = false;
-    public bool DeleteUnusedComponents = true;
-    public bool DeleteUnusedGameObjects = false;
-    public bool OptimizeFXLayer = true;
-    public bool CombineApproximateMotionTimeAnimations = false;
-    public bool DisablePhysBonesWhenUnused = true;
-    public bool MergeSameRatioBlendShapes = true;
-    public bool UseRingFingerAsFootCollider = false;
-    public bool ProfileTimeUsed = false;
     public bool ShowExcludedTransforms = false;
     public List<Transform> ExcludeTransforms = new List<Transform>();
     public bool ShowMeshAndMaterialMergePreview = true;
     public bool ShowFXLayerMergeResults = true;
-    public bool ShowFXLayerMergeErrors = false;
+    private bool _ShowFXLayerMergeErrors = false;
+    public bool ShowFXLayerMergeErrors { get { return _ShowFXLayerMergeErrors; } set { _ShowFXLayerMergeErrors = value; } }
     public bool ShowDebugInfo = false;
     public bool DebugShowUnparsableMaterials = true;
     public bool DebugShowUnmergableMaterials = true;
