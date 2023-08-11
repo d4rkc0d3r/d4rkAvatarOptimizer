@@ -456,7 +456,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (list.Any(r => !IsShaderToggleCombinableRenderer(r)))
             return false;
-
         return true;
     }
 
@@ -2710,8 +2709,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (slotSwapMaterials.ContainsKey(remap))
                 return false;
         }
-        if (!MergeDifferentPropertyMaterials)
-            return list.All(slot => slot.material == candidateMat);
+        bool allTheSameAsCandidate = list.All(slot => slot.material == candidateMat);
+        if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
+            return allTheSameAsCandidate;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
             return false;
