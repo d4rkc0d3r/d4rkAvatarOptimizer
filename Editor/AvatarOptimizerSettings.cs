@@ -90,12 +90,8 @@ public class AvatarOptimizerSettings : EditorWindow
             .Where(f => f.FieldType == typeof(bool) || f.FieldType == typeof(int)).ToArray();
         foreach (var field in fields)
         {
-            var targetField = typeof(d4rkAvatarOptimizer).GetField(field.Name);
-            if (targetField == null)
-            {
-                throw new System.ArgumentException("Field " + field.Name + " does not exist in d4rkAvatarOptimizer");
-            }
-            targetField.SetValue(optimizer.settings, GetValue(field.Name));
+            var val = GetValue(field.Name);
+            field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (object)(val != 0) : (object)val);
         }
     }
 

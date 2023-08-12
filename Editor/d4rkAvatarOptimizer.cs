@@ -43,13 +43,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeSameDimensionTextures = true;
         public bool MergeBackFaceCullingWithCullingOff = false;
         public bool MergeDifferentRenderQueue = false;
-        public bool KeepMMDBlendShapes = false;
-        public bool DeleteUnusedComponents = true;
-        public int DeleteUnusedGameObjects = 2;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;
         public bool DisablePhysBonesWhenUnused = true;
         public bool MergeSameRatioBlendShapes = true;
+        public bool KeepMMDBlendShapes = false;
+        public bool DeleteUnusedComponents = true;
+        public int DeleteUnusedGameObjects = 2;
         public bool UseRingFingerAsFootCollider = false;
         public bool ProfileTimeUsed = false;
     }
