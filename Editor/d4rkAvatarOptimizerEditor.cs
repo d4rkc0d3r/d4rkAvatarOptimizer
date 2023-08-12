@@ -25,11 +25,6 @@ public class d4rkAvatarOptimizerEditor : Editor
     
     public override void OnInspectorGUI()
     {
-        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android)
-        {
-            EditorGUILayout.HelpBox("Quest avatars don't support custom shaders. As such this tool can't work for Quest.", MessageType.Error);
-            return;
-        }
         optimizer = (d4rkAvatarOptimizer)target;
         OnSelectionChange();
         if (nullMaterial == null)
@@ -75,19 +70,24 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         ToggleOptimizerProperty(nameof(optimizer.OptimizeOnUpload));
-        ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
+        if (d4rkAvatarOptimizer.HasCustomShaderSupport)
+            ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshes));
         EditorGUI.indentLevel++;
-        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
+        if (d4rkAvatarOptimizer.HasCustomShaderSupport)
+            ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
         ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
         ToggleOptimizerProperty(nameof(optimizer.ForceMergeBlendShapeMissMatch));
         EditorGUI.indentLevel--;
-        ToggleOptimizerProperty(nameof(optimizer.MergeDifferentPropertyMaterials));
-        EditorGUI.indentLevel++;
-        ToggleOptimizerProperty(nameof(optimizer.MergeSameDimensionTextures));
-        ToggleOptimizerProperty(nameof(optimizer.MergeBackFaceCullingWithCullingOff));
-        ToggleOptimizerProperty(nameof(optimizer.MergeDifferentRenderQueue));
-        EditorGUI.indentLevel--;
+        if (d4rkAvatarOptimizer.HasCustomShaderSupport)
+        {
+            ToggleOptimizerProperty(nameof(optimizer.MergeDifferentPropertyMaterials));
+            EditorGUI.indentLevel++;
+            ToggleOptimizerProperty(nameof(optimizer.MergeSameDimensionTextures));
+            ToggleOptimizerProperty(nameof(optimizer.MergeBackFaceCullingWithCullingOff));
+            ToggleOptimizerProperty(nameof(optimizer.MergeDifferentRenderQueue));
+            EditorGUI.indentLevel--;
+        }
         ToggleOptimizerProperty(nameof(optimizer.OptimizeFXLayer));
         EditorGUI.indentLevel++;
         ToggleOptimizerProperty(nameof(optimizer.CombineApproximateMotionTimeAnimations));
@@ -1131,7 +1131,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         BlendShapeCount,
     }
 
-    static Dictionary<PerformanceCategory, int[]> _perfLevels = new Dictionary<PerformanceCategory, int[]>()
+    static Dictionary<PerformanceCategory, int[]> _perfLevelsWindows = new Dictionary<PerformanceCategory, int[]>()
     {
         { PerformanceCategory.SkinnedMeshCount, new int[] {1, 2, 8, 16, int.MaxValue} },
         { PerformanceCategory.MeshCount, new int[] {4, 8, 16, 24, int.MaxValue} },
@@ -1139,15 +1139,24 @@ public class d4rkAvatarOptimizerEditor : Editor
         { PerformanceCategory.FXLayerCount, new int[] {4, 8, 16, 32, int.MaxValue} },
         { PerformanceCategory.BlendShapeCount, new int[] {32, 48, 64, 128, int.MaxValue} },
     };
+    static Dictionary<PerformanceCategory, int[]> _perfLevelsAndroid = new Dictionary<PerformanceCategory, int[]>()
+    {
+        { PerformanceCategory.SkinnedMeshCount, new int[] {1, 1, 2, 2, int.MaxValue} },
+        { PerformanceCategory.MeshCount, new int[] {1, 1, 2, 2, int.MaxValue} },
+        { PerformanceCategory.MaterialCount, new int[] {1, 1, 2, 4, int.MaxValue} },
+        { PerformanceCategory.FXLayerCount, new int[] {2, 4, 8, 16, int.MaxValue} },
+        { PerformanceCategory.BlendShapeCount, new int[] {24, 32, 48, 64, int.MaxValue} },
+    };
 
     private void PerfRankChangeLabel(string label, int oldValue, int newValue, PerformanceCategory category)
     {
         var oldRating = PerformanceRating.VeryPoor;
         var newRating = PerformanceRating.VeryPoor;
-        if (_perfLevels.ContainsKey(category))
+        var perfLevels = d4rkAvatarOptimizer.HasCustomShaderSupport ? _perfLevelsWindows : _perfLevelsAndroid;
+        if (perfLevels.ContainsKey(category))
         {
-            oldRating = GetPerfRank(oldValue, _perfLevels[category]);
-            newRating = GetPerfRank(newValue, _perfLevels[category]);
+            oldRating = GetPerfRank(oldValue, perfLevels[category]);
+            newRating = GetPerfRank(newValue, perfLevels[category]);
         }
 
         EditorGUILayout.BeginHorizontal();

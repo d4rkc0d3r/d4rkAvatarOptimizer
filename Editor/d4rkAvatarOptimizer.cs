@@ -54,6 +54,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool ProfileTimeUsed = false;
     }
 
+    public static bool HasCustomShaderSupport { get => EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64; }
     public Settings settings = new Settings();
 
     #if HAS_IEDITOR_ONLY
@@ -62,11 +63,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool OptimizeOnUpload { get { return false; } set { settings.OptimizeOnUpload = false; } }
     #endif
     public bool WritePropertiesAsStaticValues {
-        get { return settings.WritePropertiesAsStaticValues || MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials; }
+        get { return HasCustomShaderSupport && (settings.WritePropertiesAsStaticValues || MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials); }
         set { settings.WritePropertiesAsStaticValues = value; } }
     public bool MergeSkinnedMeshes { get { return settings.MergeSkinnedMeshes; } set { settings.MergeSkinnedMeshes = value; } }
     public bool MergeSkinnedMeshesWithShaderToggle {
-        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
+        get { return HasCustomShaderSupport && settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
         set { settings.MergeSkinnedMeshesWithShaderToggle = value; } }
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
@@ -74,7 +75,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool ForceMergeBlendShapeMissMatch {
         get { return settings.MergeSkinnedMeshes && settings.ForceMergeBlendShapeMissMatch != 0; }
         set { settings.ForceMergeBlendShapeMissMatch = value ? 1 : 0; } }
-    public bool MergeDifferentPropertyMaterials { get { return settings.MergeDifferentPropertyMaterials; } set { settings.MergeDifferentPropertyMaterials = value; } }
+    public bool MergeDifferentPropertyMaterials {
+        get { return HasCustomShaderSupport && settings.MergeDifferentPropertyMaterials; }
+        set { settings.MergeDifferentPropertyMaterials = value; } }
     public bool MergeSameDimensionTextures {
         get { return settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures; }
         set { settings.MergeSameDimensionTextures = value; } }
@@ -216,7 +219,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     public List<string> GetPresetNames()
     {
-        return SettingsPresets.Select(x => x.name).ToList();
+        return SettingsPresets.Select(x => x.name).Where(x => HasCustomShaderSupport || x != "Shader Toggles").ToList();
     }
 
     public bool IsPresetActive(string presetName)
