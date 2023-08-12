@@ -678,6 +678,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
         optimizer.ClearCaches();
+        EditorUtility.SetDirty(optimizer);
     }
 
     private void OnSelectionChange()
