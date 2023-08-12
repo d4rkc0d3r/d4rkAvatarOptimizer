@@ -863,6 +863,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     physBoneBinding.path = physBonePath;
                     AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);
+                    changed = true;
                 }
             }
         }
