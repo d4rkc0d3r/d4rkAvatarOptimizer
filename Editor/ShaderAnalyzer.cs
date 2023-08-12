@@ -188,7 +188,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return parsedShader;
         }
 
-        public static List<ParsedShader> ParseAndCacheAllShaders(List<Shader> shaders, bool overrideAlreadyCached, System.Action<int, int> progressCallback = null)
+        public static List<ParsedShader> ParseAndCacheAllShaders(IEnumerable<Shader> shaders, bool overrideAlreadyCached, System.Action<int, int> progressCallback = null)
         {
             var analyzers = shaders.Distinct()
                 .Where(s => overrideAlreadyCached || !parsedShaderCache.ContainsKey(s.name))
@@ -207,16 +207,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var a in analyzers)
                 parsedShaderCache[a.parsedShader.name] = a.parsedShader;
             return shaders.Select(s => parsedShaderCache[s.name]).ToList();
-        }
-
-        public static void ParseAndCacheAllShaders(GameObject root, bool overrideAlreadyCached, System.Action<int, int> progressCallback = null)
-        {
-            var shaders = root.GetComponentsInChildren<Renderer>(true)
-                .SelectMany(r => r.sharedMaterials)
-                .Where(m => m != null && m.shader != null)
-                .Select(m => m.shader)
-                .Distinct().ToList();
-            ParseAndCacheAllShaders(shaders, overrideAlreadyCached, progressCallback);
         }
 
         private ParsedShader parsedShader;

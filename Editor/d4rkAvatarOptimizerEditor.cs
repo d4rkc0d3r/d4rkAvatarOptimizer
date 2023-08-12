@@ -126,14 +126,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         Profiler.StartSection("Show Perf Rank Change");
         var exclusions = optimizer.GetAllExcludedTransforms();
-        var particleSystemCount = optimizer.GetComponentsInChildren<ParticleSystem>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-        var skinnedMeshes = optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).ToList();
-        int meshCount = optimizer.GetComponentsInChildren<MeshRenderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly")).Count();
-        int totalMaterialCount = optimizer.GetComponentsInChildren<Renderer>(true)
-            .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+        var particleSystemCount = optimizer.GetNonEditorOnlyComponentsInChildren<ParticleSystem>().Count;
+        var skinnedMeshes = optimizer.GetNonEditorOnlyComponentsInChildren<SkinnedMeshRenderer>();
+        int meshCount = optimizer.GetNonEditorOnlyComponentsInChildren<MeshRenderer>().Count;
+        int totalMaterialCount = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
             .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
         var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
             if (r.sharedMesh == null)
@@ -246,12 +242,12 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
         {
-            ToggleOptimizerProperty(nameof(Settings.ProfileTimeUsed));
+            ToggleOptimizerProperty(nameof(optimizer.ProfileTimeUsed));
             EditorGUI.indentLevel++;
             if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
             {
                 Profiler.StartSection("Unparsable Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => !(t.Item2 != null && t.Item2.parsedCorrectly))
@@ -270,7 +266,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unmergable Materials", ref optimizer.DebugShowUnmergableMaterials))
             {
                 Profiler.StartSection("Unmergable Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => (t.Item2 != null && t.Item2.parsedCorrectly && !t.Item2.CanMerge()))
@@ -287,7 +283,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unmergable Texture Materials", ref optimizer.DebugShowUnmergableTextureMaterials))
             {
                 Profiler.StartSection("Unmergable Texture Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
                     .Where(t => (t.Item2 != null && t.Item2.CanMerge() && !t.Item2.CanMergeTextures()))
@@ -315,7 +311,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (optimizer.WritePropertiesAsStaticValues && Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
             {
                 Profiler.StartSection("Locked in Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Where(mat => IsLockedIn(mat)).ToArray();
                 DrawDebugList(list);
@@ -324,7 +320,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (!optimizer.WritePropertiesAsStaticValues && Foldout("Unlocked Materials", ref optimizer.DebugShowUnlockedMaterials))
             {
                 Profiler.StartSection("Unlocked Materials");
-                var list = optimizer.GetComponentsInChildren<Renderer>(true)
+                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Where(mat => CanLockIn(mat) && !IsLockedIn(mat)).ToArray();
                 DrawDebugList(list);
@@ -516,60 +512,55 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "If the optimized copy is broken, try to disable the option.", MessageType.Warning);
         }
 
-        var allMaterials = optimizer.GetComponentsInChildren<Renderer>(true)
-            .Where(r => !exclusions.Contains(r.transform))
-            .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
-
-        var correctlyParsedMaterials = allMaterials
-            .Select(m => ShaderAnalyzer.Parse(m?.shader))
-            .Where(p => (p?.parsedCorrectly ?? false)).ToArray();
-
-        if (correctlyParsedMaterials.Length != allMaterials.Length)
+        if (optimizer.WritePropertiesAsStaticValues)
         {
-            EditorGUILayout.HelpBox(
-                "Some materials could not be parsed.\n" +
-                "Check the Debug Info foldout for more info.", MessageType.Warning);
-        }
+            var allMaterials = optimizer.GetUsedComponentsInChildren<Renderer>()
+                .Where(r => !exclusions.Contains(r.transform))
+                .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
 
-        if (!optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => CanLockIn(m) && !IsLockedIn(m)))
-        {
-            EditorGUILayout.HelpBox(
-                "Potentially unlocked materials exist.\n" +
-                "Either lock the materials or enable Write Properties as Static Values.\n" +
-                "Check the Debug Info foldout for a full list.", MessageType.Warning);
-        }
+            var correctlyParsedMaterials = allMaterials
+                .Select(m => ShaderAnalyzer.Parse(m?.shader))
+                .Where(p => (p?.parsedCorrectly ?? false)).ToArray();
 
-        if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
-        {
-            EditorGUILayout.HelpBox(
-                "Some materials do not support merging.\n" +
-                "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
-                "Check the Debug Info foldout for more info.", MessageType.Info);
-        }
+            if (correctlyParsedMaterials.Length != allMaterials.Length)
+            {
+                EditorGUILayout.HelpBox(
+                    "Some materials could not be parsed.\n" +
+                    "Check the Debug Info foldout for more info.", MessageType.Warning);
+            }
 
-        if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
-        {
-            EditorGUILayout.HelpBox(
-                "Some materials do not support merging textures.\n" +
-                "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
-                "Check the Debug Info foldout for more info.", MessageType.Info);
-        }
+            if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
+            {
+                EditorGUILayout.HelpBox(
+                    "Some materials do not support merging.\n" +
+                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                    "Check the Debug Info foldout for more info.", MessageType.Info);
+            }
 
-        if (optimizer.MergeDifferentPropertyMaterials && optimizer.WritePropertiesAsStaticValues && allMaterials.Any(m => IsLockedIn(m)))
-        {
-            EditorGUILayout.HelpBox(
-                "Some materials are locked in.\n" +
-                "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
-                "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise.\n" + 
-                "Check the Debug Info foldout for a full list.", MessageType.Info);
-        }
+            if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
+            {
+                EditorGUILayout.HelpBox(
+                    "Some materials do not support merging textures.\n" +
+                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                    "Check the Debug Info foldout for more info.", MessageType.Info);
+            }
 
-        if (optimizer.MergeDifferentPropertyMaterials && optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)
-        {
-            EditorGUILayout.HelpBox(
-                "Some textures are crunch compressed.\n" +
-                "Crunch compressed textures cannot be merged.\n" +
-                "Check the Debug Info foldout for a full list.", MessageType.Info);
+            if (optimizer.MergeDifferentPropertyMaterials && allMaterials.Any(m => IsLockedIn(m)))
+            {
+                EditorGUILayout.HelpBox(
+                    "Some materials are locked in.\n" +
+                    "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
+                    "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise.\n" + 
+                    "Check the Debug Info foldout for a full list.", MessageType.Info);
+            }
+
+            if (optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)
+            {
+                EditorGUILayout.HelpBox(
+                    "Some textures are crunch compressed.\n" +
+                    "Crunch compressed textures cannot be merged.\n" +
+                    "Check the Debug Info foldout for a full list.", MessageType.Info);
+            }
         }
 
         if (NonBC5NormalMaps.Length > 0)
@@ -596,7 +587,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        bool hasExtraMaterialSlots = optimizer.GetComponentsInChildren<Renderer>(true)
+        bool hasExtraMaterialSlots = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
             .Where(r => !exclusions.Contains(r.transform))
             .Where(r => r.GetSharedMesh() != null)
             .Any(r => r.sharedMaterials.Length > r.GetSharedMesh().subMeshCount);
@@ -676,24 +667,24 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (lastSelected == optimizer)
             return;
         lastSelected = optimizer;
-        ShaderAnalyzer.ParseAndCacheAllShaders(lastSelected.gameObject, false);
         ClearUICaches();
         if (optimizer.DoAutoSettings)
         {
             optimizer.DoAutoSettings = false;
             AvatarOptimizerSettings.ApplyDefaults(optimizer);
-            if (AvatarOptimizerSettings.IsAutoSetting("DeleteUnusedGameObjects"))
+            if (AvatarOptimizerSettings.IsAutoSetting(nameof(optimizer.DeleteUnusedGameObjects)))
             {
                 optimizer.DeleteUnusedGameObjects = !optimizer.UsesAnyLayerMasks();
             }
-            if (AvatarOptimizerSettings.IsAutoSetting("ForceMergeBlendShapeMissMatch"))
+            if (AvatarOptimizerSettings.IsAutoSetting(nameof(optimizer.ForceMergeBlendShapeMissMatch)))
             {
-                var triCount = optimizer.GetComponentsInChildren<Renderer>(true)
+                var triCount = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
                     .Where(r => r.GetSharedMesh() != null)
                     .Sum(r => r.GetSharedMesh().triangles.Length / 3);
                 optimizer.ForceMergeBlendShapeMissMatch = triCount < 70000;
             }
         }
+        ShaderAnalyzer.ParseAndCacheAllShaders(optimizer.FindAllUsedMaterials().Select(m => m.shader), false);
     }
 
     private List<List<List<MaterialSlot>>> MergedMaterialPreview
@@ -722,8 +713,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (keptBlendShapePathsCache == null)
             {
                 optimizer.CalculateUsedBlendShapePaths();
-                var skinnedMeshes = optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-                    .Where(r => !r.gameObject.CompareTag("EditorOnly")).ToList();
+                var skinnedMeshes = optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>();
                 keptBlendShapePathsCache = new HashSet<string>(skinnedMeshes.SelectMany(r => {
                     if (r.sharedMesh == null)
                         return new string[0];
@@ -757,7 +747,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 var bones = new HashSet<Transform>();
                 var unmoving = optimizer.FindAllUnmovingTransforms();
-                optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true).ToList().ForEach(
+                optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
                     r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
                 unmovingBonesCache = bones.ToArray();
             }
@@ -787,8 +777,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (crunchedTexturesCache == null)
             {
                 var exclusions = optimizer.GetAllExcludedTransforms();
-                var tuple = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .Where(r => !r.gameObject.CompareTag("EditorOnly"))
+                var tuple = optimizer.GetUsedComponentsInChildren<Renderer>()
                     .Where(r => !exclusions.Contains(r.transform))
                     .SelectMany(r => r.sharedMaterials).Distinct()
                     .Select(mat => (mat, ShaderAnalyzer.Parse(mat?.shader)))
@@ -820,9 +809,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (nonBC5NormalMapsCache == null)
             {
                 var exclusions = optimizer.GetAllExcludedTransforms();
-                var renderers = optimizer.GetComponentsInChildren<Renderer>(true)
-                    .Where(r => !r.gameObject.CompareTag("EditorOnly"))
-                    .ToArray();
+                var renderers = optimizer.GetUsedComponentsInChildren<Renderer>();
                 var textures = new HashSet<Texture2D>();
                 foreach (var renderer in renderers)
                 {
@@ -957,12 +944,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         var value = (bool)property.GetValue(optimizer);
         var output = value;
         var displayName = d4rkAvatarOptimizer.GetDisplayName(propertyName);
-        var tooltipKey = displayName;
         var guiEnabledState = GUI.enabled;
         GUI.enabled = optimizer.CanChangeSetting(propertyName);
-        if (TooltipCache.ContainsKey(tooltipKey))
+        if (TooltipCache.TryGetValue(displayName, out var tooltip))
         {
-            output = EditorGUILayout.ToggleLeft(new GUIContent(displayName, string.Join("\n", tooltipCache[tooltipKey].ToArray())), value);
+            output = EditorGUILayout.ToggleLeft(new GUIContent(displayName, string.Join("\n", tooltip.ToArray())), value);
             var rect = GUILayoutUtility.GetLastRect();
             rect.x += rect.width - 20;
             rect.width = 20;

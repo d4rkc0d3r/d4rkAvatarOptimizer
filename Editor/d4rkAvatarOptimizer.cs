@@ -213,10 +213,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             DisplayProgressBar("Clear TrashBin Folder", 0.01f);
             ClearTrashBin();
-            DisplayProgressBar("Parsing Shaders", 0.05f);
-            Profiler.StartSection("ParseAndCacheAllShaders()");
-            ShaderAnalyzer.ParseAndCacheAllShaders(gameObject, true, (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
-            Profiler.StartNextSection("ClearCaches()");
+            Profiler.StartSection("ClearCaches()");
             optimizedMaterials.Clear();
             optimizedMaterialImportPaths.Clear();
             optimizedSlotSwapMaterials.Clear();
@@ -225,6 +222,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
             ClearCaches();
+            if (WritePropertiesAsStaticValues)
+            {
+                DisplayProgressBar("Parsing Shaders", 0.05f);
+                Profiler.StartNextSection("ParseAndCacheAllShaders()");
+                ShaderAnalyzer.ParseAndCacheAllShaders(FindAllUsedMaterials().Select(m => m.shader), true,
+                    (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
+            }
             DisplayProgressBar("Destroying unused components", 0.19f);
             Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
             DestroyEditorOnlyGameObjects();
@@ -717,15 +721,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     public List<List<Renderer>> FindPossibleSkinnedMeshMerges()
     {
-        var unused = FindAllUnusedComponents();
         slotSwapMaterials = FindAllMaterialSwapMaterials();
-        var renderers = GetComponentsInChildren<Renderer>(true);
+        var renderers = GetUsedComponentsInChildren<Renderer>();
         var matchedSkinnedMeshes = new List<List<Renderer>>();
         var exclusions = GetAllExcludedTransforms();
         var penetrators = FindAllPenetrators();
         foreach (var renderer in renderers)
         {
-            if (renderer.gameObject.CompareTag("EditorOnly") || unused.Contains(renderer) || renderer.sharedMaterials.Length == 0)
+            if (renderer.sharedMaterials.Length == 0)
                 continue;
 
             bool foundMatch = false;
@@ -2256,6 +2259,66 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         penetrators.UnionWith(GetComponentsInChildren<Renderer>(true).Where(m => IsTPSPenetratorRoot(m.transform)));
         return cache_FindAllPenetrators = penetrators;
+    }
+
+    public List<T> GetNonEditorOnlyComponentsInChildren<T>() where T : Component
+    {
+        var components = new List<T>();
+        var stack = new Stack<Transform>();
+        stack.Push(transform);
+        while (stack.Count > 0)
+        {
+            var currentTransform = stack.Pop();
+            if (currentTransform.gameObject.CompareTag("EditorOnly"))
+                continue;
+            components.AddRange(currentTransform.GetComponents<T>());
+            foreach (Transform child in currentTransform)
+            {
+                stack.Push(child);
+            }
+        }
+        return components;
+    }
+
+    public List<T> GetUsedComponentsInChildren<T>() where T : Component
+    {
+        Profiler.StartSection("GetUsedComponentsInChildren()");
+        var result = new List<T>();
+        var stack = new Stack<Transform>();
+        var alwaysDisabledGameObjects = FindAllAlwaysDisabledGameObjects();
+        var unusedComponents = FindAllUnusedComponents();
+        if (!DeleteUnusedComponents)
+        {
+            alwaysDisabledGameObjects = new HashSet<Transform>();
+            unusedComponents = new HashSet<Component>();
+        }
+        stack.Push(transform);
+        while (stack.Count > 0)
+        {
+            var currentTransform = stack.Pop();
+            if (currentTransform.gameObject.CompareTag("EditorOnly") || alwaysDisabledGameObjects.Contains(currentTransform))
+                continue;
+            result.AddRange(currentTransform.GetComponents<T>().Where(c => c != null && !unusedComponents.Contains(c)));
+            foreach (Transform child in currentTransform)
+            {
+                stack.Push(child);
+            }
+        }
+        Profiler.EndSection();
+        return result;
+    }
+
+    private HashSet<Material> cache_FindAllUsedMaterials = null;
+    public HashSet<Material> FindAllUsedMaterials()
+    {
+        if (cache_FindAllUsedMaterials != null)
+            return cache_FindAllUsedMaterials;
+        var materials = new HashSet<Material>();
+        foreach (var renderer in GetUsedComponentsInChildren<Renderer>())
+        {
+            materials.UnionWith(renderer.sharedMaterials.Where(m => m != null));
+        }
+        return cache_FindAllUsedMaterials = materials;
     }
 
     private Texture2DArray CombineTextures(List<Texture2D> textures)
