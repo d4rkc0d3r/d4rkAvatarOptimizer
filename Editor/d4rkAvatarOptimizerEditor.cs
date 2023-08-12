@@ -56,6 +56,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
         }
 
+        var presets = optimizer.GetPresetNames();
+        if (presets.Count > 0)
+        {
+            EditorGUILayout.BeginHorizontal();
+            foreach (var preset in presets)
+            {
+                GUI.enabled = !optimizer.IsPresetActive(preset);
+                if (GUILayout.Button(preset))
+                {
+                    optimizer.SetPreset(preset);
+                    ClearUICaches();
+                }
+                GUI.enabled = true;
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+
         ToggleOptimizerProperty(nameof(optimizer.OptimizeOnUpload));
         ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshes));
@@ -670,19 +687,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         ClearUICaches();
         if (optimizer.DoAutoSettings)
         {
-            optimizer.DoAutoSettings = false;
             AvatarOptimizerSettings.ApplyDefaults(optimizer);
-            if (AvatarOptimizerSettings.IsAutoSetting(nameof(optimizer.DeleteUnusedGameObjects)))
-            {
-                optimizer.DeleteUnusedGameObjects = !optimizer.UsesAnyLayerMasks();
-            }
-            if (AvatarOptimizerSettings.IsAutoSetting(nameof(optimizer.ForceMergeBlendShapeMissMatch)))
-            {
-                var triCount = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
-                    .Where(r => r.GetSharedMesh() != null)
-                    .Sum(r => r.GetSharedMesh().triangles.Length / 3);
-                optimizer.ForceMergeBlendShapeMissMatch = triCount < 70000;
-            }
+            optimizer.ApplyAutoSettings();
         }
         ShaderAnalyzer.ParseAndCacheAllShaders(optimizer.FindAllUsedMaterials().Select(m => m.shader), false);
     }

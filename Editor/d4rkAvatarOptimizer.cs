@@ -47,7 +47,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool CombineApproximateMotionTimeAnimations = false;
         public bool DisablePhysBonesWhenUnused = true;
         public bool MergeSameRatioBlendShapes = true;
-        public bool KeepMMDBlendShapes = false;
+        public bool KeepMMDBlendShapes = true;
         public bool DeleteUnusedComponents = true;
         public int DeleteUnusedGameObjects = 2;
         public bool UseRingFingerAsFootCollider = false;
@@ -151,6 +151,110 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return FieldDisplayName[fieldName];
         }
         return fieldName;
+    }
+
+    private static List<(string name, Dictionary<string, object>)> SettingsPresets = new List<(string name, Dictionary<string, object>)>()
+    {
+        ("Basic", new Dictionary<string, object>() {
+            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.WritePropertiesAsStaticValues), false},
+            {nameof(Settings.MergeSkinnedMeshes), true},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
+            {nameof(Settings.MergeStaticMeshesAsSkinned), false},
+            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
+            {nameof(Settings.MergeDifferentPropertyMaterials), false},
+            {nameof(Settings.MergeSameDimensionTextures), false},
+            {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
+            {nameof(Settings.MergeDifferentRenderQueue), false},
+            {nameof(Settings.OptimizeFXLayer), true},
+            {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
+            {nameof(Settings.DisablePhysBonesWhenUnused), true},
+            {nameof(Settings.MergeSameRatioBlendShapes), true},
+            {nameof(Settings.KeepMMDBlendShapes), true},
+            {nameof(Settings.DeleteUnusedComponents), true},
+            {nameof(Settings.DeleteUnusedGameObjects), 2},
+        }),
+        ("Shader Toggles", new Dictionary<string, object>() {
+            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.WritePropertiesAsStaticValues), true},
+            {nameof(Settings.MergeSkinnedMeshes), true},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
+            {nameof(Settings.MergeStaticMeshesAsSkinned), true},
+            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
+            {nameof(Settings.MergeDifferentPropertyMaterials), true},
+            {nameof(Settings.MergeSameDimensionTextures), true},
+            {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
+            {nameof(Settings.MergeDifferentRenderQueue), false},
+            {nameof(Settings.OptimizeFXLayer), true},
+            {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
+            {nameof(Settings.DisablePhysBonesWhenUnused), true},
+            {nameof(Settings.MergeSameRatioBlendShapes), true},
+            {nameof(Settings.KeepMMDBlendShapes), true},
+            {nameof(Settings.DeleteUnusedComponents), true},
+            {nameof(Settings.DeleteUnusedGameObjects), 2},
+        }),
+        ("Full", new Dictionary<string, object>() {
+            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.WritePropertiesAsStaticValues), true},
+            {nameof(Settings.MergeSkinnedMeshes), true},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
+            {nameof(Settings.MergeStaticMeshesAsSkinned), true},
+            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
+            {nameof(Settings.MergeDifferentPropertyMaterials), true},
+            {nameof(Settings.MergeSameDimensionTextures), true},
+            {nameof(Settings.MergeBackFaceCullingWithCullingOff), true},
+            {nameof(Settings.MergeDifferentRenderQueue), false},
+            {nameof(Settings.OptimizeFXLayer), true},
+            {nameof(Settings.CombineApproximateMotionTimeAnimations), true},
+            {nameof(Settings.DisablePhysBonesWhenUnused), true},
+            {nameof(Settings.MergeSameRatioBlendShapes), true},
+            {nameof(Settings.KeepMMDBlendShapes), false},
+            {nameof(Settings.DeleteUnusedComponents), true},
+            {nameof(Settings.DeleteUnusedGameObjects), 1},
+        }),
+    };
+
+    public List<string> GetPresetNames()
+    {
+        return SettingsPresets.Select(x => x.name).ToList();
+    }
+
+    public bool IsPresetActive(string presetName)
+    {
+        var preset = SettingsPresets.Find(x => x.name == presetName).Item2;
+        foreach (var entry in preset)
+        {
+            var field = typeof(Settings).GetField(entry.Key);
+            if (typeof(bool) == field.FieldType && !field.GetValue(settings).Equals(entry.Value))
+                return false;
+        }
+        return true;
+    }
+
+    public void SetPreset(string presetName)
+    {
+        var preset = SettingsPresets.Find(x => x.name == presetName).Item2;
+        foreach (var field in preset)
+        {
+            typeof(Settings).GetField(field.Key).SetValue(settings, field.Value);
+        }
+        ApplyAutoSettings();
+    }
+
+    public void ApplyAutoSettings()
+    {
+        DoAutoSettings = false;
+        if (settings.DeleteUnusedGameObjects == 2)
+        {
+            DeleteUnusedGameObjects = !UsesAnyLayerMasks();
+        }
+        if (settings.ForceMergeBlendShapeMissMatch == 2)
+        {
+            var triCount = GetNonEditorOnlyComponentsInChildren<Renderer>()
+                .Where(r => r.GetSharedMesh() != null)
+                .Sum(r => r.GetSharedMesh().triangles.Length / 3);
+            ForceMergeBlendShapeMissMatch = triCount < 70000;
+        }
     }
 
     public bool DoAutoSettings = true;
@@ -854,12 +958,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             AnimationUtility.SetEditorCurve(newClip, FixAnimationBinding(binding, ref changed), curve);
             bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
                 || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
-            if (addPhysBoneCurves && physBonesToDisable.ContainsKey(binding.path))
+            if (addPhysBoneCurves && physBonesToDisable.TryGetValue(binding.path, out var physBonePaths))
             {
                 var physBoneBinding = binding;
                 physBoneBinding.propertyName = "m_Enabled";
                 physBoneBinding.type = typeof(VRCPhysBone);
-                foreach (var physBonePath in physBonesToDisable[binding.path])
+                foreach (var physBonePath in physBonePaths)
                 {
                     physBoneBinding.path = physBonePath;
                     AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);

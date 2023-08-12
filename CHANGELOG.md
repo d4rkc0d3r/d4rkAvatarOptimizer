@@ -2,6 +2,7 @@
 ### Features
 * New mode to merge meshes without introducing shader toggles.
   * When none of "Use Shader Toggles", "Write Properties as Static Values" or "Merge Different Property Materials" are enabled, the optimizer will no longer generate new shaders at all.
+* Add preset buttons "Basic", "Shader Toggles" & "Full" to the optimizer.
 * Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
 * Add option to combine motion time layers as a piecewise linear 1D tree into the direct blend tree as well.
 * Show layer merge errors as tooltips in the "Show FX Layer Merge Results" section.

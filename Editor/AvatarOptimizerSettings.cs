@@ -94,10 +94,5 @@ public class AvatarOptimizerSettings : EditorWindow
             field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (object)(val != 0) : (object)val);
         }
     }
-
-    public static bool IsAutoSetting(string key)
-    {
-        return GetValue(key) == 2;
-    }
 }
 #endif
