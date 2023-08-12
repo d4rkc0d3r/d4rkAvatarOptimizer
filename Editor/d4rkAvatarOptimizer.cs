@@ -250,7 +250,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         if (settings.ForceMergeBlendShapeMissMatch == 2)
         {
-            var triCount = GetNonEditorOnlyComponentsInChildren<Renderer>()
+            var triCount = GetUsedComponentsInChildren<Renderer>()
                 .Where(r => r.GetSharedMesh() != null)
                 .Sum(r => r.GetSharedMesh().triangles.Length / 3);
             ForceMergeBlendShapeMissMatch = triCount < 70000;

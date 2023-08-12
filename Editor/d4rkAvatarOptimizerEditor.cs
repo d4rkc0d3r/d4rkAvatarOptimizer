@@ -59,7 +59,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         var presets = optimizer.GetPresetNames();
         if (presets.Count > 0)
         {
-            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.BeginHorizontal(GUI.skin.box);
+            EditorGUILayout.LabelField("Presets", EditorStyles.boldLabel, GUILayout.Width(50));
             foreach (var preset in presets)
             {
                 GUI.enabled = !optimizer.IsPresetActive(preset);
