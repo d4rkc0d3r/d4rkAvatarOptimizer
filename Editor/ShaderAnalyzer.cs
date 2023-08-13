@@ -1929,144 +1929,147 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (type, names);
         }
 
-        private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
+        private void ParseCodeLinesRecursive(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass, string endSymbol)
         {
-            var line = source[sourceLineIndex];
-            if (line.StartsWith("#include "))
+            for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
-                var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
-                if (!alreadyIncluded.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
+                var line = source[sourceLineIndex];
+                if (line == endSymbol)
+                    return;
+                if (line.StartsWith("#include "))
                 {
-                    for (int i = 0; i < includeSource.Count; i++)
+                    var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
+                    if (!alreadyIncluded.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
                     {
-                        ParseCodeLines(includeSource, ref i, pass);
+                        int innerLineIndex = 0;
+                        ParseCodeLinesRecursive(includeSource, ref innerLineIndex, pass, endSymbol);
+                    }
+                    else
+                    {
+                        output.Add(line);
+                        return;
+                    }
+                }
+                var func = ShaderAnalyzer.ParseFunctionDefinition(line);
+                if (pass.vertex != null && func.name == pass.vertex.name)
+                {
+                    InjectVertexShaderCode(source, ref sourceLineIndex, pass);
+                }
+                else if (pass.geometry != null && pass.fragment != null && pass.vertex != null && func.name == pass.geometry.name)
+                {
+                    InjectGeometryShaderCode(source, ref sourceLineIndex);
+                }
+                else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
+                {
+                    InjectFragmentShaderCode(source, ref sourceLineIndex);
+                }
+                else if (func.name != null)
+                {
+                    DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex);
+                }
+                else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.StartsWith("struct "))
+                {
+                    output.Add(line);
+                    var match = Regex.Match(line, @"struct\s+(\w+)");
+                    if (match.Success)
+                    {
+                        var structName = match.Groups[1].Value;
+                        var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+                        if (structName == vertIn?.type)
+                        {
+                            while (++sourceLineIndex < source.Count)
+                            {
+                                line = source[sourceLineIndex];
+                                match = Regex.Match(line, @"^(\w+\s+)*(\w+)\s+(\w+)\s*:\s*(\w+)\s*;");
+                                if (match.Success)
+                                {
+                                    var semantic = match.Groups[4].Value.ToLowerInvariant();
+                                    var type = match.Groups[2].Value;
+                                    if (semantic == "texcoord" || semantic == "texcoord0")
+                                    {
+                                        line = line.Replace(type, "float4");
+                                        if (type == "float2") vertexInUv0EndSwizzle = ".xy";
+                                        else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
+                                        else vertexInUv0EndSwizzle = "";
+                                        vertexInUv0Member = match.Groups[3].Value;
+                                        output.Add($"//{line}");
+                                        continue;
+                                    }
+                                }
+                                if (line.StartsWith("}"))
+                                {
+                                    output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
+                                    output.Add(line);
+                                    break;
+                                }
+                                output.Add(line);
+                            }
+                        }
                     }
                 }
                 else
                 {
-                    output.Add(line);
-                    return;
-                }
-            }
-            var func = ShaderAnalyzer.ParseFunctionDefinition(line);
-            if (pass.vertex != null && func.name == pass.vertex.name)
-            {
-                InjectVertexShaderCode(source, ref sourceLineIndex, pass);
-            }
-            else if (pass.geometry != null && pass.fragment != null && pass.vertex != null && func.name == pass.geometry.name)
-            {
-                InjectGeometryShaderCode(source, ref sourceLineIndex);
-            }
-            else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
-            {
-                InjectFragmentShaderCode(source, ref sourceLineIndex);
-            }
-            else if (func.name != null)
-            {
-                DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex);
-            }
-            else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.StartsWith("struct "))
-            {
-                output.Add(line);
-                var match = Regex.Match(line, @"struct\s+(\w+)");
-                if (match.Success)
-                {
-                    var structName = match.Groups[1].Value;
-                    var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-                    if (structName == vertIn?.type)
+                    var match = ParseVariableDeclaration(line);
+                    if (match.type != null)
                     {
-                        while (++sourceLineIndex < source.Count)
+                        var type = match.type;
+                        foreach (var name in match.names)
                         {
-                            line = source[sourceLineIndex];
-                            match = Regex.Match(line, @"^(\w+\s+)*(\w+)\s+(\w+)\s*:\s*(\w+)\s*;");
-                            if (match.Success)
+                            bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWith("sampler");
+                            if (isTextureSamplerState && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
                             {
-                                var semantic = match.Groups[4].Value.ToLowerInvariant();
-                                var type = match.Groups[2].Value;
-                                if (semantic == "texcoord" || semantic == "texcoord0")
+                                if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
                                 {
-                                    line = line.Replace(type, "float4");
-                                    if (type == "float2") vertexInUv0EndSwizzle = ".xy";
-                                    else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
-                                    else vertexInUv0EndSwizzle = "";
-                                    vertexInUv0Member = match.Groups[3].Value;
-                                    output.Add($"//{line}");
-                                    continue;
+                                    texturesToCallSoTheSamplerDoesntDisappear.Add(name.Substring("sampler".Length));
+                                    output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + name.Substring("sampler".Length));
                                 }
+                                output.Add(type + " " + name + ";");
                             }
-                            if (line.StartsWith("}"))
+                            else if (staticPropertyValues.TryGetValue(name, out string value)
+                                && !animatedPropertyValues.ContainsKey(name)
+                                && !arrayPropertyValues.ContainsKey(name))
                             {
-                                output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
-                                output.Add(line);
-                                break;
+                                output.Add("static " + type + " " + name + " = " + value + ";");
+                            }
+                            else if (!arrayPropertyValues.ContainsKey(name)
+                                && !animatedPropertyValues.ContainsKey(name)
+                                && !texturesToReplaceCalls.Contains(name)
+                                && !(isTextureSamplerState && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
+                            {
+                                output.Add(type + " " + name + ";");
+                            }
+                        }
+                    }
+                    else if (line.StartsWith("UNITY_DECLARE_TEX2D"))
+                    {
+                        var texName = line.Split('(')[1].Split(')')[0].Trim();
+                        bool hasSampler = !line.Contains("_NOSAMPLER");
+                        if (!texturesToReplaceCalls.Contains(texName))
+                        {
+                            if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
+                            {
+                                texturesToCallSoTheSamplerDoesntDisappear.Add(texName);
+                                output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + texName);
                             }
                             output.Add(line);
                         }
                     }
-                }
-            }
-            else
-            {
-                var match = ParseVariableDeclaration(line);
-                if (match.type != null)
-                {
-                    var type = match.type;
-                    foreach (var name in match.names)
+                    else if (line.StartsWith("#pragma"))
                     {
-                        bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWith("sampler");
-                        if (isTextureSamplerState && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                        if (((pass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
+                            &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
                         {
-                            if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
-                            {
-                                texturesToCallSoTheSamplerDoesntDisappear.Add(name.Substring("sampler".Length));
-                                output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + name.Substring("sampler".Length));
-                            }
-                            output.Add(type + " " + name + ";");
+                            pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                         }
-                        else if (staticPropertyValues.TryGetValue(name, out string value)
-                            && !animatedPropertyValues.ContainsKey(name)
-                            && !arrayPropertyValues.ContainsKey(name))
+                        else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
                         {
-                            output.Add("static " + type + " " + name + " = " + value + ";");
-                        }
-                        else if (!arrayPropertyValues.ContainsKey(name)
-                            && !animatedPropertyValues.ContainsKey(name)
-                            && !texturesToReplaceCalls.Contains(name)
-                            && !(isTextureSamplerState && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
-                        {
-                            output.Add(type + " " + name + ";");
+                            pragmaOutput.Add(line);
                         }
                     }
-                }
-                else if (line.StartsWith("UNITY_DECLARE_TEX2D"))
-                {
-                    var texName = line.Split('(')[1].Split(')')[0].Trim();
-                    bool hasSampler = !line.Contains("_NOSAMPLER");
-                    if (!texturesToReplaceCalls.Contains(texName))
+                    else
                     {
-                        if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
-                        {
-                            texturesToCallSoTheSamplerDoesntDisappear.Add(texName);
-                            output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + texName);
-                        }
                         output.Add(line);
                     }
-                }
-                else if (line.StartsWith("#pragma"))
-                {
-                    if (((pass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
-                        &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
-                    {
-                        pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
-                    }
-                    else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
-                    {
-                        pragmaOutput.Add(line);
-                    }
-                }
-                else
-                {
-                    output.Add(line);
                 }
             }
         }
@@ -2169,10 +2172,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output = new List<string>();
                     InjectPropertyArrays(pass);
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
-                    while (lines[++lineIndex] != endSymbol)
-                    {
-                        ParseCodeLines(lines, ref lineIndex, pass);
-                    }
+                    lineIndex++;
+                    ParseCodeLinesRecursive(lines, ref lineIndex, pass, endSymbol);
                     var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
