@@ -2031,10 +2031,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         if (!includeStack.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
                         {
                             int innerLineIndex = 0;
+                            output.Add($"// Include {includeName}");
                             includeStack.Push(includeName);
                             ParseCodeLinesRecursive(includeSource, ref innerLineIndex, pass, endSymbol);
                             includeStack.Pop();
-                            output.Add($"// Included {includeName}");
                         }
                         else
                         {
@@ -2052,17 +2052,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             expr = subLine.Substring("if".Length).Trim();
                         var (value, error) = EvalPreprocessorCondition(expr);
                         canSkipElseStack.Push(!error && value);
-                        var toAdd = line;
+                        bool skip = false;
                         if (!error && !value)
                         {
                             SkipUntilElseOrEndif(ref sourceLineIndex);
                             if (source[sourceLineIndex + 1].StartsWith("#endif"))
                             {
-                                toAdd = $"// {line}";
+                                output[output.Count - 1] += $" | {line}";
                                 sourceLineIndex++;
+                                skip = true;
                             }
                         }
-                        output.Add(toAdd);
+                        if (!skip)
+                            output.Add(line);
                     }
                     else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
                     {
@@ -2384,7 +2386,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         continue;
                     tagString += $"[{tag}] ";
                 }
-                propertyBlock.Add($"{tagString}{prop.name}({prop.stringLiteral}, {prop.type}) = {prop.defaultValue}");
+                propertyBlock.Add($"{tagString}{prop.name}(\"{prop.name}\", {prop.type}) = {prop.defaultValue}");
                 tags.Clear();
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);

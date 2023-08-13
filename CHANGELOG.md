@@ -25,6 +25,7 @@
   * No longer include unity cg include files, instead directly include only UnityLightingCommon.cginc to get the _SpecColor declaration.
   * Skip `#if` blocks in the output if the condition is known due to `shader_feature` pragmas.
   * Disable warnings 3557 & 4008 for the generated shaders as they happen quite a lot when constant folding happens.
+  * Properties only write the actual property name and not the full display name.
 
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
