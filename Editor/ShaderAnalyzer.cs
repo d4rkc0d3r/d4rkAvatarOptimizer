@@ -97,7 +97,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public List<string> customTextureDeclarations = new List<string>();
         public Dictionary<string, int> multiIncludeFileCount = new Dictionary<string, int>();
         public bool mismatchedCurlyBraces = false;
-        public List<string> lines = new List<string>();
+        public Dictionary<string, List<string>> text = new Dictionary<string, List<string>>();
         public List<Property> properties = new List<Property>();
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
         public List<Pass> passes = new List<Pass>();
@@ -210,18 +210,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
 
         private ParsedShader parsedShader;
-        private int curlyBraceDepth;
         private int maxIncludes;
         private string filePath;
         private bool doneParsing;
         private string[] shaderFileLines;
+        private HashSet<string> alreadyIncludedThisPass;
 
         private ShaderAnalyzer(string shaderName, string shaderPath)
         {
             parsedShader = new ParsedShader();
             parsedShader.name = shaderName;
             filePath = shaderPath;
-            curlyBraceDepth = 0;
             maxIncludes = 1000;
             doneParsing = false;
             if (shaderPath.EndsWith(".orlshader"))
@@ -241,7 +240,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, tempShaderPath);
                 }
-                try 
+                try
                 {
                     shaderFileLines = File.ReadAllLines(tempShaderPath);
                 }
@@ -270,10 +269,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             try
             {
-                RecursiveParseFile(filePath, parsedShader.lines);
+                RecursiveParseFile(filePath, true, filePath);
                 SemanticParseShader();
                 parsedShader.parsedCorrectly = true;
-                if (parsedShader.lines.Count == 0)
+                if (parsedShader.text[".shader"].Count == 0)
                 {
                     parsedShader.parsedCorrectly = false;
                     parsedShader.errorMessage = "Parsed shader is empty.";
@@ -320,45 +319,58 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return -1;
         }
 
-        private bool RecursiveParseFile(string filePath, List<string> processedLines, List<string> alreadyIncludedFiles = null)
+        private bool RecursiveParseFile(string currentFileName, bool isTopLevelFile, string callerPath)
         {
-            bool isTopLevelFile = false;
+            var processedLines = new List<string>();
+            if (alreadyIncludedThisPass == null)
+                alreadyIncludedThisPass = new HashSet<string>();
+            var fileID = currentFileName;
+            var currentFilePath = currentFileName;
             string[] rawLines = null;
-            if (alreadyIncludedFiles == null)
+            if (isTopLevelFile)
             {
-                alreadyIncludedFiles = new List<string>();
-                isTopLevelFile = true;
                 rawLines = shaderFileLines;
+                fileID = ".shader";
             }
+            parsedShader.text[fileID] = processedLines;
             if (rawLines == null)
             {
-                var fileName = Path.GetFileName(filePath);
+                if (currentFilePath.StartsWith("/Assets/"))
+                {
+                    var path = Path.GetDirectoryName(callerPath);
+                    var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
+                    currentFilePath = assetFolderPath + currentFilePath;
+                }
+                else if (!isTopLevelFile)
+                {
+                    currentFilePath = Path.GetDirectoryName(callerPath) + "/" + currentFilePath;
+                }
+                currentFilePath = Path.GetFullPath(currentFilePath);
+                var fileName = Path.GetFileName(currentFilePath);
                 if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")) && fileName != "UnityLightingCommon.cginc")
                 {
                     // we don't want to include and parse unity cg includes
                     return false;
                 }
+                if (alreadyIncludedThisPass.Contains(fileID))
+                {
+                    if (!parsedShader.multiIncludeFileCount.ContainsKey(fileID))
+                        parsedShader.multiIncludeFileCount[fileID] = 0;
+                    parsedShader.multiIncludeFileCount[fileID]++;
+                    return true;
+                }
                 if (--maxIncludes < 0)
                 {
                     throw new ParserException("Reached max include depth");
                 }
-                filePath = Path.GetFullPath(filePath);
-                if (alreadyIncludedFiles.Contains(filePath))
-                {
-                    if (!parsedShader.multiIncludeFileCount.ContainsKey(filePath))
-                        parsedShader.multiIncludeFileCount[filePath] = 0;
-                    parsedShader.multiIncludeFileCount[filePath]++;
-                    return true;
-                }
-                alreadyIncludedFiles.Add(filePath);
                 try
                 {
-                    rawLines = File.ReadAllLines(filePath);
+                    rawLines = File.ReadAllLines(currentFilePath);
                 }
                 catch (FileNotFoundException)
                 {
                     if (fileName != "UnityLightingCommon.cginc")
-                        Debug.LogWarning("Could not find include file: " + filePath);
+                        Debug.LogWarning("Could not find include file: " + currentFilePath);
                     return false;
                 }
                 catch (DirectoryNotFoundException)
@@ -371,11 +383,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     // happens for example if audio link is not in the project but the shader has a reference to the include file
                     // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
-                    Debug.LogWarning("Could not find directory for include file: " + filePath);
+                    Debug.LogWarning("Could not find directory for include file: " + currentFilePath);
                     return false; 
                 }
             }
-
+            alreadyIncludedThisPass.Add(fileID);
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
             {
                 string trimmedLine = rawLines[lineIndex].Trim();
@@ -457,10 +469,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM" ||trimmedLine == "HLSLINCLUDE" || trimmedLine == "HLSLPROGRAM"))
                 {
-                    alreadyIncludedFiles.Clear();
                     processedLines.Add(trimmedLine);
+                    alreadyIncludedThisPass.Clear();
                     // include UnityLightingCommon.cginc at the start of each code block since that declares _SpecColor and we don't want to just include all unity cg includes
-                    RecursiveParseFile(Path.Combine(EditorApplication.applicationContentsPath, "CGIncludes\\UnityLightingCommon.cginc"), processedLines, alreadyIncludedFiles);
+                    RecursiveParseFile("UnityLightingCommon.cginc", false, currentFilePath);
+                    processedLines.Add("#include \"UnityLightingCommon.cginc\"");
                     continue;
                 }
                 if (trimmedLine.StartsWith("UsePass"))
@@ -469,37 +482,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 if (trimmedLine.StartsWith("#include "))
                 {
-                    int firstQuote = trimmedLine.IndexOf('"');
-                    int lastQuote = trimmedLine.LastIndexOf('"');
-                    if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
-                    {
-                        firstQuote = trimmedLine.IndexOf('<');
-                        lastQuote = trimmedLine.LastIndexOf('>');
-                    }
-                    if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
-                    {
-                        throw new ParserException("Invalid #include directive.");
-                    }
-                    string includePath = trimmedLine.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
-                    if (includePath.StartsWith("/Assets/"))
-                    {
-                        var path = Path.GetDirectoryName(filePath);
-                        var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
-                        includePath = assetFolderPath + includePath;
-                    }
-                    else
-                    {
-                        includePath = Path.GetDirectoryName(filePath) + "/" + includePath;
-                    }
-                    if (!RecursiveParseFile(includePath, processedLines, alreadyIncludedFiles))
-                    {
-                        processedLines.Add(trimmedLine);
-                    }
-                    continue;
+                    RecursiveParseFile(ParseIncludeDirective(trimmedLine), false, currentFilePath);
                 }
                 processedLines.Add(trimmedLine);
             }
             return true;
+        }
+
+        public static string ParseIncludeDirective(string line)
+        {
+            if (!line.StartsWith("#include "))
+                return "";
+            int firstQuote = line.IndexOf('"');
+            int lastQuote = line.LastIndexOf('"');
+            if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+            {
+                firstQuote = line.IndexOf('<');
+                lastQuote = line.LastIndexOf('>');
+            }
+            if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+                throw new ParserException("Invalid #include directive.");
+            return line.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
         }
 
         public static (string name, string stringLiteral, string type, string defaultValue)?
@@ -837,7 +840,40 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output)
+        private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, HashSet<string> alreadyParsed = null)
+        {
+            if (alreadyParsed == null)
+                alreadyParsed = new HashSet<string>();
+            for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            {
+                var currentLine = lines[lineIndex];
+                if (currentLine.StartsWith("#include "))
+                {
+                    var includeName = ParseIncludeDirective(currentLine);
+                    if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines))
+                    {
+                        alreadyParsed.Add(includeName);
+                        ParseFunctionDeclarationsRecursive(includeLines, currentPass, alreadyParsed);
+                    }
+                    continue;
+                }
+                ParseCustomFunctionDeclarationMacro(currentLine);
+                int tempIndex = lineIndex;
+                var func = ParseFunctionDefinition(lines, ref tempIndex);
+                if (func != null)
+                {
+                    parsedShader.functions[func.name] = func;
+                    UpdateFunctionDefinition(func, currentPass);
+                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name)
+                    {
+                        ParseFunctionParametersWithPreprocessorStatements(lines, ref lineIndex);
+                    }
+                }
+                lineIndex = tempIndex;
+            }
+        }
+
+        private void PreprocessCodeLines(List<string> lines, ref int lineIndex, List<string> output, ref int curlyBraceDepth)
         {
             while (lineIndex < lines.Count - 1)
             {
@@ -876,10 +912,24 @@ namespace d4rkpl4y3r.AvatarOptimizer
             List<string> output = new List<string>();
             List<string> cgInclude = new List<string>();
             List<string> hlslInclude = new List<string>();
-            List<string> lines = parsedShader.lines;
+            List<string> lines = parsedShader.text[".shader"];
             List<string> tags = new List<string>();
-            parsedShader.lines = output;
+            parsedShader.text[".shader"] = output;
+            parsedShader.mismatchedCurlyBraces = false;
+            int curlyBraceDepth = 0;
+            foreach (var key in parsedShader.text.Keys.ToList())
+            {
+                if (key == ".shader")
+                    continue;
+                var unprocessedLines = parsedShader.text[key];
+                var processedLines = new List<string>();
+                int lineIndex = -1;
+                PreprocessCodeLines(unprocessedLines, ref lineIndex, processedLines, ref curlyBraceDepth);
+                parsedShader.text[key] = processedLines;
+                parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
+            }
             var state = ParseState.ShaderLab;
+            curlyBraceDepth = 0;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
             {
                 string line = lines[lineIndex];
@@ -938,18 +988,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         else if (line == "CGINCLUDE")
                         {
-                            PreprocessCodeLines(lines, ref lineIndex, cgInclude);
+                            PreprocessCodeLines(lines, ref lineIndex, cgInclude, ref curlyBraceDepth);
                         }
                         else if (line == "HLSLINCLUDE")
                         {
-                            PreprocessCodeLines(lines, ref lineIndex, hlslInclude);
+                            PreprocessCodeLines(lines, ref lineIndex, hlslInclude, ref curlyBraceDepth);
                         }
                         else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                         {
                             currentPass = new ParsedShader.Pass();
                             parsedShader.passes.Add(currentPass);
                             var program = new List<string>(line == "CGPROGRAM" ? cgInclude : hlslInclude);
-                            PreprocessCodeLines(lines, ref lineIndex, program);
+                            PreprocessCodeLines(lines, ref lineIndex, program, ref curlyBraceDepth);
                             for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
                             {
                                 ParsePragma(program[programLineIndex], currentPass);
@@ -958,22 +1008,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                     throw new ParserException("Shader with instancing is not supported.");
                                 }
                             }
-                            for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
-                            {
-                                ParseCustomFunctionDeclarationMacro(program[programLineIndex]);
-                                int tempIndex = programLineIndex;
-                                var func = ParseFunctionDefinition(program, ref tempIndex);
-                                if (func != null)
-                                {
-                                    parsedShader.functions[func.name] = func;
-                                    UpdateFunctionDefinition(func, currentPass);
-                                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name)
-                                    {
-                                        ParseFunctionParametersWithPreprocessorStatements(program, ref programLineIndex);
-                                    }
-                                }
-                                programLineIndex = tempIndex;
-                            }
+                            ParseFunctionDeclarationsRecursive(program, currentPass);
                             output.Add(line);
                             output.AddRange(program);
                             output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
@@ -1005,7 +1040,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 parsedShader.propertyTable[prop.name] = prop;
             }
-            parsedShader.mismatchedCurlyBraces = curlyBraceDepth != 0;
+            parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
             {
                 throw new ParserException("A pass is missing a vertex or fragment shader.");
@@ -1016,6 +1051,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
     public class ShaderOptimizer
     {
         private List<string> output;
+        private HashSet<string> alreadyIncluded;
         private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
         private List<string> pragmaOutput;
         private ParsedShader parsedShader;
@@ -1896,6 +1932,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private void ParseCodeLines(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass)
         {
             var line = source[sourceLineIndex];
+            if (line.StartsWith("#include "))
+            {
+                var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
+                if (!alreadyIncluded.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
+                {
+                    for (int i = 0; i < includeSource.Count; i++)
+                    {
+                        ParseCodeLines(includeSource, ref i, pass);
+                    }
+                }
+                else
+                {
+                    output.Add(line);
+                    return;
+                }
+            }
             var func = ShaderAnalyzer.ParseFunctionDefinition(line);
             if (pass.vertex != null && func.name == pass.vertex.name)
             {
@@ -2030,24 +2082,26 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private List<string> Run()
         {
+            alreadyIncluded = new HashSet<string>();
             output = new List<string>();
             var tags = new List<string>();
+            var lines = parsedShader.text[".shader"];
             var propertyBlock = new List<string>();
             int propertyBlockInsertionIndex = 0;
             int propertyBlockStartParseIndex = 0; 
             int lineIndex = 0;
-            while (lineIndex < parsedShader.lines.Count)
+            while (lineIndex < lines.Count)
             {
-                string line = parsedShader.lines[lineIndex++];
+                string line = lines[lineIndex++];
                 output.Add(line);
                 if (line == "Properties")
                 {
                     break;
                 }
             }
-            while (lineIndex < parsedShader.lines.Count)
+            while (lineIndex < lines.Count)
             {
-                string line = parsedShader.lines[lineIndex++];
+                string line = lines[lineIndex++];
                 if (line == "}")
                 {
                     output.Add(line);
@@ -2100,9 +2154,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             int passID = -1;
-            for (; lineIndex < parsedShader.lines.Count; lineIndex++)
+            for (; lineIndex < lines.Count; lineIndex++)
             {
-                string line = parsedShader.lines[lineIndex];
+                string line = lines[lineIndex];
                 if (line.StartsWith("CustomEditor"))
                     continue;
                 output.Add(line);
@@ -2115,9 +2169,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output = new List<string>();
                     InjectPropertyArrays(pass);
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
-                    while (parsedShader.lines[++lineIndex] != endSymbol)
+                    while (lines[++lineIndex] != endSymbol)
                     {
-                        ParseCodeLines(parsedShader.lines, ref lineIndex, pass);
+                        ParseCodeLines(lines, ref lineIndex, pass);
                     }
                     var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
@@ -2127,9 +2181,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             tags.Clear();
-            for (lineIndex = propertyBlockStartParseIndex; lineIndex < parsedShader.lines.Count; lineIndex++)
+            for (lineIndex = propertyBlockStartParseIndex; lineIndex < lines.Count; lineIndex++)
             {
-                string line = parsedShader.lines[lineIndex];
+                string line = lines[lineIndex];
                 if (line == "}")
                     break;
                 var parsedProperty = ShaderAnalyzer.ParsePropertyRaw(line, tags);

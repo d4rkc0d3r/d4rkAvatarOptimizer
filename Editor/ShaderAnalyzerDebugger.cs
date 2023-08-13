@@ -6,6 +6,7 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using d4rkpl4y3r.AvatarOptimizer;
+using System.Diagnostics;
 
 public class ShaderAnalyzerDebugger : EditorWindow
 {
@@ -16,6 +17,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private int maxProperties = 50;
     private int maxKeywords = 10;
     private bool showShaderLabParamsOnly = false;
+    private long lastTime = 0;
 
     private DefaultAsset folder = null;
     private List<Shader> shaders = null;
@@ -35,7 +37,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
     private bool Foldout(ref bool property, string name)
     {
-        return property = EditorGUILayout.Foldout(property, name);
+        return property = EditorGUILayout.Foldout(property, name, true);
     }
 
     private bool ObjectField<T>(ref T obj, string label, bool allowSceneObjects = false) where T : Object
@@ -77,7 +79,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                     if (asset != null)
                         shaders.Add(asset);
                 }
-                ShaderAnalyzer.ParseAndCacheAllShaders(shaders, false);
+                lastTime = 0;
             }
         }
 
@@ -91,6 +93,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
         if (GUILayout.Button("Clear Shader Cache"))
         {
             ShaderAnalyzer.ClearParsedShaderCache();
+            lastTime = 0;
         }
 
         GUI.enabled = material != null && material.shader != null;
@@ -123,7 +126,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
             EditorGUILayout.LabelField("Total Shaders in Folder: " + shaders.Count);
+            // time the parsing
+            var timer = Stopwatch.StartNew();
             var parsedShaders = ShaderAnalyzer.ParseAndCacheAllShaders(shaders, false);
+            timer.Stop();
+            if (lastTime == 0)
+                lastTime = timer.ElapsedMilliseconds;
+            EditorGUILayout.LabelField("Last Parse Time: " + lastTime + "ms");
             var mismatchedCurlyBraces = parsedShaders.Where(s => s.mismatchedCurlyBraces).ToList();
             if (Foldout(ref showMismatchedCurlyBraces, $"Mismatched Curly Braces ({mismatchedCurlyBraces.Count})"))
             {
@@ -179,18 +188,18 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
-            var hasMultiIncludeFiles = parsedShaders.Where(s => s.multiIncludeFileCount.Count > 0).ToList();
+            var hasMultiIncludeFiles = parsedShaders.Where(s => s.multiIncludeFileCount.Values.Count(v => v > 1) > 0).ToList();
             if (Foldout(ref showMultiIncludeFiles, $"Multi Include Files ({hasMultiIncludeFiles.Count})"))
             {
                 EditorGUI.indentLevel++;
                 foreach (var shader in hasMultiIncludeFiles)
                 {
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField($"Has {shader.multiIncludeFileCount.Count} multi include files");
+                    EditorGUILayout.LabelField($"Has {shader.multiIncludeFileCount.Values.Count(v => v > 1)} multi include files");
                     EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
                     EditorGUILayout.EndHorizontal();
                     EditorGUI.indentLevel++;
-                    foreach (var file in shader.multiIncludeFileCount)
+                    foreach (var file in shader.multiIncludeFileCount.Where(f => f.Value > 1))
                     {
                         var fileName = Path.GetFileName(file.Key);
                         EditorGUILayout.LabelField(new GUIContent($"{fileName}: {file.Value}", file.Key));
@@ -282,9 +291,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         GUILayout.Space(15);
 
-        for (int i = 0; i < maxLines && i < parsedShader.lines.Count; i++)
+        for (int i = 0; i < maxLines && i < parsedShader.text[".shader"].Count; i++)
         {
-            GUILayout.Label(parsedShader.lines[i]);
+            GUILayout.Label(parsedShader.text[".shader"][i]);
         }
 
         EditorGUILayout.EndScrollView();
