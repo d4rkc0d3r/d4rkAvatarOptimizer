@@ -63,6 +63,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     optimizer.SetPreset(preset);
                     ClearUICaches();
+                    EditorUtility.SetDirty(optimizer);
                 }
                 GUI.enabled = true;
             }
@@ -678,7 +679,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
         optimizer.ClearCaches();
-        EditorUtility.SetDirty(optimizer);
     }
 
     private void OnSelectionChange()
@@ -970,6 +970,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (value != output)
         {
             ClearUICaches();
+            EditorUtility.SetDirty(optimizer);
             property.SetValue(optimizer, output);
         }
         return output;
@@ -997,7 +998,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             output = EditorGUILayout.Foldout(value, label, true);
         }
         if (value != output)
+        {
             ClearUICaches();
+            EditorUtility.SetDirty(optimizer);
+        }
         return value = output;
     }
 
