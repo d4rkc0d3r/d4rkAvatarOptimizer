@@ -23,6 +23,7 @@
   * Changed type of Texture2DArray index from int to float eliminating a type conversion. 
   * Use ternaries for merged material properties that have only one value that differs from the rest.
   * No longer include unity cg include files, instead directly include only UnityLightingCommon.cginc to get the _SpecColor declaration.
+  * Skip `#if` blocks in the output if the condition is known due to `shader_feature` pragmas.
 
 ### Bug Fixes
 * Fix error message when trying to delete an unused AudioSource before its connected VRCSpatialAudioSource.
