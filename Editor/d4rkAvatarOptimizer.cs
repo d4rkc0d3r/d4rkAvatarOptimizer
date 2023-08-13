@@ -30,6 +30,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 , VRC.SDKBase.IEditorOnly
 #endif
 {
+    #region Settings
     [System.Serializable]
     public class Settings
     {
@@ -283,6 +284,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowAnimatedMaterialPropertyPaths = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
+    #endregion
 
     public struct MaterialSlot
     {
@@ -3449,7 +3451,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
 
-                var meshID = basicMergedMeshes.FindIndex(l => l.Contains(skinnedMesh));
+                var meshID = combinableSkinnedMeshes.FindIndex(s => s == skinnedMesh);
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
