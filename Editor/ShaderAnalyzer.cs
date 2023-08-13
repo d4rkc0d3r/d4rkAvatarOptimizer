@@ -346,7 +346,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 currentFilePath = Path.GetFullPath(currentFilePath);
                 var fileName = Path.GetFileName(currentFilePath);
-                if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")) && fileName != "UnityLightingCommon.cginc")
+                if (fileName == "UnityLightingCommon.cginc")
+                {
+                    currentFilePath = Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}");
+                }
+                else if (File.Exists(Path.Combine(EditorApplication.applicationContentsPath, $"CGIncludes\\{fileName}")))
                 {
                     // we don't want to include and parse unity cg includes
                     return false;
@@ -648,17 +652,26 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             int startIndex = index;
             while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
-            {
                 index++;
-            }
             if (index == startIndex || index == str.Length)
-            {
                 return null;
-            }
             int endIndex = index;
             while (index < str.Length && char.IsWhiteSpace(str[index]))
-            {
                 index++;
+            if (index < str.Length && str[index] == '<')
+            {
+                for (int depth = 1; depth > 0;)
+                {
+                    if (++index == str.Length)
+                        return null;
+                    if (str[index] == '<')
+                        depth++;
+                    else if (str[index] == '>')
+                        depth--;
+                }
+                endIndex = ++index;
+                while (index < str.Length && char.IsWhiteSpace(str[index]))
+                    index++;
             }
             return str.Substring(startIndex, endIndex - startIndex);
         }
@@ -2282,13 +2295,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             int passID = -1;
+            var lightModeToDefine = new  Dictionary<string, string>()
+            {
+                {"ForwardBase", "UNITY_PASS_FORWARDBASE"},
+                {"ForwardAdd", "UNITY_PASS_FORWARDADD"},
+                {"ShadowCaster", "UNITY_PASS_SHADOWCASTER"},
+                {"Meta", "UNITY_PASS_META"},
+            };
             for (; lineIndex < lines.Count; lineIndex++)
             {
                 string line = lines[lineIndex];
                 if (line.StartsWith("CustomEditor"))
                     continue;
                 output.Add(line);
-                if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
+                if (line == "Pass")
+                {
+                    knownConstants.Clear();
+                    knownConstants["UNITY_COLORSPACE_GAMMA"] = (false, null);
+                }
+                else if (line.IndexOf("\"LightMode\"") != -1)
+                {
+                    var lightMode = line.Substring(line.IndexOf("\"LightMode\"") + "\"LightMode\"".Length).Trim();
+                    lightMode = lightMode.Substring(lightMode.IndexOf('"') + 1);
+                    lightMode = lightMode.Substring(0, lightMode.IndexOf('"'));
+                    foreach (var lightModeDefine in lightModeToDefine)
+                    {
+                        knownConstants[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
+                    }
+                }
+                else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                 {
                     var pass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
@@ -2296,7 +2331,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     pragmaOutput = output;
                     output = new List<string>();
                     InjectPropertyArrays(pass);
-                    knownConstants.Clear();
                     foreach (var keyword in pass.shaderFeatureKeyWords)
                     {
                         knownConstants[keyword] = (setKeywords.Contains(keyword), null);

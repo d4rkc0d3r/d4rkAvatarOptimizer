@@ -2895,6 +2895,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 foreach (var mat in meshRenderer.sharedMaterials)
                 {
+                    if (mat == null)
+                        continue;
                     foreach (var animPropName in animatedProperties)
                     {
                         var propName = "d4rkAvatarOptimizer" + animPropName;
@@ -2929,6 +2931,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 foreach (var mat in meshRenderer.sharedMaterials)
                 {
+                    if (mat == null)
+                        continue;
                     for (int mID = 0; mID < meshCount; mID++)
                     {
                         var propName = $"_IsActiveMesh{mID}";

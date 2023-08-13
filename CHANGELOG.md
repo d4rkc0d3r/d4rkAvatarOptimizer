@@ -30,6 +30,7 @@
 * Fix boneless skinned meshes ignoring the root bone property.
 * Fix inline if return statements in the vertex & geometry shader not getting parsed correctly.
 * Fix first mesh of a merged mesh block not checking if one of its parents has game object toggles.
+* Fix `Texture2D<float4>` properties not getting parsed correctly.
 
 ## v2.3.2
 ### Bug Fixes
