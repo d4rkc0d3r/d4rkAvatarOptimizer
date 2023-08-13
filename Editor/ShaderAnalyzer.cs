@@ -1716,9 +1716,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
             "SHADOWS_SHADOWMASK"
         };
 
+        private void InjectWarningDisables(List<string> target)
+        {
+            target.Add($"#pragma warning (disable : 3557) // loop only executes for 1 iteration(s), forcing loop to unroll");
+            target.Add($"#pragma warning (disable : 4008) // A floating point division by zero occurred.");
+        }
+
         private void InjectPropertyArrays(ParsedShader.Pass pass)
         {
             pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", SkippedShaderVariants)}");
+            InjectWarningDisables(pragmaOutput);
+            InjectWarningDisables(output);
             hasVectorCBufferAliasArray = false;
             CBufferAliasArray.Clear();
             if (mergedMeshCount > 1)
