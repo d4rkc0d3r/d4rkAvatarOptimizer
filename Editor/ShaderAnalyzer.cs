@@ -893,28 +893,40 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 string line = lines[++lineIndex];
                 if (line == "ENDCG" || line == "ENDHLSL")
                     break;
-                while (!line.EndsWith(";")
-                    && !line.EndsWith("]")
-                    && !line.StartsWith("#")
-                    && !line.StartsWith("{")
-                    && !line.StartsWith("}")
-                    && lineIndex < lines.Count - 1
-                    && lines[lineIndex + 1] != "{"
-                    && lines[lineIndex + 1] != "}"
-                    && !lines[lineIndex + 1].StartsWith("#")
-                    && !lines[lineIndex + 1].StartsWith("return"))
+                if (line[0] == '{')
                 {
-                    line = line + " " + lines[++lineIndex];
+                    curlyBraceDepth++;
                 }
-                var returnIndex = line.IndexOf("return");
-                if (returnIndex > 0 && line.Length > returnIndex + 6 && !line.StartsWith("#"))
-                if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ';' || line[returnIndex - 1] == ')')
-                    && (line[returnIndex + 6] == ' ' || line[returnIndex + 6] == '\t' || line[returnIndex + 6] == ';') || line[returnIndex + 6] == '(')
+                else if (line[0] == '}')
                 {
-                    output.Add(line.Substring(0, returnIndex).TrimEnd());
-                    line = line.Substring(returnIndex);   
+                    curlyBraceDepth--;
                 }
-                curlyBraceDepth += line == "{" ? 1 : (line == "}" ? -1 : 0);
+                else if (line[0] != '#')
+                {
+                    int startIndex = lineIndex;
+                    while (lines[lineIndex][lines[lineIndex].Length - 1] != ';'
+                        && lines[lineIndex][lines[lineIndex].Length - 1] != ']'
+                        && lineIndex < lines.Count - 1
+                        && lines[lineIndex + 1][0] != '{'
+                        && lines[lineIndex + 1][0] != '}'
+                        && lines[lineIndex + 1][0] != '#'
+                        && (lines[lineIndex + 1][0] != 'r' || !lines[lineIndex + 1].StartsWith("return")))
+                    {
+                        lineIndex++;
+                    }
+                    if (startIndex != lineIndex)
+                    {
+                        line = string.Join(" ", lines.GetRange(startIndex, lineIndex - startIndex + 1));
+                    }
+                    var returnIndex = line.IndexOf("return");
+                    if (returnIndex > 0 && line.Length > returnIndex + 6)
+                    if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ';' || line[returnIndex - 1] == ')')
+                        && (line[returnIndex + 6] == ' ' || line[returnIndex + 6] == '\t' || line[returnIndex + 6] == ';') || line[returnIndex + 6] == '(')
+                    {
+                        output.Add(line.Substring(0, returnIndex).TrimEnd());
+                        line = line.Substring(returnIndex);   
+                    }
+                }
                 output.Add(line);
             }
         }
