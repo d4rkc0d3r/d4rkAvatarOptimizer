@@ -907,8 +907,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     line = line + " " + lines[++lineIndex];
                 }
                 var returnIndex = line.IndexOf("return");
-                if (returnIndex > 0 && line.Length > returnIndex + 6)
-                if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ')')
+                if (returnIndex > 0 && line.Length > returnIndex + 6 && !line.StartsWith("#"))
+                if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ';' || line[returnIndex - 1] == ')')
                     && (line[returnIndex + 6] == ' ' || line[returnIndex + 6] == '\t' || line[returnIndex + 6] == ';') || line[returnIndex + 6] == '(')
                 {
                     output.Add(line.Substring(0, returnIndex).TrimEnd());
