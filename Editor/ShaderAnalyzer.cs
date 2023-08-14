@@ -658,6 +658,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int endIndex = index;
             while (index < str.Length && char.IsWhiteSpace(str[index]))
                 index++;
+            return str.Substring(startIndex, endIndex - startIndex);
+        }
+
+        public static string ParseTypeAndTrailingWhitespace(string str, ref int index)
+        {
+            int startIndex = index;
+            while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
+                index++;
+            if (index == startIndex || index == str.Length)
+                return null;
+            int endIndex = index;
+            while (index < str.Length && char.IsWhiteSpace(str[index]))
+                index++;
             if (index < str.Length && str[index] == '<')
             {
                 for (int depth = 1; depth > 0;)
@@ -679,10 +692,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public static (string name, string returnType) ParseFunctionDefinition(string line)
         {
             int index = 0;
-            string returnType = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            string returnType = ParseTypeAndTrailingWhitespace(line, ref index);
             if (returnType == "inline")
             {
-                returnType = ParseIdentifierAndTrailingWhitespace(line, ref index);
+                returnType = ParseTypeAndTrailingWhitespace(line, ref index);
             }
             if (returnType == null || returnType == "return" || returnType == "else" || !char.IsWhiteSpace(line[index - 1]))
             {
@@ -802,7 +815,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void ParsePragma(string line, ParsedShader.Pass pass)
         {
-            if (!line.StartsWith("#pragma "))
+            if (line[0] != '#' || !line.StartsWith("#pragma "))
                 return;
             line = line.Substring("#pragma ".Length).TrimStart();
             if (line.StartsWith("surface"))
@@ -853,24 +866,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, HashSet<string> alreadyParsed = null)
+        private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
         {
             if (alreadyParsed == null)
                 alreadyParsed = new HashSet<string>();
-            for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++)
             {
                 var currentLine = lines[lineIndex];
-                if (currentLine.StartsWith("#include "))
+                if (currentLine[0] == '#')
                 {
-                    var includeName = ParseIncludeDirective(currentLine);
-                    if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines))
+                    if (currentLine.StartsWith("#include "))
                     {
-                        alreadyParsed.Add(includeName);
-                        ParseFunctionDeclarationsRecursive(includeLines, currentPass, alreadyParsed);
+                        var includeName = ParseIncludeDirective(currentLine);
+                        if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines))
+                        {
+                            alreadyParsed.Add(includeName);
+                            ParseFunctionDeclarationsRecursive(includeLines, currentPass, 0, alreadyParsed);
+                        }
+                        continue;
                     }
-                    continue;
+                    ParseCustomFunctionDeclarationMacro(currentLine);
                 }
-                ParseCustomFunctionDeclarationMacro(currentLine);
                 int tempIndex = lineIndex;
                 var func = ParseFunctionDefinition(lines, ref tempIndex);
                 if (func != null)
@@ -1021,38 +1037,41 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                         {
+                            output.Add(line);
+                            int programLineIndexStart = output.Count;
                             currentPass = new ParsedShader.Pass();
                             parsedShader.passes.Add(currentPass);
-                            var program = new List<string>(line == "CGPROGRAM" ? cgInclude : hlslInclude);
-                            PreprocessCodeLines(lines, ref lineIndex, program, ref curlyBraceDepth);
-                            for (int programLineIndex = 0; programLineIndex < program.Count; programLineIndex++)
+                            output.AddRange(line == "CGPROGRAM" ? cgInclude : hlslInclude);
+                            PreprocessCodeLines(lines, ref lineIndex, output, ref curlyBraceDepth);
+                            for (int programLineIndex = programLineIndexStart; programLineIndex < output.Count; programLineIndex++)
                             {
-                                ParsePragma(program[programLineIndex], currentPass);
-                                if (program[programLineIndex].StartsWith("UNITY_INSTANCING_BUFFER_START"))
+                                ParsePragma(output[programLineIndex], currentPass);
+                                if (output[programLineIndex].StartsWith("UNITY_INSTANCING_BUFFER_START"))
                                 {
                                     throw new ParserException("Shader with instancing is not supported.");
                                 }
                             }
-                            ParseFunctionDeclarationsRecursive(program, currentPass);
-                            output.Add(line);
-                            output.AddRange(program);
+                            ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
                             output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
                         }
                         else
                         {
                             output.Add(line);
-                            var matches = Regex.Matches(line, @"\[(\w+)\]");
-                            if (matches.Count > 0)
+                            if (line.IndexOf('[') != -1)
                             {
-                                string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Value;
-                                foreach (Match match in matches)
+                                var matches = Regex.Matches(line, @"\[(\w+)\]");
+                                if (matches.Count > 0)
                                 {
-                                    string propName = match.Groups[1].Value;
-                                    foreach (var prop in parsedShader.properties)
+                                    string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Value;
+                                    foreach (Match match in matches)
                                     {
-                                        if (propName == prop.name)
+                                        string propName = match.Groups[1].Value;
+                                        foreach (var prop in parsedShader.properties)
                                         {
-                                            prop.shaderLabParams.Add(shaderLabParam);
+                                            if (propName == prop.name)
+                                            {
+                                                prop.shaderLabParams.Add(shaderLabParam);
+                                            }
                                         }
                                     }
                                 }
@@ -1944,15 +1963,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (line[line.Length - 1] != ';')
                 return (null, null);
             int index = 0;
-            string identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-            if (identifier == "uniform")
+            string type = ShaderAnalyzer.ParseTypeAndTrailingWhitespace(line, ref index);
+            if (type == "uniform")
             {
-                identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+                type = ShaderAnalyzer.ParseTypeAndTrailingWhitespace(line, ref index);
             }
-            if (identifier == null || identifier == "return")
+            if (type == null || type == "return")
                 return (null, null);
-            string type = identifier;
-            identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+            string identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
             if (identifier == null)
                 return (null, null);
             var names = new List<string>() { identifier };
