@@ -55,7 +55,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool ProfileTimeUsed = false;
     }
 
+    #if UNITY_EDITOR
     public static bool HasCustomShaderSupport { get => EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64; }
+    #else
+    public static bool HasCustomShaderSupport { get => true; }
+    #endif
     public Settings settings = new Settings();
 
     #if HAS_IEDITOR_ONLY
@@ -235,6 +239,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
+    #if UNITY_EDITOR
     public void SetPreset(string presetName)
     {
         var preset = SettingsPresets.Find(x => x.name == presetName).Item2;
@@ -260,6 +265,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             ForceMergeBlendShapeMissMatch = triCount < 70000;
         }
     }
+    #endif
 
     public bool DoAutoSettings = true;
     public bool ShowExcludedTransforms = false;
