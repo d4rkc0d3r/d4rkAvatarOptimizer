@@ -2991,13 +2991,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (firstMat.shader != candidateMat.shader)
             return false;
-        if (slotSwapMaterials.ContainsKey((GetPathToRoot(candidate.renderer), candidate.index)))
+        bool IsAffectedByMaterialSwap(MaterialSlot slot) =>
+            (slotSwapMaterials.ContainsKey((GetPathToRoot(slot.renderer), slot.index)))
+            || (materialSlotRemap.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var remap) && slotSwapMaterials.ContainsKey(remap));
+        if (IsAffectedByMaterialSwap(list[0]) || IsAffectedByMaterialSwap(candidate))
             return false;
-        if (materialSlotRemap.TryGetValue((GetPathToRoot(candidate.renderer), candidate.index), out var remap))
-        {
-            if (slotSwapMaterials.ContainsKey(remap))
-                return false;
-        }
         bool allTheSameAsCandidate = list.All(slot => slot.material == candidateMat);
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate;
