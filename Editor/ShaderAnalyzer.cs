@@ -1096,7 +1096,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
     {
         private List<string> output;
         private Stack<string> includeStack;
-        private Stack<bool> canSkipElseStack;
         private ParsedShader.Pass currentPass;
         private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
         private List<string> pragmaOutput;
@@ -2002,34 +2001,41 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return (null, null);
             return (type, names);
         }
-
+        
+        enum ConditionResult
+        {
+            True,
+            False,
+            Unknown
+        }
+        private Stack<ConditionResult> lastIfEvalResultStack;
         private Dictionary<string, (bool defined, int? value)> knownConstants;
         string ParsePreprocessorLine(List<string> source, ref int sourceLineIndex)
         {
             var line = source[sourceLineIndex];
             if (line[0] != '#')
                 return line;
-            (bool value, bool error) EvalPreprocessorCondition(string expr)
+            ConditionResult EvalPreprocessorCondition(string expr)
             {
                 // only parse flat expressions like "defined(SYMBOL)" or "!defined(SYMBOL)" for now
                 if (expr.StartsWith("defined(") && expr.EndsWith(")"))
                 {
                     var symbol = expr.Substring(8, expr.Length - 9).Trim();
                     if (knownConstants.TryGetValue(symbol, out var known))
-                        return (known.defined, false);
+                        return known.defined ? ConditionResult.True : ConditionResult.False;
                     output.Add($"// Unknown symbol: {symbol}");
-                    return (false, true);
+                    return ConditionResult.Unknown;
                 }
                 if (expr.StartsWith("!defined(") && expr.EndsWith(")"))
                 {
                     var symbol = expr.Substring(9, expr.Length - 10).Trim();
                     if (knownConstants.TryGetValue(symbol, out var known))
-                        return (!known.defined, false);
+                        return known.defined ? ConditionResult.False : ConditionResult.True;
                     output.Add($"// Unknown symbol: {symbol}");
-                    return (false, true);
+                    return ConditionResult.Unknown;
                 }
                 output.Add($"// Could not evaluate: {expr}");
-                return (false, true);
+                return ConditionResult.Unknown;
             }
             int SkipUntilElseOrEndif(ref int lineIndex)
             {
@@ -2071,43 +2077,73 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     expr = $"!defined({subLine.Substring("ifndef".Length).Trim()})";
                 else
                     expr = subLine.Substring("if".Length).Trim();
-                var (value, error) = EvalPreprocessorCondition(expr);
-                canSkipElseStack.Push(!error && value);
-                if (!error && !value)
+                var evalResult = EvalPreprocessorCondition(expr);
+                lastIfEvalResultStack.Push(evalResult);
+                if (evalResult == ConditionResult.True)
+                {
+                    return null;
+                }
+                if (evalResult == ConditionResult.False)
                 {
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    if (source[sourceLineIndex + 1].StartsWith("#endif"))
-                    {
-                        sourceLineIndex++;
-                        return $"// Skipped {skipped + 1:###0} lines | {line}";
-                    }
-                    return $"{line} // Skipped {skipped + 1:###0} lines";
+                    return $"// Skipped {skipped} lines | {line}";
                 }
                 return line;
             }
             else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
             {
-                int skipped = 0;
-                if (canSkipElseStack.Peek())
+                var lastEval = lastIfEvalResultStack.Pop();
+                if (lastEval == ConditionResult.True)
                 {
-                    skipped += SkipUntilElseOrEndif(ref sourceLineIndex);
+                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
+                    lastIfEvalResultStack.Push(ConditionResult.False);
+                    return $"// Skipped {skipped} lines";
                 }
-                else if (subLine.StartsWith("elif"))
+                if (subLine.StartsWith("elif"))
                 {
                     string expr = subLine.Substring("elif".Length).Trim();
-                    var (value, error) = EvalPreprocessorCondition(expr);
-                    canSkipElseStack.Pop();
-                    canSkipElseStack.Push(!error && value);
-                    if (!error && !value)
+                    var evalResult = EvalPreprocessorCondition(expr);
+                    if (evalResult == ConditionResult.Unknown)
                     {
-                        skipped += SkipUntilElseOrEndif(ref sourceLineIndex);
+                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
+                        return line;
                     }
+                    if (evalResult == ConditionResult.True)
+                    {
+                        if (lastEval == ConditionResult.Unknown)
+                        {
+                            lastIfEvalResultStack.Push(ConditionResult.Unknown);
+                            return line;
+                        }
+                        lastIfEvalResultStack.Push(ConditionResult.True);
+                        return null;
+                    }
+                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
+                    if (lastEval == ConditionResult.Unknown)
+                    {
+                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
+                        return line;
+                    }
+                    lastIfEvalResultStack.Push(ConditionResult.False);
+                    return $"// Skipped {skipped} lines | {line}";
                 }
-                return skipped > 0 ? $"{line} // Skipped {skipped + 1:###0} lines" : line;
+                else
+                {
+                    if (lastEval == ConditionResult.Unknown)
+                    {
+                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
+                        return line;
+                    }
+                    lastIfEvalResultStack.Push(lastEval == ConditionResult.False ? ConditionResult.True : ConditionResult.False);
+                    return null;
+                }
             }
             else if (subLine.StartsWith("endif"))
             {
-                canSkipElseStack.Pop();
+                if (lastIfEvalResultStack.Pop() != ConditionResult.Unknown)
+                {
+                    return null;
+                }
                 return line;
             }
             else if (subLine.StartsWith("pragma"))
@@ -2286,7 +2322,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<string> Run()
         {
             includeStack = new Stack<string>();
-            canSkipElseStack = new Stack<bool>();
+            lastIfEvalResultStack = new Stack<ConditionResult>();
             knownConstants = new Dictionary<string, (bool defined, int? value)>();
             output = new List<string>();
             var tags = new List<string>();
