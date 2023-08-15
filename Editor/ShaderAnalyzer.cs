@@ -1097,6 +1097,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<string> output;
         private Stack<string> includeStack;
         private Stack<bool> canSkipElseStack;
+        private ParsedShader.Pass currentPass;
         private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
         private List<string> pragmaOutput;
         private ParsedShader parsedShader;
@@ -1338,10 +1339,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void InjectVertexShaderCode(
-            List<string> source,
-            ref int sourceLineIndex,
-            ParsedShader.Pass pass)
+        private void InjectVertexShaderCode(List<string> source, ref int sourceLineIndex)
         {
             var dummyLineIndex = sourceLineIndex;
             var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref dummyLineIndex);
@@ -1354,7 +1352,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             List<string> originalVertexShader = null;
             bool needToPassOnMeshOrMaterialID =
                 arrayPropertyValues.Count > 0
-                || (pass.geometry != null && mergedMeshCount > 1)
+                || (currentPass.geometry != null && mergedMeshCount > 1)
                 || animatedPropertyValues.Count > 0;
             if (needToPassOnMeshOrMaterialID)
             {
@@ -1400,6 +1398,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             while (++sourceLineIndex < source.Count)
             {
                 string line = source[sourceLineIndex];
+                if (line[0] == '#')
+                {
+                    line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                    output.Add(line);
+                    originalVertexShader?.Add(line);
+                    continue;
+                }
                 if (inParam != null && vertexInUv0EndSwizzle != "")
                 {
                     line = Regex.Replace(line, $"({inParam.name}\\s*\\.\\s*{vertexInUv0Member})([^0-9a-zA-Z])", $"$1{vertexInUv0EndSwizzle}$2");
@@ -1652,8 +1657,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             while (++sourceLineIndex < source.Count)
             {
                 string line = source[sourceLineIndex];
+                if (line[0] == '#')
+                {
+                    functionBody.Add(ParsePreprocessorLine(source, ref sourceLineIndex));
+                    continue;
+                }
                 functionBody.Add(line);
-                output.Add(line);
                 if (line == "}")
                 {
                     if (braceDepth-- == 0)
@@ -1666,6 +1675,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     braceDepth++;
                 }
             }
+            output.AddRange(functionBody);
             foreach (var tex in texturesToReplaceCalls)
             {
                 foreach (var line in functionDefinition)
@@ -1753,7 +1763,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             target.Add($"#pragma warning (disable : 4008) // A floating point division by zero occurred.");
         }
 
-        private void InjectPropertyArrays(ParsedShader.Pass pass)
+        private void InjectPropertyArrays()
         {
             pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", SkippedShaderVariants)}");
             InjectWarningDisables(pragmaOutput);
@@ -1829,7 +1839,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     varName = "_MainTexButNotQuiteSoThatUnityDoesntCry_ST";
                 output.Add("static " + type + " " + varName + " = " + value + ";");
             }
-            foreach(var keyword in setKeywords.Where(k => pass.shaderFeatureKeyWords.Contains(k)))
+            foreach(var keyword in setKeywords.Where(k => currentPass.shaderFeatureKeyWords.Contains(k)))
             {
                 output.Add("#define " + keyword);
             }
@@ -1990,8 +2000,132 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
 
         private Dictionary<string, (bool defined, int? value)> knownConstants;
+        string ParsePreprocessorLine(List<string> source, ref int sourceLineIndex)
+        {
+            var line = source[sourceLineIndex];
+            if (line[0] != '#')
+                return line;
+            (bool value, bool error) EvalPreprocessorCondition(string expr)
+            {
+                // only parse flat expressions like "defined(SYMBOL)" or "!defined(SYMBOL)" for now
+                if (expr.StartsWith("defined(") && expr.EndsWith(")"))
+                {
+                    var symbol = expr.Substring(8, expr.Length - 9).Trim();
+                    if (knownConstants.TryGetValue(symbol, out var known))
+                        return (known.defined, false);
+                    output.Add($"// Unknown symbol: {symbol}");
+                    return (false, true);
+                }
+                if (expr.StartsWith("!defined(") && expr.EndsWith(")"))
+                {
+                    var symbol = expr.Substring(9, expr.Length - 10).Trim();
+                    if (knownConstants.TryGetValue(symbol, out var known))
+                        return (!known.defined, false);
+                    output.Add($"// Unknown symbol: {symbol}");
+                    return (false, true);
+                }
+                output.Add($"// Could not evaluate: {expr}");
+                return (false, true);
+            }
+            int SkipUntilElseOrEndif(ref int lineIndex)
+            {
+                int depth = 0;
+                int startLineIndex = lineIndex;
+                while (lineIndex < source.Count)
+                {
+                    var innerLine = source[++lineIndex];
+                    if (innerLine[0] != '#')
+                        continue;
+                    var innerSubLine = innerLine.Substring(1);
+                    if (innerSubLine.StartsWith("if"))
+                    {
+                        depth++;
+                    }
+                    else if (innerSubLine.StartsWith("endif"))
+                    {
+                        if (depth == 0)
+                        {
+                            return --lineIndex - startLineIndex;
+                        }
+                        depth--;
+                    }
+                    else if ((innerSubLine.StartsWith("else") || innerSubLine.StartsWith("elif")) && depth == 0)
+                    {
+                        return --lineIndex - startLineIndex;
+                    }
+                }
+                return lineIndex - startLineIndex;
+            }
+            
+            var subLine = line.Substring(1);
+            if (subLine.StartsWith("if"))
+            {
+                string expr = "";
+                if (subLine.StartsWith("ifdef"))
+                    expr = $"defined({subLine.Substring("ifdef".Length).Trim()})";
+                else if (subLine.StartsWith("ifndef"))
+                    expr = $"!defined({subLine.Substring("ifndef".Length).Trim()})";
+                else
+                    expr = subLine.Substring("if".Length).Trim();
+                var (value, error) = EvalPreprocessorCondition(expr);
+                canSkipElseStack.Push(!error && value);
+                if (!error && !value)
+                {
+                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
+                    if (source[sourceLineIndex + 1].StartsWith("#endif"))
+                    {
+                        sourceLineIndex++;
+                        return $"// Skipped {skipped + 1:###0} lines | {line}";
+                    }
+                    return $"{line} // Skipped {skipped + 1:###0} lines";
+                }
+                return line;
+            }
+            else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
+            {
+                int skipped = 0;
+                if (canSkipElseStack.Peek())
+                {
+                    skipped += SkipUntilElseOrEndif(ref sourceLineIndex);
+                }
+                else if (subLine.StartsWith("elif"))
+                {
+                    string expr = subLine.Substring("elif".Length).Trim();
+                    var (value, error) = EvalPreprocessorCondition(expr);
+                    canSkipElseStack.Pop();
+                    canSkipElseStack.Push(!error && value);
+                    if (!error && !value)
+                    {
+                        skipped += SkipUntilElseOrEndif(ref sourceLineIndex);
+                    }
+                }
+                return skipped > 0 ? $"{line} // Skipped {skipped + 1:###0} lines" : line;
+            }
+            else if (subLine.StartsWith("endif"))
+            {
+                canSkipElseStack.Pop();
+                return line;
+            }
+            else if (subLine.StartsWith("pragma"))
+            {
+                if (((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
+                    &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
+                {
+                    pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                }
+                else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
+                {
+                    pragmaOutput.Add(line);
+                }
+                return $"// {line}";
+            }
+            else
+            {
+                return line;
+            }
+        }
 
-        private void ParseCodeLinesRecursive(List<string> source, ref int sourceLineIndex, ParsedShader.Pass pass, string endSymbol)
+        private void ParseCodeLinesRecursive(List<string> source, ref int sourceLineIndex, string endSymbol)
         {
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
@@ -2000,62 +2134,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return;
                 if (line[0] == '#')
                 {
-                    (bool value, bool error) EvalPreprocessorCondition(string expr)
-                    {
-                        // only parse flat expressions like "defined(SYMBOL)" or "!defined(SYMBOL)" for now
-                        if (expr.StartsWith("defined(") && expr.EndsWith(")"))
-                        {
-                            var symbol = expr.Substring(8, expr.Length - 9).Trim();
-                            if (knownConstants.TryGetValue(symbol, out var known))
-                                return (known.defined, false);
-                            output.Add($"// Unknown symbol: {symbol}");
-                            return (false, true);
-                        }
-                        if (expr.StartsWith("!defined(") && expr.EndsWith(")"))
-                        {
-                            var symbol = expr.Substring(9, expr.Length - 10).Trim();
-                            if (knownConstants.TryGetValue(symbol, out var known))
-                                return (!known.defined, false);
-                            output.Add($"// Unknown symbol: {symbol}");
-                            return (false, true);
-                        }
-                        output.Add($"// Could not evaluate: {expr}");
-                        return (false, true);
-                    }
-                    void SkipUntilElseOrEndif(ref int lineIndex)
-                    {
-                        int depth = 0;
-                        int startLineIndex = lineIndex;
-                        while (lineIndex < source.Count)
-                        {
-                            var innerLine = source[++lineIndex];
-                            if (innerLine[0] != '#')
-                                continue;
-                            var innerSubLine = innerLine.Substring(1);
-                            if (innerSubLine.StartsWith("if"))
-                            {
-                                depth++;
-                            }
-                            else if (innerSubLine.StartsWith("endif"))
-                            {
-                                if (depth == 0)
-                                {
-                                    lineIndex--;
-                                    output.Add($"// Skipped {lineIndex - startLineIndex} lines");
-                                    return;
-                                }
-                                depth--;
-                            }
-                            else if ((innerSubLine.StartsWith("else") || innerSubLine.StartsWith("elif")) && depth == 0)
-                            {
-                                lineIndex--;
-                                output.Add($"// Skipped {lineIndex - startLineIndex} lines");
-                                return;
-                            }
-                        }
-                    }
-                    var subLine = line.Substring(1);
-                    if (subLine.StartsWith("include "))
+                    if (line.StartsWith("#include "))
                     {
                         var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
                         if (!includeStack.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
@@ -2063,7 +2142,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             int innerLineIndex = 0;
                             output.Add($"// Include {includeName}");
                             includeStack.Push(includeName);
-                            ParseCodeLinesRecursive(includeSource, ref innerLineIndex, pass, endSymbol);
+                            ParseCodeLinesRecursive(includeSource, ref innerLineIndex, endSymbol);
                             includeStack.Pop();
                         }
                         else
@@ -2071,83 +2150,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             output.Add(line);
                         }
                     }
-                    else if (subLine.StartsWith("if"))
-                    {
-                        string expr = "";
-                        if (subLine.StartsWith("ifdef"))
-                            expr = $"defined({subLine.Substring("ifdef".Length).Trim()})";
-                        else if (subLine.StartsWith("ifndef"))
-                            expr = $"!defined({subLine.Substring("ifndef".Length).Trim()})";
-                        else
-                            expr = subLine.Substring("if".Length).Trim();
-                        var (value, error) = EvalPreprocessorCondition(expr);
-                        canSkipElseStack.Push(!error && value);
-                        bool skip = false;
-                        if (!error && !value)
-                        {
-                            SkipUntilElseOrEndif(ref sourceLineIndex);
-                            if (source[sourceLineIndex + 1].StartsWith("#endif"))
-                            {
-                                output[output.Count - 1] += $" | {line}";
-                                sourceLineIndex++;
-                                skip = true;
-                            }
-                        }
-                        if (!skip)
-                            output.Add(line);
-                    }
-                    else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
-                    {
-                        if (canSkipElseStack.Peek())
-                        {
-                            SkipUntilElseOrEndif(ref sourceLineIndex);
-                        }
-                        if (subLine.StartsWith("elif"))
-                        {
-                            string expr = subLine.Substring("elif".Length).Trim();
-                            var (value, error) = EvalPreprocessorCondition(expr);
-                            canSkipElseStack.Pop();
-                            canSkipElseStack.Push(!error && value);
-                            if (!error && !value)
-                            {
-                                SkipUntilElseOrEndif(ref sourceLineIndex);
-                            }
-                        }
-                        output.Add(line);
-                    }
-                    else if (subLine.StartsWith("endif"))
-                    {
-                        canSkipElseStack.Pop();
-                        output.Add(line);
-                    }
-                    else if (subLine.StartsWith("pragma"))
-                    {
-                        if (((pass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
-                            &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
-                        {
-                            pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
-                        }
-                        else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
-                        {
-                            pragmaOutput.Add(line);
-                        }
-                    }
                     else
                     {
-                        output.Add(line);
+                        output.Add(ParsePreprocessorLine(source, ref sourceLineIndex));
                     }
                     continue;
                 }
                 var func = ShaderAnalyzer.ParseFunctionDefinition(line);
-                if (pass.vertex != null && func.name == pass.vertex.name)
+                if (currentPass.vertex != null && func.name == currentPass.vertex.name)
                 {
-                    InjectVertexShaderCode(source, ref sourceLineIndex, pass);
+                    InjectVertexShaderCode(source, ref sourceLineIndex);
                 }
-                else if (pass.geometry != null && pass.fragment != null && pass.vertex != null && func.name == pass.geometry.name)
+                else if (currentPass.geometry != null && currentPass.fragment != null && currentPass.vertex != null && func.name == currentPass.geometry.name)
                 {
                     InjectGeometryShaderCode(source, ref sourceLineIndex);
                 }
-                else if (pass.vertex != null && pass.fragment != null && func.name == pass.fragment.name)
+                else if (currentPass.vertex != null && currentPass.fragment != null && func.name == currentPass.fragment.name)
                 {
                     InjectFragmentShaderCode(source, ref sourceLineIndex);
                 }
@@ -2162,7 +2180,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (match.Success)
                     {
                         var structName = match.Groups[1].Value;
-                        var vertIn = pass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+                        var vertIn = currentPass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
                         if (structName == vertIn?.type)
                         {
                             while (++sourceLineIndex < source.Count)
@@ -2365,13 +2383,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                 {
-                    var pass = parsedShader.passes[++passID];
+                    currentPass = parsedShader.passes[++passID];
                     vertexInUv0Member = "texcoord";
                     texturesToCallSoTheSamplerDoesntDisappear.Clear();
                     pragmaOutput = output;
                     output = new List<string>();
-                    InjectPropertyArrays(pass);
-                    foreach (var keyword in pass.shaderFeatureKeyWords)
+                    InjectPropertyArrays();
+                    foreach (var keyword in currentPass.shaderFeatureKeyWords)
                     {
                         knownConstants[keyword] = (setKeywords.Contains(keyword), null);
                     }
@@ -2382,7 +2400,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     includeStack.Clear();
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     lineIndex++;
-                    ParseCodeLinesRecursive(lines, ref lineIndex, pass, endSymbol);
+                    ParseCodeLinesRecursive(lines, ref lineIndex, endSymbol);
                     var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
