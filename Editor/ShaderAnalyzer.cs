@@ -1213,6 +1213,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        private bool ArrayPropertyNeedsIndexing(List<string> values)
+        {
+            var seenOnce = new HashSet<string>();
+            var seenMultiple = new HashSet<string>();
+            foreach (var value in values)
+            {
+                if (seenOnce.Contains(value))
+                {
+                    seenOnce.Remove(value);
+                    seenMultiple.Add(value);
+                }
+                else if (!seenMultiple.Contains(value))
+                {
+                    seenOnce.Add(value);
+                }
+            }
+            return seenOnce.Count != 1 || seenMultiple.Count != 1;
+        }
+
         private void InjectAnimatedPropertyInitialization()
         {
             foreach (var animatedProperty in animatedPropertyValues)
@@ -1854,6 +1873,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 foreach (var arrayProperty in arrayPropertyValues)
                 {
                     var (type, values) = arrayProperty.Value;
+                    if (!ArrayPropertyNeedsIndexing(values))
+                        continue;
                     string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
                     output.Add("static const " + type + " " + name + "[" + values.Count + "] = ");
                     output.Add("{");
