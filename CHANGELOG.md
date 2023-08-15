@@ -34,6 +34,7 @@
 * Fix first mesh of a merged mesh block not checking if one of its parents has game object toggles.
 * Fix `Texture2D<float4>` properties not getting parsed correctly.
 * Fix material merge function only checking for material swaps in the candidate slot and not also the first slot of the existing list.
+* Fix merged blendshapes not getting their initial weight set.
 
 ## v2.3.2
 ### Bug Fixes

@@ -3747,6 +3747,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
                     var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
                     var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
+                    bool first = true;
                     foreach (var toMerge in mergedBlendShapes)
                     {
                         var path = toMerge.blendshape.Substring(0, toMerge.blendshape.IndexOf("/blendShape."));
@@ -3757,6 +3758,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             continue;
                         var meshID = meshPathToID[path];
                         blendShapeMeshIDtoNewName[(meshID, blendShapeID)] = name;
+                        if (first)
+                        {
+                            blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(blendShapeID);
+                            first = false;
+                        }
                         var sourceDeltaVertices = new Vector3[mesh.vertexCount];
                         var sourceDeltaNormals = new Vector3[mesh.vertexCount];
                         var sourceDeltaTangents = new Vector3[mesh.vertexCount];
