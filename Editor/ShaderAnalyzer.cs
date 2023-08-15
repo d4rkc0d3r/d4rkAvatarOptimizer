@@ -1401,6 +1401,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (line[0] == '#')
                 {
                     line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                    if (line == null)
+                        continue;
                     output.Add(line);
                     originalVertexShader?.Add(line);
                     continue;
@@ -1659,7 +1661,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
-                    functionBody.Add(ParsePreprocessorLine(source, ref sourceLineIndex));
+                    line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                    if (line != null)
+                        functionBody.Add(line);
                     continue;
                 }
                 functionBody.Add(line);
@@ -2117,7 +2121,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     pragmaOutput.Add(line);
                 }
-                return $"// {line}";
+                return null;
             }
             else
             {
@@ -2152,7 +2156,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else
                     {
-                        output.Add(ParsePreprocessorLine(source, ref sourceLineIndex));
+                        line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                        if (line != null)
+                            output.Add(line);
                     }
                     continue;
                 }
