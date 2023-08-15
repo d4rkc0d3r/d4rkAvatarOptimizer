@@ -2017,24 +2017,98 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return line;
             ConditionResult EvalPreprocessorCondition(string expr)
             {
-                // only parse flat expressions like "defined(SYMBOL)" or "!defined(SYMBOL)" for now
-                if (expr.StartsWith("defined(") && expr.EndsWith(")"))
+                // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
+                var values = new List<ConditionResult>();
+                bool allAnd = false;
+                bool allOr = false;
+                for (int index = 0; index < expr.Length; index++)
                 {
-                    var symbol = expr.Substring(8, expr.Length - 9).Trim();
-                    if (knownConstants.TryGetValue(symbol, out var known))
-                        return known.defined ? ConditionResult.True : ConditionResult.False;
-                    output.Add($"// Unknown symbol: {symbol}");
-                    return ConditionResult.Unknown;
+                    void SkipWhitespace() { while (index < expr.Length && char.IsWhiteSpace(expr[index])) index++; }
+                    SkipWhitespace();
+                    bool isNegated = false;
+                    if (expr[index] == '!')
+                    {
+                        isNegated = true;
+                        index++;
+                    }
+                    SkipWhitespace();
+                    if (!expr.Substring(index).StartsWith("defined("))
+                    {
+                        output.Add($"// Expected defined() at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    index += "defined(".Length;
+                    SkipWhitespace();
+                    string constantName = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(expr, ref index);
+                    if (constantName == null)
+                    {
+                        output.Add($"// Expected identifier at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    if (expr[index] != ')')
+                    {
+                        output.Add($"// Expected ) at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    index++;
+                    if (!knownConstants.TryGetValue(constantName, out var constant))
+                    {
+                        values.Add(ConditionResult.Unknown);
+                    }
+                    else
+                    {
+                        values.Add(constant.defined ^ isNegated ? ConditionResult.True : ConditionResult.False);
+                    }
+                    SkipWhitespace();
+                    if (index == expr.Length)
+                    {
+                        break;
+                    }
+                    if (expr[index] == '|' && expr[index + 1] == '|')
+                    {
+                        if (allAnd)
+                        {
+                            output.Add($"// Mixed && and || at {index}");
+                            return ConditionResult.Unknown;
+                        }
+                        allOr = true;
+                    }
+                    else if (expr[index] == '&' && expr[index + 1] == '&')
+                    {
+                        if (allOr)
+                        {
+                            output.Add($"// Mixed && and || at {index}");
+                            return ConditionResult.Unknown;
+                        }
+                        allAnd = true;
+                    }
+                    else
+                    {
+                        output.Add($"// Expected && or || at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    index++;
                 }
-                if (expr.StartsWith("!defined(") && expr.EndsWith(")"))
+                if (!allAnd && !allOr)
                 {
-                    var symbol = expr.Substring(9, expr.Length - 10).Trim();
-                    if (knownConstants.TryGetValue(symbol, out var known))
-                        return known.defined ? ConditionResult.False : ConditionResult.True;
-                    output.Add($"// Unknown symbol: {symbol}");
-                    return ConditionResult.Unknown;
+                    return values[0];
                 }
-                output.Add($"// Could not evaluate: {expr}");
+                if (allAnd)
+                {
+                    if (values.Contains(ConditionResult.False))
+                        return ConditionResult.False;
+                    if (values.Contains(ConditionResult.Unknown))
+                        return ConditionResult.Unknown;
+                    return ConditionResult.True;
+                }
+                if (allOr)
+                {
+                    if (values.Contains(ConditionResult.True))
+                        return ConditionResult.True;
+                    if (values.Contains(ConditionResult.Unknown))
+                        return ConditionResult.Unknown;
+                    return ConditionResult.False;
+                }
                 return ConditionResult.Unknown;
             }
             int SkipUntilElseOrEndif(ref int lineIndex)
