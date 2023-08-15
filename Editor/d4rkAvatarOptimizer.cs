@@ -1702,9 +1702,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var physBoneDependencies = FindAllPhysBoneDependencies();
         foreach(var entry in physBoneDependencies)
         {
-            if (entry.Value.Count == 1 && entry.Value.First() is SkinnedMeshRenderer)
+            if (entry.Key != null && entry.Value.Count == 1 && entry.Value.First() is SkinnedMeshRenderer target)
             {
-                var targetPath = GetPathToRoot(entry.Value.First() as SkinnedMeshRenderer);
+                var targetPath = GetPathToRoot(target);
                 if (!result.TryGetValue(targetPath, out var physBones))
                 {
                     result[targetPath] = physBones = new List<string>();
