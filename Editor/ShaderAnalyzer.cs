@@ -2514,6 +2514,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<string> Run()
         {
             lastIfEvalResultStack = new Stack<ConditionResult>();
+            alreadyIncludedFiles.Push(new HashSet<string>());
+            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
             output = new List<string>();
             var tags = new List<string>();
             var lines = parsedShader.text[".shader"];
