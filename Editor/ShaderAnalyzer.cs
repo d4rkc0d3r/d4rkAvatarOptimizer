@@ -1095,7 +1095,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
     public class ShaderOptimizer
     {
         private List<string> output;
-        private Stack<string> includeStack;
         private ParsedShader.Pass currentPass;
         private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
         private List<string> pragmaOutput;
@@ -2030,7 +2029,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Unknown
         }
         private Stack<ConditionResult> lastIfEvalResultStack;
-        private Stack<Dictionary<string, (bool defined, int? value)>> knownDefines;
+        private Stack<Dictionary<string, (bool defined, int? value)>> knownDefines = new Stack<Dictionary<string, (bool defined, int? value)>>();
+        private Stack<HashSet<string>> alreadyIncludedFiles = new Stack<HashSet<string>>();
+        private void PushPreprocessorScope()
+        {
+            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
+            alreadyIncludedFiles.Push(new HashSet<string>(alreadyIncludedFiles.Peek()));
+        }
+        private void PopPreprocessorScope()
+        {
+            knownDefines.Pop();
+            alreadyIncludedFiles.Pop();
+        }
         string PartialEvalPreprocessorLine(List<string> source, ref int sourceLineIndex)
         {
             var line = source[sourceLineIndex];
@@ -2207,7 +2217,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
                     return $"// Skipped {skipped} lines | {line}";
                 }
-                knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
+                PushPreprocessorScope();
                 return line;
             }
             else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
@@ -2221,8 +2231,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 if (lastEval == ConditionResult.Unknown)
                 {
-                    knownDefines.Pop();
-                    knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
+                    PopPreprocessorScope();
+                    PushPreprocessorScope();
                 }
                 if (subLine.StartsWith("elif"))
                 {
@@ -2234,7 +2244,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         lastIfEvalResultStack.Push(ConditionResult.Unknown);
                         if (lastEval == ConditionResult.False)
                         {
-                            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
+                            PushPreprocessorScope();
                             return $"#{subLine.Substring(2)}";
                         }
                         return line;
@@ -2273,7 +2283,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 if (lastIfEvalResultStack.Pop() == ConditionResult.Unknown)
                 {
-                    knownDefines.Pop();
+                    PopPreprocessorScope();
                     return line;
                 }
                 return null;
@@ -2337,13 +2347,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (line.StartsWith("#include "))
                     {
                         var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
-                        if (!includeStack.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeSource))
+                        if (parsedShader.text.TryGetValue(includeName, out var includeSource))
                         {
+                            if (alreadyIncludedFiles.Peek().Contains(includeName))
+                            {
+                                output.Add($"// Already included {includeName}");
+                                continue;
+                            }
                             int innerLineIndex = 0;
                             output.Add($"// Include {includeName}");
-                            includeStack.Push(includeName);
+                            alreadyIncludedFiles.Peek().Add(includeName);
                             ParseCodeLinesRecursive(includeSource, ref innerLineIndex, endSymbol);
-                            includeStack.Pop();
                         }
                         else
                         {
@@ -2481,9 +2495,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private List<string> Run()
         {
-            includeStack = new Stack<string>();
             lastIfEvalResultStack = new Stack<ConditionResult>();
-            knownDefines = new Stack<Dictionary<string, (bool defined, int? value)>>();
             output = new List<string>();
             var tags = new List<string>();
             var lines = parsedShader.text[".shader"];
@@ -2570,6 +2582,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Add(line);
                 if (line == "Pass")
                 {
+                    alreadyIncludedFiles.Clear();
+                    alreadyIncludedFiles.Push(new HashSet<string>());
                     knownDefines.Clear();
                     knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
                     knownDefines.Peek()["UNITY_COLORSPACE_GAMMA"] = (false, null);
@@ -2601,7 +2615,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         knownDefines.Peek()[skippedShaderVariant] = (false, null);
                     }
-                    includeStack.Clear();
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     lineIndex++;
                     ParseCodeLinesRecursive(lines, ref lineIndex, endSymbol);
