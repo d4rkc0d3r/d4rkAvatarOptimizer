@@ -653,7 +653,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int startIndex = index;
             while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
                 index++;
-            if (index == startIndex || index == str.Length)
+            if (index == startIndex)
                 return null;
             int endIndex = index;
             while (index < str.Length && char.IsWhiteSpace(str[index]))
@@ -666,7 +666,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int startIndex = index;
             while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
                 index++;
-            if (index == startIndex || index == str.Length)
+            if (index == startIndex)
                 return null;
             int endIndex = index;
             while (index < str.Length && char.IsWhiteSpace(str[index]))
@@ -1418,7 +1418,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
-                    line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                    line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
                     if (line == null)
                         continue;
                     output.Add(line);
@@ -1679,7 +1679,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
-                    line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                    line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
                     if (line != null)
                         functionBody.Add(line);
                     continue;
@@ -2030,36 +2030,80 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Unknown
         }
         private Stack<ConditionResult> lastIfEvalResultStack;
-        private Dictionary<string, (bool defined, int? value)> knownConstants;
-        string ParsePreprocessorLine(List<string> source, ref int sourceLineIndex)
+        private Stack<Dictionary<string, (bool defined, int? value)>> knownDefines;
+        string PartialEvalPreprocessorLine(List<string> source, ref int sourceLineIndex)
         {
             var line = source[sourceLineIndex];
             if (line[0] != '#')
                 return line;
-            ConditionResult EvalPreprocessorCondition(string expr)
+            void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
+            ConditionResult EvalPreprocessorCondition(string expr, ref int index)
             {
                 // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
                 var values = new List<ConditionResult>();
                 bool allAnd = false;
                 bool allOr = false;
-                for (int index = 0; index < expr.Length; index++)
+                while (index < expr.Length)
                 {
-                    void SkipWhitespace() { while (index < expr.Length && char.IsWhiteSpace(expr[index])) index++; }
-                    SkipWhitespace();
+                    SkipWhitespace(expr, ref index);
+                    if (index == expr.Length)
+                        break;
+                    if (expr[index] == '|' && expr[index + 1] == '|')
+                    {
+                        if (allAnd)
+                        {
+                            output.Add($"// Mixed && and || at {index}");
+                            return ConditionResult.Unknown;
+                        }
+                        allOr = true;
+                        index += 2;
+                    }
+                    else if (expr[index] == '&' && expr[index + 1] == '&')
+                    {
+                        if (allOr)
+                        {
+                            output.Add($"// Mixed && and || at {index}");
+                            return ConditionResult.Unknown;
+                        }
+                        allAnd = true;
+                        index += 2;
+                    }
+                    SkipWhitespace(expr, ref index);
                     bool isNegated = false;
                     if (expr[index] == '!')
                     {
                         isNegated = true;
                         index++;
                     }
-                    SkipWhitespace();
-                    if (!expr.Substring(index).StartsWith("defined("))
+                    SkipWhitespace(expr, ref index);
+                    if (index == expr.Length)
                     {
-                        output.Add($"// Expected defined() at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        output.Add($"// Unexpected end of expression at {index}");
                         return ConditionResult.Unknown;
                     }
-                    index += "defined(".Length;
-                    SkipWhitespace();
+                    if (expr[index] == '(')
+                    {
+                        index++;
+                        var res = EvalPreprocessorCondition(expr, ref index);
+                        if (isNegated && res != ConditionResult.Unknown)
+                            res = res == ConditionResult.True ? ConditionResult.False : ConditionResult.True;
+                        values.Add(res);
+                        continue;
+                    }
+                    if (!expr.Substring(index).StartsWith("defined"))
+                    {
+                        output.Add($"// Expected defined at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    index += "defined".Length;
+                    SkipWhitespace(expr, ref index);
+                    if (expr[index] != '(')
+                    {
+                        output.Add($"// Expected ( at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                        return ConditionResult.Unknown;
+                    }
+                    index++;
+                    SkipWhitespace(expr, ref index);
                     string constantName = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(expr, ref index);
                     if (constantName == null)
                     {
@@ -2072,43 +2116,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         return ConditionResult.Unknown;
                     }
                     index++;
-                    if (!knownConstants.TryGetValue(constantName, out var constant))
-                    {
-                        values.Add(ConditionResult.Unknown);
-                    }
-                    else
+                    if (knownDefines.Peek().TryGetValue(constantName, out var constant))
                     {
                         values.Add(constant.defined ^ isNegated ? ConditionResult.True : ConditionResult.False);
                     }
-                    SkipWhitespace();
-                    if (index == expr.Length)
-                    {
-                        break;
-                    }
-                    if (expr[index] == '|' && expr[index + 1] == '|')
-                    {
-                        if (allAnd)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return ConditionResult.Unknown;
-                        }
-                        allOr = true;
-                    }
-                    else if (expr[index] == '&' && expr[index + 1] == '&')
-                    {
-                        if (allOr)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return ConditionResult.Unknown;
-                        }
-                        allAnd = true;
-                    }
                     else
                     {
-                        output.Add($"// Expected && or || at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return ConditionResult.Unknown;
+                        values.Add(ConditionResult.Unknown);
                     }
-                    index++;
+                    SkipWhitespace(expr, ref index);
+                    if (index == expr.Length)
+                        break;
+                    if (expr[index] == ')')
+                    {
+                        index++;
+                        break;
+                    }
                 }
                 if (!allAnd && !allOr)
                 {
@@ -2172,7 +2195,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     expr = $"!defined({subLine.Substring("ifndef".Length).Trim()})";
                 else
                     expr = subLine.Substring("if".Length).Trim();
-                var evalResult = EvalPreprocessorCondition(expr);
+                var exprIndex = 0;
+                var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                 lastIfEvalResultStack.Push(evalResult);
                 if (evalResult == ConditionResult.True)
                 {
@@ -2183,6 +2207,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
                     return $"// Skipped {skipped} lines | {line}";
                 }
+                knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
                 return line;
             }
             else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
@@ -2191,16 +2216,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (lastEval == ConditionResult.True)
                 {
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    lastIfEvalResultStack.Push(ConditionResult.False);
+                    lastIfEvalResultStack.Push(ConditionResult.True);
                     return $"// Skipped {skipped} lines";
+                }
+                if (lastEval == ConditionResult.Unknown)
+                {
+                    knownDefines.Pop();
+                    knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
                 }
                 if (subLine.StartsWith("elif"))
                 {
                     string expr = subLine.Substring("elif".Length).Trim();
-                    var evalResult = EvalPreprocessorCondition(expr);
+                    var exprIndex = 0;
+                    var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                     if (evalResult == ConditionResult.Unknown)
                     {
                         lastIfEvalResultStack.Push(ConditionResult.Unknown);
+                        if (lastEval == ConditionResult.False)
+                        {
+                            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
+                            return $"#{subLine.Substring(2)}";
+                        }
                         return line;
                     }
                     if (evalResult == ConditionResult.True)
@@ -2235,10 +2271,39 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             else if (subLine.StartsWith("endif"))
             {
-                if (lastIfEvalResultStack.Pop() != ConditionResult.Unknown)
+                if (lastIfEvalResultStack.Pop() == ConditionResult.Unknown)
                 {
-                    return null;
+                    knownDefines.Pop();
+                    return line;
                 }
+                return null;
+            }
+            else if (subLine.StartsWith("define"))
+            {
+                var index = "define".Length;
+                SkipWhitespace(subLine, ref index);
+                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(subLine, ref index);
+                if (identifier == null)
+                {
+                    output.Add($"// Expected identifier at {index}, got {subLine.Substring(index, System.Math.Min(10, subLine.Length - index))}");
+                    return line;
+                }
+                knownDefines.ToList().ForEach(d => d.Remove(identifier));
+                knownDefines.Peek()[identifier] = (true, null);
+                return line;
+            }
+            else if (subLine.StartsWith("undef"))
+            {
+                var index = "undef".Length;
+                SkipWhitespace(subLine, ref index);
+                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(subLine, ref index);
+                if (identifier == null)
+                {
+                    output.Add($"// Expected identifier at {index}, got {subLine.Substring(index, System.Math.Min(10, subLine.Length - index))}");
+                    return line;
+                }
+                knownDefines.ToList().ForEach(d => d.Remove(identifier));
+                knownDefines.Peek()[identifier] = (false, null);
                 return line;
             }
             else if (subLine.StartsWith("pragma"))
@@ -2287,7 +2352,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else
                     {
-                        line = ParsePreprocessorLine(source, ref sourceLineIndex);
+                        line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
                         if (line != null)
                             output.Add(line);
                     }
@@ -2418,7 +2483,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             includeStack = new Stack<string>();
             lastIfEvalResultStack = new Stack<ConditionResult>();
-            knownConstants = new Dictionary<string, (bool defined, int? value)>();
+            knownDefines = new Stack<Dictionary<string, (bool defined, int? value)>>();
             output = new List<string>();
             var tags = new List<string>();
             var lines = parsedShader.text[".shader"];
@@ -2505,8 +2570,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Add(line);
                 if (line == "Pass")
                 {
-                    knownConstants.Clear();
-                    knownConstants["UNITY_COLORSPACE_GAMMA"] = (false, null);
+                    knownDefines.Clear();
+                    knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
+                    knownDefines.Peek()["UNITY_COLORSPACE_GAMMA"] = (false, null);
+                    knownDefines.Peek()["SHADER_TARGET_SURFACE_ANALYSIS"] = (false, null);
                 }
                 else if (line.IndexOf("\"LightMode\"") != -1)
                 {
@@ -2515,7 +2582,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     lightMode = lightMode.Substring(0, lightMode.IndexOf('"'));
                     foreach (var lightModeDefine in lightModeToDefine)
                     {
-                        knownConstants[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
+                        knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
                     }
                 }
                 else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
@@ -2528,11 +2595,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     InjectPropertyArrays();
                     foreach (var keyword in currentPass.shaderFeatureKeyWords)
                     {
-                        knownConstants[keyword] = (setKeywords.Contains(keyword), null);
+                        knownDefines.Peek()[keyword] = (setKeywords.Contains(keyword), null);
                     }
                     foreach (var skippedShaderVariant in SkippedShaderVariants)
                     {
-                        knownConstants[skippedShaderVariant] = (false, null);
+                        knownDefines.Peek()[skippedShaderVariant] = (false, null);
                     }
                     includeStack.Clear();
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
