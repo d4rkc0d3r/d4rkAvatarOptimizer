@@ -1198,11 +1198,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         seenOnce.Add(value);
                     }
                 }
-                if (seenOnce.Count == 1 && seenMultiple.Count == 1)
+                if ((seenOnce.Count == 1 && seenMultiple.Count == 1) || values.Count == 2)
                 {
                     // all values but one are the same, so we can use a ternary operator
                     int index = values.IndexOf(seenOnce.First());
-                    output.Add($"{arrayProperty.Key} = d4rkAvatarOptimizer_MaterialID == {index} ? {seenOnce.First()} : {seenMultiple.First()};");
+                    var secondValue = values.Count == 2 ? values[1 - index] : seenMultiple.First();
+                    output.Add($"{arrayProperty.Key} = d4rkAvatarOptimizer_MaterialID == {index} ? {seenOnce.First()} : {secondValue};");
+                }
+                else if (values.Count <= 32 && seenOnce.Count + seenMultiple.Count == 2)
+                {
+                    // we can use a ternary operator to select between two values based on a bit field
+                    var firstValue = seenMultiple.First();
+                    var secondValue = seenMultiple.Last();
+                    uint bitField = 0;
+                    for (int i = 0; i < values.Count; i++)
+                    {
+                        if (values[i] == firstValue)
+                            bitField |= 1u << i;
+                    }
+                    output.Add($"{arrayProperty.Key} = ((1u << d4rkAvatarOptimizer_MaterialID) & {bitField}) != 0 ? {firstValue} : {secondValue};");
                 }
                 else
                 {
@@ -1228,7 +1242,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     seenOnce.Add(value);
                 }
             }
-            return seenOnce.Count != 1 || seenMultiple.Count != 1;
+            if ((seenOnce.Count == 1 && seenMultiple.Count == 1) || values.Count == 2)
+                return false;
+            if (values.Count <= 32 && seenOnce.Count + seenMultiple.Count == 2)
+                return false;
+            return true;
         }
 
         private void InjectAnimatedPropertyInitialization()
