@@ -50,7 +50,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeSameRatioBlendShapes = true;
         public bool KeepMMDBlendShapes = true;
         public bool DeleteUnusedComponents = true;
-        public int DeleteUnusedGameObjects = 2;
+        public int DeleteUnusedGameObjects = 0;
         public bool UseRingFingerAsFootCollider = false;
         public bool ProfileTimeUsed = false;
     }
@@ -320,7 +320,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.KeepMMDBlendShapes), true},
             {nameof(Settings.DeleteUnusedComponents), true},
-            {nameof(Settings.DeleteUnusedGameObjects), 2},
+            {nameof(Settings.DeleteUnusedGameObjects), 0},
         }),
         ("Full", new Dictionary<string, object>() {
             {nameof(Settings.OptimizeOnUpload), true},

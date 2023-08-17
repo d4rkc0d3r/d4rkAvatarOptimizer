@@ -19,6 +19,7 @@
 * Deleted "Keep Material Animations Separate" option. It is now always enabled when "Use Shader Toggles" is enabled.
 * Renamed "Merge Simple Toggles as BlendTree" to "Optimize FX Layer".
 * "Write Properties as Static Values" is now forced on when "Use Shader Toggles" or "Merge Different Property Materials" is enabled.
+* "Delete Unused GameObjects" is now turned off by default. Only the "Full" preset has it enabled.
 * Small optimizations to the generated shaders:
   * Changed type of Texture2DArray index from int to float eliminating a type conversion. 
   * Use ternaries for merged material properties that have only 2 unique values.
