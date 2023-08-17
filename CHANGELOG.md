@@ -37,6 +37,7 @@
 * Fix `Texture2D<float4>` properties not getting parsed correctly.
 * Fix material merge function only checking for material swaps in the candidate slot and not also the first slot of the existing list.
 * Fix merged blendshapes not getting their initial weight set.
+* Fix Marshmallow when "Delete Unused GameObjects" is enabled.
 
 ## v2.3.2
 ### Bug Fixes

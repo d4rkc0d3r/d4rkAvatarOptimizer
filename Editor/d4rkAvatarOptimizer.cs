@@ -4001,6 +4001,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         foreach (var contact in GetComponentsInChildren<ContactBase>(true))
         {
             used.Add(contact.GetRootTransform());
+            used.Add(contact.GetRootTransform().parent);
+        }
+
+        foreach (var physBone in GetComponentsInChildren<VRCPhysBoneBase>(true))
+        {
+            used.Add(physBone.GetRootTransform());
+            used.Add(physBone.GetRootTransform().parent);
+        }
+
+        foreach (var collider in GetComponentsInChildren<VRCPhysBoneColliderBase>(true))
+        {
+            used.Add(collider.GetRootTransform());
+            used.Add(collider.GetRootTransform().parent);
         }
 
         foreach (var obj in transform.GetAllDescendants())
