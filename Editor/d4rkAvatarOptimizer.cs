@@ -43,7 +43,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
         public bool MergeBackFaceCullingWithCullingOff = false;
-        public bool MergeDifferentRenderQueue = false;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;
         public bool DisablePhysBonesWhenUnused = true;
@@ -210,9 +209,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeBackFaceCullingWithCullingOff {
         get { return settings.MergeDifferentPropertyMaterials && settings.MergeBackFaceCullingWithCullingOff; }
         set { settings.MergeBackFaceCullingWithCullingOff = value; } }
-    public bool MergeDifferentRenderQueue {
-        get { return settings.MergeDifferentPropertyMaterials && settings.MergeDifferentRenderQueue; }
-        set { settings.MergeDifferentRenderQueue = value; } }
     public bool KeepMMDBlendShapes { get { return settings.KeepMMDBlendShapes; } set { settings.KeepMMDBlendShapes = value; } }
     public bool DeleteUnusedComponents { get { return settings.DeleteUnusedComponents; } set { settings.DeleteUnusedComponents = value; } }
     public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects != 0; } set { settings.DeleteUnusedGameObjects = value ? 1 : 0; } }
@@ -237,7 +233,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return settings.MergeSkinnedMeshes;
             case nameof(MergeSameDimensionTextures):
             case nameof(MergeBackFaceCullingWithCullingOff):
-            case nameof(MergeDifferentRenderQueue):
                 return settings.MergeDifferentPropertyMaterials;
             case nameof(CombineApproximateMotionTimeAnimations):
                 return settings.OptimizeFXLayer;
@@ -260,7 +255,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
         {nameof(MergeBackFaceCullingWithCullingOff), "Merge Cull Back with Cull Off"},
-        {nameof(MergeDifferentRenderQueue), "Merge Different Render Queue"},
         {nameof(KeepMMDBlendShapes), "Keep MMD Blend Shapes"},
         {nameof(DeleteUnusedComponents), "Delete Unused Components"},
         {nameof(DeleteUnusedGameObjects), "Delete Unused GameObjects"},
@@ -294,7 +288,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
-            {nameof(Settings.MergeDifferentRenderQueue), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -313,7 +306,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
-            {nameof(Settings.MergeDifferentRenderQueue), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -332,7 +324,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), true},
-            {nameof(Settings.MergeDifferentRenderQueue), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), true},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -3001,7 +2992,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
             return false;
-        if (!MergeDifferentRenderQueue && firstMat.renderQueue != candidateMat.renderQueue)
+        if (firstMat.renderQueue != candidateMat.renderQueue)
             return false;
         foreach (var pass in parsedShader.passes)
         {

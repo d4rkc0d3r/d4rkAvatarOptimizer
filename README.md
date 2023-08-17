@@ -107,8 +107,6 @@ Can't merge materials if:
 * The textures use crunch compression.
 ## Merge Cull Back with Cull Off
 Merges materials even if their culling properties differ. Forces culling to off.
-## Merge Different Render Queue
-Merges materials even if their render queue differs.
 ## Merge Same Ratio Blend Shapes
 This option tries to merge blend shapes that always get animated in the same ratio.  
 For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.
