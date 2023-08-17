@@ -20,22 +20,24 @@ After that you can add and update the optimizer like any other packages in your 
 ## Presets
 ### Basic
 This preset only uses optimizations that don't affect the behavior of the avatar.
-  * Removes unused components & blendshapes
-  * Merges all skinned meshes that are always animated in the same way
-  * Merges material slots that use the same material
-  * Merges toggles in the FXLayer into a direct blend tree
+* Removes unused components & blendshapes
+* Merges all skinned meshes that are always animated in the same way
+* Merges material slots that use the same material
+* Merges toggles in the FXLayer into a direct blend tree
 ### Shader Toggles
 This preset uses all the above & some new optimizations.  
 For this mode you should keep shaders unlocked as it can allow for more merging.  
-  * Merges meshes even if they are animated/toggled differently by injecting logic into the shaders
-  * Merged materials with the same shader even if their properties differ
-  * Applies a generalized version of "lock in" to the new shaders
+* Merges meshes even if they are animated/toggled differently by injecting logic into the shaders
+* Merged materials with the same shader even if their properties differ
+* Applies a generalized version of "lock in" to the new shaders
 
-When shaders are blocked expect:
-  * All merged meshes that now rely on shader toggles are always visible
-    * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually.
-  * Some of the merged materials might show up with no texture
-    * If this bothers you, you can uncheck "Merge Same Dimension Textures" to prevent this from happening
+Expect the following behavior changes:
+* World effects that rely on projectors/shader replacement don't understand shader toggles and will show like the merged meshes are always visible
+  * Some examples of this are wire frame shaders and screen space ambient occlusion
+* With blocked shaders all merged meshes that now rely on shader toggles are always visible
+  * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually
+*  With blocked shaders some of the merged materials can show up with no texture
+   * If this bothers you, you can uncheck "Merge Same Dimension Textures" to prevent this from happening
 ### Full
 This preset uses all optimizations I use for my own avatars.  
 It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.

@@ -55,11 +55,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (presets.Count > 0)
         {
             EditorGUILayout.BeginHorizontal(GUI.skin.box);
-            EditorGUILayout.LabelField("Presets", EditorStyles.boldLabel, GUILayout.Width(50));
+            EditorGUILayout.LabelField(GetLabelWithTooltip("Presets"), EditorStyles.boldLabel, GUILayout.Width(50));
             foreach (var preset in presets)
             {
                 GUI.enabled = !optimizer.IsPresetActive(preset);
-                if (GUILayout.Button(preset))
+                if (GUILayout.Button(GetLabelWithTooltip(preset)))
                 {
                     optimizer.SetPreset(preset);
                     ClearUICaches();
@@ -951,22 +951,18 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         var value = (bool)property.GetValue(optimizer);
         var output = value;
-        var displayName = d4rkAvatarOptimizer.GetDisplayName(propertyName);
-        var guiEnabledState = GUI.enabled;
-        GUI.enabled = optimizer.CanChangeSetting(propertyName);
-        if (TooltipCache.TryGetValue(displayName, out var tooltip))
+        var content = GetLabelWithTooltip(d4rkAvatarOptimizer.GetDisplayName(propertyName));
+        using (new EditorGUI.DisabledScope(!optimizer.CanChangeSetting(propertyName)))
         {
-            output = EditorGUILayout.ToggleLeft(new GUIContent(displayName, string.Join("\n", tooltip.ToArray())), value);
+            output = EditorGUILayout.ToggleLeft(content, value);
+        }
+        if (!string.IsNullOrEmpty(content.tooltip))
+        {
             var rect = GUILayoutUtility.GetLastRect();
             rect.x += rect.width - 20;
             rect.width = 20;
             GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
         }
-        else
-        {
-            output = EditorGUILayout.ToggleLeft(displayName, value);
-        }
-        GUI.enabled = guiEnabledState;
         if (value != output)
         {
             ClearUICaches();
@@ -978,24 +974,14 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Foldout(string label, ref bool value)
     {
-        bool output = value;
-        var tooltipKey = label;
-        if (tooltipKey.EndsWith(")") && !TooltipCache.ContainsKey(tooltipKey))
+        var content = GetLabelWithTooltip(label);
+        bool output = EditorGUILayout.Foldout(value, content, true);
+        if (!string.IsNullOrEmpty(content.tooltip))
         {
-            tooltipKey = tooltipKey.Substring(0, tooltipKey.LastIndexOf('(')).TrimEnd();
-        }
-        if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
-        {
-            output = EditorGUILayout.Foldout(value, new GUIContent(label, string.Join("\n", tooltip.ToArray())), true);
             var rect = GUILayoutUtility.GetLastRect();
             rect.x += rect.width - 20;
             rect.width = 20;
             GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
-            GUI.Label(rect, new GUIContent("", string.Join("\n", tooltip.ToArray())));
-        }
-        else
-        {
-            output = EditorGUILayout.Foldout(value, label, true);
         }
         if (value != output)
         {
@@ -1003,6 +989,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorUtility.SetDirty(optimizer);
         }
         return value = output;
+    }
+
+    private GUIContent GetLabelWithTooltip(string label, string tooltipKey = null)
+    {
+        tooltipKey = tooltipKey ?? label;
+        if (tooltipKey.EndsWith(")") && !TooltipCache.ContainsKey(tooltipKey))
+        {
+            tooltipKey = tooltipKey.Substring(0, tooltipKey.LastIndexOf('(')).TrimEnd();
+        }
+        if (TooltipCache.TryGetValue(tooltipKey, out var tooltip))
+        {
+            return new GUIContent(label, string.Join("\n", tooltip));
+        }
+        return new GUIContent(label);
     }
 
     private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
