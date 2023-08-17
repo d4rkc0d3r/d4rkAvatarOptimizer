@@ -7,11 +7,6 @@ d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & mate
 
 Alternatively you can click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes. That way you can test the optimized version in editor to validate it works properly before uploading it. If everything works correctly you can then upload that optimized copy.
 
-## Limitations
-The optimizer relies on creating custom variations of your shaders that support shader toggles. As such, your avatar might not show up correctly if your shaders are disabled.  
-For toggles that means all meshes that get merged will always be visible. If you use the option [Merge Same Dimension Textures](#merge-same-dimension-textures) and different textures in the `_MainTex` property get merged, those textures will show up as a white material like [here](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17) when shaders are blocked.  
-Since it relies on custom shaders, the optimizer also won't work for quest avatars at all.
-
 ## Installation
 To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.github.io/vpm-repos/main.json` as a custom repository.
 
@@ -22,14 +17,38 @@ To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.git
 
 After that you can add and update the optimizer like any other packages in your VCC projects.
 
+## Presets
+### Basic
+This preset only uses optimizations that don't affect the behavior of the avatar.
+  * Removes unused components & blendshapes
+  * Merges all skinned meshes that are always animated in the same way
+  * Merges material slots that use the same material
+  * Merges toggles in the FXLayer into a direct blend tree
+### Shader Toggles
+This preset uses all the above & some new optimizations.  
+For this mode you should keep shaders unlocked as it can allow for more merging.  
+  * Merges meshes even if they are animated/toggled differently by injecting logic into the shaders
+  * Merged materials with the same shader even if their properties differ
+  * Applies a generalized version of "lock in" to the new shaders
+
+When shaders are blocked expect:
+  * All merged meshes that now rely on shader toggles are always visible
+    * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually.
+  * Some of the merged materials might show up with no texture
+    * If this bothers you, you can uncheck "Merge Same Dimension Textures" to prevent this from happening
+### Full
+This preset uses all optimizations I use for my own avatars.  
+It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.
+
 ## Why my Shader Pink?
+Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. Here is a couple things you could try:
+* Use different shaders, for example:
+  * [ACLS](https://booth.pm/ja/items/1779615)
+  * [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
+* Use the "Basic" preset which causes the optimizer to not touch the shaders at all.
+* Use the "Exclusions" foldout to manually only exclude meshes from optimization that are broken.
 
-Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. You could try other shaders, for example:
-* [ACLS](https://booth.pm/ja/items/1779615)
-* [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
-
-You can also tell the optimizer to ignore certain parts of the model with the "Exclusions" foldout.  
-Finally you can try to make a bug report and maybe I'll be able to fix it.  
+It is also nice to make a bug report with the broken shaders so I can fix it for the future.  
 To do that you need to bundle up the optimized `.mat`, `.shader` & `.cginc` files. You can do that by right clicking on `d4rkAvatarOptimizer/TrashBin` in the project view under `Packages` and selecting `Show in Explorer`. A window with the folder selected should open. Go inside the folder and put the files into a `.zip` file. You don't need to include the `.asset` files as they can be very large and don't help when debugging the shaders.  
 Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.zip` file.
 
