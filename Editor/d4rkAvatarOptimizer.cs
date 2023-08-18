@@ -371,7 +371,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var triCount = GetUsedComponentsInChildren<Renderer>()
                 .Where(r => r.GetSharedMesh() != null)
-                .Sum(r => r.GetSharedMesh().triangles.Length / 3);
+                .Sum(r => Enumerable.Range(0, r.GetSharedMesh().subMeshCount).Sum(i => r.GetSharedMesh().GetIndexCount(i) / 3));
             ForceMergeBlendShapeMissMatch = triCount < 70000;
         }
     }
