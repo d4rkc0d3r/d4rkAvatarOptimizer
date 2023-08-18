@@ -1485,9 +1485,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         for (int i = fxLayer.layers.Length - 1; i >= 0; i--)
         {
             var layer = fxLayer.layers[i];
-            var stateMachine = layer.stateMachine;
             bool isNotFirstLayerOrLastNonUselessLayerCanBeFirst = i != 0 ||
-                (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
+                (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].avatarMask == layer.avatarMask
+                    && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
+            var stateMachine = layer.stateMachine;
             if (stateMachine == null)
             {
                 if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst)
