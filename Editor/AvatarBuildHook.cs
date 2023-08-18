@@ -21,8 +21,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public bool OnPreprocessAvatar(GameObject avatarGameObject)
         {
             var optimizer = avatarGameObject.GetComponent<d4rkAvatarOptimizer>();
+            if (optimizer == null && AvatarOptimizerSettings.DoOptimizeWithDefaultSettingsWhenNoComponent)
+            {
+                optimizer = avatarGameObject.AddComponent<d4rkAvatarOptimizer>();
+                AvatarOptimizerSettings.ApplyDefaults(optimizer);
+                optimizer.ApplyAutoSettings();
+                optimizer.OptimizeOnUpload = true;
+            }
             if (optimizer == null || !optimizer.OptimizeOnUpload)
+            {
                 return true;
+            }
             try
             {
                 optimizer.Optimize();

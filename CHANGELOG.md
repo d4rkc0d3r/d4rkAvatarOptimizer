@@ -3,6 +3,7 @@
 * New mode to merge meshes without introducing shader toggles.
   * When none of "Use Shader Toggles", "Write Properties as Static Values" or "Merge Different Property Materials" are enabled, the optimizer will no longer generate new shaders at all.
 * Support for Android build target by using the above new mode. Also hides those options when the build target is Android.
+* Add global setting "Always Optimize on Upload" that applies the default optimization settings to avatars uploaded without the optimizer component.
 * Add preset buttons "Basic", "Shader Toggles" & "Full" to the optimizer.
 * Remove useless layers from the FXLayer when "Optimize FX Layer" is enabled.
 * Add option to combine motion time layers as a piecewise linear 1D tree into the direct blend tree as well.

@@ -4026,9 +4026,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         used.UnionWith(FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)).Where(t => t != null));
 
-        foreach (var exclusionOnMainAvatar in ExcludeTransforms)
+        for (int i = 0; i < ExcludeTransforms.Count; i++)
         {
-            var exclusion = GetTransformFromPath(GetTransformPathTo(exclusionOnMainAvatar, transform));
+            var exclusion = ExcludeTransforms[i];
             if (exclusion == null)
                 continue;
             used.Add(exclusion);
