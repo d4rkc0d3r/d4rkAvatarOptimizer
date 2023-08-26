@@ -514,29 +514,38 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         trashBinPath = trashBinRoot + "/TrashBin/";
         AssetDatabase.DeleteAsset(trashBinRoot + "/TrashBin");
         AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
-        assetBundlePath = null;
+        binaryAssetBundlePath = null;
+        materialAssetBundlePath = null;
         Profiler.EndSection();
     }
 
-    private string assetBundlePath = null;
+    private string binaryAssetBundlePath = null;
+    private string materialAssetBundlePath = null;
     private void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
         var invalids = System.IO.Path.GetInvalidFileNameChars();
         var sanitizedName = string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
-        bool assetIsBundleable = asset is Material || asset is AnimationClip;
-        if (assetIsBundleable && assetBundlePath != null)
+        if (asset is Material)
         {
-            AssetDatabase.AddObjectToAsset(asset, assetBundlePath);
+            if (materialAssetBundlePath == null)
+            {
+                materialAssetBundlePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + sanitizedName);
+                AssetDatabase.CreateAsset(asset, materialAssetBundlePath);
+            }
+            else
+            {
+                AssetDatabase.AddObjectToAsset(asset, materialAssetBundlePath);
+            }
         }
         else
         {
-            var path = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + sanitizedName);
-            if (assetIsBundleable && assetBundlePath == null)
+            if (binaryAssetBundlePath == null)
             {
-                assetBundlePath = path;
+                binaryAssetBundlePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + "BinaryAssetBundle.asset");
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<BinarySerializationSO>(), binaryAssetBundlePath);
             }
-            AssetDatabase.CreateAsset(asset, path);
+            AssetDatabase.AddObjectToAsset(asset, binaryAssetBundlePath);
         }
         Profiler.EndSection();
     }
@@ -2435,7 +2444,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Graphics.CopyTexture(textures[i], 0, texArray, i);
         }
         Profiler.EndSection();
-        CreateUniqueAsset(texArray, textures[0].width + "x" + textures[0].height + "_" + textures[0].format + (isLinear ? "_linear" : "_sRGB") + "_2DArray.asset");
+        texArray.name = $"{textures[0].width}x{textures[0].height}_{textures[0].format}_{(isLinear ? "linear" : "sRGB")}_2DArray";
+        CreateUniqueAsset(texArray, $"{texArray.name}.asset");
         return texArray;
     }
 

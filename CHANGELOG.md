@@ -1,3 +1,7 @@
+## v3.0.1
+### Changes
+* Use a binary serialized object as root asset for meshes, animations & texture2darrays to speed up the asset creation process.
+
 ## v3.0.0
 ### Features
 * New mode to merge meshes without introducing shader toggles.
