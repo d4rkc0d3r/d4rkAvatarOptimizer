@@ -2439,15 +2439,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return texArray;
     }
 
-    private Matrix4x4 AddWeighted(Matrix4x4 a, Matrix4x4 b, float weight)
+    private void AddWeighted(ref Matrix4x4 a, Matrix4x4 b, float weight)
     {
         if (weight == 0)
-            return a;
+            return;
         a.SetRow(0, a.GetRow(0) + b.GetRow(0) * weight);
         a.SetRow(1, a.GetRow(1) + b.GetRow(1) * weight);
         a.SetRow(2, a.GetRow(2) + b.GetRow(2) * weight);
         a.SetRow(3, a.GetRow(3) + b.GetRow(3) * weight);
-        return a;
     }
 
     private void SearchForTextureArrayCreation(List<List<Material>> sources)
@@ -3572,11 +3571,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     boneWeight.boneIndex1 = boneWeight.boneIndex1 >= bindPoseCount ? 0 : boneWeight.boneIndex1;
                     boneWeight.boneIndex2 = boneWeight.boneIndex2 >= bindPoseCount ? 0 : boneWeight.boneIndex2;
                     boneWeight.boneIndex3 = boneWeight.boneIndex3 >= bindPoseCount ? 0 : boneWeight.boneIndex3;
-                    Matrix4x4 toWorld = Matrix4x4.zero;
-                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0);
-                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
-                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
-                    toWorld = AddWeighted(toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
+                    Matrix4x4 toWorld = toWorldArray[boneWeight.boneIndex0];
+                    if (boneWeight.weight0 != 1)
+                    {
+                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0 - 1);
+                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
+                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
+                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
+                    }
                     sourceToWorld.Add(toWorld);
                     var vertex = sourceVertices[vertIndex] + bakedBlendShapeVertexDelta[vertIndex];
                     var normal = sourceNormals[vertIndex] + bakedBlendShapeNormalDelta[vertIndex];
@@ -3585,35 +3587,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetNormals.Add(toWorld.MultiplyVector(normal).normalized);
                     var t = toWorld.MultiplyVector(tangent).normalized;
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
-                    int newIndex;
-                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex0, out newIndex))
+                    int GetNewBoneIndex(int oldIndex)
                     {
-                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
-                            sourceBones[boneWeight.boneIndex0]);
-                        bindPoseIDMap[boneWeight.boneIndex0] = newIndex;
+                        if (!bindPoseIDMap.TryGetValue(oldIndex, out int newIndex))
+                        {
+                            newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses, sourceBones[oldIndex]);
+                            bindPoseIDMap[oldIndex] = newIndex;
+                        }
+                        return newIndex;
                     }
-                    boneWeight.boneIndex0 = newIndex;
-                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex1, out newIndex))
-                    {
-                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
-                            sourceBones[boneWeight.boneIndex1]);
-                        bindPoseIDMap[boneWeight.boneIndex1] = newIndex;
-                    }
-                    boneWeight.boneIndex1 = newIndex;
-                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex2, out newIndex))
-                    {
-                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
-                            sourceBones[boneWeight.boneIndex2]);
-                        bindPoseIDMap[boneWeight.boneIndex2] = newIndex;
-                    }
-                    boneWeight.boneIndex2 = newIndex;
-                    if (!bindPoseIDMap.TryGetValue(boneWeight.boneIndex3, out newIndex))
-                    {
-                        newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses,
-                            sourceBones[boneWeight.boneIndex3]);
-                        bindPoseIDMap[boneWeight.boneIndex3] = newIndex;
-                    }
-                    boneWeight.boneIndex3 = newIndex;
+                    boneWeight.boneIndex0 = GetNewBoneIndex(boneWeight.boneIndex0);
+                    boneWeight.boneIndex1 = GetNewBoneIndex(boneWeight.boneIndex1);
+                    boneWeight.boneIndex2 = GetNewBoneIndex(boneWeight.boneIndex2);
+                    boneWeight.boneIndex3 = GetNewBoneIndex(boneWeight.boneIndex3);
                     targetWeights.Add(boneWeight);
                 }
                 

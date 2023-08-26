@@ -33,15 +33,19 @@ public class d4rkAvatarOptimizerEditor : Editor
             nullMaterial.name = "(null material slot)";
         }
 
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+        float currentViewWidth = GUILayoutUtility.GetLastRect().width + 23;
+
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
         EditorGUILayout.Space();
         EditorGUI.indentLevel++;
-        EditorGUILayout.LabelField($"<size=20>d4rk{(Screen.width > 465 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
+        EditorGUILayout.LabelField($"<size=20>d4rk{(currentViewWidth > 350 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
         var settingsRect = GUILayoutUtility.GetLastRect();
         EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
         EditorGUI.indentLevel--;
-
         settingsRect.width = 24;
         settingsRect.height = 24;
         bool pressedSettingsButton = GUI.Button(settingsRect, new GUIContent("", "Settings"));
