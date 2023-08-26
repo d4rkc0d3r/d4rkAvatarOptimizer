@@ -3340,16 +3340,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 meshRenderer.sharedMesh = newMesh;
             }
 
-            var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => materialSlotRemap[(meshPath, slot.index)].path).Distinct().ToList()).ToList();
+            (string path, int index) GetOriginalSlot((string path, int index) slot) {
+                if (!materialSlotRemap.TryGetValue(slot, out var remap)) {
+                    Debug.LogWarning($"Could not find original material slot for {slot.path}.{slot.index}");
+                    materialSlotRemap[slot] = remap = slot;
+                }
+                return remap;
+            }
+
+            var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => GetOriginalSlot((meshPath, slot.index)).path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            var allOriginalMeshPaths = Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(i => materialSlotRemap[(meshPath, i)].path).Distinct().ToList();
+            var allOriginalMeshPaths = Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(i => GetOriginalSlot((meshPath, i)).path).Distinct().ToList();
             var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices, allOriginalMeshPaths);
 
             for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
             {
                 if (uniqueMatchedMaterials[i].Count != 1 || uniqueMatchedMaterials[i][0] == null)
                     continue;
-                var originalSlot = materialSlotRemap[(meshPath, matchedSlots[i][0].index)];
+                var originalSlot = GetOriginalSlot((meshPath, matchedSlots[i][0].index));
                 AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
                     (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
                 if (!optimizedSlotSwapMaterials.TryGetValue(originalSlot, out var optimizedSwapMaterials))

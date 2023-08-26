@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 * Fix crash from EditorOnly mesh which is affected by `Disable Phys Bones When Unused`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/45)
+* Instead of crashing, only log a warning if the original material slot is not found. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/47)
 
 ## v3.0.0
 ### Features
