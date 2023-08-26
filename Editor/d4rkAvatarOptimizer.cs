@@ -125,19 +125,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
             ClearCaches();
+            DisplayProgressBar("Destroying unused components", 0.2f);
+            Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
+            DestroyEditorOnlyGameObjects();
+            Profiler.StartNextSection("DestroyUnusedComponents()");
+            DestroyUnusedComponents();
             if (WritePropertiesAsStaticValues)
             {
                 DisplayProgressBar("Parsing Shaders", 0.05f);
                 Profiler.StartNextSection("ParseAndCacheAllShaders()");
                 ShaderAnalyzer.ParseAndCacheAllShaders(FindAllUsedMaterials().Select(m => m.shader), true,
-                    (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.14f * done / total));
+                    (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.15f * done / total));
             }
-            DisplayProgressBar("Destroying unused components", 0.19f);
-            Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
-            DestroyEditorOnlyGameObjects();
-            Profiler.StartNextSection("DestroyUnusedComponents()");
             physBonesToDisable = FindAllPhysBonesToDisable();
-            DestroyUnusedComponents();
             Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
             ConvertStaticMeshesToSkinnedMeshes();
             Profiler.StartNextSection("CalculateUsedBlendShapePaths()");
@@ -1703,7 +1703,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var physBoneDependencies = FindAllPhysBoneDependencies();
         foreach(var entry in physBoneDependencies)
         {
-            if (entry.Key != null && entry.Value.Count == 1 && entry.Value.First() is SkinnedMeshRenderer target)
+            if (entry.Key != null && entry.Value.Count(o => o != null) == 1 && entry.Value.First(o => o != null) is SkinnedMeshRenderer target)
             {
                 var targetPath = GetPathToRoot(target);
                 if (!result.TryGetValue(targetPath, out var physBones))
@@ -2200,8 +2200,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(c => !usedPhysBoneColliders.Contains(c)));
 
         alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));
-
-        var physBoneDependencies = FindAllPhysBoneDependencies();
 
         return cache_FindAllUnusedComponents = alwaysDisabledBehaviours;
     }
