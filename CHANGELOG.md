@@ -1,7 +1,8 @@
 ## v3.0.2
 ### Bug Fixes
 * Fix phys bones getting deleted when they only got used for parameters in the animator.
-* Fix MergeDifferentPropertyMaterials not working when UseShaderToggles is enabled.
+* Fix MergeDifferentPropertyMaterials not working when UseShaderToggles is disabled.
+* Animators sometimes don't write exact values so change the mesh shader discard to `0.5 > _IsActiveMesh` instead of `!_IsActiveMesh`.
 
 ## v3.0.1
 ### Changes

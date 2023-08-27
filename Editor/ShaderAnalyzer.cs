@@ -1767,9 +1767,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (mergedMeshCount <= 1)
                 return;
             if (localMeshCount > 1)
-                output.Add($"if (!d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
+                output.Add($"if (0.5 > d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
             else
-                output.Add($"if (!_IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
+                output.Add($"if (0.5 > _IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
         }
 
         private bool hasVectorCBufferAliasArray = false;
