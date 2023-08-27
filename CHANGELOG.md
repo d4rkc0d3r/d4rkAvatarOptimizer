@@ -1,3 +1,7 @@
+## v3.0.2
+### Bug Fixes
+* Fix phys bones getting deleted when they only got used for parameters in the animator.
+
 ## v3.0.1
 ### Changes
 * Use a binary serialized object as root asset for meshes, animations & texture2darrays to speed up the asset creation process.

@@ -1587,6 +1587,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             result.Add(physBone, new HashSet<Object>());
             physBonePath[GetPathToRoot(physBone)] = physBone;
         }
+        var parameterSuffixes = new string[] { "_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish" };
+        foreach (var controller in GetComponent<VRCAvatarDescriptor>().baseAnimationLayers.Select(l => l.animatorController as AnimatorController).Where(c => c != null))
+        {
+            var parameterNames = new HashSet<string>(controller.parameters.Select(p => p.name));
+            foreach (var physBone in physBones)
+            {
+                if (parameterSuffixes.Any(s => parameterNames.Contains(physBone.parameter + s)))
+                {
+                    result[physBone].Add(controller);
+                }
+            }
+        }
         foreach (var clip in GetAllUsedFXLayerAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
@@ -1701,9 +1713,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (!DisablePhysBonesWhenUnused)
             return result;
         var physBoneDependencies = FindAllPhysBoneDependencies();
+        foreach(var dependencies in physBoneDependencies.Values)
+        {
+            dependencies.RemoveWhere(o => o == null);
+        }
         foreach(var entry in physBoneDependencies)
         {
-            if (entry.Key != null && entry.Value.Count(o => o != null) == 1 && entry.Value.First(o => o != null) is SkinnedMeshRenderer target)
+            if (entry.Key != null && entry.Value.Count(o => !(o is AnimatorController)) == 1 && entry.Value.First(o => !(o is AnimatorController)) is SkinnedMeshRenderer target)
             {
                 var targetPath = GetPathToRoot(target);
                 if (!result.TryGetValue(targetPath, out var physBones))
@@ -2186,7 +2202,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (exclusions.Contains(entry.Key.transform))
                 continue;
             var dependencies = entry.Value.Select(d => d as Component).Where(d => d != null);
-            if (dependencies.All(d => alwaysDisabledBehaviours.Contains(d)))
+            if (!entry.Value.Any(d => d is AnimatorController) && dependencies.All(d => alwaysDisabledBehaviours.Contains(d)))
             {
                 alwaysDisabledBehaviours.Add(entry.Key);
             }
