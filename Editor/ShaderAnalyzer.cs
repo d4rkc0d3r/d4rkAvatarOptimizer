@@ -1727,7 +1727,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void InjectDummyCBufferUsage(string nullReturn)
         {
-            if (localMeshCount <= 1)
+            if (localMeshCount <= 1 || mergedMeshCount <= 1)
                 return;
 
             var valuesToDummyUse = new Stack<string>();
