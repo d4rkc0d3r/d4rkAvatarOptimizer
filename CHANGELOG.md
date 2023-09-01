@@ -1,3 +1,8 @@
+## v3.1.0
+### Features
+* Blend trees can now also get merged into the direct blend tree when `Optimize FX Layer` is enabled.
+* Toggle layers can now be merged even when their states are motion time or blend tree based.
+
 ## v3.0.2
 ### Bug Fixes
 * Fix phys bones getting deleted with `Delete Unused Components` when they only got used for parameters in the animator.

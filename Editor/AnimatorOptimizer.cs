@@ -208,101 +208,94 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 blendType = BlendTreeType.Direct
             };
             var motions = new List<ChildMotion>();
-            int currentHeight = 0;
-            foreach (var i in layersToMerge)
-            {
-                var layer = source.layers[i].stateMachine;
-                string param = null;
-                var treeMotions = new List<Motion>();
-                if (layer.states.Length == 2)
-                {
-                    if (layer.states.All(s => s.state.transitions.Length == 1))
-                    {
-                        param = layer.states[0].state.transitions[0].conditions[0].parameter;
-                        int onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
-                        var onClip = layer.states[onStateIndex].state.motion as AnimationClip;
-                        var offClip = layer.states[1 - onStateIndex].state.motion as AnimationClip;
-                        if (onClip == null)
-                            onClip = CloneAndFlipCurves(offClip);
-                        if (offClip == null)
-                            offClip = CloneAndFlipCurves(onClip);
-                        treeMotions.Add(offClip);
-                        treeMotions.Add(onClip);
-                    }
-                    else
-                    {
-                        int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;
-                        var singleClip = layer.states[singleIndex].state.motion as AnimationClip;
-                        var doubleClip = layer.states[1 - singleIndex].state.motion as AnimationClip;
-                        if (singleClip == null)
-                            singleClip = CloneAndFlipCurves(doubleClip);
-                        if (doubleClip == null)
-                            doubleClip = CloneAndFlipCurves(singleClip);
-                        var conditions = layer.states[singleIndex].state.transitions[0].conditions;
-                        param = conditions[0].parameter;
-                        var innerTreeMotions = new ChildMotion[2] {
-                            new ChildMotion() { motion = singleClip, timeScale = 1f },
-                            new ChildMotion() { motion = doubleClip, timeScale = 1f }
-                        };
-                        if (conditions[1].mode == AnimatorConditionMode.IfNot)
-                        {
-                            innerTreeMotions = innerTreeMotions.Reverse().ToArray();
-                        }
-                        var tree = new BlendTree()
-                        {
-                            hideFlags = HideFlags.HideInHierarchy,
-                            name = "InnerFusedBoolCondition",
-                            blendType = BlendTreeType.Simple1D,
-                            useAutomaticThresholds = true,
-                            maxThreshold = 1f,
-                            minThreshold = 0f,
-                            blendParameter = conditions[1].parameter,
-                            children = innerTreeMotions,
-                        };
-                        AssetDatabase.AddObjectToAsset(tree, assetPath);
-                        treeMotions.Add(singleClip);
-                        treeMotions.Add(tree);
-                        if (conditions[0].mode == AnimatorConditionMode.IfNot)
-                        {
-                            treeMotions.Reverse();
-                        }
-                    }
+            BlendTree CreateBlendTree(string param, ChildMotion[] children, string name = null) {
+                var tree = new BlendTree() {
+                    hideFlags = HideFlags.HideInHierarchy,
+                    name = name ?? param,
+                    blendType = BlendTreeType.Simple1D,
+                    useAutomaticThresholds = children.All(c => c.threshold == 0f),
+                    maxThreshold = 1f,
+                    minThreshold = 0f,
+                    blendParameter = param,
+                    children = children.Select(x => new ChildMotion() { motion = x.motion, timeScale = 1f, threshold = x.threshold}).ToArray()
+                };
+                AssetDatabase.AddObjectToAsset(tree, assetPath);
+                return tree;
+            }
+            Motion ConvertStateToMotion(AnimatorState s) {
+                if (s.motion is BlendTree tree) {
+                    return tree;
                 }
-                else
+                if (s.motion is AnimationClip clip)
                 {
-                    param = layer.states[0].state.timeParameter;
+                    if (!s.timeParameterActive) {
+                        return clip;
+                    }
                     float maxKeyframeTime = 0;
-                    var clip = layer.states[0].state.motion as AnimationClip;
                     foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                     {
                         var curve = AnimationUtility.GetEditorCurve(clip, binding);
                         maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
                     }
+                    var treeMotions = new List<Motion>();
                     treeMotions.Add(CloneFromTime(clip, 0, $"{clip.name} (0%)"));
                     treeMotions.Add(CloneFromTime(clip, 0.25f * maxKeyframeTime, $"{clip.name} (25%)"));
                     treeMotions.Add(CloneFromTime(clip, 0.5f * maxKeyframeTime, $"{clip.name} (50%)"));
                     treeMotions.Add(CloneFromTime(clip, 0.75f * maxKeyframeTime, $"{clip.name} (75%)"));
                     treeMotions.Add(CloneFromTime(clip, maxKeyframeTime, $"{clip.name} (100%)"));
+                    return CreateBlendTree(s.timeParameter, treeMotions.Select(x => new ChildMotion() { motion = x }).ToArray());
                 }
-                var layerTree = new BlendTree()
-                {
-                    hideFlags = HideFlags.HideInHierarchy,
-                    name = source.layers[i].name,
-                    blendType = BlendTreeType.Simple1D,
-                    useAutomaticThresholds = true,
-                    maxThreshold = 1f,
-                    minThreshold = 0f,
-                    blendParameter = param,
-                    children = treeMotions.Select(x => new ChildMotion() { motion = x, timeScale = 1f }).ToArray()
-                };
-                AssetDatabase.AddObjectToAsset(layerTree, assetPath);
-                motions.Add(new ChildMotion()
-                {
-                    motion = layerTree,
+                return s.motion;
+            }
+            foreach (var i in layersToMerge) {
+                var layer = source.layers[i].stateMachine;
+                Motion layerMotion = null;
+                if (layer.states.Length == 2) {
+                    string param = null;
+                    var treeMotions = new List<Motion>();
+                    var layerMotions = layer.states.Select(x => ConvertStateToMotion(x.state)).ToArray();
+                    if (layerMotions[0] == null)
+                        layerMotions[0] = CloneAndFlipCurves(layerMotions[1] as AnimationClip);
+                    if (layerMotions[1] == null)
+                        layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
+
+                    if (layer.states.All(s => s.state.transitions.Length == 1)) {
+                        param = layer.states[0].state.transitions[0].conditions[0].parameter;
+                        int onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
+                        treeMotions.Add(layerMotions[1 - onStateIndex]);
+                        treeMotions.Add(layerMotions[onStateIndex]);
+                    }
+                    else {
+                        int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;
+                        var singleMotion = layerMotions[singleIndex];
+                        var doubleMotion = layerMotions[1 - singleIndex];
+                        var conditions = layer.states[singleIndex].state.transitions[0].conditions;
+                        param = conditions[0].parameter;
+                        var innerTreeMotions = new ChildMotion[2] {
+                            new ChildMotion() { motion = singleMotion },
+                            new ChildMotion() { motion = doubleMotion }
+                        };
+                        if (conditions[1].mode == AnimatorConditionMode.IfNot) {
+                            innerTreeMotions = innerTreeMotions.Reverse().ToArray();
+                        }
+                        var tree = CreateBlendTree(conditions[1].parameter, innerTreeMotions);
+                        treeMotions.Add(singleMotion);
+                        treeMotions.Add(tree);
+                        if (conditions[0].mode == AnimatorConditionMode.IfNot) {
+                            treeMotions.Reverse();
+                        }
+                    }
+                    layerMotion = CreateBlendTree(param, treeMotions.Select(x => new ChildMotion() { motion = x }).ToArray(), source.layers[i].name);
+                }
+                else {
+                    layerMotion = ConvertStateToMotion(layer.states[0].state);
+                    layerMotion.name = source.layers[i].name;
+                }
+                motions.Add(new ChildMotion() {
+                    motion = layerMotion,
                     directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     timeScale = 1f
                 });
-                currentHeight++;
             }
             directBlendTree.children = motions.ToArray();
             AssetDatabase.AddObjectToAsset(directBlendTree, assetPath);
