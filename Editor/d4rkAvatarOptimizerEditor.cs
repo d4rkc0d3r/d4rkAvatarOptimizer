@@ -189,7 +189,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
         if (optimizer.GetFXLayer() != null)
         {
-            var nonErrors = new HashSet<string>() {"toggle", "motion time"};
+            var nonErrors = new HashSet<string>() {"toggle", "motion time", "lone blend tree"};
             var mergedLayerCount = optimizer.OptimizeFXLayer ? optimizer.AnalyzeFXLayerMergeAbility().Count(list => list.All(e => nonErrors.Contains(e))) : 0;
             var layerCount = optimizer.GetFXLayer().layers.Length;
             var optimizedLayerCount = mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount;
@@ -231,11 +231,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var errorMessages = optimizer.AnalyzeFXLayerMergeAbility();
                 var uselessLayers = optimizer.FindUselessFXLayers();
                 var fxLayer = optimizer.GetFXLayer();
-                var nonErrors = new HashSet<string>() {"toggle", "motion time", "useless"};
+                var nonErrors = new HashSet<string>() {"toggle", "motion time", "useless", "lone blend tree"};
                 for (int i = 0; i < errorMessages.Count; i++)
                 {
                     var perfRating = PerformanceRating.VeryPoor;
-                    if (errorMessages[i].Count == 1 && errorMessages[i][0] == "toggle")
+                    if (errorMessages[i].Count == 1 && (errorMessages[i][0] == "toggle" || errorMessages[i][0] == "lone blend tree"))
                         perfRating = PerformanceRating.Good;
                     else if (errorMessages[i].Count == 1 && errorMessages[i][0] == "motion time")
                         perfRating = PerformanceRating.Medium;

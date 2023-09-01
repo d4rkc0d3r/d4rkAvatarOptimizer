@@ -1059,7 +1059,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayerMap = new Dictionary<int, int>();
         if (OptimizeFXLayer && GetFXLayer() != null)
         {
-            var nonErrors = new HashSet<string>() {"toggle", "motion time"};
+            var nonErrors = new HashSet<string>() {"toggle", "motion time", "lone blend tree"};
             var errors = AnalyzeFXLayerMergeAbility();
             var uselessLayers = FindUselessFXLayers();
             int currentLayer = 0;
@@ -1379,41 +1379,48 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             
             if (states.Length == 1) // check for motion time layer
             {
-                if (!CombineApproximateMotionTimeAnimations)
-                {
-                    errorMessages[i].Add($"no motion time combination enabled");
-                    continue;
-                }
                 var state = states[0].state;
-                var clip = state.motion as AnimationClip;
-                if (clip == null)
+                if (state.motion is BlendTree)
                 {
-                    errorMessages[i].Add($"{state.name} is not an animation clip");
-                    continue;
+                    errorMessages[i].Add($"lone blend tree");
                 }
-                if (!state.timeParameterActive)
+                else
                 {
-                    errorMessages[i].Add($"{state.name} has no motion time");
-                    continue;
+                    if (!CombineApproximateMotionTimeAnimations)
+                    {
+                        errorMessages[i].Add($"no motion time combination enabled");
+                        continue;
+                    }
+                    var clip = state.motion as AnimationClip;
+                    if (clip == null)
+                    {
+                        errorMessages[i].Add($"{state.name} is not an animation clip");
+                        continue;
+                    }
+                    if (!state.timeParameterActive)
+                    {
+                        errorMessages[i].Add($"{state.name} has no motion time");
+                        continue;
+                    }
+                    if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Any())
+                    {
+                        errorMessages[i].Add($"{state.name} has object reference curves");
+                        continue;
+                    }
+                    var bindings = AnimationUtility.GetCurveBindings(clip);
+                    var keyframes = new HashSet<float>();
+                    foreach (var binding in bindings)
+                    {
+                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                        keyframes.UnionWith(curve.keys.Select(k => k.time));
+                    }
+                    if (keyframes.Count < 2)
+                    {
+                        errorMessages[i].Add($"{state.name} has less than 2 keyframes");
+                        continue;
+                    }
+                    errorMessages[i].Add($"motion time");
                 }
-                if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Any())
-                {
-                    errorMessages[i].Add($"{state.name} has object reference curves");
-                    continue;
-                }
-                var bindings = AnimationUtility.GetCurveBindings(clip);
-                var keyframes = new HashSet<float>();
-                foreach (var binding in bindings)
-                {
-                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                    keyframes.UnionWith(curve.keys.Select(k => k.time));
-                }
-                if (keyframes.Count < 2)
-                {
-                    errorMessages[i].Add($"{state.name} has less than 2 keyframes");
-                    continue;
-                }
-                errorMessages[i].Add($"motion time");
             }
 
             for (int j = 0; j < fxLayer.layers.Length; j++)

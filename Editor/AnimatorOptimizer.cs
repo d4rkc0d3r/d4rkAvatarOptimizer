@@ -270,19 +270,31 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 else
                 {
-                    param = layer.states[0].state.timeParameter;
-                    float maxKeyframeTime = 0;
-                    var clip = layer.states[0].state.motion as AnimationClip;
-                    foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                    if (layer.states[0].state.motion is BlendTree blendTreeToClone)
                     {
-                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                        maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
+                        param = "d4rkAvatarOptimizer_MergedLayers_Weight";
+                        var clonedBlendTree = CloneBlendTree(null, blendTreeToClone);
+                        clonedBlendTree.name = $"{clonedBlendTree.name} (cloned)";
+                        clonedBlendTree.hideFlags = HideFlags.HideInHierarchy;
+                        AssetDatabase.AddObjectToAsset(clonedBlendTree, assetPath);
+                        treeMotions.Add(clonedBlendTree);
                     }
-                    treeMotions.Add(CloneFromTime(clip, 0, $"{clip.name} (0%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.25f * maxKeyframeTime, $"{clip.name} (25%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.5f * maxKeyframeTime, $"{clip.name} (50%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.75f * maxKeyframeTime, $"{clip.name} (75%)"));
-                    treeMotions.Add(CloneFromTime(clip, maxKeyframeTime, $"{clip.name} (100%)"));
+                    else
+                    {
+                        param = layer.states[0].state.timeParameter;
+                        float maxKeyframeTime = 0;
+                        var clip = layer.states[0].state.motion as AnimationClip;
+                        foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                        {
+                            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                            maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
+                        }
+                        treeMotions.Add(CloneFromTime(clip, 0, $"{clip.name} (0%)"));
+                        treeMotions.Add(CloneFromTime(clip, 0.25f * maxKeyframeTime, $"{clip.name} (25%)"));
+                        treeMotions.Add(CloneFromTime(clip, 0.5f * maxKeyframeTime, $"{clip.name} (50%)"));
+                        treeMotions.Add(CloneFromTime(clip, 0.75f * maxKeyframeTime, $"{clip.name} (75%)"));
+                        treeMotions.Add(CloneFromTime(clip, maxKeyframeTime, $"{clip.name} (100%)"));
+                    }
                 }
                 var layerTree = new BlendTree()
                 {
