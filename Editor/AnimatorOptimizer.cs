@@ -224,7 +224,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             Motion ConvertStateToMotion(AnimatorState s) {
                 if (s.motion is BlendTree tree) {
-                    return tree;
+                    return CloneBlendTree(null, tree);
                 }
                 if (s.motion is AnimationClip clip)
                 {
