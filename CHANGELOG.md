@@ -2,6 +2,8 @@
 ### Features
 * Blend trees can now also get merged into the direct blend tree when `Optimize FX Layer` is enabled.
 * Toggle layers can now be merged even when their states are motion time or blend tree based.
+* Toggle layers now recognize int params with greater x & less x + 1 as a bool condition. Can only convert int to float if its never used with a not equal condition.
+* Toggle layers can now have an arbitrary amount of binary and conditions instead of just 1 or 2.
 
 ## v3.0.2
 ### Bug Fixes

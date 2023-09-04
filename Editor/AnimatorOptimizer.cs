@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -22,7 +23,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private Dictionary<int, int> fxLayerMap = new Dictionary<int, int>();
         private HashSet<int> layersToMerge = new HashSet<int>();
         private HashSet<int> layersToDestroy = new HashSet<int>();
-        private HashSet<string> parametersToChangeToFloat = new HashSet<string>();
+        private HashSet<string> boolsToChangeToFloat = new HashSet<string>();
+        private HashSet<string> intsToChangeToFloat = new HashSet<string>();
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source)
         {
@@ -61,37 +63,36 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return optimizer.Run();
         }
 
-        private AnimatorController Run()
-        {
-            for (int i = 0; i < source.layers.Length; i++)
-            {
-                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length == 2)
-                {
-                    parametersToChangeToFloat.UnionWith(source.layers[i].stateMachine.states.SelectMany(x => x.state.transitions).SelectMany(x => x.conditions).Select(x => x.parameter));
+        private AnimatorController Run() {
+            for (int i = 0; i < source.layers.Length; i++) {
+                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length == 2) {
+                    foreach (var condition in source.layers[i].stateMachine.EnumerateAllTransitions().SelectMany(x => x.conditions)) {
+                        if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Int)) {
+                            intsToChangeToFloat.Add(condition.parameter);
+                        } else if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Bool)) {
+                            boolsToChangeToFloat.Add(condition.parameter);
+                        }
+                    }
                 }
             }
 
-            foreach (var p in source.parameters)
-            {
-                bool changeToFloat = parametersToChangeToFloat.Contains(p.name);
-                var newP = new AnimatorControllerParameter
-                {
+            foreach (var p in source.parameters) {
+                bool boolToFloat = boolsToChangeToFloat.Contains(p.name);
+                bool intToFloat = intsToChangeToFloat.Contains(p.name);
+                var newP = new AnimatorControllerParameter {
                     name = p.name,
-                    type = changeToFloat ? AnimatorControllerParameterType.Float : p.type,
+                    type = boolToFloat || intToFloat ? AnimatorControllerParameterType.Float : p.type,
                     defaultBool = p.defaultBool,
-                    defaultFloat = changeToFloat ? (p.defaultBool ? 1f : 0f) : p.defaultFloat,
+                    defaultFloat = boolToFloat ? (p.defaultBool ? 1f : 0f) : intToFloat ? (float)p.defaultInt : p.defaultFloat,
                     defaultInt = p.defaultInt
                 };
-                if (target.parameters.Count(x => x.name.Equals(newP.name)) == 0)
-                {
+                if (target.parameters.Count(x => x.name.Equals(newP.name)) == 0) {
                     target.AddParameter(newP);
                 }
             }
 
-            if (layersToMerge.Count > 0)
-            {
-                var blendTreeDummyWeight = new AnimatorControllerParameter
-                {
+            if (layersToMerge.Count > 0) {
+                var blendTreeDummyWeight = new AnimatorControllerParameter {
                     name = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     type = AnimatorControllerParameterType.Float,
                     defaultFloat = 1f,
@@ -101,10 +102,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 target.AddParameter(blendTreeDummyWeight);
             }
 
-            for (int i = 0; i < source.layers.Length; i++)
-            {
-                if (layersToMerge.Contains(i) || layersToDestroy.Contains(i))
-                {
+            for (int i = 0; i < source.layers.Length; i++) {
+                if (layersToMerge.Contains(i) || layersToDestroy.Contains(i)) {
                     continue;
                 }
                 AnimatorControllerLayer newL = CloneLayer(source.layers[i], i == 0);
@@ -195,14 +194,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return newClip;
         }
 
-        private void MergeLayers()
-        {
-            if (layersToMerge.Count == 0)
-            {
+        private void MergeLayers() {
+            if (layersToMerge.Count == 0) {
                 return;
             }
-            var directBlendTree = new BlendTree()
-            {
+            var directBlendTree = new BlendTree() {
                 hideFlags = HideFlags.HideInHierarchy,
                 name = "MergedToggles",
                 blendType = BlendTreeType.Direct
@@ -225,15 +221,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Motion ConvertStateToMotion(AnimatorState s) {
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
-                }
-                if (s.motion is AnimationClip clip)
-                {
+                } else if (s.motion is AnimationClip clip) {
                     if (!s.timeParameterActive) {
-                        return clip;
+                        return CloneFromTime(clip, 0, clip.name);
                     }
                     float maxKeyframeTime = 0;
-                    foreach (var binding in AnimationUtility.GetCurveBindings(clip))
-                    {
+                    foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
                         var curve = AnimationUtility.GetEditorCurve(clip, binding);
                         maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
                     }
@@ -251,43 +244,45 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var layer = source.layers[i].stateMachine;
                 Motion layerMotion = null;
                 if (layer.states.Length == 2) {
-                    string param = null;
-                    var treeMotions = new List<Motion>();
                     var layerMotions = layer.states.Select(x => ConvertStateToMotion(x.state)).ToArray();
                     if (layerMotions[0] == null)
                         layerMotions[0] = CloneAndFlipCurves(layerMotions[1] as AnimationClip);
                     if (layerMotions[1] == null)
                         layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
 
-                    if (layer.states.All(s => s.state.transitions.Length == 1)) {
-                        param = layer.states[0].state.transitions[0].conditions[0].parameter;
-                        int onStateIndex = layer.states[0].state.transitions[0].conditions[0].mode == AnimatorConditionMode.If ? 1 : 0;
-                        treeMotions.Add(layerMotions[1 - onStateIndex]);
-                        treeMotions.Add(layerMotions[onStateIndex]);
-                    }
-                    else {
-                        int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;
-                        var singleMotion = layerMotions[singleIndex];
-                        var doubleMotion = layerMotions[1 - singleIndex];
-                        var conditions = layer.states[singleIndex].state.transitions[0].conditions;
-                        param = conditions[0].parameter;
+                    int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;
+                    var andMotion = layerMotions[1 - singleIndex];
+                    var orMotion = layerMotions[singleIndex];
+                    foreach (var condition in layer.states[singleIndex].state.transitions[0].conditions) {
                         var innerTreeMotions = new ChildMotion[2] {
-                            new ChildMotion() { motion = singleMotion },
-                            new ChildMotion() { motion = doubleMotion }
+                            new ChildMotion() { motion = orMotion },
+                            new ChildMotion() { motion = andMotion },
                         };
-                        if (conditions[1].mode == AnimatorConditionMode.IfNot) {
+                        var param = source.parameters.FirstOrDefault(x => x.name == condition.parameter);
+                        if (condition.mode == AnimatorConditionMode.IfNot) {
                             innerTreeMotions = innerTreeMotions.Reverse().ToArray();
                         }
-                        var tree = CreateBlendTree(conditions[1].parameter, innerTreeMotions);
-                        treeMotions.Add(singleMotion);
-                        treeMotions.Add(tree);
-                        if (conditions[0].mode == AnimatorConditionMode.IfNot) {
-                            treeMotions.Reverse();
+                        if (param.type == AnimatorControllerParameterType.Float) {
+                            innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold;
+                            if (condition.mode == AnimatorConditionMode.Less) {
+                                innerTreeMotions = innerTreeMotions.Reverse().ToArray();
+                            }
+                            innerTreeMotions[0].threshold -= 0.001f;
+                            innerTreeMotions[1].threshold += 0.001f;
+                        } else if (param.type == AnimatorControllerParameterType.Int) {
+                            innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold + 0.5f;
+                            if (condition.mode == AnimatorConditionMode.Less) {
+                                innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold - 0.5f;
+                                innerTreeMotions = innerTreeMotions.Reverse().ToArray();
+                            }
+                            innerTreeMotions[0].threshold -= 0.25f;
+                            innerTreeMotions[1].threshold += 0.25f;
                         }
+                        andMotion = CreateBlendTree(condition.parameter, innerTreeMotions);
                     }
-                    layerMotion = CreateBlendTree(param, treeMotions.Select(x => new ChildMotion() { motion = x }).ToArray(), source.layers[i].name);
-                }
-                else {
+                    layerMotion = andMotion;
+                    layerMotion.name = source.layers[i].name;
+                } else if (layer.states.Length == 1) {
                     layerMotion = ConvertStateToMotion(layer.states[0].state);
                     layerMotion.name = source.layers[i].name;
                 }
@@ -299,29 +294,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             directBlendTree.children = motions.ToArray();
             AssetDatabase.AddObjectToAsset(directBlendTree, assetPath);
-            var state = new AnimatorState()
-            {
+            var state = new AnimatorState() {
                 name = "d4rkAvatarOptimizer_MergedLayers",
                 writeDefaultValues = true,
                 hideFlags = HideFlags.HideInHierarchy,
                 motion = directBlendTree
             };
             AssetDatabase.AddObjectToAsset(state, assetPath);
-            var stateMachine = new AnimatorStateMachine()
-            {
+            var stateMachine = new AnimatorStateMachine() {
                 name = "d4rkAvatarOptimizer_MergedLayers",
                 hideFlags = HideFlags.HideInHierarchy,
                 states = new ChildAnimatorState[1] {
-                    new ChildAnimatorState()
-                    {
+                    new ChildAnimatorState() {
                         state = state,
                         position = new Vector3(250, 0, 0)
                     }
                 }
             };
             AssetDatabase.AddObjectToAsset(stateMachine, assetPath);
-            target.AddLayer(new AnimatorControllerLayer
-            {
+            target.AddLayer(new AnimatorControllerLayer {
                 avatarMask = null,
                 blendingMode = AnimatorLayerBlendingMode.Override,
                 defaultWeight = 1f,
@@ -739,15 +730,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void AddCondition(AnimatorTransitionBase transition, AnimatorCondition condition)
-        {
-            if (parametersToChangeToFloat.Contains(condition.parameter))
-            {
+        private void AddCondition(AnimatorTransitionBase transition, AnimatorCondition condition) {
+            if (boolsToChangeToFloat.Contains(condition.parameter)) {
                 var mode = condition.mode == AnimatorConditionMode.If ? AnimatorConditionMode.Greater : AnimatorConditionMode.Less;
                 transition.AddCondition(mode, 0.5f, condition.parameter);
-            }
-            else
-            {
+            } else if (intsToChangeToFloat.Contains(condition.parameter)) {
+                if (condition.mode == AnimatorConditionMode.Equals) {
+                    transition.AddCondition(AnimatorConditionMode.Less, condition.threshold + 0.5f, condition.parameter);
+                    transition.AddCondition(AnimatorConditionMode.Greater, condition.threshold - 0.5f, condition.parameter);
+                } else {
+                    transition.AddCondition(condition.mode, condition.threshold + (condition.mode == AnimatorConditionMode.Greater ? 0.5f : -0.5f), condition.parameter);
+                }
+            } else {
                 transition.AddCondition(condition.mode, condition.threshold, condition.parameter);
             }
         }

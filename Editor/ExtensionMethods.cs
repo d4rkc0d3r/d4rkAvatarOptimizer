@@ -114,6 +114,28 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             }
         }
 
+        public static List<AnimatorTransitionBase> EnumerateAllTransitions(this AnimatorStateMachine stateMachine)
+        {
+            var queue = new Queue<AnimatorStateMachine>();
+            var stateTransitions = new List<AnimatorTransitionBase>();
+            var transitions = new List<AnimatorTransitionBase>();
+            queue.Enqueue(stateMachine);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                transitions.AddRange(current.entryTransitions);
+                stateTransitions.AddRange(current.anyStateTransitions);
+                stateTransitions.AddRange(current.states.SelectMany(s => s.state.transitions));
+                foreach (var subStateMachine in current.stateMachines)
+                {
+                    queue.Enqueue(subStateMachine.stateMachine);
+                    transitions.AddRange(current.GetStateMachineTransitions(subStateMachine.stateMachine));
+                }
+            }
+            transitions.AddRange(stateTransitions);
+            return transitions;
+        }
+
         public static IEnumerable<AnimationClip> EnumerateAllClips(this Motion motion)
         {
             if (motion is AnimationClip clip)
