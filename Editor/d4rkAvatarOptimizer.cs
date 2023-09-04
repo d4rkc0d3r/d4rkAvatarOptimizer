@@ -1059,7 +1059,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayerMap = new Dictionary<int, int>();
         if (OptimizeFXLayer && GetFXLayer() != null)
         {
-            var nonErrors = new HashSet<string>() {"toggle", "motion time", "blend tree"};
+            var nonErrors = new HashSet<string>() {"toggle", "motion time", "blend tree", "multi toggle"};
             var errors = AnalyzeFXLayerMergeAbility();
             var uselessLayers = FindUselessFXLayers();
             int currentLayer = 0;
@@ -1237,7 +1237,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 errorMessages[i].Add($"default weight {layer.defaultWeight}");
             }
             var states = stateMachine.states;
-            if (states.Length == 0 || states.Length > 2)
+            if (states.Length == 0)
             {
                 errorMessages[i].Add($"{states.Length} states");
                 continue;
@@ -1291,22 +1291,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return false;
             }
             
-            if (states.Length == 1) // check for motion time or blend tree layer
-            {
+            if (states.Length == 1) {
                 var state = states[0].state;
                 if (!IsStateConvertableToAnimationOrBlendTree(state))
                     continue;
                 errorMessages[i].Add(state.motion is AnimationClip ? $"motion time" : $"blend tree");
             }
 
-            if (states.Length == 2) // check for toggle layer
-            {
-                var param = states.SelectMany(s => s.state.transitions).SelectMany(t => t.conditions).Select(c => c.parameter).Distinct().ToList();
-                var paramLookup = param.ToDictionary(p => p, p => fxLayer.parameters.FirstOrDefault(p2 => p2.name == p));
-                if (paramLookup.Values.Any(p => p == null)) {
-                    errorMessages[i].Add($"didn't find parameter {paramLookup.First(p => p.Value == null).Key}");
-                    continue;
-                }
+            var param = states.SelectMany(s => s.state.transitions).Concat(stateMachine.anyStateTransitions).SelectMany(t => t.conditions).Select(c => c.parameter).Distinct().ToList();
+            var paramLookup = param.ToDictionary(p => p, p => fxLayer.parameters.FirstOrDefault(p2 => p2.name == p));
+            if (paramLookup.Values.Any(p => p == null)) {
+                errorMessages[i].Add($"didn't find parameter {paramLookup.First(p => p.Value == null).Key}");
+                continue;
+            }
+
+            if (states.Length == 2) {
                 int singleTransitionStateIndex = System.Array.FindIndex(states, s => s.state.transitions.Length == 1);
                 if (singleTransitionStateIndex == -1) {
                     errorMessages[i].Add($"no single transition state");
@@ -1395,7 +1394,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
                 bool onlyBoolBindings = true;
                 foreach (var binding in fxLayerBindings[i]) {
-                    if (!binding.path.EndsWith("/m_Enabled") && !binding.path.EndsWith("/m_IsActive")) {
+                    if (!binding.path.EndsWith("m_Enabled") && !binding.path.EndsWith("m_IsActive")) {
                         onlyBoolBindings = false;
                         break;
                     }
@@ -1409,12 +1408,69 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 errorMessages[i].Add($"toggle");
             }
 
+            if (states.Length > 2) {
+                if (paramLookup.Count != 1 || (paramLookup.Count == 1 && paramLookup.First().Value.type != AnimatorControllerParameterType.Int)) {
+                    errorMessages[i].Add($"more than 2 states and not a single int parameter");
+                    continue;
+                }
+                if (states.Any(s => s.state.transitions.Length != 0)) {
+                    errorMessages[i].Add($"more than 2 states and a state has transitions");
+                    continue;
+                }
+                if (intParamsWithNotEqualConditions.Contains(paramLookup.First().Key)) {
+                    errorMessages[i].Add($"parameter {paramLookup.First().Key} has a not equal condition somewhere");
+                    continue;
+                }
+                if (stateMachine.anyStateTransitions.Length != states.Length) {
+                    errorMessages[i].Add($"any state transitions length is not the same as states length");
+                    continue;
+                }
+                if (stateMachine.anyStateTransitions.Any(t => t.conditions.Length != 1)) {
+                    errorMessages[i].Add($"a transition has multiple conditions");
+                    continue;
+                }
+                if (stateMachine.anyStateTransitions.Any(t => (t.hasExitTime && t.exitTime != 0.0f) || t.duration != 0.0f)) {
+                    errorMessages[i].Add($"a transition has non 0 exit time or duration");
+                    continue;
+                }
+                var thresholdsNeeded = Enumerable.Range(0, states.Length).Select(number => (float)number).ToList();
+                if (thresholdsNeeded.Any(t => !stateMachine.anyStateTransitions.Any(tr => tr.conditions[0].threshold == t && tr.conditions[0].mode == AnimatorConditionMode.Equals))) {
+                    errorMessages[i].Add($"missing some transition with correct threshold and condition mode");
+                    continue;
+                }
+                if (states.Any(s => s.state.motion == null)) {
+                    errorMessages[i].Add($"a state has no motion");
+                    continue;
+                }
+                if (states.Any(s => !IsStateConvertableToAnimationOrBlendTree(s.state))) {
+                    continue;
+                }
+                HashSet<EditorCurveBinding> GetAllMotionBindings(AnimatorState state) {
+                    return new HashSet<EditorCurveBinding>(state.motion.EnumerateAllClips().SelectMany(c => AnimationUtility.GetCurveBindings(c)));
+                }
+                var firstBindings = GetAllMotionBindings(states[0].state);
+                bool hadError = false;
+                for (int j = 1; j < states.Length; j++) {
+                    var bindings = GetAllMotionBindings(states[j].state);
+                    if (!bindings.SetEquals(firstBindings)) {
+                        bindings.Except(firstBindings).Concat(firstBindings.Except(bindings)).ToList()
+                            .ForEach(b => errorMessages[i].Add($"{b.path}/{b.propertyName} is not animated in all states"));
+                        hadError = true;
+                        break;
+                    }
+                }
+                if (hadError) {
+                    continue;
+                }
+                errorMessages[i].Add($"multi toggle");
+            }
+
             for (int j = 0; j < fxLayer.layers.Length; j++) {
                 if (i == j || uselessLayers.Contains(j))
                     continue;
                 foreach (var binding in fxLayerBindings[i]) {
                     if (fxLayerBindings[j].Contains(binding)) {
-                        errorMessages[i].Add($"{binding.path} ({binding.type.Name}) is used in {j} {fxLayer.layers[j].name}");
+                        errorMessages[i].Add($"{binding.path} is used in {j} {fxLayer.layers[j].name}");
                     }
                 }
             }

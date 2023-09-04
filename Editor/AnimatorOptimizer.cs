@@ -65,7 +65,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private AnimatorController Run() {
             for (int i = 0; i < source.layers.Length; i++) {
-                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length == 2) {
+                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length >= 2) {
                     foreach (var condition in source.layers[i].stateMachine.EnumerateAllTransitions().SelectMany(x => x.conditions)) {
                         if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Int)) {
                             intsToChangeToFloat.Add(condition.parameter);
@@ -81,7 +81,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 bool intToFloat = intsToChangeToFloat.Contains(p.name);
                 var newP = new AnimatorControllerParameter {
                     name = p.name,
-                    type = boolToFloat || intToFloat ? AnimatorControllerParameterType.Float : p.type,
+                    type = (boolToFloat || intToFloat) ? AnimatorControllerParameterType.Float : p.type,
                     defaultBool = p.defaultBool,
                     defaultFloat = boolToFloat ? (p.defaultBool ? 1f : 0f) : intToFloat ? (float)p.defaultInt : p.defaultFloat,
                     defaultInt = p.defaultInt
@@ -222,13 +222,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
                 } else if (s.motion is AnimationClip clip) {
-                    if (!s.timeParameterActive) {
-                        return CloneFromTime(clip, 0, clip.name);
-                    }
                     float maxKeyframeTime = 0;
                     foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
                         var curve = AnimationUtility.GetEditorCurve(clip, binding);
                         maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
+                    }
+                    if (!s.timeParameterActive || maxKeyframeTime == 0) {
+                        return CloneFromTime(clip, 0, clip.name);
                     }
                     var treeMotions = new List<Motion>();
                     treeMotions.Add(CloneFromTime(clip, 0, $"{clip.name} (0%)"));
@@ -281,11 +281,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         andMotion = CreateBlendTree(condition.parameter, innerTreeMotions);
                     }
                     layerMotion = andMotion;
-                    layerMotion.name = source.layers[i].name;
                 } else if (layer.states.Length == 1) {
                     layerMotion = ConvertStateToMotion(layer.states[0].state);
-                    layerMotion.name = source.layers[i].name;
+                } else {
+                    var transitions = layer.anyStateTransitions.OrderBy(x => x.conditions[0].threshold).ToArray();
+                    var layerMotions = transitions.Select(x => ConvertStateToMotion(x.destinationState)).ToArray();
+                    layerMotion = CreateBlendTree(transitions[0].conditions[0].parameter, layerMotions.Select((x, index) => new ChildMotion() { motion = x, threshold = index}).ToArray());
                 }
+                layerMotion.name = source.layers[i].name;
                 motions.Add(new ChildMotion() {
                     motion = layerMotion,
                     directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",

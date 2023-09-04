@@ -115,9 +115,25 @@ Deletes all layers in the FXLayer that are considered useless:
   * Has no states or sub state machines.
   * Has 0 weight and is not affected by any layer weight control and has no state behaviours.
   * Has no state behaviours and only animates bindings that don't exist.
-  
-Tries to find simple toggle layers in the FXLayer that have exactly two states with one transition each that has a simple bool condition. The optimizer will then merge all layers like that into one by using a large direct blend tree.  
+
+Tries to merge layers that are only doing toggles into a direct blend tree.
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
+
+Toggles are layers that:
+  * Have no state behaviours.
+  * Have exactly two states.
+  * Both states transitions point to the other state.
+  * One state can only have a single transition while the other state has to have one transition with one inverse condition per condition of the first state.
+  * Transition conditions can be bool `if` & `if not` or int `greater x` & `less x + 1`.
+  
+Multi toggles are layers that:
+  * Have no state behaviours.
+  * Have n > 2 states.
+  * All states animate the exact same bindings.
+  * No state has transitions.
+  * For each \[0, n\) there is one any state transition that points to one unique state.
+  * All any state transitions have only one int equals condition with the value of the state index. They all have to use the same int parameter.
+  * The int parameter can't be used with a not equals condition in any transition condition anywhere in the fxlayer.
 ## Combine Motion Time Approximation
 This tries to combine layers that have a single motion time state into the direct blend tree.  
 It samples the original motion time at the snapping points of a radial puppet (0, 25, 50, 75, 100) and then uses those samples to approximate the motion time with a 1D blend tree.

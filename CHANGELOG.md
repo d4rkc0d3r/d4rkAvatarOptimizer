@@ -4,6 +4,7 @@
 * Toggle layers can now be merged even when their states are motion time or blend tree based.
 * Toggle layers now recognize int params with greater x & less x + 1 as a bool condition. Can only convert int to float if its never used with a not equal condition.
 * Toggle layers can now have an arbitrary amount of binary and conditions instead of just 1 or 2.
+* Add support for basic multi toggle layers where each state animates the same bindings and all states are only chosen by any state transitions with a single int equals condition.
 
 ## v3.0.2
 ### Bug Fixes
