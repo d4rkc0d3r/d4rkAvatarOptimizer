@@ -222,21 +222,41 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
                 } else if (s.motion is AnimationClip clip) {
-                    float maxKeyframeTime = 0;
-                    foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
-                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                        maxKeyframeTime = Mathf.Max(maxKeyframeTime, curve.keys.Max(x => x.time));
-                    }
+                    var curves = AnimationUtility.GetCurveBindings(clip).Select(binding => AnimationUtility.GetEditorCurve(clip, binding)).ToList();
+                    float maxKeyframeTime = curves.Max(x => x.keys.Max(y => y.time));
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
-                    var treeMotions = new List<Motion>();
-                    treeMotions.Add(CloneFromTime(clip, 0, $"{clip.name} (0%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.25f * maxKeyframeTime, $"{clip.name} (25%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.5f * maxKeyframeTime, $"{clip.name} (50%)"));
-                    treeMotions.Add(CloneFromTime(clip, 0.75f * maxKeyframeTime, $"{clip.name} (75%)"));
-                    treeMotions.Add(CloneFromTime(clip, maxKeyframeTime, $"{clip.name} (100%)"));
-                    return CreateBlendTree(s.timeParameter, treeMotions.Select(x => new ChildMotion() { motion = x }).ToArray());
+                    var interpolationPoints = new List<float>() { 0, 0.25f, 0.5f, 0.75f, 1f };
+                    bool removedSomePoint = true;
+                    while (removedSomePoint) {
+                        removedSomePoint = false;
+                        for (int i = 1; i < interpolationPoints.Count - 1; i++) {
+                            var timeA = interpolationPoints[i - 1] * maxKeyframeTime;
+                            var timeB = interpolationPoints[i + 1] * maxKeyframeTime;
+                            var timeCandidate = interpolationPoints[i] * maxKeyframeTime;
+                            bool allClose = true;
+                            foreach (var curve in curves) {
+                                var valueA = curve.Evaluate(timeA);
+                                var valueB = curve.Evaluate(timeB);
+                                var valueCandidate = curve.Evaluate(timeCandidate);
+                                var valueInterpolated = Mathf.Lerp(valueA, valueB, (timeCandidate - timeA) / (timeB - timeA));
+                                var threshold = 0.01f * Mathf.Max(Mathf.Abs(valueA), Mathf.Abs(valueB), 1e-6f);
+                                if (Mathf.Abs(valueCandidate - valueInterpolated) > threshold) {
+                                    allClose = false;
+                                    break;
+                                }
+                            }
+                            if (allClose) {
+                                interpolationPoints.RemoveAt(i);
+                                removedSomePoint = true;
+                            }
+                        }
+                    }
+                    var childMotions = interpolationPoints.Select(x => new ChildMotion() {
+                        motion = CloneFromTime(clip, x * maxKeyframeTime, $"{clip.name} ({x * 100}%)"),
+                        threshold = x }).ToArray();
+                    return CreateBlendTree(s.timeParameter, childMotions);
                 }
                 return s.motion;
             }

@@ -6,6 +6,9 @@
 * Toggle layers can now have an arbitrary amount of binary and conditions instead of just 1 or 2.
 * Add support for basic multi toggle layers where each state animates the same bindings and all states are only chosen by any state transitions with a single int equals condition.
 
+### Changes
+* `Combine Motion Time Approximation` now only generates the 25%, 50% & 75% time points if they improve the approximation.
+
 ## v3.0.2
 ### Bug Fixes
 * Fix phys bones getting deleted with `Delete Unused Components` when they only got used for parameters in the animator.
