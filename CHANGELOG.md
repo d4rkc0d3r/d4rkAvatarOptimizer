@@ -1,3 +1,7 @@
+## v3.1.1
+### Bug Fixes
+* Hard code that lilToon shaders are not supported as some of them don't get caught by the automated parsing.
+
 ## v3.1.0
 ### Features
 * Blend trees can now also get merged into the direct blend tree when `Optimize FX Layer` is enabled.

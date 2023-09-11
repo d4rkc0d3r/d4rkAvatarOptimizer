@@ -331,6 +331,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 rawLines = shaderFileLines;
                 fileID = ".shader";
+                if (parsedShader.name.Contains("lilToon"))
+                {
+                    throw new ParserException("lilToon shaders are not supported.");
+                }
             }
             if (rawLines == null)
             {

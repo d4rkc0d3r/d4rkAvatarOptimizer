@@ -548,7 +548,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 EditorGUILayout.HelpBox(
                     "Some materials could not be parsed.\n" +
-                    "Check the Debug Info foldout for more info.", MessageType.Warning);
+                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                    "Check the Debug Info foldout for more info.", MessageType.Info);
             }
 
             if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
