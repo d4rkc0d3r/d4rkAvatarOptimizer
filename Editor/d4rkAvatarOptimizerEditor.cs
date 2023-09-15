@@ -624,7 +624,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
         }
 
-        bool hasVRCFuryComponent = optimizer.GetComponents<Component>().Any(c => c.GetType().Name == "VRCFury");
+        bool hasVRCFuryComponent = optimizer.GetComponents<Component>().Any(c => c != null && c.GetType().Name == "VRCFury");
         if (hasVRCFuryComponent)
         {
             EditorGUILayout.HelpBox(
