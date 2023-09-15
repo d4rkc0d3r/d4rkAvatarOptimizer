@@ -1,3 +1,7 @@
+## v3.1.2
+### Bug Fixes
+* Fix crash when something from the exclusion list gets deleted before the optimizer runs or is marked as editor only. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/50#issuecomment-1717940085)
+
 ## v3.1.1
 ### Bug Fixes
 * Hard code that lilToon shaders are not supported as some of them don't get caught by the automated parsing.

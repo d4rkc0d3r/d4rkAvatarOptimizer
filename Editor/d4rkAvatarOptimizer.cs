@@ -3967,13 +3967,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     }
 
     private HashSet<Transform> cache_GetAllExcludedTransforms;
-    public HashSet<Transform> GetAllExcludedTransforms()
-    {
+    public HashSet<Transform> GetAllExcludedTransforms() {
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
         var allExcludedTransforms = new HashSet<Transform>();
-        foreach (var excludedTransform in ExcludeTransforms)
-        {
+        foreach (var excludedTransform in ExcludeTransforms) {
+            if (excludedTransform == null)
+                continue;
             allExcludedTransforms.Add(excludedTransform);
             allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
         }
