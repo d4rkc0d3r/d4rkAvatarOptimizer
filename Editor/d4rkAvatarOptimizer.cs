@@ -1091,7 +1091,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (controller == null)
                 continue;
             layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
-            optimizedControllers[i] = i == 4
+            optimizedControllers[i] = controller == GetFXLayer()
                 ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy)
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
         }
@@ -1859,9 +1859,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public AnimatorController GetFXLayer()
     {
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
-        if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != 5)
+        var rootAnimator = GetComponent<Animator>();
+        var baseLayerCount = rootAnimator != null ? (rootAnimator.avatar.isHuman ? 5 : 3) : 3;
+        if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != baseLayerCount)
             return null;
-        return avDescriptor.baseAnimationLayers[4].animatorController as AnimatorController;
+        return avDescriptor.baseAnimationLayers[baseLayerCount - 1].animatorController as AnimatorController;
     }
 
     public void CalculateUsedBlendShapePaths()

@@ -437,9 +437,17 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         }
 
-        if (avDescriptor.baseAnimationLayers == null || avDescriptor.baseAnimationLayers.Length != 5)
+        var rootAnimator = optimizer.GetComponent<Animator>();
+        var isHumanoid = rootAnimator != null ? rootAnimator.avatar.isHuman : false;
+        if (avDescriptor.baseAnimationLayers == null || avDescriptor.baseAnimationLayers.Length != (isHumanoid ? 5 : 3))
         {
-            EditorGUILayout.HelpBox("Playable base layer count in the avatar descriptor is not 5.", MessageType.Error);
+            if (isHumanoid) {
+                EditorGUILayout.HelpBox("Humanoid rig but playable base layer count in the avatar descriptor is not 5.\n" +
+                    "Try to reimport the avatar fbx.", MessageType.Error);
+            } else {
+                EditorGUILayout.HelpBox("Generic rig but playable base layer count in the avatar descriptor is not 3.\n" +
+                    "Try to reimport the avatar fbx.", MessageType.Error);
+            }
             return false;
         }
 
