@@ -194,6 +194,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return newClip;
         }
 
+        public static bool IsNullOrEmpty(Motion motion)
+        {
+            return motion == null || (motion is AnimationClip clip && clip.empty);
+        }
+
         private void MergeLayers() {
             if (layersToMerge.Count == 0) {
                 return;
@@ -223,7 +228,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return CloneBlendTree(null, tree);
                 } else if (s.motion is AnimationClip clip) {
                     var curves = AnimationUtility.GetCurveBindings(clip).Select(binding => AnimationUtility.GetEditorCurve(clip, binding)).ToList();
-                    float maxKeyframeTime = curves.Max(x => x.keys.Max(y => y.time));
+                    float maxKeyframeTime = curves.Max(x => (float?)x.keys.Max(y => y.time)) ?? 0;
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
@@ -265,9 +270,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Motion layerMotion = null;
                 if (layer.states.Length == 2) {
                     var layerMotions = layer.states.Select(x => ConvertStateToMotion(x.state)).ToArray();
-                    if (layerMotions[0] == null)
+                    if (IsNullOrEmpty(layerMotions[0]))
                         layerMotions[0] = CloneAndFlipCurves(layerMotions[1] as AnimationClip);
-                    if (layerMotions[1] == null)
+                    if (IsNullOrEmpty(layerMotions[1]))
                         layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
 
                     int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;

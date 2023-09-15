@@ -2,7 +2,7 @@
 ### Bug Fixes
 * Fix crash when something from the exclusion list gets deleted before the optimizer runs or is marked as editor only. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/50#issuecomment-1717940085)
 * Fix UI crash when the avatar has a missing script component on the avatar root.
-* 
+* Fix crash when the avatar uses empty clips with WD ON toggles. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/50)
 
 ## v3.1.1
 ### Bug Fixes

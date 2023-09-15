@@ -1290,7 +1290,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 errorMessages[i].Add($"{state.name} is not null, animation clip or blend tree ???");
                 return false;
             }
-            
+
+            HashSet<EditorCurveBinding> GetAllMotionBindings(AnimatorState state) {
+                return new HashSet<EditorCurveBinding>(state.motion.EnumerateAllClips().SelectMany(c => AnimationUtility.GetCurveBindings(c)));
+            }
+
             if (states.Length == 1) {
                 var state = states[0].state;
                 if (!IsStateConvertableToAnimationOrBlendTree(state))
@@ -1374,15 +1378,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         errorMessages[i].Add($"{state} transition has exit time");
                         break;
                     }
-                    if (state.motion == null) {
-                        if (otherState.motion == null) {
-                            errorMessages[i].Add($"both states have no motion");
+                    if (AnimatorOptimizer.IsNullOrEmpty(state.motion)) {
+                        if (AnimatorOptimizer.IsNullOrEmpty(otherState.motion)) {
+                            errorMessages[i].Add($"both states have no motion or are empty clips");
                             break;
                         } else if (!(otherState.motion is AnimationClip)) {
-                            errorMessages[i].Add($"state {j} has no motion but {1 - j} has non animation clip motion");
+                            errorMessages[i].Add($"state {j} has no motion or an empty clip but {1 - j} has non animation clip motion");
                             break;
-                        } else if (!otherState.writeDefaultValues) {
-                            errorMessages[i].Add($"state {j} has no motion but {1 - j} does not have write defaults");
+                        } else if (!otherState.writeDefaultValues || !state.writeDefaultValues) {
+                            errorMessages[i].Add($"state {j} has no motion or an empty clip but states do not have write defaults");
                             break;
                         } else {
                             reliesOnWriteDefaults = true;
@@ -1397,6 +1401,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (!binding.path.EndsWith("m_Enabled") && !binding.path.EndsWith("m_IsActive")) {
                         onlyBoolBindings = false;
                         break;
+                    }
+                }
+                if (!reliesOnWriteDefaults) {
+                    var bindings0 = GetAllMotionBindings(states[0].state);
+                    var bindings1 = GetAllMotionBindings(states[1].state);
+                    if (!bindings1.SetEquals(bindings0)) {
+                        bindings1.Except(bindings0).Concat(bindings0.Except(bindings1)).ToList()
+                            .ForEach(b => errorMessages[i].Add($"{b.path}/{b.propertyName} is not animated in both states"));
+                        continue;
                     }
                 }
                 if (reliesOnWriteDefaults && !onlyBoolBindings) {
@@ -1444,9 +1457,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
                 if (states.Any(s => !IsStateConvertableToAnimationOrBlendTree(s.state))) {
                     continue;
-                }
-                HashSet<EditorCurveBinding> GetAllMotionBindings(AnimatorState state) {
-                    return new HashSet<EditorCurveBinding>(state.motion.EnumerateAllClips().SelectMany(c => AnimationUtility.GetCurveBindings(c)));
                 }
                 var firstBindings = GetAllMotionBindings(states[0].state);
                 bool hadError = false;
