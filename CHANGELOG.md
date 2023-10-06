@@ -1,6 +1,7 @@
 ## v3.1.3
 ### Changes
 * When the UI takes longer than 500ms (default value, can be changed in settings) it will disable the auto refresh of the preview and instead shows a manual button to refresh the preview. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/51)
+* Toggling foldouts no longer refreshes the preview. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/51)
 
 ### Bug Fixes
 * Fix crash when the FX controller has a layer with two states and only one transition with zero conditions. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/56)

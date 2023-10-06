@@ -1018,7 +1018,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         if (value != output)
         {
-            ClearUICaches();
             EditorUtility.SetDirty(optimizer);
         }
         return value = output;
