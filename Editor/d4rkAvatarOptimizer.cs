@@ -1321,6 +1321,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     errorMessages[i].Add($"or state has {orState.transitions[0].conditions.Length} conditions but and state has {andState.transitions.Length} transitions");
                     continue;
                 }
+                if (andState.transitions.Length == 0) {
+                    errorMessages[i].Add($"and state has no transitions");
+                    continue;
+                }
                 if (andState.transitions.Any(t => t.conditions.Length != 1)) {
                     errorMessages[i].Add($"a and state transition has multiple conditions");
                     continue;
@@ -1415,7 +1419,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (reliesOnWriteDefaults && !onlyBoolBindings) {
                     errorMessages[i].Add($"relies on write defaults and animates something other than m_Enabled/m_IsActive");
                 }
-                if (states.Any(s => s.state.transitions[0].duration != 0.0f) && !onlyBoolBindings) {
+                if (states.Any(s => s.state.transitions.Any(t => t.duration != 0.0f)) && !onlyBoolBindings) {
                     errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
                 }
                 errorMessages[i].Add($"toggle");

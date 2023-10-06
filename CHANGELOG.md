@@ -1,3 +1,7 @@
+## v3.1.3
+### Bug Fixes
+* Fix crash when the FX controller has a layer with two states and only one transition with zero conditions. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/56)
+
 ## v3.1.2
 ### Bug Fixes
 * Fix crash when something from the exclusion list gets deleted before the optimizer runs or is marked as editor only. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/50#issuecomment-1717940085)
