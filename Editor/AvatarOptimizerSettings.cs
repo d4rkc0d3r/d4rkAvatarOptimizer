@@ -18,6 +18,12 @@ public class AvatarOptimizerSettings : EditorWindow
         get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", false);
         private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", value);
     }
+
+    public static int AutoRefreshPreviewTimeout
+    {
+        get => EditorPrefs.GetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", 500);
+        private set => EditorPrefs.SetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", value);
+    }
     
     [MenuItem("Tools/d4rkpl4y3r/Avatar Optimizer Settings")]
     static void Init()
@@ -34,6 +40,9 @@ public class AvatarOptimizerSettings : EditorWindow
         DoOptimizeWithDefaultSettingsWhenNoComponent = EditorGUILayout.ToggleLeft(
             new GUIContent("Always Optimize on Upload", "If an Avatar does not have a d4rkAvatarOptimizer component attached, it will be optimized with the default settings below when uploading it to VRChat."),
             DoOptimizeWithDefaultSettingsWhenNoComponent);
+        AutoRefreshPreviewTimeout = IntFieldLeft(
+            new GUIContent("Auto Refresh Preview Timeout", "In milliseconds. If the preview takes longer than this to refresh, the auto refresh will be disabled."),
+            AutoRefreshPreviewTimeout);
         EndSection();
         EditorGUILayout.Space();
         BeginSection("Default Settings");
@@ -91,6 +100,15 @@ public class AvatarOptimizerSettings : EditorWindow
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.Space();
         EditorGUILayout.EndVertical();
+    }
+
+    private int IntFieldLeft(GUIContent label, int value)
+    {
+        EditorGUILayout.BeginHorizontal();
+        var val = EditorGUILayout.IntField(value, GUILayout.Width(50));
+        EditorGUILayout.LabelField(label);
+        EditorGUILayout.EndHorizontal();
+        return val;
     }
 
     public static int GetValue(string key)

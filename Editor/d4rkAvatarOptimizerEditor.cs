@@ -22,11 +22,15 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer optimizer;
     private static Material nullMaterial = null;
+    private static long longestTimeUsed = 0;
     
     public override void OnInspectorGUI()
     {
         optimizer = (d4rkAvatarOptimizer)target;
         OnSelectionChange();
+        // exclude OnSelectionChange from timing since it parses shaders which will stay cached after the first time
+        var stopWatch = new System.Diagnostics.Stopwatch();
+        stopWatch.Start();
         if (nullMaterial == null)
         {
             nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
@@ -145,6 +149,17 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         EditorGUILayout.Separator();
         GUI.enabled = true;
+
+        if (longestTimeUsed > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
+        {
+            EditorGUILayout.HelpBox($"Preview auto refresh is disabled because it took {longestTimeUsed}ms which is longer than the threshold of {AvatarOptimizerSettings.AutoRefreshPreviewTimeout}ms to refresh.\n"
+                + "The preview might still be refreshed manually by clicking the refresh button.", MessageType.Info);
+            if (GUILayout.Button("Refresh Preview"))
+            {
+                longestTimeUsed = 0;
+                ClearUICaches();
+            }
+        }
 
         Profiler.StartSection("Show Perf Rank Change");
         var exclusions = optimizer.GetAllExcludedTransforms();
@@ -425,6 +440,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 EditorGUILayout.LabelField(time);
             }
         }
+        stopWatch.Stop();
+        if (stopWatch.ElapsedMilliseconds > longestTimeUsed)
+            longestTimeUsed = stopWatch.ElapsedMilliseconds;
     }
     
     private bool Validate()
@@ -683,6 +701,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private void ClearUICaches()
     {
+        if (longestTimeUsed > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
+            return;
         mergedMaterialPreviewCache = null;
         unmovingBonesCache = null;
         gameObjectsWithToggleAnimationsCache = null;
@@ -697,6 +717,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (lastSelected == optimizer)
             return;
+        longestTimeUsed = 0;
         lastSelected = optimizer;
         ClearUICaches();
         if (optimizer.DoAutoSettings)
