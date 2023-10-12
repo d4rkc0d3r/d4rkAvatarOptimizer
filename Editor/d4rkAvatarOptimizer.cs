@@ -2305,6 +2305,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             transforms.Add(avDescriptor.customEyeLookSettings.upperRightEyelid);
         }
 
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBone)
+        {
+            transforms.Add(avDescriptor.lipSyncJawBone);
+        }
+
         var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
         layers.AddRange(avDescriptor.specialAnimationLayers.Select(a => a.animatorController));
         foreach (var layer in layers.Where(a => a != null))
