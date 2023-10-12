@@ -1,3 +1,7 @@
+## v3.1.4
+### Bug Fixes
+* Fix jaw flap bone not marked as moving transform. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/58)
+
 ## v3.1.3
 ### Changes
 * When the UI takes longer than 500ms (default value, can be changed in settings) it will disable the auto refresh of the preview and instead shows a manual button to refresh the preview. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/51)

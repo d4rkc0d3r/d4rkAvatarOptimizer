@@ -1085,6 +1085,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
+        Profiler.StartSection("AnimatorOptimizer.Run()");
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
         {
             var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
@@ -1095,7 +1096,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy)
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
         }
-        AssetDatabase.SaveAssets();
+        Profiler.EndSection();
 
         var animations = new HashSet<AnimationClip>();
         for (int i = 0; i < optimizedControllers.Length; i++)
