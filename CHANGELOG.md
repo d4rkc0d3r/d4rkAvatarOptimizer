@@ -1,3 +1,7 @@
+## v3.2.0
+### Changes
+* Remove option `Merge Regardless of Blend Shapes`. It is now always enabled because VRChat now uses unity 2022.
+
 ## v3.1.4
 ### Bug Fixes
 * Fix jaw flap bone not marked as moving transform. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/58)

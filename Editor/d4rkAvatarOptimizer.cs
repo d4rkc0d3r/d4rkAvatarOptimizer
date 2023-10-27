@@ -39,7 +39,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeSkinnedMeshes = true;
         public bool MergeSkinnedMeshesWithShaderToggle = true;
         public bool MergeStaticMeshesAsSkinned = true;
-        public int ForceMergeBlendShapeMissMatch = 2;
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
         public bool MergeBackFaceCullingWithCullingOff = false;
@@ -197,9 +196,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
         set { settings.MergeStaticMeshesAsSkinned = value; } }
-    public bool ForceMergeBlendShapeMissMatch {
-        get { return settings.MergeSkinnedMeshes && settings.ForceMergeBlendShapeMissMatch != 0; }
-        set { settings.ForceMergeBlendShapeMissMatch = value ? 1 : 0; } }
     public bool MergeDifferentPropertyMaterials {
         get { return HasCustomShaderSupport && settings.MergeDifferentPropertyMaterials; }
         set { settings.MergeDifferentPropertyMaterials = value; } }
@@ -229,7 +225,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return !(MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials);
             case nameof(MergeSkinnedMeshesWithShaderToggle):
             case nameof(MergeStaticMeshesAsSkinned):
-            case nameof(ForceMergeBlendShapeMissMatch):
                 return settings.MergeSkinnedMeshes;
             case nameof(MergeSameDimensionTextures):
             case nameof(MergeBackFaceCullingWithCullingOff):
@@ -251,7 +246,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
-        {nameof(ForceMergeBlendShapeMissMatch), "Merge Regardless of Blend Shapes"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
         {nameof(MergeBackFaceCullingWithCullingOff), "Merge Cull Back with Cull Off"},
@@ -284,7 +278,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
-            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
@@ -302,7 +295,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
-            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
@@ -320,7 +312,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
-            {nameof(Settings.ForceMergeBlendShapeMissMatch), 2},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), true},
@@ -366,13 +357,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (settings.DeleteUnusedGameObjects == 2)
         {
             DeleteUnusedGameObjects = !UsesAnyLayerMasks();
-        }
-        if (settings.ForceMergeBlendShapeMissMatch == 2)
-        {
-            var triCount = GetUsedComponentsInChildren<Renderer>()
-                .Where(r => r.GetSharedMesh() != null)
-                .Sum(r => Enumerable.Range(0, r.GetSharedMesh().subMeshCount).Sum(i => r.GetSharedMesh().GetIndexCount(i) / 3));
-            ForceMergeBlendShapeMissMatch = triCount < 70000;
         }
     }
 
@@ -653,8 +637,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (!MergeSkinnedMeshes)
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
-            return false;
-        if (!ForceMergeBlendShapeMissMatch && (hasUsedBlendShapes.Contains(list[0]) ^ hasUsedBlendShapes.Contains(candidate)))
             return false;
         bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
         {
