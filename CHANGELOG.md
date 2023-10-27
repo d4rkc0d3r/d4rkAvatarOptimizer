@@ -1,6 +1,7 @@
 ## v3.2.0
 ### Changes
 * Remove option `Merge Regardless of Blend Shapes`. It is now always enabled because VRChat now uses unity 2022.
+* Add debug info for blendshapes that get merged together.
 
 ## v3.1.4
 ### Bug Fixes

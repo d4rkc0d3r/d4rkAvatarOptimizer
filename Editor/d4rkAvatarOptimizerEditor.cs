@@ -368,6 +368,32 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(optimizer.FindAllPenetrators().ToArray());
                 Profiler.EndSection();
             }
+            if (optimizer.MergeSameRatioBlendShapes && Foldout("Same Ratio Blend Shapes", ref optimizer.DebugShowMergeableBlendShapes))
+            {
+                Profiler.StartSection("Same Ratio Blend Shapes");
+                bool first = true;
+                foreach (var list in MergeableBlendShapes) 
+                {
+                    if (!first)
+                    {
+                        EditorGUILayout.Separator();
+                    }
+                    first = false;
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.Space(15, false);
+                    EditorGUILayout.BeginVertical(GUI.skin.box);
+                    foreach (var ratio in list)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.LabelField($"{ratio.value * 100:F1}".Replace(".0", ""), GUILayout.Width(50));
+                        EditorGUILayout.LabelField(ratio.blendshape.Replace("/blendShape.", "."));
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    EditorGUILayout.EndVertical();
+                    EditorGUILayout.EndHorizontal();
+                }
+                Profiler.EndSection();
+            }
             if (Foldout("Phys Bone Dependencies", ref optimizer.DebugShowPhysBoneDependencies))
             {
                 Profiler.StartSection("Phys Bone Dependencies");
@@ -697,6 +723,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private Texture2D[] nonBC5NormalMapsCache = null;
     private string[] animatedMaterialPropertyPathsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
+    private List<List<(string blendshape, float value)>> mergeableBlendShapesCache = null;
 
     private void ClearUICaches()
     {
@@ -709,6 +736,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         nonBC5NormalMapsCache = null;
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
+        mergeableBlendShapesCache = null;
         optimizer.ClearCaches();
     }
 
@@ -734,7 +762,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (mergedMaterialPreviewCache == null)
             {
                 mergedMaterialPreviewCache = new List<List<List<MaterialSlot>>>();
-                optimizer.CalculateUsedBlendShapePaths();
                 var matchedSkinnedMeshes = optimizer.FindPossibleSkinnedMeshMerges();
                 foreach (var mergedMeshes in matchedSkinnedMeshes)
                 {
@@ -743,6 +770,27 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
             return mergedMaterialPreviewCache;
+        }
+    }
+
+    private List<List<(string blendshape, float value)>> MergeableBlendShapes
+    {
+        get
+        {
+            if (mergeableBlendShapesCache == null)
+            {
+                mergeableBlendShapesCache = new List<List<(string blendshape, float value)>>();
+                if (optimizer.MergeSameRatioBlendShapes)
+                {
+                    foreach (var matched in MergedMaterialPreview)
+                    {
+                        var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
+                        var mergedBlendShapes = optimizer.FindMergeableBlendShapes(renderers);
+                        mergeableBlendShapesCache.AddRange(mergedBlendShapes);
+                    }
+                }
+            }
+            return mergeableBlendShapesCache;
         }
     }
 
@@ -760,18 +808,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                     return Enumerable.Range(0, r.sharedMesh.blendShapeCount)
                         .Select(i => $"{optimizer.GetPathToRoot(r.transform)}/blendShape.{r.sharedMesh.GetBlendShapeName(i)}");
                 }));
-                if (optimizer.MergeSameRatioBlendShapes)
+                foreach (var list in MergeableBlendShapes)
                 {
-                    foreach (var matched in MergedMaterialPreview)
-                    {
-                        var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
-                        var mergedBlendShapes = optimizer.FindMergeableBlendShapes(renderers);
-                        foreach (var list in mergedBlendShapes)
-                        {
-                            for (int i = 1; i < list.Count; i++)
-                                keptBlendShapePathsCache.Remove(list[i].blendshape);
-                        }
-                    }
+                    for (int i = 1; i < list.Count; i++)
+                        keptBlendShapePathsCache.Remove(list[i].blendshape);
                 }
                 keptBlendShapePathsCache.IntersectWith(optimizer.GetUsedBlendShapePaths());
             }

@@ -70,6 +70,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowLockedInMaterials = true;
     public bool DebugShowUnlockedMaterials = true;
     public bool DebugShowPenetrators = true;
+    public bool DebugShowMergeableBlendShapes = true;
     public bool DebugShowPhysBoneDependencies = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
@@ -378,7 +379,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
-    private static HashSet<SkinnedMeshRenderer> hasUsedBlendShapes = new HashSet<SkinnedMeshRenderer>();
     private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private static Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
@@ -1856,7 +1856,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public void CalculateUsedBlendShapePaths()
     {
         usedBlendShapes.Clear();
-        hasUsedBlendShapes.Clear();
         blendShapesToBake.Clear();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor != null)
@@ -1889,7 +1888,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
                     {
                         usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
-                        hasUsedBlendShapes.Add(meshRenderer);
                     }
                 }
             }
@@ -1917,7 +1915,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
                         continue;
                     usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-                    hasUsedBlendShapes.Add(smr);
                 }
             }
         }
@@ -1935,7 +1932,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (KeepMMDBlendShapes && MMDBlendShapes.Contains(name))
                 {
                     usedBlendShapes.Add(path + name);
-                    hasUsedBlendShapes.Add(skinnedMeshRenderer);
                     continue;
                 }
                 if (skinnedMeshRenderer.GetBlendShapeWeight(i) != 0 && !usedBlendShapes.Contains(path + name))
@@ -1943,7 +1939,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (mesh.GetBlendShapeFrameCount(i) > 1)
                     {
                         usedBlendShapes.Add(path + name);
-                        hasUsedBlendShapes.Add(skinnedMeshRenderer);
                     }
                     else
                     {

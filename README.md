@@ -202,6 +202,8 @@ Shows all materials that have a "lock in" or "bake" feature disabled which the o
 With the `Write Properties as Static Values` option disabled you need to make sure to lock in or bake your materials in this list before optimization.
 ### Penetrators
 Shows all meshes that the optimizer detected as DPS or TPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked.
+### Same Ratio Blend Shapes
+Shows all blend shapes that are animated in the same ratio and will get merged together. The first number of each merged group should always be 100 as that is the base value the others get compared to. In the final mesh the first blend shape will be the one the others get merged into.
 ### Phys Bone Dependencies
 For each phys bone component this shows all components that use the affected transforms of the phys bone. Also lists all animations that animate the m_Enabled property.  
 Any phys bones listed here that have exactly one skinned mesh renderer listed in its list will add an animation curve to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag if the `Disable Phys Bones When Unused` option is enabled.
