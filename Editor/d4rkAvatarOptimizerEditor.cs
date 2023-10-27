@@ -371,14 +371,8 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (optimizer.MergeSameRatioBlendShapes && Foldout("Same Ratio Blend Shapes", ref optimizer.DebugShowMergeableBlendShapes))
             {
                 Profiler.StartSection("Same Ratio Blend Shapes");
-                bool first = true;
                 foreach (var list in MergeableBlendShapes) 
                 {
-                    if (!first)
-                    {
-                        EditorGUILayout.Separator();
-                    }
-                    first = false;
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.Space(15, false);
                     EditorGUILayout.BeginVertical(GUI.skin.box);
@@ -391,6 +385,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     }
                     EditorGUILayout.EndVertical();
                     EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.Separator();
                 }
                 Profiler.EndSection();
             }

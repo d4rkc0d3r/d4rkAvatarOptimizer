@@ -3,6 +3,9 @@
 * Remove option `Merge Regardless of Blend Shapes`. It is now always enabled because VRChat now uses unity 2022.
 * Add debug info for blendshapes that get merged together.
 
+### Bug Fixes
+* Fix warning spam in console if a material has Hidden/InternalErrorShader assigned to it.
+
 ## v3.1.4
 ### Bug Fixes
 * Fix jaw flap bone not marked as moving transform. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/58)

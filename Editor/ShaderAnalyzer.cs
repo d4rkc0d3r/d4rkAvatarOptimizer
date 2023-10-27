@@ -376,6 +376,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 catch (FileNotFoundException)
                 {
+                    if (isTopLevelFile)
+                    {
+                        // unity shader files are not assets in the project so we just throw the error again to mark
+                        // the parsed shader as failed to read
+                        throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
+                    }
                     if (fileName != "UnityLightingCommon.cginc")
                         Debug.LogWarning("Could not find include file: " + currentFilePath);
                     return false;
