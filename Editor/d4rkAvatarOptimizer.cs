@@ -3131,7 +3131,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             DisplayProgressBar($"Optimizing materials on {meshRenderer.name}");
             var path = GetPathToRoot(meshRenderer);
-            var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).ToList();
+            var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).Where(m => m.material != null).ToList();
             var alreadyOptimizedMaterials = new HashSet<Material>();
             foreach (var (material, index) in mats)
             {

@@ -1,3 +1,7 @@
+## v3.2.1
+### Bug Fixes
+* Fix crash when a static mesh has a missing material and `Write Properties as Static Values` is enabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/60)
+
 ## v3.2.0
 ### Changes
 * Remove option `Merge Regardless of Blend Shapes`. It is now always enabled because VRChat now uses unity 2022.
