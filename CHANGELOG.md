@@ -1,3 +1,7 @@
+## v3.2.2
+### Bug Fixes
+* Fix phys bone dependency check only checking the moved transforms and not all children. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/61)
+
 ## v3.2.1
 ### Bug Fixes
 * Fix crash when a static mesh has a missing material and `Write Properties as Static Values` is enabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/60)

@@ -1717,33 +1717,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         foreach (var physBone in physBones)
         {
             var root = physBone.GetRootTransform();
-            var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
-            var stack = new Stack<Transform>();
-            if (physBone.multiChildType == VRCPhysBoneBase.MultiChildType.Ignore && root.childCount > 1)
+            foreach (Transform current in root.GetAllDescendants().Concat(new Transform[] { root }))
             {
-                foreach (Transform child in root)
-                {
-                    stack.Push(child);
-                }
-            }
-            else
-            {
-                stack.Push(root);
-            }
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                if (exclusions.Contains(current))
-                    continue;
                 if (transformToDependency.TryGetValue(current, out var dependencies))
                 {
                     result[physBone].UnionWith(dependencies);
                 }
                 result[physBone].UnionWith(current.GetComponents<Component>().Where(c => c != physBone && !(c is Transform)));
-                foreach (Transform child in current)
-                {
-                    stack.Push(child);
-                }
             }
         }
 
