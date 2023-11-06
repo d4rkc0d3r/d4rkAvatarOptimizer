@@ -4052,6 +4052,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             used.Add(physBone.GetRootTransform());
             used.Add(physBone.GetRootTransform().parent);
+            used.UnionWith(physBone.ignoreTransforms);
         }
 
         foreach (var collider in GetComponentsInChildren<VRCPhysBoneColliderBase>(true))
