@@ -1,6 +1,7 @@
 ## v3.2.2
 ### Bug Fixes
 * Fix phys bone dependency check only checking the moved transforms and not all children. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/61)
+* Fix ignored transform in phys bone not being marked as moving despite it being possible thanks to stretch & squish.
 
 ## v3.2.1
 ### Bug Fixes

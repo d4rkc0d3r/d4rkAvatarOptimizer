@@ -2314,9 +2314,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             while (stack.Count > 0)
             {
                 var current = stack.Pop();
+                transforms.Add(current);
                 if (exclusions.Contains(current))
                     continue;
-                transforms.Add(current);
                 foreach (Transform child in current)
                 {
                     stack.Push(child);
