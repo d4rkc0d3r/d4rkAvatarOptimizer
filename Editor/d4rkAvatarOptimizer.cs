@@ -2284,6 +2284,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var animators = GetComponentsInChildren<Animator>(true);
         foreach (var animator in animators)
         {
+            if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
+                continue;
             foreach (var boneId in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
             {
                 if (boneId < 0 || boneId >= HumanBodyBones.LastBone)
