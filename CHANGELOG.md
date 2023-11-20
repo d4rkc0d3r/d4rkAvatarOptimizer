@@ -1,3 +1,7 @@
+## v3.2.3
+### Bug Fixes
+* Fix crash when a material name has slashes or other characters that are not allowed in file names.
+
 ## v3.2.2
 ### Bug Fixes
 * Fix phys bone dependency check only checking the moved transforms and not all children. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/61)
