@@ -162,7 +162,6 @@ In addition to the selected optimizations there are some optimizations that are 
 * Bake unused shape keys with non-zero weight into the mesh data. (only if the blend shape has a single frame)
 * Merge identical material slots on skinned meshes.
 * Only reference bones if they have a non-zero weight on any vertex.
-* Add dummy animation to animator states that have no animation specified.
 * Remove everything with the EditorOnly tag.
 ## Show Mesh & Material Merge Preview
 Shows a preview of how meshes and materials would get merged.

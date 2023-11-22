@@ -1,7 +1,10 @@
 ## v3.2.3
+### Changes
+* No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
+
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
-* Fix crash in unity 2022 when an animator is not humanoid.
+* Fix crash when an animator is not humanoid.
 
 ## v3.2.2
 ### Bug Fixes

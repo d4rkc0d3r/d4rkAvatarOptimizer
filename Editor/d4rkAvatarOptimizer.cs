@@ -987,10 +987,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return clip;
     }
 
-    private Motion FixMotion(Motion motion, Dictionary<Motion, Motion> fixedMotions, string assetPath, AnimationClip dummyClip)
+    private Motion FixMotion(Motion motion, Dictionary<Motion, Motion> fixedMotions, string assetPath)
     {
         if (motion == null)
-            return dummyClip;
+            return null;
         if (fixedMotions.TryGetValue(motion, out var fixedMotionValue))
             return fixedMotionValue;
         if (motion is BlendTree oldTree)
@@ -1006,7 +1006,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var childNodes = oldTree.children;
             for (int j = 0; j < childNodes.Length; j++)
             {
-                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedMotions, assetPath, dummyClip);
+                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedMotions, assetPath);
             }
             newTree.children = childNodes;
             fixedMotions[motion] = newTree;
@@ -1024,8 +1024,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return;
-
-        var dummyAnimationToFillEmptyStates = AssetDatabase.LoadAssetAtPath<AnimationClip>(packageRootPath + "/Editor/Assets/DummyAnimationToFillEmptyStates.anim");
         
         var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
         var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
@@ -1102,7 +1100,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             foreach (var state in newLayer.EnumerateAllStates())
             {
-                state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i], dummyAnimationToFillEmptyStates);
+                state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i]);
             }
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
