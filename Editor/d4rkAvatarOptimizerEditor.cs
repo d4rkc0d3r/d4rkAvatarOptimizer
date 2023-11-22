@@ -379,9 +379,50 @@ public class d4rkAvatarOptimizerEditor : Editor
                     foreach (var ratio in list)
                     {
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField($"{ratio.value * 100:F1}".Replace(".0", ""), GUILayout.Width(50));
+                        EditorGUILayout.LabelField($"{ratio.value * 100:F1}".Replace(".0", ""), GUILayout.Width(60));
                         EditorGUILayout.LabelField(ratio.blendshape.Replace("/blendShape.", "."));
                         EditorGUILayout.EndHorizontal();
+                    }
+                    EditorGUILayout.EndVertical();
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.Separator();
+                }
+                Profiler.EndSection();
+            }
+            if (Foldout("Mesh Bone Weight Stats", ref optimizer.DebugShowBoneWeightStats))
+            {
+                Profiler.StartSection("Mesh Bone Weight Stats");
+                foreach (var mesh in optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>().Select(r => r.sharedMesh).Distinct())
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.Space(15, false);
+                    EditorGUILayout.BeginVertical(GUI.skin.box);
+                    EditorGUILayout.ObjectField(mesh, typeof(Mesh), false);
+                    var stats = GetMeshBoneWeightStats(mesh);
+                    if (stats[0].count == 0)
+                    {
+                        EditorGUILayout.LabelField("No bone weights");
+                    }
+                    else
+                    {
+                        var entryWidth = GUILayout.Width(60f);
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.LabelField($"Index", entryWidth);
+                        EditorGUILayout.LabelField($"Count", entryWidth);
+                        EditorGUILayout.LabelField($"Max", entryWidth);
+                        EditorGUILayout.LabelField($"Median", entryWidth);
+                        EditorGUILayout.EndHorizontal();
+                        for (int i = 0; i < 4; i++)
+                        {
+                            if (stats[i].count == 0)
+                                continue;
+                            EditorGUILayout.BeginHorizontal();
+                            EditorGUILayout.LabelField($"{i}", entryWidth);
+                            EditorGUILayout.LabelField($"{stats[i].count}", entryWidth);
+                            EditorGUILayout.LabelField($"{stats[i].maxValue:F2}", entryWidth);
+                            EditorGUILayout.LabelField($"{stats[i].medianValue:F2}", entryWidth);
+                            EditorGUILayout.EndHorizontal();
+                        }
                     }
                     EditorGUILayout.EndVertical();
                     EditorGUILayout.EndHorizontal();
@@ -719,6 +760,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private string[] animatedMaterialPropertyPathsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
     private List<List<(string blendshape, float value)>> mergeableBlendShapesCache = null;
+    private Dictionary<Mesh, (int count, float maxValue, float medianValue)[]> meshBoneWeightStatsCache = null;
 
     private void ClearUICaches()
     {
@@ -748,6 +790,51 @@ public class d4rkAvatarOptimizerEditor : Editor
             optimizer.ApplyAutoSettings();
         }
         ShaderAnalyzer.ParseAndCacheAllShaders(optimizer.FindAllUsedMaterials().Select(m => m.shader), false);
+    }
+
+    private (int count, float maxValue, float medianValue)[] GetMeshBoneWeightStats(Mesh mesh)
+    {
+        if (meshBoneWeightStatsCache == null)
+            meshBoneWeightStatsCache = new Dictionary<Mesh, (int count, float maxValue, float medianValue)[]>();
+        if (!meshBoneWeightStatsCache.TryGetValue(mesh, out var stats))
+        {
+            stats = new (int count, float maxValue, float medianValue)[4];
+            var nonZeroWeights = new List<float>[4]
+            {
+                new List<float>(),
+                new List<float>(),
+                new List<float>(),
+                new List<float>(),
+            };
+            var boneWeights = mesh.boneWeights;
+            for (int i = 0; i < boneWeights.Length; i++)
+            {
+                var weight = boneWeights[i];
+                if (weight.weight0 > 0)
+                    nonZeroWeights[0].Add(weight.weight0);
+                if (weight.weight1 > 0)
+                    nonZeroWeights[1].Add(weight.weight1);
+                if (weight.weight2 > 0)
+                    nonZeroWeights[2].Add(weight.weight2);
+                if (weight.weight3 > 0)
+                    nonZeroWeights[3].Add(weight.weight3);
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                stats[i].count = nonZeroWeights[i].Count;
+                if (stats[i].count == 0)
+                {
+                    stats[i].maxValue = 0;
+                    stats[i].medianValue = 0;
+                    continue;
+                }
+                nonZeroWeights[i].Sort();
+                stats[i].maxValue = nonZeroWeights[i][stats[i].count - 1];
+                stats[i].medianValue = nonZeroWeights[i][stats[i].count / 2];
+            }
+            meshBoneWeightStatsCache.Add(mesh, stats);
+        }
+        return stats;
     }
 
     private List<List<List<MaterialSlot>>> MergedMaterialPreview

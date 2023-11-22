@@ -71,6 +71,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowUnlockedMaterials = true;
     public bool DebugShowPenetrators = true;
     public bool DebugShowMergeableBlendShapes = true;
+    public bool DebugShowBoneWeightStats = true;
     public bool DebugShowPhysBoneDependencies = true;
     public bool DebugShowUnusedComponents = true;
     public bool DebugShowAlwaysDisabledGameObjects = true;
