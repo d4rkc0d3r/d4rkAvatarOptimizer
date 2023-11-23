@@ -38,6 +38,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool WritePropertiesAsStaticValues = true;
         public bool MergeSkinnedMeshes = true;
         public bool MergeSkinnedMeshesWithShaderToggle = true;
+        public bool MergeSkinnedMeshesWithNaNScale = true;
         public bool MergeStaticMeshesAsSkinned = true;
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
@@ -195,6 +196,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSkinnedMeshesWithShaderToggle {
         get { return HasCustomShaderSupport && settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
         set { settings.MergeSkinnedMeshesWithShaderToggle = value; } }
+    public bool MergeSkinnedMeshesWithNaNScale {
+        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNScale; }
+        set { settings.MergeSkinnedMeshesWithNaNScale = value; } }
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
         set { settings.MergeStaticMeshesAsSkinned = value; } }
@@ -226,6 +230,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(WritePropertiesAsStaticValues):
                 return !(MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials);
             case nameof(MergeSkinnedMeshesWithShaderToggle):
+            case nameof(MergeSkinnedMeshesWithNaNScale):
             case nameof(MergeStaticMeshesAsSkinned):
                 return settings.MergeSkinnedMeshes;
             case nameof(MergeSameDimensionTextures):
@@ -247,6 +252,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(WritePropertiesAsStaticValues), "Write Properties as Static Values"},
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
+        {nameof(MergeSkinnedMeshesWithNaNScale), "NaNimation Toggles"},
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
@@ -279,6 +285,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), false},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
@@ -296,6 +303,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
@@ -313,6 +321,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
@@ -666,10 +675,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding)
     {
-        if (typeof(Renderer).IsAssignableFrom(binding.type))
-            return !binding.propertyName.StartsWith("blendShape.");
-        if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
-            return true;
+        if (!MergeSkinnedMeshesWithNaNScale) {
+            if (typeof(Renderer).IsAssignableFrom(binding.type))
+                return !binding.propertyName.StartsWith("blendShape.");
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+                return true;
+        } else {
+            if (typeof(Renderer).IsAssignableFrom(binding.type))
+                return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
+        }
         return false;
     }
 
@@ -882,26 +896,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         return matchedSkinnedMeshes;
     }
-    
-    private int GetNewBoneIDFromTransform(List<Transform> bones, Dictionary<Transform, int> boneMap, List<Matrix4x4> bindPoses, Transform toMatch)
-    {
-        if (boneMap.TryGetValue(toMatch, out int index))
-            return index;
-        if (DeleteUnusedGameObjects)
-            toMatch = movingParentMap[toMatch];
-        foreach (var bone in transform.GetAllDescendants())
-        {
-            if (bone == toMatch)
-            {
-                bones.Add(bone);
-                bindPoses.Add(bone.worldToLocalMatrix);
-                return bones.Count - 1;
-            }
-        }
-        bones.Add(transform);
-        bindPoses.Add(transform.localToWorldMatrix);
-        return bones.Count - 1;
-    }
 
     private EditorCurveBinding FixAnimationBindingPath(EditorCurveBinding binding, ref bool changed)
     {
@@ -931,6 +925,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         return FixAnimationBindingPath(newBinding, ref changed);
     }
+
+    private AnimationCurve ReplaceZeroWithNaN(AnimationCurve curve)
+    {
+        var newCurve = new AnimationCurve();
+        for (int i = 0; i < curve.keys.Length; i++)
+        {
+            var key = curve.keys[i];
+            if (key.value == 0)
+            {
+                key.value = float.NaN;
+            }
+            newCurve.AddKey(key);
+        }
+        newCurve.preWrapMode = curve.preWrapMode;
+        newCurve.postWrapMode = curve.postWrapMode;
+        return newCurve;
+    }
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
@@ -942,7 +953,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
-            AnimationUtility.SetEditorCurve(newClip, FixAnimationBinding(binding, ref changed), curve);
+            var fixedBinding = FixAnimationBinding(binding, ref changed);
+            if (fixedBinding.propertyName == "NaNimation") {
+                var NaNCurve = ReplaceZeroWithNaN(curve);
+                fixedBinding.propertyName = "m_LocalScale.x";
+                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+                fixedBinding.propertyName = "m_LocalScale.y";
+                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+                fixedBinding.propertyName = "m_LocalScale.z";
+                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+            } else {
+                AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
+            }
             bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
                 || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
             if (addPhysBoneCurves && physBonesToDisable.TryGetValue(binding.path, out var physBonePaths))
@@ -3436,6 +3458,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         return result;
     }
+    
+    private int GetNewBoneIDFromTransform(List<Transform> bones, Dictionary<Transform, int> boneMap, List<Matrix4x4> bindPoses, Transform toMatch)
+    {
+        if (boneMap.TryGetValue(toMatch, out int index))
+            return index;
+        if (DeleteUnusedGameObjects)
+            toMatch = movingParentMap[toMatch];
+        foreach (var bone in transform.GetAllDescendants())
+        {
+            if (bone == toMatch)
+            {
+                bones.Add(bone);
+                bindPoses.Add(bone.worldToLocalMatrix);
+                boneMap[bone] = bones.Count - 1;
+                return bones.Count - 1;
+            }
+        }
+        bones.Add(transform);
+        bindPoses.Add(transform.localToWorldMatrix);
+        boneMap[transform] = bones.Count - 1;
+        return bones.Count - 1;
+    }
 
     private void CombineSkinnedMeshes()
     {
@@ -3513,6 +3557,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var sourceWeights = mesh.boneWeights;
                 var rootBone = skinnedMesh.rootBone == null ? skinnedMesh.transform : skinnedMesh.rootBone;
                 var sourceBones = skinnedMesh.bones;
+                Transform NaNimationBone = null;
+                int NaNimationBoneIndex = -1;
+                if (MergeSkinnedMeshesWithNaNScale && combinableSkinnedMeshes.Count > 1)
+                {
+                    NaNimationBone = new GameObject("NaNimationBone").transform;
+                    var pathToRoot = GetPathToRoot(skinnedMesh).Replace('/', '_');
+                    var siblingNames = new HashSet<string>(transform.Cast<Transform>().Select(t => t.name));
+                    var nameCandidate = "NaNimation " + pathToRoot;
+                    int i = 1;
+                    while (siblingNames.Contains(nameCandidate))
+                    {
+                        nameCandidate = "NaNimation " + pathToRoot + " " + i++;
+                    }
+                    NaNimationBone.name = nameCandidate;
+                    NaNimationBone.parent = transform;
+                    NaNimationBone.localPosition = Vector3.zero;
+                    NaNimationBone.localRotation = Quaternion.identity;
+                    NaNimationBone.localScale = Vector3.one;
+                    targetBones.Add(NaNimationBone);
+                    NaNimationBoneIndex = targetBoneMap[NaNimationBone] = targetBones.Count - 1;
+                    targetBindPoses.Add(NaNimationBone.worldToLocalMatrix);
+                    AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_IsActive", typeof(GameObject)),
+                        (GetPathToRoot(NaNimationBone), "NaNimation", typeof(Transform)));
+                    AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_Enabled", typeof(SkinnedMeshRenderer)),
+                        (GetPathToRoot(NaNimationBone), "NaNimation", typeof(Transform)));
+                }
                 for (int i = 0; i < sourceBones.Length; i++)
                 {
                     if (sourceBones[i] == null)
@@ -3658,6 +3728,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     boneWeight.boneIndex1 = GetNewBoneIndex(boneWeight.boneIndex1);
                     boneWeight.boneIndex2 = GetNewBoneIndex(boneWeight.boneIndex2);
                     boneWeight.boneIndex3 = GetNewBoneIndex(boneWeight.boneIndex3);
+                    if (NaNimationBoneIndex != -1) {
+                        var sum = boneWeight.weight0 + boneWeight.weight1 + boneWeight.weight2;
+                        sum = sum == 0 ? 1 : sum;
+                        boneWeight.weight0 /= sum;
+                        boneWeight.weight1 /= sum;
+                        boneWeight.weight2 /= sum;
+                        boneWeight.weight3 = 0;
+                        if (boneWeight.weight1 == 0) {
+                            boneWeight.boneIndex1 = NaNimationBoneIndex;
+                            boneWeight.weight1 = 1e-35f;
+                        } else if (boneWeight.weight2 == 0) {
+                            boneWeight.boneIndex2 = NaNimationBoneIndex;
+                            boneWeight.weight2 = 1e-35f;
+                        } else {
+                            boneWeight.boneIndex3 = NaNimationBoneIndex;
+                            boneWeight.weight3 = 1e-35f;
+                        }
+                    }
                     targetWeights.Add(boneWeight);
                 }
                 
@@ -3860,13 +3948,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var properties = new MaterialPropertyBlock();
                 if (meshRenderer.HasPropertyBlock())
                     meshRenderer.GetPropertyBlock(properties);
-                bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
-                properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
-                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
-                AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
-                        (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
-                AddAnimationPathChange((oldPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
-                        (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                if (!MergeSkinnedMeshesWithNaNScale) {
+                    bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
+                    properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
+                    properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
+                    AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
+                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                    AddAnimationPathChange((oldPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
+                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                } else {
+                    properties.SetFloat("_IsActiveMesh" + meshID, 1f);
+                    properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
+                }
                 var animatedMaterialPropertiesToAdd = new List<string>();
                 if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                 {
@@ -4032,6 +4125,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         used.Add(transform);
         used.UnionWith(GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
+        used.UnionWith(transform.Cast<Transform>().Where(t => t.name.StartsWith("NaNimation ")));
 
         foreach (var skinnedRenderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {

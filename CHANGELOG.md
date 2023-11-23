@@ -1,4 +1,8 @@
 ## v3.3.0
+### Features
+* Add new way to toggle merged meshes `NaNimation`.
+  * This allows merging meshes that have shaders that don't support shader toggles.
+
 ### Changes
 * No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
 * Add debug list `Mesh Bone Weight Stats`.
