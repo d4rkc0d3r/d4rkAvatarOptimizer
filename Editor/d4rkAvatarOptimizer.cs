@@ -3602,7 +3602,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBindPoses.Add(NaNimationBone.worldToLocalMatrix);
                     string key = "NaNimation";
                     if (MergeSkinnedMeshesWithShaderToggle) {
-                        key += $";{meshID};{GetPathToRoot(skinnedMesh)}";
+                        key += $";{meshID};{newPath}";
                     }
                     AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_IsActive", typeof(GameObject)),
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
