@@ -2177,6 +2177,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return cache_FindAllGameObjectTogglePaths = togglePaths;
     }
 
+    private HashSet<string> cache_FindAllRendererTogglePaths = null;
+    public HashSet<string> FindAllRendererTogglePaths()
+    {
+        if (cache_FindAllRendererTogglePaths != null)
+            return cache_FindAllRendererTogglePaths;
+        var togglePaths = new HashSet<string>();
+        foreach (var binding in GetAllUsedFXLayerCurveBindings())
+        {
+            if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
+                togglePaths.Add(binding.path);
+        }
+        togglePaths.UnionWith(FindAllGameObjectTogglePaths());
+        return cache_FindAllRendererTogglePaths = togglePaths;
+    }
+
     private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
@@ -3559,15 +3574,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var sourceBones = skinnedMesh.bones;
                 Transform NaNimationBone = null;
                 int NaNimationBoneIndex = -1;
-                if (MergeSkinnedMeshesWithNaNScale && combinableSkinnedMeshes.Count > 1)
-                {
+                if (MergeSkinnedMeshesWithNaNScale && combinableSkinnedMeshes.Count > 1
+                        && FindAllRendererTogglePaths().Contains(GetPathToRoot(skinnedMesh))) {
                     NaNimationBone = new GameObject("NaNimationBone").transform;
                     var pathToRoot = GetPathToRoot(skinnedMesh).Replace('/', '_');
                     var siblingNames = new HashSet<string>(transform.Cast<Transform>().Select(t => t.name));
                     var nameCandidate = "NaNimation " + pathToRoot;
                     int i = 1;
-                    while (siblingNames.Contains(nameCandidate))
-                    {
+                    while (siblingNames.Contains(nameCandidate)) {
                         nameCandidate = "NaNimation " + pathToRoot + " " + i++;
                     }
                     NaNimationBone.name = nameCandidate;
