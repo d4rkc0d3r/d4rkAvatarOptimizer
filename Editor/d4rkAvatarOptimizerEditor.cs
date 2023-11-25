@@ -632,27 +632,24 @@ public class d4rkAvatarOptimizerEditor : Editor
                 .Select(m => ShaderAnalyzer.Parse(m?.shader))
                 .Where(p => (p?.parsedCorrectly ?? false)).ToArray();
 
-            if (correctlyParsedMaterials.Length != allMaterials.Length)
-            {
-                EditorGUILayout.HelpBox(
-                    "Some materials could not be parsed.\n" +
-                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
-                    "Check the Debug Info foldout for more info.", MessageType.Info);
+            var mergeInfoList = new List<string>();
+
+            if (correctlyParsedMaterials.Length != allMaterials.Length) {
+                mergeInfoList.Add("Some materials could not be parsed.\n");
             }
 
-            if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
-            {
-                EditorGUILayout.HelpBox(
-                    "Some materials do not support merging.\n" +
-                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
-                    "Check the Debug Info foldout for more info.", MessageType.Info);
+            if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge())) {
+                mergeInfoList.Add("Some materials do not support merging.\n");
             }
 
-            if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
-            {
+            if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures())) {
+                mergeInfoList.Add("Some materials do not support merging textures.\n");
+            }
+            
+            if (mergeInfoList.Count > 0) {
                 EditorGUILayout.HelpBox(
-                    "Some materials do not support merging textures.\n" +
-                    "Swapping their shaders to compatible ones might help reduce material count further.\n" + 
+                    string.Join("", mergeInfoList) +
+                    "Swapping their shaders to compatible ones might help reduce material count further.\n" +
                     "Check the Debug Info foldout for more info.", MessageType.Info);
             }
 

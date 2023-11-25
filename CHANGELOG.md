@@ -6,6 +6,7 @@
 ### Changes
 * No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
 * Add debug list `Mesh Bone Weight Stats`.
+* Collapsed some info boxes regarding materials that can't merge into one info box.
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
