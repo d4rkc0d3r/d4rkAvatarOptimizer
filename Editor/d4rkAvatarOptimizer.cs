@@ -954,14 +954,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
-            if (fixedBinding.propertyName == "NaNimation") {
+            if (fixedBinding.propertyName.StartsWith("NaNimation")) {
+                var shaderToggleInfo = fixedBinding.propertyName.Substring("NaNimation".Length);
+                var propertyNames = new string[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z" };
                 var NaNCurve = ReplaceZeroWithNaN(curve);
-                fixedBinding.propertyName = "m_LocalScale.x";
-                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
-                fixedBinding.propertyName = "m_LocalScale.y";
-                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
-                fixedBinding.propertyName = "m_LocalScale.z";
-                AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+                for (int i = 0; i < propertyNames.Length; i++) {
+                    fixedBinding.propertyName = propertyNames[i];
+                    AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+                }
+                if (shaderToggleInfo.Length > 0) {
+                    shaderToggleInfo = shaderToggleInfo.Substring(1);
+                    var semicolonIndex = shaderToggleInfo.IndexOf(';');
+                    fixedBinding.path = shaderToggleInfo.Substring(semicolonIndex + 1);
+                    fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
+                    fixedBinding.type = typeof(SkinnedMeshRenderer);
+                    AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
+                }
             } else {
                 AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
             }
@@ -3592,10 +3600,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBones.Add(NaNimationBone);
                     NaNimationBoneIndex = targetBoneMap[NaNimationBone] = targetBones.Count - 1;
                     targetBindPoses.Add(NaNimationBone.worldToLocalMatrix);
+                    string key = "NaNimation";
+                    if (MergeSkinnedMeshesWithShaderToggle) {
+                        key += $";{meshID};{GetPathToRoot(skinnedMesh)}";
+                    }
                     AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_IsActive", typeof(GameObject)),
-                        (GetPathToRoot(NaNimationBone), "NaNimation", typeof(Transform)));
+                        (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
                     AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_Enabled", typeof(SkinnedMeshRenderer)),
-                        (GetPathToRoot(NaNimationBone), "NaNimation", typeof(Transform)));
+                        (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
                 }
                 for (int i = 0; i < sourceBones.Length; i++)
                 {
@@ -3962,17 +3974,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var properties = new MaterialPropertyBlock();
                 if (meshRenderer.HasPropertyBlock())
                     meshRenderer.GetPropertyBlock(properties);
+                bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
+                properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
+                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                 if (!MergeSkinnedMeshesWithNaNScale) {
-                    bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
-                    properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
-                    properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     AddAnimationPathChange((oldPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
-                } else {
-                    properties.SetFloat("_IsActiveMesh" + meshID, 1f);
-                    properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
                 }
                 var animatedMaterialPropertiesToAdd = new List<string>();
                 if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
