@@ -794,6 +794,8 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         if (meshBoneWeightStatsCache == null)
             meshBoneWeightStatsCache = new Dictionary<Mesh, (int count, float maxValue, float medianValue)[]>();
+        if (mesh == null)
+            return new (int count, float maxValue, float medianValue)[4];
         if (!meshBoneWeightStatsCache.TryGetValue(mesh, out var stats))
         {
             stats = new (int count, float maxValue, float medianValue)[4];
