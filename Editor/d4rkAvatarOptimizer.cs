@@ -126,6 +126,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             texArrayPropertiesToSet.Clear();
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
+            constantAnimatedValuesToAdd.Clear();
             ClearCaches();
             DisplayProgressBar("Destroying unused components", 0.2f);
             Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
@@ -373,25 +374,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private static string packageRootPath = "Assets/d4rkAvatarOptimizer";
     private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
-    private static HashSet<string> usedBlendShapes = new HashSet<string>();
-    private static Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
-    private static Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
-    private static List<Material> optimizedMaterials = new List<Material>();
-    private static List<string> optimizedMaterialImportPaths = new List<string>();
-    private static List<List<string>> mergedMeshPaths = new List<List<string>>();
-    private static Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
-    private static Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
-    private static Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
-    private static Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
-    private static Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
-    private static Dictionary<string, HashSet<string>> fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
-    private static List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
-    private static List<Texture2DArray> textureArrays = new List<Texture2DArray>();
-    private static Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
-    private static HashSet<Transform> keepTransforms = new HashSet<Transform>();
-    private static HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
-    private static Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
-    private static Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
+    private HashSet<string> usedBlendShapes = new HashSet<string>();
+    private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
+    private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
+    private List<Material> optimizedMaterials = new List<Material>();
+    private List<string> optimizedMaterialImportPaths = new List<string>();
+    private List<List<string>> mergedMeshPaths = new List<List<string>>();
+    private Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
+    private Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
+    private Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
+    private Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
+    private Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+    private Dictionary<string, HashSet<string>> fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+    private List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
+    private List<Texture2DArray> textureArrays = new List<Texture2DArray>();
+    private Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
+    private HashSet<Transform> keepTransforms = new HashSet<Transform>();
+    private HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
+    private Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
+    private Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
+    private Dictionary<EditorCurveBinding, float> constantAnimatedValuesToAdd = new Dictionary<EditorCurveBinding, float>();
     // blendshape names come from https://www.deviantart.com/xoriu/art/MMD-Facial-Expressions-Chart-341504917
     private static HashSet<string> MMDBlendShapes = new HashSet<string>()
     {
@@ -1104,7 +1106,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
             optimizedControllers[i] = controller == GetFXLayer()
-                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy)
+                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
         }
         Profiler.EndSection();
@@ -3608,6 +3610,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
                     AddAnimationPathChange((GetPathToRoot(skinnedMesh), "m_Enabled", typeof(SkinnedMeshRenderer)),
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
+                    var curveBinding = EditorCurveBinding.DiscreteCurve(GetPathToRoot(combinableSkinnedMeshes[0]), typeof(SkinnedMeshRenderer), "m_UpdateWhenOffscreen");
+                    constantAnimatedValuesToAdd[curveBinding] = 0f;
                 }
                 for (int i = 0; i < sourceBones.Length; i++)
                 {

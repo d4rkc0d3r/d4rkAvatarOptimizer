@@ -25,6 +25,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<int> layersToDestroy = new HashSet<int>();
         private HashSet<string> boolsToChangeToFloat = new HashSet<string>();
         private HashSet<string> intsToChangeToFloat = new HashSet<string>();
+        private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source)
         {
@@ -50,16 +51,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return target;
         }
 
-        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge, List<int> layersToDestroy)
+        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge, List<int> layersToDestroy, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
         {
             var target = new AnimatorController();
             target.name = $"{source.name}(Optimized)";
             AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<BinarySerializationSO>(), path);
             AssetDatabase.AddObjectToAsset(target, path);
             var optimizer = new AnimatorOptimizer(target, source);
+            optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             optimizer.layersToMerge = new HashSet<int>(layersToMerge);
             optimizer.layersToDestroy = new HashSet<int>(layersToDestroy);
-            optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
+            optimizer.constantCurvesToAdd = constantCurvesToAdd ?? new List<(EditorCurveBinding binding, float value)>();
             return optimizer.Run();
         }
 
@@ -91,7 +93,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
 
-            if (layersToMerge.Count > 0) {
+            if (layersToMerge.Count > 0 || constantCurvesToAdd.Count > 0) {
                 var blendTreeDummyWeight = new AnimatorControllerParameter {
                     name = "d4rkAvatarOptimizer_MergedLayers_Weight",
                     type = AnimatorControllerParameterType.Float,
@@ -200,7 +202,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
 
         private void MergeLayers() {
-            if (layersToMerge.Count == 0) {
+            if (layersToMerge.Count == 0 && constantCurvesToAdd.Count == 0) {
                 return;
             }
             var directBlendTree = new BlendTree() {
@@ -314,6 +316,23 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     layerMotion = CreateBlendTree(transitions[0].conditions[0].parameter, layerMotions.Select((x, index) => new ChildMotion() { motion = x, threshold = index}).ToArray());
                 }
                 layerMotion.name = source.layers[i].name;
+                motions.Add(new ChildMotion() {
+                    motion = layerMotion,
+                    directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
+                    timeScale = 1f
+                });
+            }
+            if (constantCurvesToAdd.Count > 0)
+            {
+                var layerMotion = new AnimationClip() {
+                    hideFlags = HideFlags.HideInHierarchy,
+                    name = "d4rkAvatarOptimizer_MergedLayers_Constants"
+                };
+                foreach (var curve in constantCurvesToAdd)
+                {
+                    AnimationUtility.SetEditorCurve(layerMotion, curve.binding, new AnimationCurve(new Keyframe[] { new Keyframe(0, curve.value) }));
+                }
+                AssetDatabase.AddObjectToAsset(layerMotion, assetPath);
                 motions.Add(new ChildMotion() {
                     motion = layerMotion,
                     directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
