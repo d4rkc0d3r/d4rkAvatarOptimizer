@@ -869,7 +869,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (!line.StartsWith("#define "))
                 return;
-            if (line.Contains("Texture2D ") || line.Contains("sampler2D "))
+            if (line.Contains("Texture2D ") || line.Contains("sampler2D ") || Regex.IsMatch(line, @"##_ST\s*(;|$)"))
             {
                 if (!parsedShader.customTextureDeclarations.Contains(line))
                     parsedShader.customTextureDeclarations.Add(line);
