@@ -1108,6 +1108,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             optimizedControllers[i] = controller == GetFXLayer()
                 ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
+            optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
         }
         Profiler.EndSection();
 
@@ -2986,27 +2987,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         continue;
                     foreach (var animPropName in animatedProperties)
                     {
-                        var propName = "d4rkAvatarOptimizer" + animPropName;
+                        var propName = animPropName;
                         bool isVector = propName.EndsWith(".x");
                         bool isColor = propName.EndsWith(".r");
-                        if (isColor || isVector)
-                        {
+                        if (isColor || isVector) {
                             propName = propName.Substring(0, propName.Length - 2);
-                        }
-                        else if (propName[propName.Length - 2] == '.')
-                        {
+                        } else if (propName[propName.Length - 2] == '.') {
                             continue;
+                        } else if (animatedProperties.Contains($"{propName}.x")) {
+                            isVector = true;
+                        } else if (animatedProperties.Contains($"{propName}.r")) {
+                            isColor = true;
                         }
                         for (int mID = 0; mID < meshCount; mID++)
                         {
-                            var propArrayName = $"{propName}_ArrayIndex{mID}";
-                            var signal = System.Single.NaN;
-                            if (isVector || isColor)
-                            {
+                            var propArrayName = $"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
+                            if (!mat.HasProperty(propArrayName))
+                                continue;
+                            var signal = float.NaN;
+                            if (isVector) {
                                 mat.SetVector(propArrayName, new Vector4(signal, signal, signal, signal));
-                            }
-                            else
-                            {
+                            } else if(isColor) {
+                                mat.SetColor(propArrayName, new Color(signal, signal, signal, signal));
+                            } else {
                                 mat.SetFloat(propArrayName, signal);
                             }
                         }

@@ -12,6 +12,7 @@
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
 * Fix crash when an animator is not humanoid.
 * Fix macro to declare `tex##_ST` not being detected as a custom texture property declaration macro.
+* Fix log spam in 2022 from vector array properties also setting as a float value.
 
 ## v3.2.2
 ### Bug Fixes
