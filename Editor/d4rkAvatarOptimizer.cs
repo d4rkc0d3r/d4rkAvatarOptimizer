@@ -909,6 +909,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var path = GetPathToRoot(transform);
                 changed = changed || path != newBinding.path;
                 newBinding.path = path;
+                if (binding.type == typeof(MeshRenderer) && !transform.TryGetComponent(out MeshRenderer renderer))
+                {
+                    newBinding.type = typeof(SkinnedMeshRenderer);
+                    changed = true;
+                }
             }
         }
         return newBinding;
@@ -919,6 +924,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var currentPath = (binding.path, binding.propertyName, binding.type);
         var newBinding = binding;
         if (newAnimationPaths.TryGetValue(currentPath, out var modifiedPath))
+        {
+            newBinding.path = modifiedPath.Item1;
+            newBinding.propertyName = modifiedPath.Item2;
+            newBinding.type = modifiedPath.Item3;
+            changed = true;
+        }
+        else if (binding.type == typeof(MeshRenderer) && newAnimationPaths.TryGetValue((binding.path, binding.propertyName, typeof(SkinnedMeshRenderer)), out modifiedPath))
         {
             newBinding.path = modifiedPath.Item1;
             newBinding.propertyName = modifiedPath.Item2;

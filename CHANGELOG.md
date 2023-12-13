@@ -13,6 +13,7 @@
 * Fix crash when an animator is not humanoid.
 * Fix macro to declare `tex##_ST` not being detected as a custom texture property declaration macro.
 * Fix log spam in 2022 from vector array properties also setting as a float value.
+* Fix material property animations on MeshRenderer components that get combined into a SkinnedMeshRenderer still being bound to the MeshRenderer type.
 
 ## v3.2.2
 ### Bug Fixes
