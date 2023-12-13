@@ -3599,7 +3599,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var sourceBones = skinnedMesh.bones;
                 Transform NaNimationBone = null;
                 int NaNimationBoneIndex = -1;
-                if (MergeSkinnedMeshesWithNaNScale && combinableSkinnedMeshes.Count > 1
+                if (MergeSkinnedMeshesWithNaNScale && basicMergedMeshes.Count > 1
                         && FindAllRendererTogglePaths().Contains(GetPathToRoot(skinnedMesh))) {
                     NaNimationBone = new GameObject("NaNimationBone").transform;
                     var pathToRoot = GetPathToRoot(skinnedMesh).Replace('/', '_');
@@ -3986,7 +3986,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
 
-            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count && combinableSkinnedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; meshID++)
+            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count && basicMergedMeshes.Count > 1; meshID++)
             {
                 var skinnedMesh = combinableSkinnedMeshes[meshID];
                 var oldPath = GetPathToRoot(skinnedMesh);
@@ -4069,7 +4069,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
 
-            if (combinableSkinnedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle)
+            if (basicMergedMeshes.Count > 1)
             {
                 meshRenderer.gameObject.SetActive(true);
                 meshRenderer.enabled = true;

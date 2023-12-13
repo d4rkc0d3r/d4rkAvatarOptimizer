@@ -14,6 +14,7 @@
 * Fix macro to declare `tex##_ST` not being detected as a custom texture property declaration macro.
 * Fix log spam in 2022 from vector array properties also setting as a float value.
 * Fix material property animations on MeshRenderer components that get combined into a SkinnedMeshRenderer still being bound to the MeshRenderer type.
+* Fix basic merged mesh blobs also trying to use `Use Shader Toggles` when it is enabled but the shaders don't support it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/66)
 
 ## v3.2.2
 ### Bug Fixes
