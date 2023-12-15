@@ -42,6 +42,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeStaticMeshesAsSkinned = true;
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
+        public bool MergeMainTex = false;
         public bool MergeBackFaceCullingWithCullingOff = false;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;
@@ -209,6 +210,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSameDimensionTextures {
         get { return settings.MergeDifferentPropertyMaterials && settings.MergeSameDimensionTextures; }
         set { settings.MergeSameDimensionTextures = value; } }
+    public bool MergeMainTex {
+        get { return MergeSameDimensionTextures && settings.MergeMainTex; }
+        set { settings.MergeMainTex = value; } }
     public bool MergeBackFaceCullingWithCullingOff {
         get { return settings.MergeDifferentPropertyMaterials && settings.MergeBackFaceCullingWithCullingOff; }
         set { settings.MergeBackFaceCullingWithCullingOff = value; } }
@@ -237,6 +241,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(MergeSameDimensionTextures):
             case nameof(MergeBackFaceCullingWithCullingOff):
                 return settings.MergeDifferentPropertyMaterials;
+            case nameof(MergeMainTex):
+                return MergeSameDimensionTextures;
             case nameof(CombineApproximateMotionTimeAnimations):
                 return settings.OptimizeFXLayer;
             #if !HAS_IEDITOR_ONLY
@@ -257,6 +263,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
+        {nameof(MergeMainTex), "Merge MainTex"},
         {nameof(MergeBackFaceCullingWithCullingOff), "Merge Cull Back with Cull Off"},
         {nameof(KeepMMDBlendShapes), "Keep MMD Blend Shapes"},
         {nameof(DeleteUnusedComponents), "Delete Unused Components"},
@@ -290,6 +297,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
+            {nameof(Settings.MergeMainTex), false},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
@@ -308,6 +316,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
+            {nameof(Settings.MergeMainTex), false},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
@@ -326,6 +335,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
+            {nameof(Settings.MergeMainTex), true},
             {nameof(Settings.MergeBackFaceCullingWithCullingOff), true},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), true},
@@ -3152,9 +3162,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         {
                             var mTex = mat.GetTexture(prop.name);
                             var cTex = candidateMat.GetTexture(prop.name);
-                            if (mergeTextures && !CanCombineTextures(mTex, cTex))
+                            bool mergeTexture = mergeTextures && (prop.name != "_MainTex" || MergeMainTex);
+                            if (mergeTexture && !CanCombineTextures(mTex, cTex))
                                 return false;
-                            if (!mergeTextures && cTex != mTex)
+                            if (!mergeTexture && cTex != mTex)
                                 return false;
                         }
                         break;

@@ -2,6 +2,7 @@
 ### Features
 * Add new way to toggle merged meshes `NaNimation`.
   * This allows merging meshes that have shaders that don't support shader toggles.
+* Add sub option `Merge MainTex` that decides whether the `_MainTex` property is allowed to be merged into a texture array. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17)
 
 ### Changes
 * No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
@@ -10,7 +11,7 @@
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
-* Fix crash when an animator is not humanoid.
+* Fix crash when an extra animator is not humanoid or doesn't have an avatar definition. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/65)
 * Fix macro to declare `tex##_ST` not being detected as a custom texture property declaration macro.
 * Fix log spam in 2022 from vector array properties also setting as a float value.
 * Fix material property animations on MeshRenderer components that get combined into a SkinnedMeshRenderer still being bound to the MeshRenderer type.

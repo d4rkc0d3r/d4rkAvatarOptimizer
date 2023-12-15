@@ -103,6 +103,9 @@ Can't merge materials if:
 * Shader declares Texture2D or sampler2D properties with a custom macro.  
   eg `#define CUSTOM_TEX2D(name) Texture2D name`
 * The textures use crunch compression.
+## Merge MainTex
+If disabled, the optimizer will not merge materials that have different textures assigned to the `_MainTex` property.  
+If you care about your avatar looking ok with disabled shaders you should disable this option.
 ## Merge Cull Back with Cull Off
 Merges materials even if their culling properties differ. Forces culling to off.
 ## Merge Same Ratio Blend Shapes
