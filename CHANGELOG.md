@@ -8,6 +8,7 @@
 * No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
 * Add debug list `Mesh Bone Weight Stats`.
 * Collapsed some info boxes regarding materials that can't merge into one info box.
+* The UI is now disabled when in play mode. This saves performance when testing with av3 emulator without running the optimizer.
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.

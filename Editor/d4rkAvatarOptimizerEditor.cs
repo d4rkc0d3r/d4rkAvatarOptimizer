@@ -59,6 +59,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
         }
 
+        if (Application.isPlaying)
+        {
+            EditorGUILayout.HelpBox("Exit play mode to use the optimizer.", MessageType.Info);
+            return;
+        }
+
         var presets = optimizer.GetPresetNames();
         if (presets.Count > 0)
         {
