@@ -24,7 +24,7 @@
         },
         {
             "name": "sh.orels.shaders.generator",
-            "expression": "6.1",
+            "expression": "6.2",
             "define": "ORLSHADER_EXISTS"
         },
         {

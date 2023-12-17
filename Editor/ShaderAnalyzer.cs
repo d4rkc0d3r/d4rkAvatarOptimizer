@@ -227,22 +227,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 #if ORLSHADER_EXISTS
                 Profiler.StartSection("ORL.ShaderGenerator");
-                var fileName = Path.GetFileNameWithoutExtension(shaderName);
-                var shaderNameHash = "";
-                using (var md5 = MD5.Create())
-                {
-                    md5.ComputeHash(Encoding.UTF8.GetBytes(shaderName));
-                    shaderNameHash = string.Join("", md5.Hash.Select(b => b.ToString("x2")));
-                }
-                var trashBinPath = d4rkAvatarOptimizer.GetTrashBinPath();
-                var tempShaderPath = Path.Combine(trashBinPath, $"{fileName}_{shaderNameHash}.shader");
-                if (!File.Exists(tempShaderPath))
-                {
-                    ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, tempShaderPath);
-                }
                 try
                 {
-                    shaderFileLines = File.ReadAllLines(tempShaderPath);
+                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, false)
+                        .Split(new string[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.RemoveEmptyEntries);
                 }
                 catch (IOException e)
                 {
@@ -254,7 +242,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 #else
                 parsedShader.parsedCorrectly = false;
                 doneParsing = true;
-                parsedShader.errorMessage = "ORLShader Generator is not installed.";
+                parsedShader.errorMessage = "ORLShader Generator 6.2 is not installed.";
                 #endif
             }
         }
