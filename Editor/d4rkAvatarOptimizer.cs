@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using VRC.SDK3.Dynamics.Contact.Components;
 using VRC.SDK3.Dynamics.PhysBone.Components;
+using System.Text.RegularExpressions;
 
 #if UNITY_EDITOR
 using System.Threading;
@@ -1001,6 +1002,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             } else {
                 AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
+                if (fixedBinding.propertyName.StartsWith($"material.d4rkAvatarOptimizer")) {
+                    var otherBinding = fixedBinding;
+                    otherBinding.propertyName = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+").Groups[1].Value;
+                    AnimationUtility.SetEditorCurve(newClip, otherBinding, curve);
+                }
             }
             bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
                 || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
@@ -2676,6 +2682,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             continue;
                         }
                         defaultAnimatedProperties.Add(($"d4rkAvatarOptimizer{name}_ArrayIndex{i}", isVector));
+                        defaultAnimatedProperties.Add((name, isVector));
                     }
                 }
                 defaultAnimatedProperties.Add(($"_IsActiveMesh{i}", false));

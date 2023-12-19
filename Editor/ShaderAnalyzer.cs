@@ -2655,6 +2655,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var prop = parsedProperty.Value;
                 if (prop.name.StartsWith("_ShaderOptimizer"))
                     continue;
+                if (defaultAnimatedProperties.Contains((prop.name, false)) || defaultAnimatedProperties.Contains((prop.name, true)))
+                    continue;
                 if (texturesToMerge.Contains(prop.name))
                 {
                     int index = prop.type.LastIndexOf("2D");
