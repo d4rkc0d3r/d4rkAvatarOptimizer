@@ -4013,7 +4013,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
 
-            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count && basicMergedMeshes.Count > 1; meshID++)
+            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count && basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; meshID++)
             {
                 var skinnedMesh = combinableSkinnedMeshes[meshID];
                 var oldPath = GetPathToRoot(skinnedMesh);
