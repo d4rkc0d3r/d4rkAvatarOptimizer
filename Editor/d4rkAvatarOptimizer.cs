@@ -3539,6 +3539,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private void CombineSkinnedMeshes()
     {
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var combinableMeshList = FindPossibleSkinnedMeshMerges();
         mergedMeshPaths = combinableMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
         var exclusions = GetAllExcludedTransforms();
@@ -3613,6 +3614,30 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var sourceWeights = mesh.boneWeights;
                 var rootBone = skinnedMesh.rootBone == null ? skinnedMesh.transform : skinnedMesh.rootBone;
                 var sourceBones = skinnedMesh.bones;
+                for (int i = 0; i < sourceBones.Length; i++)
+                {
+                    if (sourceBones[i] == null)
+                        sourceBones[i] = rootBone;
+                }
+                var bindPoseCount = mesh.bindposes.Length;
+                if (sourceBones.Length != bindPoseCount)
+                {
+                    Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
+                    bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
+                }
+                var toWorldArray = Enumerable.Range(0, bindPoseCount).Select(i =>
+                    sourceBones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
+                    ).ToArray();
+                var aabb = skinnedMesh.localBounds;
+                var m = toLocal * rootBone.localToWorldMatrix;
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, -1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, -1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, 1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, 1, -1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, 1) + aabb.center));
+                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, -1) + aabb.center));
                 Transform NaNimationBone = null;
                 int NaNimationBoneIndex = -1;
                 if (MergeSkinnedMeshesWithNaNScale && basicMergedMeshes.Count > 1
@@ -3643,31 +3668,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
                     var curveBinding = EditorCurveBinding.DiscreteCurve(GetPathToRoot(combinableSkinnedMeshes[0]), typeof(SkinnedMeshRenderer), "m_UpdateWhenOffscreen");
                     constantAnimatedValuesToAdd[curveBinding] = 0f;
+                    targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f + Vector3.up * 0.2f));
+                    targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.up * 0.2f));
+                    targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f + Vector3.right * 0.2f));
+                    targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.right * 0.2f));
                 }
-                for (int i = 0; i < sourceBones.Length; i++)
-                {
-                    if (sourceBones[i] == null)
-                        sourceBones[i] = rootBone;
-                }
-                var bindPoseCount = mesh.bindposes.Length;
-                if (sourceBones.Length != bindPoseCount)
-                {
-                    Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
-                    bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
-                }
-                var toWorldArray = Enumerable.Range(0, bindPoseCount).Select(i =>
-                    sourceBones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
-                    ).ToArray();
-                var aabb = skinnedMesh.localBounds;
-                var m = toLocal * rootBone.localToWorldMatrix;
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, 1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, -1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, -1, 1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, -1, -1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, 1, 1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, 1, -1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, 1) + aabb.center));
-                targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, -1) + aabb.center));
                 
                 if (sourceWeights.Length != sourceVertices.Length || bindPoseCount == 0)
                 {
@@ -3968,7 +3973,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             
             var meshRenderer = combinableSkinnedMeshes[0];
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
-            var avDescriptor = GetComponent<VRCAvatarDescriptor>();
 
             if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
