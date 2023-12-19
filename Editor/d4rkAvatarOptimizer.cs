@@ -643,14 +643,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
-    private bool CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate)
+    private bool CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate, bool withNaNimation)
     {
         if (!IsBasicCombinableRenderer(candidate))
             return false;
         if (list.Any(r => !IsBasicCombinableRenderer(r)))
             return false;
-        if (list.Count == 1 || list.Skip(1).All(r => RenderersHaveSameAnimationCurves(list[0], r)))
-            return RenderersHaveSameAnimationCurves(list[0], candidate);
+        if (list.Count == 1 || list.Skip(1).All(r => RenderersHaveSameAnimationCurves(list[0], r, withNaNimation)))
+            return RenderersHaveSameAnimationCurves(list[0], candidate, withNaNimation);
         return false;
     }
 
@@ -674,7 +674,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(candidate.transform, list.Select(r => GetPathToRoot(r.transform.parent)).ToArray()))
             return false;
-        if (CanCombineRendererWithBasicMerge(list, candidate))
+        if (CanCombineRendererWithBasicMerge(list, candidate, true))
             return true;
         if (!MergeSkinnedMeshesWithShaderToggle)
             return false;
@@ -685,50 +685,55 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
-    private bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding)
-    {
-        if (!MergeSkinnedMeshesWithNaNScale) {
-            if (typeof(Renderer).IsAssignableFrom(binding.type))
-                return !binding.propertyName.StartsWith("blendShape.");
-            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
-                return true;
-        } else {
-            if (typeof(Renderer).IsAssignableFrom(binding.type))
-                return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
-        }
-        return false;
-    }
-
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
-    private Dictionary<string, HashSet<AnimationClip>> FindAllAnimationClipsAffectingRenderer()
-    {
-        if (cache_FindAllAnimationClipsAffectingRenderer != null)
-            return cache_FindAllAnimationClipsAffectingRenderer;
-        var result = new Dictionary<string, HashSet<AnimationClip>>();
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
-        {
-            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
-            {
-                if (IsRelevantBindingForSkinnedMeshMerge(binding))
-                {
-                    if (!result.TryGetValue(binding.path, out var clips))
-                    {
-                        result[binding.path] = clips = new HashSet<AnimationClip>();
-                    }
-                    clips.Add(clip);
-                }
-            }
-        }
-        return cache_FindAllAnimationClipsAffectingRenderer = result;
-    }
-
+    private bool? cache_withNaNimation = null;
     private Dictionary<(Renderer, Renderer), bool> cache_RendererHaveSameAnimationCurves = null;
-    private bool RenderersHaveSameAnimationCurves(Renderer a, Renderer b)
+    private bool RenderersHaveSameAnimationCurves(Renderer a, Renderer b, bool withNaNimation)
     {
+        if (cache_withNaNimation == null || cache_withNaNimation != withNaNimation)
+        {
+            cache_withNaNimation = withNaNimation;
+            cache_FindAllAnimationClipsAffectingRenderer = null;
+            cache_RendererHaveSameAnimationCurves = null;
+        }
         if (cache_RendererHaveSameAnimationCurves == null)
             cache_RendererHaveSameAnimationCurves = new Dictionary<(Renderer, Renderer), bool>();
         if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
             return result;
+        bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding)
+        {
+            if (!MergeSkinnedMeshesWithNaNScale || !withNaNimation) {
+                if (typeof(Renderer).IsAssignableFrom(binding.type))
+                    return !binding.propertyName.StartsWith("blendShape.");
+                if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+                    return true;
+            } else {
+                if (typeof(Renderer).IsAssignableFrom(binding.type))
+                    return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
+            }
+            return false;
+        }
+        Dictionary<string, HashSet<AnimationClip>> FindAllAnimationClipsAffectingRenderer()
+        {
+            if (cache_FindAllAnimationClipsAffectingRenderer != null)
+                return cache_FindAllAnimationClipsAffectingRenderer;
+            var result = new Dictionary<string, HashSet<AnimationClip>>();
+            foreach (var clip in GetAllUsedFXLayerAnimationClips())
+            {
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                {
+                    if (IsRelevantBindingForSkinnedMeshMerge(binding))
+                    {
+                        if (!result.TryGetValue(binding.path, out var clips))
+                        {
+                            result[binding.path] = clips = new HashSet<AnimationClip>();
+                        }
+                        clips.Add(clip);
+                    }
+                }
+            }
+            return cache_FindAllAnimationClipsAffectingRenderer = result;
+        }
         var aHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(a), out var aClips);
         var bHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(b), out var bClips);
         if (aHasClips != bHasClips)
@@ -3578,7 +3583,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 bool foundMatch = false;
                 foreach (var subList in basicMergedMeshes)
                 {
-                    if (CanCombineRendererWithBasicMerge(subList, renderer))
+                    if (CanCombineRendererWithBasicMerge(subList, renderer, false))
                     {
                         subList.Add(renderer);
                         foundMatch = true;
