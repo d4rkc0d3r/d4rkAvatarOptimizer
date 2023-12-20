@@ -3123,6 +3123,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         bool allTheSameAsCandidate = list.All(slot => slot.material == candidateMat);
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate;
+        if (list.Count > 1 && list.Any(slot => slot.material == candidateMat))
+            return true;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
             return false;
@@ -3147,41 +3149,40 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         bool mergeTextures = MergeSameDimensionTextures && parsedShader.CanMergeTextures();
         foreach (var prop in parsedShader.properties)
         {
-            foreach (var slot in list)
+            switch (prop.type)
             {
-                var mat = slot.material;
-                switch (prop.type)
-                {
-                    case ParsedShader.Property.Type.Color:
-                    case ParsedShader.Property.Type.ColorHDR:
-                    case ParsedShader.Property.Type.Vector:
+                case ParsedShader.Property.Type.Color:
+                case ParsedShader.Property.Type.ColorHDR:
+                case ParsedShader.Property.Type.Vector:
+                    break;
+                case ParsedShader.Property.Type.Int:
+                case ParsedShader.Property.Type.Float:
+                    if (prop.shaderLabParams.Count == 0)
                         break;
-                    case ParsedShader.Property.Type.Float:
+                    var candidateValue = candidateMat.GetFloat(prop.name);
+                    foreach (var slot in list)
+                    {
                         if (prop.shaderLabParams.Any(s => s != "Cull" || !MergeBackFaceCullingWithCullingOff)
-                            && mat.GetFloat(prop.name) != candidateMat.GetFloat(prop.name))
+                            && slot.material.GetFloat(prop.name) != candidateValue)
                             return false;
-                        break;
-                    case ParsedShader.Property.Type.Int:
-                        if (prop.shaderLabParams.Any(s => s != "Cull" || !MergeBackFaceCullingWithCullingOff)
-                            && mat.GetInt(prop.name) != candidateMat.GetInt(prop.name))
+                    }
+                    break;
+                case ParsedShader.Property.Type.Texture2D:
+                case ParsedShader.Property.Type.Texture2DArray:
+                case ParsedShader.Property.Type.Texture3D:
+                case ParsedShader.Property.Type.TextureCube:
+                case ParsedShader.Property.Type.TextureCubeArray:
+                    bool mergeTexture = mergeTextures && (prop.name != "_MainTex" || MergeMainTex);
+                    var cTex = candidateMat.GetTexture(prop.name);
+                    foreach (var slot in list)
+                    {
+                        var mTex = slot.material.GetTexture(prop.name);
+                        if (mergeTexture && !CanCombineTextures(mTex, cTex))
                             return false;
-                        break;
-                    case ParsedShader.Property.Type.Texture2D:
-                    case ParsedShader.Property.Type.Texture2DArray:
-                    case ParsedShader.Property.Type.Texture3D:
-                    case ParsedShader.Property.Type.TextureCube:
-                    case ParsedShader.Property.Type.TextureCubeArray:
-                        {
-                            var mTex = mat.GetTexture(prop.name);
-                            var cTex = candidateMat.GetTexture(prop.name);
-                            bool mergeTexture = mergeTextures && (prop.name != "_MainTex" || MergeMainTex);
-                            if (mergeTexture && !CanCombineTextures(mTex, cTex))
-                                return false;
-                            if (!mergeTexture && cTex != mTex)
-                                return false;
-                        }
-                        break;
-                }
+                        if (!mergeTexture && cTex != mTex)
+                            return false;
+                    }
+                    break;
             }
         }
         return true;

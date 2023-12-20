@@ -10,6 +10,7 @@
 * Collapsed some info boxes regarding materials that can't merge into one info box.
 * The UI is now disabled when in play mode. This saves performance when testing with av3 emulator without running the optimizer.
 * Requires ORL shader generator 6.2 or newer for faster shader parsing of .orlshader files.
+* Slight performance improvement for calculating the preview.
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
