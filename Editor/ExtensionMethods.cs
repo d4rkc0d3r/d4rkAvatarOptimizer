@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -23,6 +24,43 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             {
                 return null;
             }
+        }
+
+        // using mesh.boneWeights = boneWeights; causes the mesh to always use 4 bone weights per vertex
+        // this method allows to also use 2 or 1 bone weights per vertex if none of the vertices need more
+        public static void SetBoneWeights(this Mesh mesh, BoneWeight[] boneWeights)
+        {
+            var weightsPerVertex = new byte[boneWeights.Length];
+            var boneWeights1 = new List<BoneWeight1>();
+            for (int i = 0; i < boneWeights.Length; i++)
+            {
+                weightsPerVertex[i] = 0;
+                var w = boneWeights[i];
+                if (w.weight0 > 0)
+                {
+                    weightsPerVertex[i]++;
+                    boneWeights1.Add(new BoneWeight1() { boneIndex = w.boneIndex0, weight = w.weight0 });
+                }
+                if (w.weight1 > 0)
+                {
+                    weightsPerVertex[i]++;
+                    boneWeights1.Add(new BoneWeight1() { boneIndex = w.boneIndex1, weight = w.weight1 });
+                }
+                if (w.weight2 > 0)
+                {
+                    weightsPerVertex[i]++;
+                    boneWeights1.Add(new BoneWeight1() { boneIndex = w.boneIndex2, weight = w.weight2 });
+                }
+                if (w.weight3 > 0)
+                {
+                    weightsPerVertex[i]++;
+                    boneWeights1.Add(new BoneWeight1() { boneIndex = w.boneIndex3, weight = w.weight3 });
+                }
+            }
+            var boneWeights1Array = boneWeights1.ToArray();
+            var nativeBoneWeights1Array = new NativeArray<BoneWeight1>(boneWeights1Array, Allocator.Temp);
+            var nativeWeightsPerVertex = new NativeArray<byte>(weightsPerVertex, Allocator.Temp);
+            mesh.SetBoneWeights(nativeWeightsPerVertex, nativeBoneWeights1Array);
         }
     }
 

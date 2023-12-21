@@ -3398,7 +3398,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     : UnityEngine.Rendering.IndexFormat.UInt16;
                 newMesh.SetVertices(targetVertices);
                 newMesh.bindposes = mesh.bindposes;
-                newMesh.boneWeights = targetWeights.ToArray();
+                newMesh.SetBoneWeights(targetWeights.ToArray());
                 if (targetColor != null && targetColor.Any(c => !c.Equals(Color.white)))
                 {
                     newMesh.colors = targetColor.ToArray();
@@ -3846,7 +3846,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 : UnityEngine.Rendering.IndexFormat.UInt16;
             combinedMesh.SetVertices(targetVertices);
             combinedMesh.bindposes = targetBindPoses.ToArray();
-            combinedMesh.boneWeights = targetWeights.ToArray();
+            combinedMesh.SetBoneWeights(targetWeights.ToArray());
             if (!useColor32 && targetColor.Any(c => !c.Equals(Color.white)))
             {
                 combinedMesh.colors = targetColor.ToArray();
