@@ -12,6 +12,9 @@
 * Requires ORL shader generator 6.2 or newer for faster shader parsing of .orlshader files.
 * Slight performance improvement for calculating the preview.
 * Mesh only uses 1 or 2 bone weight skinning if none of the vertices need more than that. Was always 4 bone weights before.
+* Minor performance improvements:
+  * Calculating if materials can merge is faster which speeds up the preview.
+  * Merging skinned mesh data is faster by pre allocating list capacity and skipping uv sets that don't exist.
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.

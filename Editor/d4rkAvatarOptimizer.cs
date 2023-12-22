@@ -3312,7 +3312,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             for(int i = 0; i < 8; i++)
             {
                 mesh.GetUVs(i, sourceUv[i]);
-                sourceUv[i] = sourceUv[i].Count != sourceVertices.Length ? Enumerable.Range(0, sourceVertices.Length).Select(r => Vector4.zero).ToList() : sourceUv[i];
+                sourceUv[i] = sourceUv[i].Count != sourceVertices.Length ? Enumerable.Repeat(Vector4.zero, sourceVertices.Length).ToList() : sourceUv[i];
             }
             var sourceColor = mesh.colors;
             var sourceColor32 = mesh.colors32;
@@ -3567,25 +3567,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var combinableSkinnedMeshes = combinableSkinnedMeshList[combinedMeshID];
 
-            var targetBones = new List<Transform>();
-            var targetBoneMap = new Dictionary<Transform, int>();
-            var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
-            var targetColor = new List<Color>();
-            var targetColor32 = new List<Color32>();
-            bool useColor32 = true;
-            var targetVertices = new List<Vector3>();
-            var targetIndices = new List<List<int>>();
-            var targetNormals = new List<Vector3>();
-            var targetTangents = new List<Vector4>();
-            var targetWeights = new List<BoneWeight>();
-            var targetBindPoses = new List<Matrix4x4>();
-            var sourceToWorld = new List<Matrix4x4>();
-            var targetBounds = combinableSkinnedMeshes[0].localBounds;
-            var toLocal = (combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone).worldToLocalMatrix;
-
-            string newMeshName = combinableSkinnedMeshes[0].name;
-            string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
-
             var basicMergedMeshes = new List<List<Renderer>>();
             foreach (var renderer in combinableSkinnedMeshes)
             {
@@ -3606,6 +3587,39 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
 
             Profiler.StartSection("CombineMeshData");
+
+            int totalVertexCount = combinableSkinnedMeshes.Sum(m => m.sharedMesh.vertexCount);
+
+            var targetBones = new List<Transform>();
+            var targetBoneMap = new Dictionary<Transform, int>();
+            var hasUvSet = new bool[8] {
+                true,
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord1)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord2)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord3)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord4)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord5)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord6)),
+                combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord7)),
+            };
+            var targetUv = Enumerable.Range(0, 8).Select(i => hasUvSet[i] ? new List<Vector4>(totalVertexCount) : null).ToArray();
+            bool useColor32 = !combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.Color)
+                && m.sharedMesh.GetVertexAttributeFormat(VertexAttribute.Color) != VertexAttributeFormat.UNorm8);
+            var targetColor = new List<Color>(useColor32 ? 0 : totalVertexCount);
+            var targetColor32 = new List<Color32>(useColor32 ? totalVertexCount : 0);
+            var targetVertices = new List<Vector3>(totalVertexCount);
+            var targetIndices = new List<List<int>>();
+            var targetNormals = new List<Vector3>(totalVertexCount);
+            var targetTangents = new List<Vector4>(totalVertexCount);
+            var targetWeights = new List<BoneWeight>(totalVertexCount);
+            var targetBindPoses = new List<Matrix4x4>();
+            var sourceToWorld = new List<Matrix4x4>(totalVertexCount);
+            var targetBounds = combinableSkinnedMeshes[0].localBounds;
+            var toLocal = (combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone).worldToLocalMatrix;
+
+            string newMeshName = combinableSkinnedMeshes[0].name;
+            string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
+
             foreach (var skinnedMesh in combinableSkinnedMeshes)
             {
                 DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
@@ -3695,7 +3709,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         weight2 = 0,
                         weight3 = 0
                     };
-                    sourceWeights = Enumerable.Range(0, sourceVertices.Length).Select(s => defaultWeight).ToArray();
+                    sourceWeights = Enumerable.Repeat(defaultWeight, sourceVertices.Length).ToArray();
                     sourceBones = new Transform[1] { rootBone.transform };
                     toWorldArray = new Matrix4x4[1] { rootBone.transform.localToWorldMatrix };
                     keepTransforms.Add(rootBone.transform);
@@ -3704,46 +3718,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                 for (int i = 1; i < 8; i++)
                 {
+                    if (!hasUvSet[i])
+                        continue;
                     var uvs = new List<Vector4>();
                     mesh.GetUVs(i, uvs);
-                    if (uvs.Count == sourceVertices.Length)
-                    {
-                        targetUv[i].AddRange(uvs);
-                    }
-                    else
-                    {
-                        targetUv[i].AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Vector4.zero));
-                    }
+                    targetUv[i].AddRange(uvs.Count == sourceVertices.Length ? uvs : Enumerable.Repeat(Vector4.zero, sourceVertices.Length));
                 }
 
                 if (mesh.HasVertexAttribute(VertexAttribute.Color))
                 {
-                    if (mesh.GetVertexAttributeFormat(VertexAttribute.Color) == VertexAttributeFormat.UNorm8)
-                    {
-                        var colors = mesh.colors32;
-                        targetColor32.AddRange(colors);
-                        targetColor.AddRange(colors.Select(s => (Color)s));
-                    }
-                    else
-                    {
-                        var colors = mesh.colors;
-                        targetColor.AddRange(colors);
-                        useColor32 = false;
+                    if (useColor32) {
+                        targetColor32.AddRange(mesh.colors32);
+                    } else {
+                        targetColor.AddRange(mesh.colors);
                     }
                 }
                 else
                 {
-                    targetColor.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => Color.white));
-                    targetColor32.AddRange(Enumerable.Range(0, sourceVertices.Length).Select(s => new Color32(255, 255, 255, 255)));
+                    if (useColor32) {
+                        targetColor32.AddRange(Enumerable.Repeat(new Color32(255, 255, 255, 255), sourceVertices.Length));
+                    } else {
+                        targetColor.AddRange(Enumerable.Repeat(Color.white, sourceVertices.Length));
+                    }
                 }
 
                 sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
                 sourceTangents = sourceTangents.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceTangents;
-
-                var bakedBlendShapeVertexDelta = new Vector3[sourceVertices.Length];
-                var bakedBlendShapeNormalDelta = new Vector3[sourceVertices.Length];
-                var bakedBlendShapeTangentDelta = new Vector3[sourceVertices.Length];
 
                 if (!blendShapesToBake.TryGetValue(skinnedMesh, out var blendShapeIDs))
                 {
@@ -3759,9 +3760,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     mesh.GetBlendShapeFrameVertices(blendShapeID, 0, deltaVertices, deltaNormals, deltaTangents);
                     for (int i = 0; i < sourceVertices.Length; i++)
                     {
-                        bakedBlendShapeVertexDelta[i] += deltaVertices[i] * weight;
-                        bakedBlendShapeNormalDelta[i] += deltaNormals[i] * weight;
-                        bakedBlendShapeTangentDelta[i] += deltaTangents[i] * weight;
+                        sourceVertices[i] += deltaVertices[i] * weight;
+                        sourceNormals[i] += deltaNormals[i] * weight;
+                        sourceTangents[i] += (Vector4)(deltaTangents[i] * weight);
                     }
                 }
 
@@ -3782,9 +3783,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
                     }
                     sourceToWorld.Add(toWorld);
-                    var vertex = sourceVertices[vertIndex] + bakedBlendShapeVertexDelta[vertIndex];
-                    var normal = sourceNormals[vertIndex] + bakedBlendShapeNormalDelta[vertIndex];
-                    var tangent = (Vector3)sourceTangents[vertIndex] + bakedBlendShapeTangentDelta[vertIndex];
+                    var vertex = sourceVertices[vertIndex];
+                    var normal = sourceNormals[vertIndex];
+                    var tangent = (Vector3)sourceTangents[vertIndex];
                     targetVertices.Add(toWorld.MultiplyPoint3x4(vertex));
                     targetNormals.Add(toWorld.MultiplyVector(normal).normalized);
                     var t = toWorld.MultiplyVector(tangent).normalized;
@@ -3857,7 +3858,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             for (int i = 0; i < 8; i++)
             {
-                if (targetUv[i].Any(uv => !uv.Equals(Vector4.zero)))
+                if (hasUvSet[i] && targetUv[i].Any(uv => !uv.Equals(Vector4.zero)))
                 {
                     combinedMesh.SetUVs(i, targetUv[i]);
                 }
