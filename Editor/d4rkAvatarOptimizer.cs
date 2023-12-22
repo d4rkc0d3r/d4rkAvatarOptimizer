@@ -3473,9 +3473,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 Profiler.EndSection();
 
                 CreateUniqueAsset(newMesh, newMesh.name + ".asset");
-                Profiler.StartSection("AssetDatabase.SaveAssets()");
-                AssetDatabase.SaveAssets();
-                Profiler.EndSection();
 
                 meshRenderer.sharedMesh = newMesh;
             }
