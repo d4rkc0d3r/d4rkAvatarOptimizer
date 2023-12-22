@@ -106,10 +106,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             return result;
         }
+#if UNITY_EDITOR
         public MeshTopology GetTopology()
         {
             return renderer.GetSharedMesh().GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1));
         }
+#endif
     }
 
 #if UNITY_EDITOR
