@@ -106,6 +106,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             return result;
         }
+        public MeshTopology GetTopology()
+        {
+            return renderer.GetSharedMesh().GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1));
+        }
     }
 
 #if UNITY_EDITOR
@@ -3115,6 +3119,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (firstMat.shader != candidateMat.shader)
             return false;
+        if (list.Any(slot => slot.GetTopology() != candidate.GetTopology()))
+            return false;
         bool IsAffectedByMaterialSwap(MaterialSlot slot) =>
             (slotSwapMaterials.ContainsKey((GetPathToRoot(slot.renderer), slot.index)))
             || (materialSlotRemap.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var remap) && slotSwapMaterials.ContainsKey(remap));
@@ -3307,7 +3313,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var mergedMeshIndices = new List<List<int>>();
 
             var sourceVertices = mesh.vertices;
-            var sourceIndices = mesh.triangles;
             var hasUvSet = new bool[8] {
                 true,
                 mesh.HasVertexAttribute(VertexAttribute.TexCoord1),
@@ -3351,6 +3356,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             var targetVertices = new List<Vector3>(sourceVertices.Length);
             var targetIndices = new List<List<int>>();
+            var targetTopology = new List<MeshTopology>();
             var targetNormals = new List<Vector3>(sourceVertices.Length);
             var targetTangents = new List<Vector4>(sourceVertices.Length);
             var targetWeights = new List<BoneWeight>(sourceVertices.Length);
@@ -3366,9 +3372,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedSlots[i].Select((slot, index) => (slot, index)).First(t => t.slot.material == matchedSlots[i][k].material).index;
                     int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedSlots[i][k].index);
-                    int startIndex = (int)mesh.GetIndexStart(materialSubMeshId);
-                    int endIndex = (int)mesh.GetIndexCount(materialSubMeshId) + startIndex;
-                    for (int j = startIndex; j < endIndex; j++)
+                    var sourceIndices = mesh.GetIndices(materialSubMeshId);
+                    for (int j = 0; j < sourceIndices.Length; j++)
                     {
                         int oldIndex = sourceIndices[j];
                         if (indexMap.TryGetValue(oldIndex, out int newIndex))
@@ -3397,6 +3402,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
                 targetIndices.Add(indexList);
+                targetTopology.Add(mesh.GetTopology(Math.Min(matchedSlots[i][0].index, mesh.subMeshCount - 1)));
                 mergedMeshIndices.Add(uniqueMeshIndices.ToList());
             }
 
@@ -3441,7 +3447,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 newMesh.subMeshCount = matchedSlots.Count;
                 for (int i = 0; i < matchedSlots.Count; i++)
                 {
-                    newMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
+                    newMesh.SetIndices(targetIndices[i].ToArray(), targetTopology[i], i);
                 }
 
                 for (int i = 0; i < mesh.blendShapeCount; i++)
@@ -3617,7 +3623,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var targetColor = new List<Color>(useColor32 ? 0 : totalVertexCount);
             var targetColor32 = new List<Color32>(useColor32 ? totalVertexCount : 0);
             var targetVertices = new List<Vector3>(totalVertexCount);
-            var targetIndices = new List<List<int>>();
+            var targetIndices = new List<int[]>();
+            var targetTopology = new List<MeshTopology>();
             var targetNormals = new List<Vector3>(totalVertexCount);
             var targetTangents = new List<Vector4>(totalVertexCount);
             var targetWeights = new List<BoneWeight>(totalVertexCount);
@@ -3638,7 +3645,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
                 var sourceVertices = mesh.vertices;
-                var sourceIndices = mesh.triangles;
                 var sourceUv = mesh.uv;
                 var sourceNormals = mesh.normals;
                 var sourceTangents = mesh.tangents;
@@ -3835,15 +3841,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
                 {
-                    uint startIndex = mesh.GetIndexStart(Math.Min(matID, mesh.subMeshCount - 1));
-                    uint endIndex = mesh.GetIndexCount(Math.Min(matID, mesh.subMeshCount - 1)) + startIndex;
-                    var indices = new List<int>();
-                    for (uint i = startIndex; i < endIndex; i++)
+                    int clampedSubMeshID = Math.Min(matID, mesh.subMeshCount - 1);
+                    int[] indices = mesh.GetIndices(clampedSubMeshID);
+                    for (uint i = 0; i < indices.Length; i++)
                     {
-                        indices.Add(sourceIndices[i] + indexOffset);
+                        indices[i] += indexOffset;
                     }
                     materialSlotRemap[(newPath, targetIndices.Count)] = (GetPathToRoot(skinnedMesh), matID);
                     targetIndices.Add(indices);
+                    targetTopology.Add(mesh.GetTopology(clampedSubMeshID));
                 }
             }
             Profiler.EndSection();
@@ -3879,7 +3885,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             combinedMesh.name = newMeshName;
             for (int i = 0; i < targetIndices.Count; i++)
             {
-                combinedMesh.SetIndices(targetIndices[i].ToArray(), MeshTopology.Triangles, i);
+                combinedMesh.SetIndices(targetIndices[i], targetTopology[i], i);
             }
 
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
