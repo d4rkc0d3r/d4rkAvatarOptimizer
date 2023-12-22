@@ -3308,42 +3308,52 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             var sourceVertices = mesh.vertices;
             var sourceIndices = mesh.triangles;
-            var sourceUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
-            for(int i = 0; i < 8; i++)
+            var hasUvSet = new bool[8] {
+                true,
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord1),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord2),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord3),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord4),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord5),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord6),
+                mesh.HasVertexAttribute(VertexAttribute.TexCoord7),
+            };
+            int highestUsedUvSet = hasUvSet.Select((b, i) => (b, i)).Where(t => t.b).Select(t => t.i).LastOrDefault();
+            var sourceUv = Enumerable.Range(0, 8).Select(i => hasUvSet[i] ? new List<Vector4>(sourceVertices.Length) : null).ToArray();
+            for(int i = 0; i <= highestUsedUvSet; i++)
             {
+                if (!hasUvSet[i])
+                    continue;
                 mesh.GetUVs(i, sourceUv[i]);
                 sourceUv[i] = sourceUv[i].Count != sourceVertices.Length ? Enumerable.Repeat(Vector4.zero, sourceVertices.Length).ToList() : sourceUv[i];
             }
-            var sourceColor = mesh.colors;
-            var sourceColor32 = mesh.colors32;
+            Color[] sourceColor = null;
+            Color32[] sourceColor32 = null;
             var sourceNormals = mesh.normals;
             var sourceTangents = mesh.tangents;
             var sourceWeights = mesh.boneWeights;
 
-            var targetUv = Enumerable.Range(0, 8).Select(i => new List<Vector4>()).ToArray();
-            var targetColor = new List<Color>();
-            var targetColor32 = new List<Color32>();
+            var targetUv = Enumerable.Range(0, 8).Select(i => hasUvSet[i] ? new List<Vector4>(sourceVertices.Length) : null).ToArray();
+            List<Color> targetColor = null;
+            List<Color32> targetColor32 = null;
             if (mesh.HasVertexAttribute(VertexAttribute.Color))
             {
                 if (mesh.GetVertexAttributeFormat(VertexAttribute.Color) == VertexAttributeFormat.UNorm8)
                 {
-                    targetColor = null;
+                    targetColor32 = new List<Color32>(sourceVertices.Length);
+                    sourceColor32 = mesh.colors32;
                 }
                 else
                 {
-                    targetColor32 = null;
+                    targetColor = new List<Color>(sourceVertices.Length);
+                    sourceColor = mesh.colors;
                 }
             }
-            else
-            {
-                targetColor = null;
-                targetColor32 = null;
-            }
-            var targetVertices = new List<Vector3>();
+            var targetVertices = new List<Vector3>(sourceVertices.Length);
             var targetIndices = new List<List<int>>();
-            var targetNormals = new List<Vector3>();
-            var targetTangents = new List<Vector4>();
-            var targetWeights = new List<BoneWeight>();
+            var targetNormals = new List<Vector3>(sourceVertices.Length);
+            var targetTangents = new List<Vector4>(sourceVertices.Length);
+            var targetWeights = new List<BoneWeight>(sourceVertices.Length);
 
             var targetOldVertexIndex = new List<int>();
 
@@ -3371,9 +3381,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             indexList.Add(newIndex);
                             indexMap[oldIndex] = newIndex;
                             targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z + internalMaterialID, 0));
-                            for (int a = 1; a < 8; a++)
+                            for (int a = 1; a <= highestUsedUvSet; a++)
                             {
-                                targetUv[a].Add(sourceUv[a][oldIndex]);
+                                targetUv[a]?.Add(sourceUv[a][oldIndex]);
                             }
                             targetColor?.Add(sourceColor[oldIndex]);
                             targetColor32?.Add(sourceColor32[oldIndex]);
@@ -3407,8 +3417,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     newMesh.colors32 = targetColor32.ToArray();
                 }
-                for (int i = 0; i < 8; i++)
+                for (int i = 0; i <= highestUsedUvSet; i++)
                 {
+                    if (!hasUvSet[i])
+                        continue;
                     if (targetUv[i].Any(uv => uv.w != 0))
                     {
                         newMesh.SetUVs(i, targetUv[i]);
