@@ -2,6 +2,7 @@
 ### Features
 * Add new way to toggle merged meshes `NaNimation`.
   * This allows merging meshes that have shaders that don't support shader toggles.
+  * Add sub option `Keep Default Enabled State` which only merges meshes that have the same default enabled state.
 * Add sub option `Merge MainTex` that decides whether the `_MainTex` property is allowed to be merged into a texture array. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/17)
 
 ### Changes

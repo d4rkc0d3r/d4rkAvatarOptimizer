@@ -80,6 +80,10 @@ This will add logic to the shaders to ensure everything works correctly. Some sh
 Can't merge meshes that have any tessellation or surface shaders.  
 
 Forces on "Write Properties as Static Values" if enabled.
+## Keep Default Enabled State
+Stops meshes that are enabled by default from getting merged with meshes that are disabled by default and vice versa.
+
+This is useful to not look weird with blocked animations in case of NaNimation toggles. With this disabled and animations blocked all merged meshes will be visible.
 ## Merge Static Meshes as Skinned
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.

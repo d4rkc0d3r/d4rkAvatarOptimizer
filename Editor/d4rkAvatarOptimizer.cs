@@ -40,6 +40,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeSkinnedMeshes = true;
         public bool MergeSkinnedMeshesWithShaderToggle = true;
         public bool MergeSkinnedMeshesWithNaNScale = true;
+        public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState = true;
         public bool MergeStaticMeshesAsSkinned = true;
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
@@ -208,6 +209,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSkinnedMeshesWithNaNScale {
         get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNScale; }
         set { settings.MergeSkinnedMeshesWithNaNScale = value; } }
+    public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState {
+        get { return MergeSkinnedMeshesWithNaNScale && settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState; }
+        set { settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState = value; } }
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
         set { settings.MergeStaticMeshesAsSkinned = value; } }
@@ -245,6 +249,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(MergeSkinnedMeshesWithNaNScale):
             case nameof(MergeStaticMeshesAsSkinned):
                 return settings.MergeSkinnedMeshes;
+            case nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState):
+                return MergeSkinnedMeshesWithNaNScale;
             case nameof(MergeSameDimensionTextures):
             case nameof(MergeBackFaceCullingWithCullingOff):
                 return settings.MergeDifferentPropertyMaterials;
@@ -267,6 +273,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
         {nameof(MergeSkinnedMeshesWithNaNScale), "NaNimation Toggles"},
+        {nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState), "Keep Default Enabled State"},
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
@@ -301,6 +308,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
             {nameof(Settings.MergeSkinnedMeshesWithNaNScale), false},
+            {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
@@ -320,6 +328,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
             {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
+            {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
@@ -339,6 +348,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
             {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
+            {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
@@ -650,6 +660,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
+    private bool GetRendererDefaultEnabledState(Renderer r) => r.enabled && r.gameObject.activeSelf;
+
     private bool CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate, bool withNaNimation)
     {
         if (!IsBasicCombinableRenderer(candidate))
@@ -681,6 +693,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(candidate.transform, list.Select(r => GetPathToRoot(r.transform.parent)).ToArray()))
             return false;
+        if (MergeSkinnedMeshesSeparatedByDefaultEnabledState)
+        {
+            bool candidateDefaultEnabledState = GetRendererDefaultEnabledState(candidate);
+            if (list.Any(r => GetRendererDefaultEnabledState(r) != candidateDefaultEnabledState))
+                return false;
+        }
         if (CanCombineRendererWithBasicMerge(list, candidate, true))
             return true;
         if (!MergeSkinnedMeshesWithShaderToggle)
@@ -981,7 +999,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
-
+        if (clip.name == "d4rkAvatarOptimizer_MergedLayers_Constants")
+            return clip;
         var newClip = Instantiate(clip);
         newClip.ClearCurves();
         newClip.name = clip.name;
@@ -3635,6 +3654,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
             var toLocal = (combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone).worldToLocalMatrix;
 
+            targetBones.Add(combinableSkinnedMeshes[0].transform);
+            targetBoneMap[combinableSkinnedMeshes[0].transform] = targetBones.Count - 1;
+            targetBindPoses.Add(combinableSkinnedMeshes[0].transform.worldToLocalMatrix);
+
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
 
@@ -4117,8 +4140,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             if (basicMergedMeshes.Count > 1)
             {
-                meshRenderer.gameObject.SetActive(true);
-                meshRenderer.enabled = true;
+                if (MergeSkinnedMeshesSeparatedByDefaultEnabledState && !GetRendererDefaultEnabledState(meshRenderer))
+                {
+                    meshRenderer.gameObject.SetActive(true);
+                    meshRenderer.enabled = false;
+                    var curveBinding = EditorCurveBinding.DiscreteCurve(GetPathToRoot(meshRenderer), typeof(SkinnedMeshRenderer), "m_Enabled");
+                    constantAnimatedValuesToAdd[curveBinding] = 1f;
+                }
+                else
+                {
+                    meshRenderer.gameObject.SetActive(true);
+                    meshRenderer.enabled = true;
+                }
             }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
