@@ -270,7 +270,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                         perfRating = PerformanceRating.Excellent;
                     
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(15));
+                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(20));
                     EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayer.layers[i].name}", string.Join("\n", errorMessages[i])));
                     EditorGUILayout.EndHorizontal();
                     if (optimizer.ShowFXLayerMergeErrors)
@@ -1330,10 +1330,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(15));
+        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(20));
         EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
-        EditorGUILayout.LabelField($"->", GUILayout.Width(25));
-        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(15));
+        EditorGUILayout.LabelField($"->", GUILayout.Width(20));
+        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(20));
         EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
         EditorGUILayout.LabelField(label);
         EditorGUILayout.EndHorizontal();

@@ -12,6 +12,7 @@
 * The UI is now disabled when in play mode. This saves performance when testing with av3 emulator without running the optimizer.
 * Requires ORL shader generator 6.2 or newer for faster shader parsing of .orlshader files.
 * Mesh only uses 1 or 2 bone weight skinning if none of the vertices need more than that. Was always 4 bone weights before.
+* Slightly increase the size of the performance rank change icons.
 * Minor performance improvements:
   * Calculating if materials can merge is faster which speeds up the preview.
   * Merging skinned mesh data is faster by pre allocating list capacity and skipping uv sets that don't exist.
