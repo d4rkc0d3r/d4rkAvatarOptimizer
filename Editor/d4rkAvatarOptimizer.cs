@@ -2166,20 +2166,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         var candidateValue = ratioToCheckAgainst[blendshape];
         if (intersectionMax == 0)
-        {
-            if (candidateValue != 0)
-                return false;
-            for (int i = 0; i < subList.Count; i++)
-            {
-                if (subList[i].value != 1)
-                    return false;
-            }
-            if (value < 0)
-                value = 1;
-            else if (value != 1)
-                return false;
-            return true;
-        }
+            return candidateValue == 0;
         if (candidateValue == 0)
             return false;
         for (int i = 0; i < subList.Count; i++)
