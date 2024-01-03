@@ -2143,13 +2143,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
     }
 
-    private bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, Dictionary<string, float> list)
+    private bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, Dictionary<string, float> ratioToCheckAgainst)
     {
         int intersectionCount = 0;
         float intersectionMax = 0;
         for (int i = 0; i < subList.Count; i++)
         {
-            if (list.TryGetValue(subList[i].blendshape, out var match))
+            if (ratioToCheckAgainst.TryGetValue(subList[i].blendshape, out var match))
             {
                 intersectionCount++;
                 intersectionMax = Mathf.Max(intersectionMax, match);
@@ -2159,19 +2159,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return false;
             }
         }
-        bool hasCandidate = list.ContainsKey(blendshape);
+        bool hasCandidate = ratioToCheckAgainst.ContainsKey(blendshape);
         if (intersectionCount == 0 && !hasCandidate)
             return true;
         if (intersectionCount != subList.Count || !hasCandidate)
             return false;
+        var candidateValue = ratioToCheckAgainst[blendshape];
         if (intersectionMax == 0)
+        {
+            if (candidateValue != 0)
+                return false;
+            for (int i = 0; i < subList.Count; i++)
+            {
+                if (subList[i].value != 1)
+                    return false;
+            }
+            if (value < 0)
+                value = 1;
+            else if (value != 1)
+                return false;
             return true;
-        var candidateValue = list[blendshape];
+        }
         if (candidateValue == 0)
             return false;
         for (int i = 0; i < subList.Count; i++)
         {
-            var match = list[subList[i].blendshape];
+            var match = ratioToCheckAgainst[subList[i].blendshape];
             if (Mathf.Abs(subList[i].value - match / intersectionMax) > 0.01f)
                 return false;
         }
