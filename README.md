@@ -88,6 +88,11 @@ This will add an extra bone per original mesh that gets added to each vertex wit
 
 Unlike the `Use Shader Toggles` option this does not require the shaders to be changed.  
 It also doesn't have the problems of projectors and blocked shaders not understanding the toggles.
+## Allow 3 Bone Skinning
+Allows NaNimation Toggles to be used on meshes that use 4 bone weights on some vertices reducing the skinning quality to only 3 effective bone weights.
+
+You can see which meshes use 4 bone weights in the debug info section under `Mesh Bone Weight Stats`.
+Any mesh that shows index 3 being used will be affected by reduced skinning quality if it has toggle animations.
 ## Keep Default Enabled State
 Stops meshes that are enabled by default from getting merged with meshes that are disabled by default and vice versa.
 

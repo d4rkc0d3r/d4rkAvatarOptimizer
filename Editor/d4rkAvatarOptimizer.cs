@@ -39,7 +39,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool WritePropertiesAsStaticValues = true;
         public bool MergeSkinnedMeshes = true;
         public bool MergeSkinnedMeshesWithShaderToggle = true;
-        public bool MergeSkinnedMeshesWithNaNScale = true;
+        public bool MergeSkinnedMeshesWithNaNimation = true;
+        public bool NaNimationAllow3BoneSkinning = false;
         public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState = true;
         public bool MergeStaticMeshesAsSkinned = true;
         public bool MergeDifferentPropertyMaterials = true;
@@ -206,11 +207,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeSkinnedMeshesWithShaderToggle {
         get { return HasCustomShaderSupport && settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
         set { settings.MergeSkinnedMeshesWithShaderToggle = value; } }
-    public bool MergeSkinnedMeshesWithNaNScale {
-        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNScale; }
-        set { settings.MergeSkinnedMeshesWithNaNScale = value; } }
+    public bool MergeSkinnedMeshesWithNaNimation {
+        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNimation; }
+        set { settings.MergeSkinnedMeshesWithNaNimation = value; } }
+    public bool NaNimationAllow3BoneSkinning {
+        get { return MergeSkinnedMeshesWithNaNimation && settings.NaNimationAllow3BoneSkinning; }
+        set { settings.NaNimationAllow3BoneSkinning = value; } }
     public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState {
-        get { return MergeSkinnedMeshesWithNaNScale && settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState; }
+        get { return MergeSkinnedMeshesWithNaNimation && settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState; }
         set { settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState = value; } }
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
@@ -246,11 +250,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(WritePropertiesAsStaticValues):
                 return !(MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials);
             case nameof(MergeSkinnedMeshesWithShaderToggle):
-            case nameof(MergeSkinnedMeshesWithNaNScale):
+            case nameof(MergeSkinnedMeshesWithNaNimation):
             case nameof(MergeStaticMeshesAsSkinned):
                 return settings.MergeSkinnedMeshes;
+            case nameof(NaNimationAllow3BoneSkinning):
             case nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState):
-                return MergeSkinnedMeshesWithNaNScale;
+                return MergeSkinnedMeshesWithNaNimation;
             case nameof(MergeSameDimensionTextures):
             case nameof(MergeBackFaceCullingWithCullingOff):
                 return settings.MergeDifferentPropertyMaterials;
@@ -272,7 +277,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(WritePropertiesAsStaticValues), "Write Properties as Static Values"},
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
-        {nameof(MergeSkinnedMeshesWithNaNScale), "NaNimation Toggles"},
+        {nameof(MergeSkinnedMeshesWithNaNimation), "NaNimation Toggles"},
+        {nameof(NaNimationAllow3BoneSkinning), "Allow 3 Bone Skinning"},
         {nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState), "Keep Default Enabled State"},
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
@@ -307,7 +313,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), false},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), false},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), false},
+            {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
@@ -327,7 +334,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), true},
+            {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
@@ -347,7 +355,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNScale), true},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), true},
+            {nameof(Settings.NaNimationAllow3BoneSkinning), true},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
@@ -710,6 +719,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
+    private Dictionary<string, bool> cache_MeshUses4BoneSkinning = null;
+    private bool MeshUses4BoneSkinning(string path)
+    {
+        if (cache_MeshUses4BoneSkinning == null)
+            cache_MeshUses4BoneSkinning = new Dictionary<string, bool>();
+        if (cache_MeshUses4BoneSkinning.TryGetValue(path, out var cachedResult))
+            return cachedResult;
+        var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
+        if (renderer == null)
+            return cache_MeshUses4BoneSkinning[path] = false;
+        var mesh = renderer.GetSharedMesh();
+        if (mesh == null)
+            return cache_MeshUses4BoneSkinning[path] = false;
+        var boneWeights = mesh.boneWeights;
+        for (int i = 0; i < boneWeights.Length; i++)
+        {
+            if (boneWeights[i].weight3 > 0)
+                return cache_MeshUses4BoneSkinning[path] = true;
+        }
+        return cache_MeshUses4BoneSkinning[path] = false;
+    }
+
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
     private bool? cache_withNaNimation = null;
     private Dictionary<(Renderer, Renderer), bool> cache_RendererHaveSameAnimationCurves = null;
@@ -727,7 +758,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return result;
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding)
         {
-            if (!MergeSkinnedMeshesWithNaNScale || !withNaNimation) {
+            if ((!MergeSkinnedMeshesWithNaNimation || !withNaNimation) || (!NaNimationAllow3BoneSkinning && MeshUses4BoneSkinning(binding.path))) {
                 if (typeof(Renderer).IsAssignableFrom(binding.type))
                     return !binding.propertyName.StartsWith("blendShape.");
                 if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
@@ -3702,7 +3733,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(-1, -1, -1) + aabb.center));
                 Transform NaNimationBone = null;
                 int NaNimationBoneIndex = -1;
-                if (MergeSkinnedMeshesWithNaNScale && basicMergedMeshes.Count > 1
+                if (MergeSkinnedMeshesWithNaNimation && basicMergedMeshes.Count > 1
                         && FindAllRendererTogglePaths().Contains(GetPathToRoot(skinnedMesh))) {
                     NaNimationBone = new GameObject("NaNimationBone").transform;
                     var pathToRoot = GetPathToRoot(skinnedMesh).Replace('/', '_');
@@ -4065,7 +4096,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
                 properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
                 properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
-                if (!MergeSkinnedMeshesWithNaNScale) {
+                if (!MergeSkinnedMeshesWithNaNimation) {
                     AddAnimationPathChange((oldPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     AddAnimationPathChange((oldPath, "m_Enabled", typeof(SkinnedMeshRenderer)),

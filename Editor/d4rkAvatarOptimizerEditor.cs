@@ -91,8 +91,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         EditorGUI.indentLevel++;
         if (d4rkAvatarOptimizer.HasCustomShaderSupport)
             ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
-        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithNaNScale));
+        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithNaNimation));
         EditorGUI.indentLevel++;
+        ToggleOptimizerProperty(nameof(optimizer.NaNimationAllow3BoneSkinning));
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesSeparatedByDefaultEnabledState));
         EditorGUI.indentLevel--;
         ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
@@ -405,13 +406,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Mesh Bone Weight Stats", ref optimizer.DebugShowBoneWeightStats))
             {
                 Profiler.StartSection("Mesh Bone Weight Stats");
-                foreach (var mesh in optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>().Select(r => r.sharedMesh).Distinct())
+                var statsList = optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>()
+                    .Select(r => r.sharedMesh).Distinct()
+                    .Select(mesh => (mesh, GetMeshBoneWeightStats(mesh)))
+                    .OrderByDescending(t => t.Item2[3].count)
+                    .ThenByDescending(t => t.Item2[2].count)
+                    .ThenByDescending(t => t.Item2[1].count)
+                    .ThenByDescending(t => t.Item2[0].count)
+                    .ToArray();
+                foreach (var tuple in statsList)
                 {
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.Space(15, false);
                     EditorGUILayout.BeginVertical(GUI.skin.box);
-                    EditorGUILayout.ObjectField(mesh, typeof(Mesh), false);
-                    var stats = GetMeshBoneWeightStats(mesh);
+                    EditorGUILayout.ObjectField(tuple.mesh, typeof(Mesh), false);
+                    var stats = tuple.Item2;
                     if (stats[0].count == 0)
                     {
                         EditorGUILayout.LabelField("No bone weights");
