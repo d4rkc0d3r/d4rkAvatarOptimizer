@@ -18,7 +18,7 @@
 
 ### Bug Fixes
 * Fix crash when a material name has slashes or other characters that are not allowed in file names.
-* Fix crash when an extra animator is not humanoid or doesn't have an avatar definition. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/65)
+* Fix crash in 2022 when an extra animator is not humanoid or doesn't have an avatar definition. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/65)
 * Fix macro to declare `tex##_ST` not being detected as a custom texture property declaration macro.
 * Fix log spam in 2022 from vector array properties also setting as a float value.
 * Fix material property animations on MeshRenderer components that get combined into a SkinnedMeshRenderer still being bound to the MeshRenderer type.

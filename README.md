@@ -20,10 +20,11 @@ After that you can add and update the optimizer like any other packages in your 
 ## Presets
 ### Basic
 This preset only uses optimizations that don't affect the behavior of the avatar.
-* Removes unused components & blendshapes
+* Removes unused components and blendshapes & bones from skinned meshes
 * Merges all skinned meshes that are always animated in the same way
 * Merges material slots that use the same material
 * Merges toggles in the FXLayer into a direct blend tree
+* Merges blend shapes that are always animated in the same ratio to each other
 ### Shader Toggles
 This preset uses all the above & some new optimizations.  
 For this mode you should keep shaders unlocked as it can allow for more merging.  
@@ -31,15 +32,14 @@ For this mode you should keep shaders unlocked as it can allow for more merging.
 * Merged materials with the same shader even if their properties differ
 * Applies a generalized version of "lock in" to the new shaders
 
-Expect the following behavior changes:
+Expect the following behavior changes (reduced due to NaNimation toggles):
 * World effects that rely on projectors/shader replacement don't understand shader toggles and will show like the merged meshes are always visible
   * Some examples of this are wire frame shaders and screen space ambient occlusion
 * With blocked shaders all merged meshes that now rely on shader toggles are always visible
   * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually
-*  With blocked shaders some of the merged materials can show up with no texture
-   * If this bothers you, you can uncheck "Merge Same Dimension Textures" to prevent this from happening
 ### Full
 This preset uses all optimizations I use for my own avatars.  
+Some of the settings used here compromise quality of the avatar heavily when animations/shaders are blocked.  
 It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.
 
 ## Why my Shader Pink?
@@ -80,6 +80,14 @@ This will add logic to the shaders to ensure everything works correctly. Some sh
 Can't merge meshes that have any tessellation or surface shaders.  
 
 Forces on "Write Properties as Static Values" if enabled.
+
+Shader Toggles will not work with blocked shaders or projectors.
+## NaNimation Toggles
+Merges meshes even if they get toggled separately from each other.  
+This will add an extra bone per original mesh that gets added to each vertex with a very low weight. This bones scale will be animated to NaN to toggle the mesh off.
+
+Unlike the `Use Shader Toggles` option this does not require the shaders to be changed.  
+It also doesn't have the problems of projectors and blocked shaders not understanding the toggles.
 ## Keep Default Enabled State
 Stops meshes that are enabled by default from getting merged with meshes that are disabled by default and vice versa.
 
