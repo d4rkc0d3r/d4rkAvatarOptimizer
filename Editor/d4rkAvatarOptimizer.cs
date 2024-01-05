@@ -902,32 +902,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = GetUsedComponentsInChildren<Renderer>();
         var matchedSkinnedMeshes = new List<List<Renderer>>();
+        var unmergableRenderers = new List<Renderer>();
         var exclusions = GetAllExcludedTransforms();
         var penetrators = FindAllPenetrators();
-        foreach (var renderer in renderers)
-        {
+        foreach (var renderer in renderers) {
             if (renderer.sharedMaterials.Length == 0)
                 continue;
 
+            if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || penetrators.Contains(renderer)) {
+                unmergableRenderers.Add(renderer);
+                continue;
+            }
+
             bool foundMatch = false;
-            foreach (var subList in matchedSkinnedMeshes)
-            {
-                if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || penetrators.Contains(renderer))
-                    break;
-                if (exclusions.Contains(subList[0].transform))
-                    continue;
-                if (CanCombineRendererWith(subList, renderer))
-                {
+            foreach (var subList in matchedSkinnedMeshes) {
+                if (CanCombineRendererWith(subList, renderer)) {
                     subList.Add(renderer);
                     foundMatch = true;
                     break;
                 }
             }
-            if (!foundMatch)
-            {
+            if (!foundMatch) {
                 matchedSkinnedMeshes.Add(new List<Renderer> { renderer });
             }
         }
+        matchedSkinnedMeshes.AddRange(unmergableRenderers.Select(r => new List<Renderer> { r }));
         matchedSkinnedMeshes = matchedSkinnedMeshes
             .OrderBy(subList => subList[0] is ParticleSystemRenderer ? 1 : 0)
             .ThenByDescending(subList => subList.Count).ToList();

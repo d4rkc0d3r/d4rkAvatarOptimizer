@@ -27,6 +27,7 @@
 * Fix basic merged mesh blobs also trying to use `Use Shader Toggles` when it is enabled but the shaders don't support it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/66)
 * Fix non triangle topology meshes not working when merged.
 * Fix `Merge Same Ratio Blend Shapes` not working correctly if some ratios had 0 values in them.
+* Fix crash with Skinned Mesh Renderers that have no mesh assigned to them. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/72)
 
 ## v3.2.2
 ### Bug Fixes
