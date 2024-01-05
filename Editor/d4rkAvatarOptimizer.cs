@@ -1053,7 +1053,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     fixedBinding.path = shaderToggleInfo.Substring(semicolonIndex + 1);
                     fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
-                    AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
+                    AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(fixedBinding, ref changed), curve);
                 }
             } else {
                 AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
