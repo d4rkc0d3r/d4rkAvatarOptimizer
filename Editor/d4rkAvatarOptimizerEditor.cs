@@ -749,8 +749,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
         }
 
-        bool hasVRCFuryComponent = optimizer.GetComponents<Component>().Any(c => c != null && c.GetType().Name == "VRCFury");
-        if (hasVRCFuryComponent)
+        var furyType = Type.GetType("VF.Model.VRCFury, VRCFury");
+        if (furyType != null && optimizer.GetComponentsInChildren(furyType, true).Any())
         {
             EditorGUILayout.HelpBox(
                 "VRCFury is used on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +

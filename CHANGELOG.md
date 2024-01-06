@@ -29,6 +29,7 @@
 * Fix non triangle topology meshes not working when merged.
 * Fix `Merge Same Ratio Blend Shapes` not working correctly if some ratios had 0 values in them.
 * Fix crash with Skinned Mesh Renderers that have no mesh assigned to them. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/72)
+* Fix VRCFury check only checking the root game object and not all children. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/69)
 
 ## v3.2.2
 ### Bug Fixes
