@@ -72,6 +72,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool DebugShowUnmergableTextureMaterials = true;
     public bool DebugShowCrunchedTextures = true;
     public bool DebugShowNonBC5NormalMaps = true;
+    public bool DebugShowMeshesThatCantMergeNaNimationCausedByAnimations = true;
     public bool DebugShowLockedInMaterials = true;
     public bool DebugShowUnlockedMaterials = true;
     public bool DebugShowPenetrators = true;

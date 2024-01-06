@@ -63,7 +63,7 @@ There are also some settings to tweak the optimization. You can read about their
 ## Optimize on Upload
 Automatically optimizes the avatar before uploading it to vrc. This is non destructive, the avatar in your scene will stay as it is.
 ## Write Properties as Static Values
-This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader. If you don't use it you need to make sure to lock in or bake your shader before uploading it to vrc or running the optimizer.
+This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader.
 
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
@@ -79,7 +79,7 @@ Merges meshes even if their material properties get animated differently or if t
 This will add logic to the shaders to ensure everything works correctly. Some shaders might not work correctly with this option enabled.  
 Can't merge meshes that have any tessellation or surface shaders.  
 
-Forces on "Write Properties as Static Values" if enabled.
+Forces on `Write Properties as Static Values` if enabled.
 
 Shader Toggles will not work with blocked shaders or projectors.
 ## NaNimation Toggles
@@ -88,6 +88,8 @@ This will add an extra bone per original mesh that gets added to each vertex wit
 
 Unlike the `Use Shader Toggles` option this does not require the shaders to be changed.  
 It also doesn't have the problems of projectors and blocked shaders not understanding the toggles.
+
+It can't merge meshes that use a WD ON workflow unless the toggles are simple enough that they can get optimized by `Optimize FX Layer`.
 ## Allow 3 Bone Skinning
 Allows NaNimation Toggles to be used on meshes that use 4 bone weights on some vertices reducing the skinning quality to only 3 effective bone weights.
 
@@ -213,6 +215,9 @@ These materials use shader features that prevent the optimizer from merging text
 Shows all textures that got crunch compressed. Crunch compressed textures can't be merged into Texture2DArrays and as such can prevent materials from being merged.
 ### NonBC5 Normal Maps
 Shows all textures that are used as normal maps but don't use the BC5 compression format. BC5 normal maps have higher quality than DXT5 & BC7 normal maps while using the same amount of VRAM.
+### Unmergable NaNimation by Animations
+Shows all meshes that can't be merged with NaNimation toggles because they are missing either the on or off animation in a layer.  
+This usually happens when using a WD ON workflow. In that case switching to a WD OFF workflow is recommended as it allows for more optimizations.
 ### Locked in Materials
 Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
 The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.

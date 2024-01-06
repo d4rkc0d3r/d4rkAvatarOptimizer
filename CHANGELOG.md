@@ -9,6 +9,7 @@
 ### Changes
 * No longer put the dummy animation clip in empty states. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/63)
 * Add debug list `Mesh Bone Weight Stats`.
+* Add debug list and validation info for when some meshes can't use NaNimation because of missing on or off animations.
 * Collapsed some info boxes regarding materials that can't merge into one info box.
 * The UI is now disabled when in play mode. This saves performance when testing with av3 emulator without running the optimizer.
 * Requires ORL shader generator 6.2 or newer for faster shader parsing of .orlshader files.

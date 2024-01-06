@@ -358,6 +358,17 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(NonBC5NormalMaps);
                 Profiler.EndSection();
             }
+            if (Foldout("Unmergable NaNimation by Animations", ref optimizer.DebugShowMeshesThatCantMergeNaNimationCausedByAnimations))
+            {
+                Profiler.StartSection("Unmergable NaNimation by Animations");
+                var list = optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+                    .Select(path => optimizer.GetTransformFromPath(path))
+                    .Where(t => t != null)
+                    .Select(t => t.GetComponent<Renderer>())
+                    .Where(r => r != null).ToArray();
+                DrawDebugList(list);
+                Profiler.EndSection();
+            }
             if (optimizer.WritePropertiesAsStaticValues && Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
             {
                 Profiler.StartSection("Locked in Materials");
@@ -714,6 +725,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 ClearUICaches();
             }
+        }
+
+        if (optimizer.MergeSkinnedMeshesWithNaNimation && optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Count > 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Some meshes are missing the corresponding on or off toggle animation. This is likely due to a WD ON workflow.\n" +
+                "This means they can't be merged with NaNimation and switching to a WD OFF workflow would help reduce mesh count further.\n" +
+                "Check the Debug Info foldout for a full list at:\n\"Unmergable NaNimation by Animations\"", MessageType.Info);
         }
 
         bool hasExtraMaterialSlots = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
