@@ -741,6 +741,79 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return cache_MeshUses4BoneSkinning[path] = false;
     }
 
+    private Dictionary<string, bool> cache_CanUseNaNimationOnMesh = null;
+    public bool CanUseNaNimationOnMesh(string path)
+    {
+        if (cache_CanUseNaNimationOnMesh == null)
+            cache_CanUseNaNimationOnMesh = new Dictionary<string, bool>();
+        if (cache_CanUseNaNimationOnMesh.TryGetValue(path, out var cachedResult))
+            return cachedResult;
+        if (!MergeSkinnedMeshesWithNaNimation)
+            return cache_CanUseNaNimationOnMesh[path] = false;
+        if (!NaNimationAllow3BoneSkinning && MeshUses4BoneSkinning(path))
+            return cache_CanUseNaNimationOnMesh[path] = false;
+        return cache_CanUseNaNimationOnMesh[path] = !FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Contains(path);
+    }
+
+    private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = null;
+    public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+    {
+        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation == null) {
+            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = new HashSet<string>();
+            var goOffPaths = new HashSet<string>();
+            var goOnPaths = new HashSet<string>();
+            var meshOffPaths = new HashSet<string>();
+            var meshOnPaths = new HashSet<string>();
+            var fxLayer = GetFXLayer();
+            var uselessLayers = FindUselessFXLayers();
+            for (int i = 0; i < fxLayer.layers.Length; i++) {
+                if (fxLayer.layers[i] == null || fxLayer.layers[i].stateMachine == null)
+                    continue;
+                if (uselessLayers.Contains(i) || IsMergeableFXLayer(i))
+                    continue;
+                goOffPaths.Clear();
+                goOnPaths.Clear();
+                meshOffPaths.Clear();
+                meshOnPaths.Clear();
+                foreach (var state in fxLayer.layers[i].stateMachine.EnumerateAllStates()) {
+                    if (state.motion == null)
+                        continue;
+                    foreach (var clip in state.motion.EnumerateAllClips()) {
+                        foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
+                            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive") {
+                                var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                                foreach (var key in curve.keys) {
+                                    if (key.value == 0)
+                                        goOffPaths.Add(binding.path);
+                                    else if (key.value == 1)
+                                        goOnPaths.Add(binding.path);
+                                }
+                            } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
+                                var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                                foreach (var key in curve.keys) {
+                                    if (key.value == 0)
+                                        meshOffPaths.Add(binding.path);
+                                    else if (key.value == 1)
+                                        meshOnPaths.Add(binding.path);
+                                }
+                            }
+                        }
+                    }
+                }
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOffPaths.Except(goOnPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOnPaths.Except(goOffPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOffPaths.Except(meshOnPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
+            }
+            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.ToList()) {
+                var t = GetTransformFromPath(path);
+                if (t == null || (t.GetComponent<MeshRenderer>() == null && t.GetComponent<SkinnedMeshRenderer>() == null))
+                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.Remove(path);
+            }
+        }
+        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation;
+    }
+
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
     private bool? cache_withNaNimation = null;
     private Dictionary<(Renderer, Renderer), bool> cache_RendererHaveSameAnimationCurves = null;
@@ -756,16 +829,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             cache_RendererHaveSameAnimationCurves = new Dictionary<(Renderer, Renderer), bool>();
         if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
             return result;
-        bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding)
-        {
-            if ((!MergeSkinnedMeshesWithNaNimation || !withNaNimation) || (!NaNimationAllow3BoneSkinning && MeshUses4BoneSkinning(binding.path))) {
+        bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
+            if (withNaNimation && CanUseNaNimationOnMesh(binding.path)) {
+                if (typeof(Renderer).IsAssignableFrom(binding.type))
+                    return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
+            } else {
                 if (typeof(Renderer).IsAssignableFrom(binding.type))
                     return !binding.propertyName.StartsWith("blendShape.");
                 if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                     return true;
-            } else {
-                if (typeof(Renderer).IsAssignableFrom(binding.type))
-                    return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
             }
             return false;
         }
@@ -909,7 +981,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (renderer.sharedMaterials.Length == 0)
                 continue;
 
-            if (exclusions.Contains(renderer.transform) || renderer is ParticleSystemRenderer || renderer.GetSharedMesh() == null || penetrators.Contains(renderer)) {
+            if (exclusions.Contains(renderer.transform) ||
+                    !(renderer is SkinnedMeshRenderer || renderer is MeshRenderer) ||
+                    renderer.GetSharedMesh() == null ||
+                    penetrators.Contains(renderer)) {
                 unmergableRenderers.Add(renderer);
                 continue;
             }
@@ -928,7 +1003,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         matchedSkinnedMeshes.AddRange(unmergableRenderers.Select(r => new List<Renderer> { r }));
         matchedSkinnedMeshes = matchedSkinnedMeshes
-            .OrderBy(subList => subList[0] is ParticleSystemRenderer ? 1 : 0)
+            .OrderBy(subList => subList[0] is SkinnedMeshRenderer || subList[0] is MeshRenderer ? 0 : 1)
             .ThenByDescending(subList => subList.Count).ToList();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         foreach (var subList in matchedSkinnedMeshes)
@@ -1597,6 +1672,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             errorMessages[i] = errorMessages[i].Distinct().ToList();
         }
         return cache_AnalyzeFXLayerMergeAbility = errorMessages;
+    }
+
+    public bool IsMergeableFXLayer(int layerIndex)
+    {
+        var errors = AnalyzeFXLayerMergeAbility();
+        var nonErrors = new HashSet<string>() {"toggle", "motion time", "useless", "blend tree", "multi toggle"};
+        return layerIndex < errors.Count && errors[layerIndex].Count == 1 && nonErrors.Contains(errors[layerIndex][0]);
     }
 
     private HashSet<int> cache_FindUselessFXLayers = null;
@@ -3735,7 +3817,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 int NaNimationBoneIndex = -1;
                 if (MergeSkinnedMeshesWithNaNimation && basicMergedMeshes.Count > 1
                         && FindAllRendererTogglePaths().Contains(currentMeshPath)
-                        && (NaNimationAllow3BoneSkinning || !MeshUses4BoneSkinning(currentMeshPath))) {
+                        && CanUseNaNimationOnMesh(currentMeshPath)) {
                     NaNimationBone = new GameObject("NaNimationBone").transform;
                     var pathToRoot = currentMeshPath.Replace('/', '_');
                     var siblingNames = new HashSet<string>(transform.Cast<Transform>().Select(t => t.name));
