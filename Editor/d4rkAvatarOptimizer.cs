@@ -846,22 +846,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             if (cache_FindAllAnimationClipsAffectingRenderer != null)
                 return cache_FindAllAnimationClipsAffectingRenderer;
-            var result = new Dictionary<string, HashSet<AnimationClip>>();
+            cache_FindAllAnimationClipsAffectingRenderer = new Dictionary<string, HashSet<AnimationClip>>();
             foreach (var clip in GetAllUsedFXLayerAnimationClips())
             {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
                     if (IsRelevantBindingForSkinnedMeshMerge(binding))
                     {
-                        if (!result.TryGetValue(binding.path, out var clips))
+                        if (!cache_FindAllAnimationClipsAffectingRenderer.TryGetValue(binding.path, out var clips))
                         {
-                            result[binding.path] = clips = new HashSet<AnimationClip>();
+                            cache_FindAllAnimationClipsAffectingRenderer[binding.path] = clips = new HashSet<AnimationClip>();
                         }
                         clips.Add(clip);
                     }
                 }
             }
-            return cache_FindAllAnimationClipsAffectingRenderer = result;
+            return cache_FindAllAnimationClipsAffectingRenderer;
         }
         var aHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(a), out var aClips);
         var bHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(b), out var bClips);

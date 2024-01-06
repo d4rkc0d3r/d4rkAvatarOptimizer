@@ -1,3 +1,7 @@
+## v3.3.1
+### Bug Fixes
+* Fix it not working in unity 2019
+
 ## v3.3.0
 ### Features
 * Add new way to toggle merged meshes `NaNimation`.

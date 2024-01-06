@@ -362,7 +362,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 Profiler.StartSection("Unmergable NaNimation by Animations");
                 var list = optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
-                    .Select(path => optimizer.GetTransformFromPath(path))
+                    .Select(p => optimizer.GetTransformFromPath(p))
                     .Where(t => t != null)
                     .Select(t => t.GetComponent<Renderer>())
                     .Where(r => r != null).ToArray();
