@@ -767,7 +767,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var meshOnPaths = new HashSet<string>();
             var fxLayer = GetFXLayer();
             var uselessLayers = FindUselessFXLayers();
-            for (int i = 0; i < fxLayer.layers.Length; i++) {
+            for (int i = 0; fxLayer != null && i < fxLayer.layers.Length; i++) {
                 if (fxLayer.layers[i] == null || fxLayer.layers[i].stateMachine == null)
                     continue;
                 if (uselessLayers.Contains(i) || IsMergeableFXLayer(i))

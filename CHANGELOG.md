@@ -1,3 +1,7 @@
+## v3.3.2
+### Bug Fixes
+* Fix crash when no fxlayer is present.
+
 ## v3.3.1
 ### Bug Fixes
 * Fix it not working in unity 2019
