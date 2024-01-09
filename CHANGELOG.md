@@ -1,6 +1,7 @@
 ## v3.3.2
 ### Bug Fixes
 * Fix crash when no fxlayer is present.
+* Fix non shader or NaNimation toggles getting broken.
 
 ## v3.3.1
 ### Bug Fixes

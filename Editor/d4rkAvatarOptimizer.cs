@@ -3849,7 +3849,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.up * 0.2f));
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f + Vector3.right * 0.2f));
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.right * 0.2f));
-                } else {
+                } else if (basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle) {
                     AddAnimationPathChange((currentMeshPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
                     AddAnimationPathChange((currentMeshPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
