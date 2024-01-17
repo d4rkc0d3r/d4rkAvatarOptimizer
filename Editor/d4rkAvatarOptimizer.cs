@@ -3913,7 +3913,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                 foreach (int blendShapeID in blendShapeIDs)
                 {
-                    var weight = skinnedMesh.GetBlendShapeWeight(blendShapeID) / 100f;
+                    var weight = Mathf.Clamp(skinnedMesh.GetBlendShapeWeight(blendShapeID) / 100f, 0, 1);
                     var deltaVertices = new Vector3[sourceVertices.Length];
                     var deltaNormals = new Vector3[sourceVertices.Length];
                     var deltaTangents = new Vector3[sourceVertices.Length];
