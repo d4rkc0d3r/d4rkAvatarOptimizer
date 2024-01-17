@@ -3947,8 +3947,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     var normal = sourceNormals[vertIndex];
                     var tangent = (Vector3)sourceTangents[vertIndex];
                     targetVertices.Add(toWorld.MultiplyPoint3x4(vertex));
-                    targetNormals.Add(toWorld.MultiplyVector(normal).normalized);
-                    var t = toWorld.MultiplyVector(tangent).normalized;
+                    targetNormals.Add(toWorld.MultiplyVector(normal));
+                    var t = toWorld.MultiplyVector(tangent);
                     targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
                     int GetNewBoneIndex(int oldIndex)
                     {

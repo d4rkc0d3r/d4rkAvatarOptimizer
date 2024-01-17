@@ -1,3 +1,7 @@
+## v3.3.3
+### Bug Fixes
+* Don't normalize normals & tangents when merging meshes. This fixes outlines that are dependent on the normal length to determine mesh scale.
+
 ## v3.3.2
 ### Bug Fixes
 * Fix crash when no fxlayer is present.
