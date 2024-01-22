@@ -1003,24 +1003,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         matchedSkinnedMeshes.AddRange(unmergableRenderers.Select(r => new List<Renderer> { r }));
-        matchedSkinnedMeshes = matchedSkinnedMeshes
-            .OrderBy(subList => subList[0] is SkinnedMeshRenderer || subList[0] is MeshRenderer ? 0 : 1)
-            .ThenByDescending(subList => subList.Count).ToList();
-        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
-        foreach (var subList in matchedSkinnedMeshes)
-        {
-            if (subList.Count == 1)
-                continue;
-            int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
-            if (index == -1)
-            {
-                var obj = subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/')).First();
-                index = subList.IndexOf(obj);
-            }
-            var oldFirst = subList[0];
-            subList[0] = subList[index];
-            subList[index] = oldFirst;
-        }
         for (int i = 0; i < matchedSkinnedMeshes.Count && MergeStaticMeshesAsSkinned; i++)
         {
             var mergedMeshes = matchedSkinnedMeshes[i];
@@ -1042,6 +1024,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 mergedMeshes.Remove(meshRenderer);
             }
         }
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+        foreach (var subList in matchedSkinnedMeshes)
+        {
+            if (subList.Count == 1)
+                continue;
+            int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
+            if (index == -1)
+            {
+                var obj = subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/'))
+                    .ThenByDescending(smr => smr.name == "Body" ? 1 : 0).First();
+                index = subList.IndexOf(obj);
+            }
+            var oldFirst = subList[0];
+            subList[0] = subList[index];
+            subList[index] = oldFirst;
+        }
+        matchedSkinnedMeshes = matchedSkinnedMeshes
+            .OrderBy(subList => subList[0] is SkinnedMeshRenderer || subList[0] is MeshRenderer ? 0 : 1)
+            .ThenByDescending(subList => subList.Count).ToList();
         return matchedSkinnedMeshes;
     }
 
