@@ -1,3 +1,7 @@
+## v3.3.4
+### Bug Fixes
+* Fix `Delete Unused GameObjects` not marking the global phys bone collider transforms as used.
+
 ## v3.3.3
 ### Bug Fixes
 * Don't normalize normals & tangents when merging meshes. This fixes outlines that are dependent on the normal length to determine mesh scale.

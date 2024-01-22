@@ -4362,6 +4362,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
         used.UnionWith(transform.Cast<Transform>().Where(t => t.name.StartsWith("NaNimation ")));
 
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+        used.Add(avDescriptor.collider_footL.transform);
+        used.Add(avDescriptor.collider_footR.transform);
+        used.Add(avDescriptor.collider_handL.transform);
+        used.Add(avDescriptor.collider_handR.transform);
+        used.Add(avDescriptor.collider_head.transform);
+        used.Add(avDescriptor.collider_torso.transform);
+        used.Add(avDescriptor.collider_fingerIndexL.transform);
+        used.Add(avDescriptor.collider_fingerIndexR.transform);
+        used.Add(avDescriptor.collider_fingerMiddleL.transform);
+        used.Add(avDescriptor.collider_fingerMiddleR.transform);
+        used.Add(avDescriptor.collider_fingerRingL.transform);
+        used.Add(avDescriptor.collider_fingerRingR.transform);
+        used.Add(avDescriptor.collider_fingerLittleL.transform);
+        used.Add(avDescriptor.collider_fingerLittleR.transform);
+
         foreach (var skinnedRenderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
             used.Add(skinnedRenderer.rootBone);
