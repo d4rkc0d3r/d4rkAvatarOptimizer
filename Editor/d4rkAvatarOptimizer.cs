@@ -670,7 +670,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return true;
     }
 
-    private bool GetRendererDefaultEnabledState(Renderer r) => r.enabled && r.gameObject.activeSelf;
+    public bool GetRendererDefaultEnabledState(Renderer r) => r.enabled && r.gameObject.activeSelf;
 
     private bool CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate, bool withNaNimation)
     {
@@ -745,15 +745,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private Dictionary<string, bool> cache_CanUseNaNimationOnMesh = null;
     public bool CanUseNaNimationOnMesh(string path)
     {
+        if (!MergeSkinnedMeshesWithNaNimation)
+            return false;
         if (cache_CanUseNaNimationOnMesh == null)
             cache_CanUseNaNimationOnMesh = new Dictionary<string, bool>();
         if (cache_CanUseNaNimationOnMesh.TryGetValue(path, out var cachedResult))
             return cachedResult;
-        if (!MergeSkinnedMeshesWithNaNimation)
-            return cache_CanUseNaNimationOnMesh[path] = false;
         if (!NaNimationAllow3BoneSkinning && MeshUses4BoneSkinning(path))
             return cache_CanUseNaNimationOnMesh[path] = false;
-        return cache_CanUseNaNimationOnMesh[path] = !FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Contains(path);
+        var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
+        if (renderer == null)
+            return cache_CanUseNaNimationOnMesh[path] = false;
+        return cache_CanUseNaNimationOnMesh[path] = GetRendererDefaultEnabledState(renderer) || !FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Contains(path);
     }
 
     private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = null;

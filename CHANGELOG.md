@@ -3,6 +3,7 @@
 * Fix `Delete Unused GameObjects` not marking the global phys bone collider transforms as used.
 * Fix sort order of which mesh should get priority for getting merged into.
 * Fix WD ON workflow toggles not stopping NaNimation when `Optimize FX Layer` is disabled.
+* Fix NaNimation getting blocked by WD ON workflow even for meshes that are on by default.
 
 ## v3.3.3
 ### Bug Fixes

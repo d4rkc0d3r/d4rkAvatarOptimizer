@@ -361,12 +361,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Unmergable NaNimation by Animations", ref optimizer.DebugShowMeshesThatCantMergeNaNimationCausedByAnimations))
             {
                 Profiler.StartSection("Unmergable NaNimation by Animations");
-                var list = optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
-                    .Select(p => optimizer.GetTransformFromPath(p))
-                    .Where(t => t != null)
-                    .Select(t => t.GetComponent<Renderer>())
-                    .Where(r => r != null).ToArray();
-                DrawDebugList(list);
+                DrawDebugList(CantMergeNaNimationBecauseOfWDONAnimations);
                 Profiler.EndSection();
             }
             if (optimizer.WritePropertiesAsStaticValues && Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
@@ -727,7 +722,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        if (optimizer.MergeSkinnedMeshesWithNaNimation && optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Count > 0)
+        if (optimizer.MergeSkinnedMeshesWithNaNimation && CantMergeNaNimationBecauseOfWDONAnimations.Length > 0)
         {
             EditorGUILayout.HelpBox(
                 "Some meshes are missing the corresponding on or off toggle animation. This is likely due to a WD ON workflow.\n" +
@@ -795,6 +790,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private GameObject[] gameObjectsWithToggleAnimationsCache = null;
     private Texture2D[] crunchedTexturesCache = null;
     private Texture2D[] nonBC5NormalMapsCache = null;
+    private Renderer[] cantMergeNaNimationBecauseOfWDONAnimationsCache = null;
     private string[] animatedMaterialPropertyPathsCache = null;
     private HashSet<string> keptBlendShapePathsCache = null;
     private List<List<(string blendshape, float value)>> mergeableBlendShapesCache = null;
@@ -809,6 +805,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         gameObjectsWithToggleAnimationsCache = null;
         crunchedTexturesCache = null;
         nonBC5NormalMapsCache = null;
+        cantMergeNaNimationBecauseOfWDONAnimationsCache = null;
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
         mergeableBlendShapesCache = null;
@@ -913,6 +910,22 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
             }
             return mergeableBlendShapesCache;
+        }
+    }
+
+    private Renderer[] CantMergeNaNimationBecauseOfWDONAnimations
+    {
+        get
+        {
+            if (cantMergeNaNimationBecauseOfWDONAnimationsCache != null)
+                return cantMergeNaNimationBecauseOfWDONAnimationsCache;
+            return cantMergeNaNimationBecauseOfWDONAnimationsCache =
+                optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+                    .Select(p => optimizer.GetTransformFromPath(p))
+                    .Where(t => t != null)
+                    .Select(t => t.GetComponent<Renderer>())
+                    .Where(r => r != null && !optimizer.GetRendererDefaultEnabledState(r))
+                    .ToArray();
         }
     }
 
