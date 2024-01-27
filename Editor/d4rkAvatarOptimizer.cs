@@ -43,6 +43,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool NaNimationAllow3BoneSkinning = false;
         public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState = true;
         public bool MergeStaticMeshesAsSkinned = true;
+        public bool MergePreferBodyOverVisemeMesh = false;
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
         public bool MergeMainTex = false;
@@ -220,6 +221,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeStaticMeshesAsSkinned {
         get { return settings.MergeSkinnedMeshes && settings.MergeStaticMeshesAsSkinned; }
         set { settings.MergeStaticMeshesAsSkinned = value; } }
+    public bool MergePreferBodyOverVisemeMesh {
+        get { return settings.MergeSkinnedMeshes && settings.MergePreferBodyOverVisemeMesh; }
+        set { settings.MergePreferBodyOverVisemeMesh = value; } }
     public bool MergeDifferentPropertyMaterials {
         get { return HasCustomShaderSupport && settings.MergeDifferentPropertyMaterials; }
         set { settings.MergeDifferentPropertyMaterials = value; } }
@@ -282,6 +286,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(NaNimationAllow3BoneSkinning), "Allow 3 Bone Skinning"},
         {nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState), "Keep Default Enabled State"},
         {nameof(MergeStaticMeshesAsSkinned), "Merge Static Meshes as Skinned"},
+        {nameof(MergePreferBodyOverVisemeMesh), "Prefer Merging into Body over Viseme Mesh"},
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
         {nameof(MergeMainTex), "Merge MainTex"},
@@ -318,6 +323,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
+            {nameof(Settings.MergePreferBodyOverVisemeMesh), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
             {nameof(Settings.MergeMainTex), false},
@@ -339,6 +345,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
+            {nameof(Settings.MergePreferBodyOverVisemeMesh), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeMainTex), false},
@@ -360,6 +367,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.NaNimationAllow3BoneSkinning), true},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
+            {nameof(Settings.MergePreferBodyOverVisemeMesh), false},
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeMainTex), true},
@@ -1032,13 +1040,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             if (subList.Count == 1)
                 continue;
-            int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
-            if (index == -1)
-            {
-                var obj = subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/'))
-                    .ThenByDescending(smr => smr.name == "Body" ? 1 : 0).First();
-                index = subList.IndexOf(obj);
+
+            int visemeMeshIndex = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
+            int bodyMeshIndex = subList.FindIndex(smr => smr.name == "Body");
+            int shallowestMeshIndex = subList.IndexOf(subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/')).First());
+
+            int index = shallowestMeshIndex;
+            if (settings.MergePreferBodyOverVisemeMesh) {
+                if (bodyMeshIndex >= 0)
+                    index = bodyMeshIndex;
+                else if (visemeMeshIndex >= 0)
+                    index = visemeMeshIndex;
+            } else {
+                if (visemeMeshIndex >= 0)
+                    index = visemeMeshIndex;
+                else if (bodyMeshIndex >= 0)
+                    index = bodyMeshIndex;
             }
+
             var oldFirst = subList[0];
             subList[0] = subList[index];
             subList[index] = oldFirst;

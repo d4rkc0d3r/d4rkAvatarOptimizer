@@ -102,6 +102,8 @@ This is useful to not look weird with blocked animations in case of NaNimation t
 ## Merge Static Meshes as Skinned
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
+## Prefer Merging into Body over Viseme Mesh
+By default, when merging meshes together, the Viseme mesh referenced in the VRC Avatar Descriptor will be prioritized as the merge target, followed by any mesh named "Body". Enable this setting to prefer merging into a "Body" mesh by default instead. This can be used to improve compatiblity with MMD worlds if your avatar contains a Body mesh and a separate viseme mesh.
 ## Merge Different Property Materials
 Merges materials with the same shader where properties can have different values. If they do have different values the values will get written to a constant buffer. Material IDs get written to uv.w and used to access the correct value from that cbuffer.
 

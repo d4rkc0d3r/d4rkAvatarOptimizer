@@ -97,6 +97,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesSeparatedByDefaultEnabledState));
         EditorGUI.indentLevel--;
         ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
+        ToggleOptimizerProperty(nameof(optimizer.MergePreferBodyOverVisemeMesh));
         EditorGUI.indentLevel--;
         if (d4rkAvatarOptimizer.HasCustomShaderSupport)
         {
