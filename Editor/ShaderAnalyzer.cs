@@ -406,9 +406,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (trimmedLine.StartsWith("//ifex"))
                     {
-                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*[\d+]$");
+                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*\d+(\s*&&\s*(\w+)\s*[!=]=\s*\d+)*$");
                         if (match.Success) {
                             parsedShader.ifexParameters.Add(match.Groups[1].Value);
+                            match.Groups[3].Captures.Cast<Capture>().Select(c => c.Value).ToList().ForEach(p => parsedShader.ifexParameters.Add(p));
                         } else {
                             parsedShader.unableToParseIfexStatements.Add(trimmedLine);
                         }
@@ -2550,7 +2551,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (!line.StartsWith("#ifex"))
                 return;
-            var match = Regex.Match(line, @"^#ifex\s+(\w+)\s*([!=])=\s*(\d+)$");
+            
+            var match = Regex.Match(line, @"^#ifex\s+(\s*(&&)?\s*(\w+)\s*([!=])=\s*(\d+))+$");
             if (!match.Success)
             {
                 lineIndex++;
@@ -2558,25 +2560,32 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 ParseAndEvaluateIfex(lines, ref lineIndex);
                 return;
             }
-            var name = match.Groups[1].Value;
-            var op = match.Groups[2].Value;
-            var compValue = float.Parse(match.Groups[3].Value);
-            if (!staticPropertyValues.TryGetValue(name, out var valueString))
+            var outputString = $"// #ifex ";
+            var firstCondition = true;
+            foreach (Capture capture in match.Groups[1].Captures)
             {
-                lineIndex++;
-                output.Add($"// #ifex {name} not found in static properties");
-                ParseAndEvaluateIfex(lines, ref lineIndex);
-                return;
+                var subMatch = Regex.Match(capture.Value, @"(\w+)\s*([!=])=\s*(\d+)");
+                var name = subMatch.Groups[1].Value;
+                var op = subMatch.Groups[2].Value;
+                var compValue = float.Parse(subMatch.Groups[3].Value);
+                if (!staticPropertyValues.TryGetValue(name, out var valueString))
+                {
+                    lineIndex++;
+                    output.Add($"// #ifex {name} not found in static properties");
+                    ParseAndEvaluateIfex(lines, ref lineIndex);
+                    return;
+                }
+                var value = float.Parse(valueString);
+                outputString += $"{(firstCondition ? "" : " && ")}{name}({value}) {op}= {compValue}";
+                if ((compValue != value) ^ op == "!")
+                {
+                    lineIndex++;
+                    output.Add(outputString + ", FALSE");
+                    ParseAndEvaluateIfex(lines, ref lineIndex);
+                    return;
+                }
             }
-            var value = float.Parse(valueString);
-            var outputString = $"// #ifex {name}({value}) {op}= {compValue}";
-            if ((compValue != value) ^ op == "!")
-            {
-                lineIndex++;
-                output.Add(outputString);
-                ParseAndEvaluateIfex(lines, ref lineIndex);
-                return;
-            }
+
             // skip all code until matching #endex
             int depth = 0;
             int linesSkipped = 0;
@@ -2591,7 +2600,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (depth == 0)
                     {
                         lineIndex++;
-                        output.Add($"{outputString}, skipped {linesSkipped} lines");
+                        output.Add($"{outputString}, TRUE skipped {linesSkipped} lines");
                         ParseAndEvaluateIfex(lines, ref lineIndex);
                         return;
                     }
