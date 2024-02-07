@@ -1,6 +1,8 @@
 ## v3.4.0
 ### Features
 * Add support for Poiyomi `//ifex` logic. This is important for Poiyomi 9.0 as it is used to skip entire passes.
+* Massive performance improvements for the perf rank change preview.
+  * My personal avatar went from 450ms to 35ms. (`AnimatorController.layers` is slow and you should cache it)
 
 ### Changes
 * Add property filter for the shader analyzer debugger.

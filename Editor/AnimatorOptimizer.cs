@@ -66,9 +66,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
 
         private AnimatorController Run() {
-            for (int i = 0; i < source.layers.Length; i++) {
-                if (layersToMerge.Contains(i) && source.layers[i].stateMachine.states.Length >= 2) {
-                    foreach (var condition in source.layers[i].stateMachine.EnumerateAllTransitions().SelectMany(x => x.conditions)) {
+            var sourceLayers = source.layers;
+
+            for (int i = 0; i < sourceLayers.Length; i++) {
+                if (layersToMerge.Contains(i) && sourceLayers[i].stateMachine.states.Length >= 2) {
+                    foreach (var condition in sourceLayers[i].stateMachine.EnumerateAllTransitions().SelectMany(x => x.conditions)) {
                         if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Int)) {
                             intsToChangeToFloat.Add(condition.parameter);
                         } else if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Bool)) {
@@ -104,11 +106,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 target.AddParameter(blendTreeDummyWeight);
             }
 
-            for (int i = 0; i < source.layers.Length; i++) {
+            for (int i = 0; i < sourceLayers.Length; i++) {
                 if (layersToMerge.Contains(i) || layersToDestroy.Contains(i)) {
                     continue;
                 }
-                AnimatorControllerLayer newL = CloneLayer(source.layers[i], i == 0);
+                AnimatorControllerLayer newL = CloneLayer(sourceLayers[i], i == 0);
                 newL.name = target.MakeUniqueLayerName(newL.name);
                 newL.stateMachine.name = newL.name;
                 target.AddLayer(newL);
@@ -123,9 +125,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void FixAllLayerControlBehaviours()
         {
-            for (int i = 0; i < target.layers.Length; i++)
+            var targetLayers = target.layers;
+            for (int i = 0; i < targetLayers.Length; i++)
             {
-                FixLayerControlBehavioursInStateMachine(target.layers[i].stateMachine);
+                FixLayerControlBehavioursInStateMachine(targetLayers[i].stateMachine);
             }
             EditorUtility.SetDirty(target);
         }
@@ -267,8 +270,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 return s.motion;
             }
+            var sourceLayers = source.layers;
             foreach (var i in layersToMerge) {
-                var layer = source.layers[i].stateMachine;
+                var layer = sourceLayers[i].stateMachine;
                 Motion layerMotion = null;
                 if (layer.states.Length == 2) {
                     var layerMotions = layer.states.Select(x => ConvertStateToMotion(x.state)).ToArray();
@@ -315,7 +319,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var layerMotions = transitions.Select(x => ConvertStateToMotion(x.destinationState)).ToArray();
                     layerMotion = CreateBlendTree(transitions[0].conditions[0].parameter, layerMotions.Select((x, index) => new ChildMotion() { motion = x, threshold = index}).ToArray());
                 }
-                layerMotion.name = source.layers[i].name;
+                layerMotion.name = sourceLayers[i].name;
                 motions.Add(new ChildMotion() {
                     motion = layerMotion,
                     directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",

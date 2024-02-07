@@ -770,8 +770,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var meshOnPaths = new HashSet<string>();
             var fxLayer = GetFXLayer();
             var uselessLayers = FindUselessFXLayers();
-            for (int i = 0; fxLayer != null && i < fxLayer.layers.Length; i++) {
-                if (fxLayer.layers[i] == null || fxLayer.layers[i].stateMachine == null)
+            var fxLayerLayers = GetFXLayerLayers();
+            for (int i = 0; fxLayer != null && i < fxLayerLayers.Length; i++) {
+                if (fxLayerLayers[i] == null || fxLayerLayers[i].stateMachine == null)
                     continue;
                 if (OptimizeFXLayer && (uselessLayers.Contains(i) || IsMergeableFXLayer(i)))
                     continue;
@@ -779,7 +780,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 goOnPaths.Clear();
                 meshOffPaths.Clear();
                 meshOnPaths.Clear();
-                foreach (var state in fxLayer.layers[i].stateMachine.EnumerateAllStates()) {
+                foreach (var state in fxLayerLayers[i].stateMachine.EnumerateAllStates()) {
                     if (state.motion == null)
                         continue;
                     foreach (var clip in state.motion.EnumerateAllClips()) {
@@ -1244,7 +1245,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var errors = AnalyzeFXLayerMergeAbility();
             var uselessLayers = FindUselessFXLayers();
             int currentLayer = 0;
-            for (int i = 0; i < GetFXLayer().layers.Length; i++)
+            for (int i = 0; i < GetFXLayerLayers().Length; i++)
             {
                 fxLayerMap[i] = currentLayer;
                 if (uselessLayers.Contains(i))
@@ -1348,16 +1349,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return new List<List<string>>();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
 
-        var errorMessages = fxLayer.layers.Select(layer => new List<string>()).ToList();
+        var fxLayerLayers = GetFXLayerLayers();
+        var errorMessages = fxLayerLayers.Select(layer => new List<string>()).ToList();
 
         for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
         {
             var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
             if (controller == null)
                 continue;
-            for (int j = 0; j < controller.layers.Length; j++)
+            var controllerLayers = controller.layers;
+            for (int j = 0; j < controllerLayers.Length; j++)
             {
-                var layer = controller.layers[j];
+                var layer = controllerLayers[j];
                 var stateMachine = layer.stateMachine;
                 if (stateMachine == null)
                     continue;
@@ -1375,30 +1378,30 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
-        var fxLayerBindings = fxLayer.layers.Select(layer => GetAllCurveBindings(layer.stateMachine)).ToList();
+        var fxLayerBindings = fxLayerLayers.Select(layer => GetAllCurveBindings(layer.stateMachine)).ToList();
         var uselessLayers = FindUselessFXLayers();
         var intParams = new HashSet<string>(fxLayer.parameters.Where(p => p.type == AnimatorControllerParameterType.Int).Select(p => p.name));
         var intParamsWithNotEqualConditions = new HashSet<string>();
 
-        for (int i = 0; i < fxLayer.layers.Length; i++) {
+        for (int i = 0; i < fxLayerLayers.Length; i++) {
             if (uselessLayers.Contains(i)) {
                 continue;
             }
-            foreach (var condition in fxLayer.layers[i].stateMachine.EnumerateAllTransitions().SelectMany(t => t.conditions)) {
+            foreach (var condition in fxLayerLayers[i].stateMachine.EnumerateAllTransitions().SelectMany(t => t.conditions)) {
                 if (condition.mode == AnimatorConditionMode.NotEqual && intParams.Contains(condition.parameter)) {
                     intParamsWithNotEqualConditions.Add(condition.parameter);
                 }
             }
         }
 
-        for (int i = 0; i < fxLayer.layers.Length; i++)
+        for (int i = 0; i < fxLayerLayers.Length; i++)
         {
             if (uselessLayers.Contains(i))
             {
                 errorMessages[i].Add("useless");
                 continue;
             }
-            var layer = fxLayer.layers[i];
+            var layer = fxLayerLayers[i];
             var stateMachine = layer.stateMachine;
             if (stateMachine == null)
             {
@@ -1662,12 +1665,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 errorMessages[i].Add($"multi toggle");
             }
 
-            for (int j = 0; j < fxLayer.layers.Length; j++) {
+            for (int j = 0; j < fxLayerLayers.Length; j++) {
                 if (i == j || uselessLayers.Contains(j))
                     continue;
                 foreach (var binding in fxLayerBindings[i]) {
                     if (fxLayerBindings[j].Contains(binding)) {
-                        errorMessages[i].Add($"{binding.path} is used in {j} {fxLayer.layers[j].name}");
+                        errorMessages[i].Add($"{binding.path} is used in {j} {fxLayerLayers[j].name}");
                     }
                 }
             }
@@ -1704,9 +1707,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
             if (controller == null)
                 continue;
-            for (int j = 0; j < controller.layers.Length; j++)
+            var controllerLayers = controller.layers;
+            for (int j = 0; j < controllerLayers.Length; j++)
             {
-                var stateMachine = controller.layers[j].stateMachine;
+                var stateMachine = controllerLayers[j].stateMachine;
                 if (stateMachine == null)
                     continue;
                 foreach (var behaviour in stateMachine.EnumerateAllBehaviours())
@@ -1740,13 +1744,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return possibleTypeNames.Contains(binding.type.FullName);
         }
 
-        int lastNonUselessLayer = fxLayer.layers.Length;
-        for (int i = fxLayer.layers.Length - 1; i >= 0; i--)
+        var fxLayerLayers = GetFXLayerLayers();
+        int lastNonUselessLayer = fxLayerLayers.Length;
+        for (int i = fxLayerLayers.Length - 1; i >= 0; i--)
         {
-            var layer = fxLayer.layers[i];
+            var layer = fxLayerLayers[i];
             bool isNotFirstLayerOrLastNonUselessLayerCanBeFirst = i != 0 ||
-                (lastNonUselessLayer < fxLayer.layers.Length && fxLayer.layers[lastNonUselessLayer].avatarMask == layer.avatarMask
-                    && fxLayer.layers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
+                (lastNonUselessLayer < fxLayerLayers.Length && fxLayerLayers[lastNonUselessLayer].avatarMask == layer.avatarMask
+                    && fxLayerLayers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
             var stateMachine = layer.stateMachine;
             if (stateMachine == null)
             {
@@ -1795,9 +1800,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return new HashSet<AnimationClip>();
         var unusedLayers = FindUselessFXLayers();
         var usedClips = new HashSet<AnimationClip>();
-        for (int i = 0; i < fxLayer.layers.Length; i++)
+        var fxLayerLayers = GetFXLayerLayers();
+        for (int i = 0; i < fxLayerLayers.Length; i++)
         {
-            var stateMachine = fxLayer.layers[i].stateMachine;
+            var stateMachine = fxLayerLayers[i].stateMachine;
             if (stateMachine == null || unusedLayers.Contains(i))
                 continue;
             foreach (var state in stateMachine.EnumerateAllStates())
@@ -1880,23 +1886,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             if (skinnedMesh.sharedMesh == null)
                 continue;
-            var bones = new HashSet<Transform>();
             var meshBones = skinnedMesh.bones;
+            var usedBoneIDs = new bool[meshBones.Length];
             var boneWeights = skinnedMesh.sharedMesh.boneWeights;
             for (int i = 0; i < boneWeights.Length; i++)
             {
                 if (boneWeights[i].weight0 > 0)
-                    bones.Add(meshBones[boneWeights[i].boneIndex0]);
+                    usedBoneIDs[boneWeights[i].boneIndex0] = true;
                 if (boneWeights[i].weight1 > 0)
-                    bones.Add(meshBones[boneWeights[i].boneIndex1]);
+                    usedBoneIDs[boneWeights[i].boneIndex1] = true;
                 if (boneWeights[i].weight2 > 0)
-                    bones.Add(meshBones[boneWeights[i].boneIndex2]);
+                    usedBoneIDs[boneWeights[i].boneIndex2] = true;
                 if (boneWeights[i].weight3 > 0)
-                    bones.Add(meshBones[boneWeights[i].boneIndex3]);
+                    usedBoneIDs[boneWeights[i].boneIndex3] = true;
             }
-            foreach (var bone in bones)
+            for (int i = 0; i < usedBoneIDs.Length; i++)
             {
-                AddDependency(bone, skinnedMesh);
+                if (usedBoneIDs[i])
+                {
+                    AddDependency(meshBones[i], skinnedMesh);
+                }
             }
         }
         foreach (var constraint in GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
@@ -2038,6 +2047,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != baseLayerCount)
             return null;
         return avDescriptor.baseAnimationLayers[baseLayerCount - 1].animatorController as AnimatorController;
+    }
+
+    private AnimatorControllerLayer[] cache_GetFXLayerLayers = null;
+    public AnimatorControllerLayer[] GetFXLayerLayers()
+    {
+        if (cache_GetFXLayerLayers != null)
+            return cache_GetFXLayerLayers;
+        var fxLayer = GetFXLayer();
+        return cache_GetFXLayerLayers = fxLayer != null ? fxLayer.layers : new AnimatorControllerLayer[0];
     }
 
     public void CalculateUsedBlendShapePaths()
@@ -2283,7 +2301,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         int intersectionCount = 0;
         float intersectionMax = 0;
-        for (int i = 0; i < subList.Count; i++)
+        int subListCount = subList.Count;
+        for (int i = 0; i < subListCount; i++)
         {
             if (ratioToCheckAgainst.TryGetValue(subList[i].blendshape, out var match))
             {
@@ -2295,17 +2314,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return false;
             }
         }
-        bool hasCandidate = ratioToCheckAgainst.ContainsKey(blendshape);
+        float candidateValue;
+        bool hasCandidate = ratioToCheckAgainst.TryGetValue(blendshape, out candidateValue);
         if (intersectionCount == 0 && !hasCandidate)
             return true;
-        if (intersectionCount != subList.Count || !hasCandidate)
+        if (intersectionCount != subListCount || !hasCandidate)
             return false;
-        var candidateValue = ratioToCheckAgainst[blendshape];
         if (intersectionMax == 0)
             return candidateValue == 0;
         if (candidateValue == 0)
             return false;
-        for (int i = 0; i < subList.Count; i++)
+        for (int i = 0; i < subListCount; i++)
         {
             var match = ratioToCheckAgainst[subList[i].blendshape];
             if (Mathf.Abs(subList[i].value - match / intersectionMax) > 0.01f)
@@ -3588,18 +3607,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     newMesh.SetIndices(targetIndices[i].ToArray(), targetTopology[i], i);
                 }
 
+                int meshVertexCount = mesh.vertexCount;
+                int newMeshVertexCount = newMesh.vertexCount;
                 for (int i = 0; i < mesh.blendShapeCount; i++)
                 {
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(i); j++)
                     {
-                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
-                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
-                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        var sourceDeltaVertices = new Vector3[meshVertexCount];
+                        var sourceDeltaNormals = new Vector3[meshVertexCount];
+                        var sourceDeltaTangents = new Vector3[meshVertexCount];
                         mesh.GetBlendShapeFrameVertices(i, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
-                        var targetDeltaVertices = new Vector3[newMesh.vertexCount];
-                        var targetDeltaNormals = new Vector3[newMesh.vertexCount];
-                        var targetDeltaTangents = new Vector3[newMesh.vertexCount];
-                        for (int k = 0; k < newMesh.vertexCount; k++)
+                        var targetDeltaVertices = new Vector3[newMeshVertexCount];
+                        var targetDeltaNormals = new Vector3[newMeshVertexCount];
+                        var targetDeltaTangents = new Vector3[newMeshVertexCount];
+                        for (int k = 0; k < newMeshVertexCount; k++)
                         {
                             var oldIndex = targetOldVertexIndex[k];
                             targetDeltaVertices[k] = sourceDeltaVertices[oldIndex];
@@ -4060,6 +4081,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 vertexOffset.Add(vertexOffset[i] + combinableSkinnedMeshes[i].sharedMesh.vertexCount);
             }
+            int combinedMeshVertexCount = combinedMesh.vertexCount;
             foreach (var mergedBlendShapes in allMergedBlendShapes)
             {
                 if (mergedBlendShapes.Count == 1)
@@ -4080,14 +4102,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
                     for (int j = 0; j < mesh.GetBlendShapeFrameCount(blendShapeID); j++)
                     {
-                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
-                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
-                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        int meshVertexCount = mesh.vertexCount;
+                        var sourceDeltaVertices = new Vector3[meshVertexCount];
+                        var sourceDeltaNormals = new Vector3[meshVertexCount];
+                        var sourceDeltaTangents = new Vector3[meshVertexCount];
                         mesh.GetBlendShapeFrameVertices(blendShapeID, j, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
-                        var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
-                        var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
-                        var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
-                        for (int k = 0; k < mesh.vertexCount; k++)
+                        var targetDeltaVertices = new Vector3[combinedMeshVertexCount];
+                        var targetDeltaNormals = new Vector3[combinedMeshVertexCount];
+                        var targetDeltaTangents = new Vector3[combinedMeshVertexCount];
+                        for (int k = 0; k < meshVertexCount; k++)
                         {
                             int vertIndex = k + vertexOffset[meshID];
                             var toWorld = sourceToWorld[vertIndex];
@@ -4107,9 +4130,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     AddAnimationPathChange(
                         (oldPath, "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
                         (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
-                    var targetDeltaVertices = new Vector3[combinedMesh.vertexCount];
-                    var targetDeltaNormals = new Vector3[combinedMesh.vertexCount];
-                    var targetDeltaTangents = new Vector3[combinedMesh.vertexCount];
+                    var targetDeltaVertices = new Vector3[combinedMeshVertexCount];
+                    var targetDeltaNormals = new Vector3[combinedMeshVertexCount];
+                    var targetDeltaTangents = new Vector3[combinedMeshVertexCount];
                     bool first = true;
                     foreach (var toMerge in mergedBlendShapes)
                     {
@@ -4126,11 +4149,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             blendShapeWeights[name] = skinnedMesh.GetBlendShapeWeight(blendShapeID);
                             first = false;
                         }
-                        var sourceDeltaVertices = new Vector3[mesh.vertexCount];
-                        var sourceDeltaNormals = new Vector3[mesh.vertexCount];
-                        var sourceDeltaTangents = new Vector3[mesh.vertexCount];
+                        int meshVertexCount = mesh.vertexCount;
+                        var sourceDeltaVertices = new Vector3[meshVertexCount];
+                        var sourceDeltaNormals = new Vector3[meshVertexCount];
+                        var sourceDeltaTangents = new Vector3[meshVertexCount];
                         mesh.GetBlendShapeFrameVertices(blendShapeID, 0, sourceDeltaVertices, sourceDeltaNormals, sourceDeltaTangents);
-                        for (int k = 0; k < mesh.vertexCount; k++)
+                        for (int k = 0; k < meshVertexCount; k++)
                         {
                             int vertIndex = k + vertexOffset[meshID];
                             var toWorld = sourceToWorld[vertIndex];
