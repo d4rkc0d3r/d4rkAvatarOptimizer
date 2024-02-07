@@ -406,7 +406,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (trimmedLine.StartsWith("//ifex"))
                     {
-                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*[01]$");
+                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*[\d+]$");
                         if (match.Success) {
                             parsedShader.ifexParameters.Add(match.Groups[1].Value);
                         } else {
@@ -2550,7 +2550,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (!line.StartsWith("#ifex"))
                 return;
-            var match = Regex.Match(line, @"^#ifex\s+(\w+)\s*([!=])=\s*([01])$");
+            var match = Regex.Match(line, @"^#ifex\s+(\w+)\s*([!=])=\s*(\d+)$");
             if (!match.Success)
             {
                 lineIndex++;
@@ -2560,19 +2560,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             var name = match.Groups[1].Value;
             var op = match.Groups[2].Value;
-            var compValue = match.Groups[3].Value;
-            if (!staticPropertyValues.TryGetValue(name, out var value))
+            var compValue = float.Parse(match.Groups[3].Value);
+            if (!staticPropertyValues.TryGetValue(name, out var valueString))
             {
                 lineIndex++;
                 output.Add($"// #ifex {name} not found in static properties");
                 ParseAndEvaluateIfex(lines, ref lineIndex);
                 return;
             }
+            var value = float.Parse(valueString);
             var outputString = $"// #ifex {name}({value}) {op}= {compValue}";
-            value = value == "1.0" ? "1" : value;
-            value = value == "0.0" ? "0" : value;
-            compValue = compValue == "1" ^ op == "!" ? "1" : "0";
-            if (value != compValue)
+            if ((compValue != value) ^ op == "!")
             {
                 lineIndex++;
                 output.Add(outputString);
