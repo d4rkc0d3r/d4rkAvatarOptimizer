@@ -1,3 +1,7 @@
+## v3.4.0
+### Changes
+* Add property filter for the shader analyzer debugger.
+
 ## v3.3.4
 ### Bug Fixes
 * Fix `Delete Unused GameObjects` not marking the global phys bone collider transforms as used.

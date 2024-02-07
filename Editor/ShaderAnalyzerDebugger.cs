@@ -28,6 +28,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showMultiIncludeFiles = true;
     private bool showErrorLess = true;
     private Vector2 scrollPos;
+    private string propertyFilter = "";
 
     [MenuItem("Tools/d4rkpl4y3r/Shader Analyzer Debugger")]
     static void Init()
@@ -278,10 +279,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
         GUILayout.Space(15);
 
         int shownProperties = 0;
+        propertyFilter = EditorGUILayout.TextField("Property Filter", propertyFilter);
         for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
         {
             var prop = parsedShader.properties[i];
             if (showShaderLabParamsOnly && prop.shaderLabParams.Count == 0)
+                continue;
+            if (!string.IsNullOrEmpty(propertyFilter) && !prop.name.Contains(propertyFilter))
                 continue;
             shownProperties++;
             EditorGUILayout.LabelField(prop.name, (prop.hasGammaTag ? "[gamma] " : "") + prop.type +
