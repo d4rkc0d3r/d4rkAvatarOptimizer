@@ -1137,9 +1137,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             } else {
                 AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
-                if (fixedBinding.propertyName.StartsWith($"material.d4rkAvatarOptimizer")) {
+                if (fixedBinding.propertyName.StartsWith($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
                     var otherBinding = fixedBinding;
-                    otherBinding.propertyName = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+").Groups[1].Value;
+                    otherBinding.propertyName = "material." + Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+").Groups[1].Value;
                     AnimationUtility.SetEditorCurve(newClip, otherBinding, curve);
                 }
             }

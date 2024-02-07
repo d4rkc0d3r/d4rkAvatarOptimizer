@@ -2,6 +2,9 @@
 ### Changes
 * Add property filter for the shader analyzer debugger.
 
+### Bug Fixes
+* Fix material property animation of the original property not getting the correct `material.` prefix.
+
 ## v3.3.4
 ### Bug Fixes
 * Fix `Delete Unused GameObjects` not marking the global phys bone collider transforms as used.
