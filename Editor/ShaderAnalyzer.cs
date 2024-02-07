@@ -103,6 +103,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
         public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
+        public HashSet<string> ifexParameters = new HashSet<string>();
+        public HashSet<string> unableToParseIfexStatements = new HashSet<string>();
 
         public bool CanMerge()
         {
@@ -399,6 +401,24 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 while (trimmedLine.EndsWith("\\"))
                 {
                     trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd() + " " + rawLines[++lineIndex].Trim();
+                }
+                if (trimmedLine.Length >= 6 && trimmedLine[0] == '/' && trimmedLine[1] == '/')
+                {
+                    if (trimmedLine.StartsWith("//ifex"))
+                    {
+                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*[01]$");
+                        if (match.Success) {
+                            parsedShader.ifexParameters.Add(match.Groups[1].Value);
+                        } else {
+                            parsedShader.unableToParseIfexStatements.Add(trimmedLine);
+                        }
+                        processedLines.Add($"#{trimmedLine.Substring(2)}");
+                    }
+                    else if (trimmedLine.StartsWith("//endex"))
+                    {
+                        processedLines.Add("#endex");
+                    }
+                    continue;
                 }
                 for (int i = 0; i < trimmedLine.Length; i++)
                 {
@@ -1081,6 +1101,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var prop in parsedShader.properties)
             {
                 parsedShader.propertyTable[prop.name] = prop;
+                if (parsedShader.ifexParameters.Contains(prop.name))
+                {
+                    prop.shaderLabParams.Add("ifex");
+                }
             }
             parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
@@ -1430,6 +1454,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
+                ParseAndEvaluateIfex(source, ref sourceLineIndex);
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
@@ -1553,6 +1578,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
+                ParseAndEvaluateIfex(source, ref sourceLineIndex);
                 line = source[sourceLineIndex];
                 if (line == "}")
                 {
@@ -1691,6 +1717,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var functionBody = new List<string>();
             while (++sourceLineIndex < source.Count)
             {
+                ParseAndEvaluateIfex(source, ref sourceLineIndex);
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
@@ -2185,13 +2212,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 int depth = 0;
                 int startLineIndex = lineIndex;
-                while (lineIndex < source.Count)
+                while (++lineIndex < source.Count)
                 {
-                    var innerLine = source[++lineIndex];
+                    var innerLine = source[lineIndex];
                     if (innerLine[0] != '#')
                         continue;
                     var innerSubLine = innerLine.Substring(1);
-                    if (innerSubLine.StartsWith("if"))
+                    if (innerSubLine.StartsWith("if") && !innerSubLine.StartsWith("ifex"))
                     {
                         depth++;
                     }
@@ -2355,6 +2382,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
+                ParseAndEvaluateIfex(source, ref sourceLineIndex);
                 var line = source[sourceLineIndex];
                 if (line == endSymbol)
                     return;
@@ -2509,6 +2537,76 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        private void ParseAndEvaluateIfex(List<string> lines, ref int lineIndex)
+        {
+            string line = lines[lineIndex];
+            if (line[0] != '#')
+                return;
+            if (line == "#endex")
+            {
+                lineIndex++;
+                ParseAndEvaluateIfex(lines, ref lineIndex);
+                return;
+            }
+            if (!line.StartsWith("#ifex"))
+                return;
+            var match = Regex.Match(line, @"^#ifex\s+(\w+)\s*([!=])=\s*([01])$");
+            if (!match.Success)
+            {
+                lineIndex++;
+                output.Add($"// {line} failed to match regex, just skip statement");
+                ParseAndEvaluateIfex(lines, ref lineIndex);
+                return;
+            }
+            var name = match.Groups[1].Value;
+            var op = match.Groups[2].Value;
+            var compValue = match.Groups[3].Value;
+            if (!staticPropertyValues.TryGetValue(name, out var value))
+            {
+                lineIndex++;
+                output.Add($"// #ifex {name} not found in static properties");
+                ParseAndEvaluateIfex(lines, ref lineIndex);
+                return;
+            }
+            var outputString = $"// #ifex {name}({value}) {op}= {compValue}";
+            value = value == "1.0" ? "1" : value;
+            value = value == "0.0" ? "0" : value;
+            compValue = compValue == "1" ^ op == "!" ? "1" : "0";
+            if (value != compValue)
+            {
+                lineIndex++;
+                output.Add(outputString);
+                ParseAndEvaluateIfex(lines, ref lineIndex);
+                return;
+            }
+            // skip all code until matching #endex
+            int depth = 0;
+            int linesSkipped = 0;
+            while (++lineIndex < lines.Count)
+            {
+                line = lines[lineIndex];
+                linesSkipped++;
+                if (line[0] != '#')
+                    continue;
+                if (line == "#endex")
+                {
+                    if (depth == 0)
+                    {
+                        lineIndex++;
+                        output.Add($"{outputString}, skipped {linesSkipped} lines");
+                        ParseAndEvaluateIfex(lines, ref lineIndex);
+                        return;
+                    }
+                    depth--;
+                }
+                else if (line.StartsWith("#ifex"))
+                {
+                    depth++;
+                }
+            }
+            output.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
+        }
+
         private List<string> Run()
         {
             lastIfEvalResultStack = new Stack<ConditionResult>();
@@ -2523,6 +2621,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int lineIndex = 0;
             while (lineIndex < lines.Count)
             {
+                ParseAndEvaluateIfex(lines, ref lineIndex);
                 string line = lines[lineIndex++];
                 output.Add(line);
                 if (line == "Properties")
@@ -2532,6 +2631,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             while (lineIndex < lines.Count)
             {
+                ParseAndEvaluateIfex(lines, ref lineIndex);
                 string line = lines[lineIndex++];
                 if (line == "}")
                 {
@@ -2594,6 +2694,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             };
             for (; lineIndex < lines.Count; lineIndex++)
             {
+                ParseAndEvaluateIfex(lines, ref lineIndex);
                 string line = lines[lineIndex];
                 if (line.StartsWith("CustomEditor"))
                     continue;
@@ -2646,6 +2747,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             tags.Clear();
             for (lineIndex = propertyBlockStartParseIndex; lineIndex < lines.Count; lineIndex++)
             {
+                ParseAndEvaluateIfex(lines, ref lineIndex);
                 string line = lines[lineIndex];
                 if (line == "}")
                     break;

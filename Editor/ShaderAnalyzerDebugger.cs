@@ -19,6 +19,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showShaderLabParamsOnly = false;
     private long lastTime = 0;
 
+    private bool showProperties = true;
+    private bool showFailedIfex = true;
+
     private DefaultAsset folder = null;
     private List<Shader> shaders = null;
     private bool showMismatchedCurlyBraces = true;
@@ -278,19 +281,43 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
         GUILayout.Space(15);
 
-        int shownProperties = 0;
-        propertyFilter = EditorGUILayout.TextField("Property Filter", propertyFilter);
-        for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
+        bool IsShownProperty(ParsedShader.Property prop)
         {
-            var prop = parsedShader.properties[i];
             if (showShaderLabParamsOnly && prop.shaderLabParams.Count == 0)
-                continue;
-            if (!string.IsNullOrEmpty(propertyFilter) && !prop.name.Contains(propertyFilter))
-                continue;
-            shownProperties++;
-            EditorGUILayout.LabelField(prop.name, (prop.hasGammaTag ? "[gamma] " : "") + prop.type +
-                (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : "")
-                + " = " + prop.defaultValue);
+                return false;
+            if (!string.IsNullOrEmpty(propertyFilter) && !prop.name.Contains(propertyFilter) && !(propertyFilter == "ifex" && parsedShader.ifexParameters.Contains(prop.name)))
+                return false;
+            return true;
+        }
+
+        if (Foldout(ref showProperties, $"Properties ({parsedShader.properties.Count(IsShownProperty)}/{parsedShader.properties.Count})"))
+        {
+            EditorGUI.indentLevel++;
+            int shownProperties = 0;
+            propertyFilter = EditorGUILayout.TextField("Property Filter", propertyFilter);
+            for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
+            {
+                var prop = parsedShader.properties[i];
+                if (!IsShownProperty(prop))
+                    continue;
+                shownProperties++;
+                EditorGUILayout.LabelField(prop.name, (prop.hasGammaTag ? "[gamma] " : "") + prop.type
+                    + (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : "")
+                    + " = " + prop.defaultValue);
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        GUILayout.Space(15);
+
+        if (Foldout(ref showFailedIfex, "Failed Ifex (" + parsedShader.unableToParseIfexStatements.Count + ")"))
+        {
+            EditorGUI.indentLevel++;
+            foreach (var ifex in parsedShader.unableToParseIfexStatements)
+            {
+                EditorGUILayout.LabelField(ifex);
+            }
+            EditorGUI.indentLevel--;
         }
 
         GUILayout.Space(15);
