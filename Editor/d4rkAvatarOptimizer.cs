@@ -1891,14 +1891,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var boneWeights = skinnedMesh.sharedMesh.boneWeights;
             for (int i = 0; i < boneWeights.Length; i++)
             {
-                if (boneWeights[i].weight0 > 0)
-                    usedBoneIDs[boneWeights[i].boneIndex0] = true;
-                if (boneWeights[i].weight1 > 0)
+                usedBoneIDs[boneWeights[i].boneIndex0] = true;
+                if (boneWeights[i].weight1 > 0) {
                     usedBoneIDs[boneWeights[i].boneIndex1] = true;
-                if (boneWeights[i].weight2 > 0)
-                    usedBoneIDs[boneWeights[i].boneIndex2] = true;
-                if (boneWeights[i].weight3 > 0)
-                    usedBoneIDs[boneWeights[i].boneIndex3] = true;
+                    if (boneWeights[i].weight2 > 0) {
+                        usedBoneIDs[boneWeights[i].boneIndex2] = true;
+                        if (boneWeights[i].weight3 > 0) {
+                            usedBoneIDs[boneWeights[i].boneIndex3] = true;
+                        }
+                    }
+                }
             }
             for (int i = 0; i < usedBoneIDs.Length; i++)
             {
