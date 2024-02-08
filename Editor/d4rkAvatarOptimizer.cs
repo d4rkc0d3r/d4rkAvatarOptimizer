@@ -3283,10 +3283,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             || (materialSlotRemap.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var remap) && slotSwapMaterials.ContainsKey(remap));
         if (IsAffectedByMaterialSwap(list[0]) || IsAffectedByMaterialSwap(candidate))
             return false;
-        bool allTheSameAsCandidate = list.All(slot => slot.material == candidateMat);
+        var listMaterials = list.Select(slot => slot.material).ToArray();
+        bool allTheSameAsCandidate = listMaterials.All(mat => mat == candidateMat);
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate;
-        if (list.Count > 1 && list.Any(slot => slot.material == candidateMat))
+        if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
             return true;
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
@@ -3309,6 +3310,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
                 return false;
         }
+        listMaterials = new HashSet<Material>(listMaterials).ToArray();
         bool mergeTextures = MergeSameDimensionTextures && parsedShader.CanMergeTextures();
         foreach (var prop in parsedShader.properties)
         {
@@ -3324,11 +3326,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         (MergeBackFaceCullingWithCullingOff && parsedShader.cullProperties.Length == 1 && prop.name == parsedShader.cullProperties[0].name))
                         break;
                     var candidateValue = candidateMat.GetFloat(prop.name);
-                    foreach (var slot in list)
-                    {
-                        if (slot.material.GetFloat(prop.name) != candidateValue)
-                            return false;
-                    }
+                    if (listMaterials[0].GetFloat(prop.name) != candidateValue)
+                        return false;
                     break;
                 case ParsedShader.Property.Type.Texture2D:
                 case ParsedShader.Property.Type.Texture2DArray:
@@ -3337,9 +3336,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 case ParsedShader.Property.Type.TextureCubeArray:
                     bool mergeTexture = mergeTextures && (prop.name != "_MainTex" || MergeMainTex);
                     var cTex = candidateMat.GetTexture(prop.name);
-                    foreach (var slot in list)
+                    foreach (var mat in listMaterials)
                     {
-                        var mTex = slot.material.GetTexture(prop.name);
+                        var mTex = mat.GetTexture(prop.name);
                         if (mergeTexture && !CanCombineTextures(mTex, cTex))
                             return false;
                         if (!mergeTexture && cTex != mTex)
