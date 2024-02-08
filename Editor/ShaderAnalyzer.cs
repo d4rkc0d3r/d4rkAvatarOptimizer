@@ -1685,7 +1685,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return;
             }
 
-            if (!func.parameters.Any(p => p.type == "sampler2D" || p.type.StartsWith("Texture2D")))
+            if (!func.parameters.Any(p => p.type == "sampler2D" || (p.type.StartsWith("Texture2D") && !p.type.StartsWith("Texture2DArray"))))
             {
                 output.Add(source[sourceLineIndex]);
                 return;

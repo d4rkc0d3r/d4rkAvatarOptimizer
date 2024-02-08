@@ -9,6 +9,7 @@
 
 ### Bug Fixes
 * Fix material property animation of the original property not getting the correct `material.` prefix.
+* Don't duplicate shader functions with a `Texture2DArray` parameter.
 
 ## v3.3.4
 ### Bug Fixes
