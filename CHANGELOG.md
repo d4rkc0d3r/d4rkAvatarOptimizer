@@ -10,6 +10,7 @@
 ### Bug Fixes
 * Fix material property animation of the original property not getting the correct `material.` prefix.
 * Don't duplicate shader functions with a `Texture2DArray` parameter.
+* Fix detection of cull ShaderLab property and disable merge with off when there is more than one cull property.
 
 ## v3.3.4
 ### Bug Fixes

@@ -2957,7 +2957,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
 
             cullReplace[i] = null;
-            var cullProp = parsedShader[i].properties.FirstOrDefault(p => p.shaderLabParams.Count == 1 && p.shaderLabParams.First() == "Cull");
+            var cullProp = parsedShader[i].cullProperties.Length == 1 ? parsedShader[i].cullProperties[0] : null;
             if (cullProp != null)
             {
                 int firstCull = source[0].GetInt(cullProp.name);
@@ -3320,13 +3320,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     break;
                 case ParsedShader.Property.Type.Int:
                 case ParsedShader.Property.Type.Float:
-                    if (prop.shaderLabParams.Count == 0)
+                    if (prop.shaderLabParams.Count == 0 ||
+                        (MergeBackFaceCullingWithCullingOff && parsedShader.cullProperties.Length == 1 && prop.name == parsedShader.cullProperties[0].name))
                         break;
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     foreach (var slot in list)
                     {
-                        if (prop.shaderLabParams.Any(s => s != "Cull" || !MergeBackFaceCullingWithCullingOff)
-                            && slot.material.GetFloat(prop.name) != candidateValue)
+                        if (slot.material.GetFloat(prop.name) != candidateValue)
                             return false;
                     }
                     break;

@@ -105,6 +105,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
         public HashSet<string> ifexParameters = new HashSet<string>();
         public HashSet<string> unableToParseIfexStatements = new HashSet<string>();
+        public Property[] cullProperties = new Property[0];
 
         public bool CanMerge()
         {
@@ -1107,6 +1108,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     prop.shaderLabParams.Add("ifex");
                 }
             }
+            parsedShader.cullProperties = parsedShader.properties.Where(p => p.shaderLabParams.Any(paramType => paramType.ToLowerInvariant() == "cull")).ToArray();
             parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
             {
