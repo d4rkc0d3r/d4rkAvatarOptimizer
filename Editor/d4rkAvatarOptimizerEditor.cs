@@ -22,7 +22,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer optimizer;
     private static Material nullMaterial = null;
-    private static long longestTimeUsed = 0;
+    private static long longestTimeUsed = -1;
     
     public override void OnInspectorGUI()
     {
@@ -531,8 +531,11 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
         stopWatch.Stop();
-        if (stopWatch.ElapsedMilliseconds > longestTimeUsed)
-            longestTimeUsed = stopWatch.ElapsedMilliseconds;
+        if (stopWatch.ElapsedMilliseconds > longestTimeUsed && stopWatch.ElapsedMilliseconds > AvatarOptimizerSettings.AutoRefreshPreviewTimeout) {
+            // longestTimeUsed == -1 means it's the first time the optimizer is used
+            // first time should not be counted as it is always much slower
+            longestTimeUsed = longestTimeUsed == -1 ? 0 : stopWatch.ElapsedMilliseconds;
+        }
     }
     
     private bool Validate()

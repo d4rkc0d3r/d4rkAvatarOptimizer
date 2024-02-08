@@ -6,6 +6,8 @@
 
 ### Changes
 * Add property filter for the shader analyzer debugger.
+* `Auto Refresh Preview Timeout` now ignores the first time it is over the threshold.
+  * This is because the first time the preview is calculated it takes longer than usual.
 
 ### Bug Fixes
 * Fix material property animation of the original property not getting the correct `material.` prefix.
