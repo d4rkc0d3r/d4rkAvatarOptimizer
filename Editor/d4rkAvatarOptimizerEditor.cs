@@ -219,7 +219,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             var nonErrors = new HashSet<string>() {"toggle", "motion time", "blend tree", "multi toggle"};
             var mergedLayerCount = optimizer.OptimizeFXLayer ? optimizer.AnalyzeFXLayerMergeAbility().Count(list => list.All(e => nonErrors.Contains(e))) : 0;
-            var layerCount = optimizer.GetFXLayer().layers.Length;
+            var layerCount = optimizer.GetFXLayerLayers().Length;
             var optimizedLayerCount = mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount;
             if (optimizer.OptimizeFXLayer)
                 optimizedLayerCount -= optimizer.FindUselessFXLayers().Count;
@@ -259,6 +259,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var errorMessages = optimizer.AnalyzeFXLayerMergeAbility();
                 var uselessLayers = optimizer.FindUselessFXLayers();
                 var fxLayer = optimizer.GetFXLayer();
+                var fxLayerLayers = optimizer.GetFXLayerLayers();
                 var nonErrors = new HashSet<string>() {"toggle", "motion time", "useless", "blend tree", "multi toggle"};
                 for (int i = 0; i < errorMessages.Count; i++)
                 {
@@ -272,7 +273,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(20));
-                    EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayer.layers[i].name}", string.Join("\n", errorMessages[i])));
+                    EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayerLayers[i].name}", string.Join("\n", errorMessages[i])));
                     EditorGUILayout.EndHorizontal();
                     if (optimizer.ShowFXLayerMergeErrors)
                     {
