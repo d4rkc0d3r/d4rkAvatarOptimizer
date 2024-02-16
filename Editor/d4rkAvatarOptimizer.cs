@@ -1033,13 +1033,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             if (subList.Count == 1)
                 continue;
-            int index = subList.FindIndex(smr => smr == avDescriptor?.VisemeSkinnedMesh);
-            if (index == -1)
-            {
-                var obj = subList.OrderBy(smr => GetPathToRoot(smr).Count(c => c == '/'))
-                    .ThenByDescending(smr => smr.name == "Body" ? 1 : 0).First();
-                index = subList.IndexOf(obj);
-            }
+            var obj = subList.OrderByDescending(smr => GetPathToRoot(smr) == "Body" ? 1 : 0)
+                .ThenByDescending(smr => smr == avDescriptor.VisemeSkinnedMesh)
+                .ThenBy(smr => GetPathToRoot(smr).Count(c => c == '/')).First();
+            int index = subList.IndexOf(obj);
             var oldFirst = subList[0];
             subList[0] = subList[index];
             subList[index] = oldFirst;
@@ -4208,14 +4205,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 avDescriptor.customEyeLookSettings.eyelidsBlendshapes = ids;
             }
 
-            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count; meshID++)
             {
-                if (avDescriptor != null)
+                var oldVisemeMesh = combinableSkinnedMeshes[meshID];
+                if (avDescriptor.VisemeSkinnedMesh == oldVisemeMesh)
                 {
-                    if (avDescriptor.VisemeSkinnedMesh == skinnedMesh)
-                    {
-                        avDescriptor.VisemeSkinnedMesh = meshRenderer;
+                    avDescriptor.VisemeSkinnedMesh = meshRenderer;
+                    string CalculateNewBlendShapeName(string blendShapeName) {
+                        var blendShapeID = oldVisemeMesh.sharedMesh.GetBlendShapeIndex(blendShapeName ?? "");
+                        return blendShapeMeshIDtoNewName.TryGetValue((meshID, blendShapeID), out string newName)
+                            ? newName : $"MISSING \"{blendShapeName}\"";
                     }
+                    avDescriptor.VisemeBlendShapes = avDescriptor.VisemeBlendShapes.Select(CalculateNewBlendShapeName).ToArray();
+                    avDescriptor.MouthOpenBlendShapeName = CalculateNewBlendShapeName(avDescriptor.MouthOpenBlendShapeName);
                 }
             }
 

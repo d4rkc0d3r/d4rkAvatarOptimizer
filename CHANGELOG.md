@@ -7,6 +7,7 @@
   * My personal avatar went from 450ms to 35ms. (`AnimatorController.layers` is slow and you should cache it)
 
 ### Changes
+* Always merge other meshes into the mesh `Body` if it exists. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/74)
 * Add property filter for the shader analyzer debugger.
 * `Auto Refresh Preview Timeout` now ignores the first time it is over the threshold.
   * This is because the first time the preview is calculated it takes longer than usual.
