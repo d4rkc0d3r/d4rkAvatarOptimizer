@@ -1135,6 +1135,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private Dictionary<string, string> texturesToNullCheck;
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
+        private Dictionary<string, bool> poiUsedPropertyDefines;
         private string vertexInUv0Member;
         private string vertexInUv0EndSwizzle = "";
         private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
@@ -1152,7 +1153,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Dictionary<string, string> texturesToNullCheck = null,
             HashSet<string> texturesToMerge = null,
             Dictionary<string, string> animatedPropertyValues = null,
-            List<string> setKeywords = null)
+            List<string> setKeywords = null,
+            Dictionary<string, bool> poiUsedPropertyDefines = null
+            )
         {
             if (source == null || !source.parsedCorrectly)
                 return null;
@@ -1179,6 +1182,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 texturesToNullCheck = texturesToNullCheck ?? new Dictionary<string, string>(),
                 texturesToMerge = texturesToMerge ?? new HashSet<string>(),
                 texturesToCallSoTheSamplerDoesntDisappear = new HashSet<string>(),
+                poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>()
             };
@@ -2095,6 +2099,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
             ConditionResult EvalPreprocessorCondition(string expr, ref int index)
             {
+                // hardcoded parse of poiyomi texture prop guards as OPTIMIZER_ENABLED is also rarely used for other cases which could break when properties are not inline replaced
+                var match = Regex.Match(expr, @"defined\((PROP\w+)\) || !defined\(OPTIMIZER_ENABLED\)");
+                if (match.Success)
+                {
+                    if (poiUsedPropertyDefines.TryGetValue(match.Groups[1].Value, out var used))
+                        return used ? ConditionResult.True : ConditionResult.False;
+                    return ConditionResult.Unknown;
+                }
                 // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
                 var values = new List<ConditionResult>();
                 bool allAnd = false;

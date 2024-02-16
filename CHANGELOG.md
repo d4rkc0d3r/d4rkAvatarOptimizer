@@ -1,6 +1,8 @@
 ## v3.4.0
 ### Features
-* Add support for Poiyomi `//ifex` logic. This is important for Poiyomi 9.0 as it is used to skip entire passes.
+* Improved support for poiyomi shaders to better match the lock in logic.
+  * Add support for `//ifex` parsing which is important for poi 9.0 as it is used to skip entire passes.
+  * Add support for `#if defined(PROP_Texture) || !defined(OPTIMIZER_ENABLED)` macros to skip unused texture properties.
 * Massive performance improvements for the perf rank change preview.
   * My personal avatar went from 450ms to 35ms. (`AnimatorController.layers` is slow and you should cache it)
 

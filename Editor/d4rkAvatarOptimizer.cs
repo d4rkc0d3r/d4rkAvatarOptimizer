@@ -2861,6 +2861,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>[sources.Count];
         var texturesToCheckNull = new Dictionary<string, string>[sources.Count];
         var animatedPropertyValues = new Dictionary<string, string>[sources.Count];
+        var poiUsedPropertyDefines = new Dictionary<string, bool>[sources.Count];
         for (int i = 0; i < sources.Count; i++)
         {
             var source = sources[i];
@@ -2873,6 +2874,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             texturesToMerge[i] = new HashSet<string>();
             propertyTextureArrayIndex[i] = new Dictionary<string, int>();
             arrayPropertyValues[i] = new Dictionary<string, (string type, List<string> values)>();
+            poiUsedPropertyDefines[i] = new Dictionary<string, bool>();
             foreach (var mat in source)
             {
                 foreach (var prop in parsedShader[i].properties)
@@ -3000,6 +3002,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         texturesToCheckNull[i][prop.name] = prop.defaultValue;
                     }
                 }
+                switch (prop.type)
+                {
+                    case ParsedShader.Property.Type.Texture2D:
+                    case ParsedShader.Property.Type.Texture2DArray:
+                    case ParsedShader.Property.Type.Texture3D:
+                    case ParsedShader.Property.Type.TextureCube:
+                    case ParsedShader.Property.Type.TextureCubeArray:
+                        bool isUsed = arrayPropertyValues[i].ContainsKey($"shouldSample{prop.name}")
+                            || source[0].GetTexture(prop.name) != null;
+                        poiUsedPropertyDefines[i][$"PROP{prop.name.ToUpper()}"] = isUsed;
+                        break;
+                }
             }
 
             animatedPropertyValues[i] = new Dictionary<string, string>();
@@ -3056,7 +3070,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     texturesToCheckNull[i],
                     texturesToMerge[i],
                     animatedPropertyValues[i],
-                    setShaderKeywords[i]);
+                    setShaderKeywords[i],
+                    poiUsedPropertyDefines[i]);
             }
         });
         Profiler.EndSection();
