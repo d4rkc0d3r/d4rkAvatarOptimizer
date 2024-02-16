@@ -112,7 +112,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 #if UNITY_EDITOR
         public MeshTopology GetTopology()
         {
-            return renderer.GetSharedMesh().GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1));
+            return renderer.GetSharedMesh()?.GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1)) ?? MeshTopology.Triangles;
         }
 #endif
     }
