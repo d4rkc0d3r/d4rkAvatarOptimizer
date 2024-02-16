@@ -1461,7 +1461,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex);
+                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
@@ -1585,7 +1585,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex);
+                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 line = source[sourceLineIndex];
                 if (line == "}")
                 {
@@ -1724,7 +1724,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var functionBody = new List<string>();
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex);
+                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 string line = source[sourceLineIndex];
                 if (line[0] == '#')
                 {
@@ -2397,7 +2397,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex);
+                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 var line = source[sourceLineIndex];
                 if (line == endSymbol)
                     return;
@@ -2552,7 +2552,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void ParseAndEvaluateIfex(List<string> lines, ref int lineIndex)
+        private void ParseAndEvaluateIfex(List<string> lines, ref int lineIndex, List<string> debugOutput)
         {
             string line = lines[lineIndex];
             if (line[0] != '#')
@@ -2560,7 +2560,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (line == "#endex")
             {
                 lineIndex++;
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
             if (!line.StartsWith("#ifex"))
@@ -2570,8 +2570,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (!match.Success)
             {
                 lineIndex++;
-                output.Add($"// {line} failed to match regex, just skip statement");
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                debugOutput?.Add($"// {line} failed to match regex, just skip statement");
+                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
             var outputString = $"// #ifex ";
@@ -2585,17 +2585,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (!staticPropertyValues.TryGetValue(name, out var valueString))
                 {
                     lineIndex++;
-                    output.Add($"// #ifex {name} not found in static properties");
-                    ParseAndEvaluateIfex(lines, ref lineIndex);
+                    debugOutput?.Add($"// #ifex {name} not found in static properties");
+                    ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                     return;
                 }
                 var value = float.Parse(valueString);
                 outputString += $"{(firstCondition ? "" : " && ")}{name}({value}) {op}= {compValue}";
+                firstCondition = false;
                 if ((compValue != value) ^ op == "!")
                 {
                     lineIndex++;
-                    output.Add(outputString + ", FALSE");
-                    ParseAndEvaluateIfex(lines, ref lineIndex);
+                    debugOutput?.Add(outputString + ", FALSE");
+                    ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                     return;
                 }
             }
@@ -2614,8 +2615,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (depth == 0)
                     {
                         lineIndex++;
-                        output.Add($"{outputString}, TRUE skipped {linesSkipped} lines");
-                        ParseAndEvaluateIfex(lines, ref lineIndex);
+                        debugOutput?.Add($"{outputString}, TRUE skipped {linesSkipped} lines");
+                        ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                         return;
                     }
                     depth--;
@@ -2625,7 +2626,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     depth++;
                 }
             }
-            output.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
+            debugOutput?.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
         }
 
         private List<string> Run()
@@ -2642,7 +2643,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int lineIndex = 0;
             while (lineIndex < lines.Count)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                ParseAndEvaluateIfex(lines, ref lineIndex, output);
                 string line = lines[lineIndex++];
                 output.Add(line);
                 if (line == "Properties")
@@ -2652,7 +2653,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             while (lineIndex < lines.Count)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                ParseAndEvaluateIfex(lines, ref lineIndex, null);
                 string line = lines[lineIndex++];
                 if (line == "}")
                 {
@@ -2715,7 +2716,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             };
             for (; lineIndex < lines.Count; lineIndex++)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                ParseAndEvaluateIfex(lines, ref lineIndex, output);
                 string line = lines[lineIndex];
                 if (line.StartsWith("CustomEditor"))
                     continue;
@@ -2768,7 +2769,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             tags.Clear();
             for (lineIndex = propertyBlockStartParseIndex; lineIndex < lines.Count; lineIndex++)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex);
+                ParseAndEvaluateIfex(lines, ref lineIndex, propertyBlock);
                 string line = lines[lineIndex];
                 if (line == "}")
                     break;
