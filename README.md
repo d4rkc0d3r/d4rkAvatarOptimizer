@@ -45,8 +45,9 @@ It has some more experimental & some behavior changing ones. Testing that your a
 ## Why my Shader Pink?
 Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. Here is a couple things you could try:
 * Use different shaders, for example:
-  * [ACLS](https://booth.pm/ja/items/1779615)
+  * [Poiyomi Toon](https://github.com/poiyomi/PoiyomiToonShader)
   * [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
+  * [ACLS](https://booth.pm/ja/items/1779615)
 * Use the "Basic" preset which causes the optimizer to not touch the shaders at all.
 * Use the "Exclusions" foldout to manually only exclude meshes from optimization that are broken.
 
