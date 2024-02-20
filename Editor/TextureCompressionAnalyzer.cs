@@ -55,6 +55,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var refTextureImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(staticTexture)) as TextureImporter;
                 var match = Regex.Match(assetPath, @"/Z_IGNORE_([\w()\d]+)\.(\w+)$");
                 var parsedVariant = match.Groups[1].Success ? TextureVariant.Parse(match.Groups[1].Value) : null;
+                if (parsedVariant != null && refTextureImporter == null)
+                {
+                    Debug.LogError($"Reference texture importer for {assetPath} not found.");
+                }
                 if (parsedVariant != null)
                 {
                     var variant = parsedVariant.Value;
@@ -76,6 +80,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     textureImporter.sRGBTexture = refTextureImporter.sRGBTexture;
                     textureImporter.mipmapFilter = refTextureImporter.mipmapFilter;
                     textureImporter.mipMapsPreserveCoverage = refTextureImporter.mipMapsPreserveCoverage;
+                    if (refTextureImporter.textureType == TextureImporterType.NormalMap && 
+                        (variant.compression == TextureImporterFormat.BC6H || variant.compression == TextureImporterFormat.DXT1))
+                    {
+                        textureImporter.textureType = TextureImporterType.Default;
+                        textureImporter.sRGBTexture = false;
+                    }
                     textureImporter.SetPlatformTextureSettings(platformSettings);
                 }
             }
@@ -145,9 +155,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             new TextureVariant(TextureImporterFormat.BC7, 2),
             new TextureVariant(TextureImporterFormat.BC5, 1),
             new TextureVariant(TextureImporterFormat.BC5, 2),
+            new TextureVariant(TextureImporterFormat.BC6H, 1),
+            new TextureVariant(TextureImporterFormat.BC6H, 2),
             new TextureVariant(TextureImporterFormat.DXT5, 1),
             new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 100),
             new TextureVariant(TextureImporterFormat.DXT5Crunched, 1, 50),
+            new TextureVariant(TextureImporterFormat.DXT1, 1),
         };
         TextureVariant[] variantsHDR = new TextureVariant[]
         {

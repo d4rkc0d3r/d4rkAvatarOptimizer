@@ -1,4 +1,7 @@
 ## v3.4.1
+### Changes
+* Added BC6H & DXT1 compression to normal maps in the texture compression analyzer.
+
 ### Bug Fixes
 * Fix mesh disappearing locally when NaNimation is enabled and the mesh has the Head or one of its children as the root bone.
 
