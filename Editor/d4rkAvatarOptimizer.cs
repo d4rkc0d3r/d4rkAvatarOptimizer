@@ -3803,7 +3803,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var targetBindPoses = new List<Matrix4x4>();
             var sourceToWorld = new List<Matrix4x4>(totalVertexCount);
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
-            var toLocal = (combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone).worldToLocalMatrix;
+            var targetRootBone = combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone;
+
+            // if NaNimation is enabled check if target root bone is Head bone or a child of Head and if so reassign it to the Hip bone
+            // we do this since NaNimation disables Update when Offscreen and the head gets scaled down locally
+            // without this fix the merged mesh would disappear locally
+            if (MergeSkinnedMeshesWithNaNimation && basicMergedMeshes.Count > 1)
+            {
+                var animator = GetComponent<Animator>();
+                if (animator != null && animator.isHuman)
+                {
+                    var headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+                    if (headBone != null && (targetRootBone == headBone || targetRootBone.IsChildOf(headBone)))
+                    {
+                        targetRootBone = animator.GetBoneTransform(HumanBodyBones.Hips);
+                        if (targetRootBone == null)
+                        {
+                            targetRootBone = transform;
+                        }
+                    }
+                }
+            }
+
+            var toLocal = targetRootBone.worldToLocalMatrix;
 
             targetBones.Add(combinableSkinnedMeshes[0].transform);
             targetBoneMap[combinableSkinnedMeshes[0].transform] = targetBones.Count - 1;
@@ -4182,6 +4204,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Profiler.EndSection();
             
             var meshRenderer = combinableSkinnedMeshes[0];
+            meshRenderer.rootBone = targetRootBone;
             var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
 
             if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
