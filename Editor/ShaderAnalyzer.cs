@@ -612,7 +612,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.type = ParsedShader.Property.Type.Vector;
                 output.defaultValue = "float4" + output.defaultValue;
             }
-            else if (typeDefinition.StartsWith("int"))
+            else if (typeDefinition == "int")
+            {
+                output.type = ParsedShader.Property.Type.Float;
+            }
+            else if (typeDefinition == "integer")
             {
                 output.type = ParsedShader.Property.Type.Int;
             }

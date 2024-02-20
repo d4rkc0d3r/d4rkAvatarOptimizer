@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 * Fix mesh disappearing locally when NaNimation is enabled and the mesh has the Head or one of its children as the root bone.
+* Fix shaderlab `Int` parameters actually getting written as an int. "Obviously" they should be written as a float.
 
 ## v3.4.0
 ### Features
