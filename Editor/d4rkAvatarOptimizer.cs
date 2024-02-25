@@ -2180,14 +2180,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     public List<List<(string blendshape, float value)>> FindMergeableBlendShapes(IEnumerable<Renderer> mergedMeshBlob)
     {
-        var mergeableBlendShapes = new List<List<(string blendshape, float value)>>();
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var fxLayer = GetFXLayer();
         if (avDescriptor == null || fxLayer == null)
-            return mergeableBlendShapes;
+            return new List<List<(string blendshape, float value)>>();
         var exclusions = GetAllExcludedTransforms();
         var validPaths = new HashSet<string>();
-        var ratios = new List<Dictionary<string, float>>() { new Dictionary<string, float>() };
+        var blendShapeNameToID = new Dictionary<string, int>();
+        var blendShapeIDToName = new List<string>();
+        int GetBlendShapeID(string name)
+        {
+            if (blendShapeNameToID.TryGetValue(name, out var id))
+                return id;
+            id = blendShapeIDToName.Count;
+            blendShapeNameToID[name] = id;
+            blendShapeIDToName.Add(name);
+            return id;
+        }
+        var ratiosDict = new List<Dictionary<int, float>>() { new Dictionary<int, float>() };
         foreach (var renderer in mergedMeshBlob)
         {
             var skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
@@ -2203,12 +2213,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (mesh.GetBlendShapeFrameCount(i) == 1)
                 {
                     validPaths.Add(path + name);
-                    ratios[0][path + name] = skinnedMeshRenderer.GetBlendShapeWeight(i);
+                    ratiosDict[0][GetBlendShapeID(path + name)] = skinnedMeshRenderer.GetBlendShapeWeight(i);
                 }
             }
         }
         if (validPaths.Count == 0)
-            return mergeableBlendShapes;
+            return new List<List<(string blendshape, float value)>>();
         if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
             && avDescriptor.VisemeSkinnedMesh != null)
         {
@@ -2240,9 +2250,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
+        var mergeableBlendShapes = new List<List<(int blendshapeID, float value)>>();
+        var hasEntryInMergeableBlendShapes = new HashSet<int>();
         foreach (var clip in GetAllUsedFXLayerAnimationClips())
         {
-            var blendShapes = new List<(string path, EditorCurveBinding binding)>();
+            var blendShapes = new List<(int blendShapeID, EditorCurveBinding binding)>();
             var keyframes = new HashSet<float>();
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
@@ -2252,36 +2264,48 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var path = $"{binding.path}/{binding.propertyName}";
                 if (!validPaths.Contains(path))
                     continue;
-                blendShapes.Add((path, binding));
+                blendShapes.Add((GetBlendShapeID(path), binding));
                 var curve = AnimationUtility.GetEditorCurve(clip, binding);
                 keyframes.UnionWith(curve.keys.Select(x => x.time));
             }
             foreach (var key in keyframes)
             {
-                var blendShapeValues = new Dictionary<string, float>();
+                var blendShapeValues = new Dictionary<int, float>();
                 foreach (var blendShape in blendShapes)
                 {
                     var curve = AnimationUtility.GetEditorCurve(clip, blendShape.binding);
-                    blendShapeValues[blendShape.path] = curve.Evaluate(key);
+                    blendShapeValues[blendShape.blendShapeID] = curve.Evaluate(key);
                 }
                 NormalizeBlendShapeValues(blendShapeValues);
-                if (!ratios.Any(list => list.SequenceEqual(blendShapeValues)))
-                    ratios.Add(blendShapeValues);
+                if (!ratiosDict.Any(list => list.SequenceEqual(blendShapeValues)))
+                    ratiosDict.Add(blendShapeValues);
             }
             foreach (var blendshape in blendShapes)
             {
-                if (!mergeableBlendShapes.Any(x => x[0].blendshape == blendshape.path))
-                    mergeableBlendShapes.Add(new List<(string blendshape, float value)>() { (blendshape.path, 1) });
+                if (!hasEntryInMergeableBlendShapes.Contains(blendshape.blendShapeID))
+                {
+                    hasEntryInMergeableBlendShapes.Add(blendshape.blendShapeID);
+                    mergeableBlendShapes.Add(new List<(int blendshapeID, float value)>() { (blendshape.blendShapeID, 1) });
+                }
             }
         }
+        var ratiosArray = ratiosDict.Select(x => {
+            var array = new float[blendShapeIDToName.Count];
+            System.Array.Fill(array, float.NegativeInfinity);
+            foreach (var entry in x)
+            {
+                array[entry.Key] = entry.Value;
+            }
+            return array;
+        }).ToArray();
         for (int i = 0; i < mergeableBlendShapes.Count - 1; i++)
         {
             for (int j = i + 1; j < mergeableBlendShapes.Count; j++)
             {
                 var subList = mergeableBlendShapes[i];
-                var candidate = mergeableBlendShapes[j][0].blendshape;
+                var candidate = mergeableBlendShapes[j][0].blendshapeID;
                 float value = -1;
-                if (ratios.All(x => TryAddBlendShapeToSubList(subList, candidate, ref value, x)) && value != -1)
+                if (ratiosArray.All(x => TryAddBlendShapeToSubList(subList, candidate, ref value, x)) && value != -1)
                 {
                     subList.Add((candidate, value));
                     NormalizeBlendShapeValues(subList);
@@ -2291,10 +2315,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         mergeableBlendShapes.RemoveAll(x => x.Count == 1);
-        return mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).ToList()).ToList();
+        return mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).Select(x => (blendShapeIDToName[x.blendshapeID], x.value)).ToList()).ToList();
     }
 
-    private void NormalizeBlendShapeValues(List<(string blendshape, float value)> blendShapeValues)
+    private void NormalizeBlendShapeValues(List<(int blendshape, float value)> blendShapeValues)
     {
         var maxValue = blendShapeValues.Max(x => x.value);
         if (maxValue == 0 || maxValue == 1)
@@ -2305,7 +2329,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
     }
 
-    private void NormalizeBlendShapeValues(Dictionary<string, float> blendShapeValues)
+    private void NormalizeBlendShapeValues(Dictionary<int, float> blendShapeValues)
     {
         var maxValue = blendShapeValues.Max(x => x.Value);
         if (maxValue == 0 || maxValue == 1)
@@ -2316,25 +2340,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
     }
 
-    private bool TryAddBlendShapeToSubList(List<(string blendshape, float value)> subList, string blendshape, ref float value, Dictionary<string, float> ratioToCheckAgainst)
+    private bool TryAddBlendShapeToSubList(List<(int blendshapeID, float value)> subList, int blendshapeID, ref float value, float[] ratioToCheckAgainst)
     {
         int intersectionCount = 0;
         float intersectionMax = 0;
         int subListCount = subList.Count;
         for (int i = 0; i < subListCount; i++)
         {
-            if (ratioToCheckAgainst.TryGetValue(subList[i].blendshape, out var match))
+            float ratioValue = ratioToCheckAgainst[subList[i].blendshapeID];
+            if (ratioValue != float.NegativeInfinity)
             {
                 intersectionCount++;
-                intersectionMax = Mathf.Max(intersectionMax, match);
+                intersectionMax = Mathf.Max(intersectionMax, ratioValue);
             }
             else if (intersectionCount > 0)
             {
                 return false;
             }
         }
-        float candidateValue;
-        bool hasCandidate = ratioToCheckAgainst.TryGetValue(blendshape, out candidateValue);
+        float candidateValue = ratioToCheckAgainst[blendshapeID];
+        bool hasCandidate = candidateValue != float.NegativeInfinity;
         if (intersectionCount == 0 && !hasCandidate)
             return true;
         if (intersectionCount != subListCount || !hasCandidate)
@@ -2345,7 +2370,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         for (int i = 0; i < subListCount; i++)
         {
-            var match = ratioToCheckAgainst[subList[i].blendshape];
+            var match = ratioToCheckAgainst[subList[i].blendshapeID];
             if (Mathf.Abs(subList[i].value - match / intersectionMax) > 0.01f)
                 return false;
         }
