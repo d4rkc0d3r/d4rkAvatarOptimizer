@@ -46,7 +46,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool MergeDifferentPropertyMaterials = true;
         public bool MergeSameDimensionTextures = true;
         public bool MergeMainTex = false;
-        public bool MergeBackFaceCullingWithCullingOff = false;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;
         public bool DisablePhysBonesWhenUnused = true;
@@ -229,9 +228,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public bool MergeMainTex {
         get { return MergeSameDimensionTextures && settings.MergeMainTex; }
         set { settings.MergeMainTex = value; } }
-    public bool MergeBackFaceCullingWithCullingOff {
-        get { return settings.MergeDifferentPropertyMaterials && settings.MergeBackFaceCullingWithCullingOff; }
-        set { settings.MergeBackFaceCullingWithCullingOff = value; } }
     public bool KeepMMDBlendShapes { get { return settings.KeepMMDBlendShapes; } set { settings.KeepMMDBlendShapes = value; } }
     public bool DeleteUnusedComponents { get { return settings.DeleteUnusedComponents; } set { settings.DeleteUnusedComponents = value; } }
     public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects != 0; } set { settings.DeleteUnusedGameObjects = value ? 1 : 0; } }
@@ -258,7 +254,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(MergeSkinnedMeshesSeparatedByDefaultEnabledState):
                 return MergeSkinnedMeshesWithNaNimation;
             case nameof(MergeSameDimensionTextures):
-            case nameof(MergeBackFaceCullingWithCullingOff):
                 return settings.MergeDifferentPropertyMaterials;
             case nameof(MergeMainTex):
                 return MergeSameDimensionTextures;
@@ -285,7 +280,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {nameof(MergeDifferentPropertyMaterials), "Merge Different Property Materials"},
         {nameof(MergeSameDimensionTextures), "Merge Same Dimension Textures"},
         {nameof(MergeMainTex), "Merge MainTex"},
-        {nameof(MergeBackFaceCullingWithCullingOff), "Merge Cull Back with Cull Off"},
         {nameof(KeepMMDBlendShapes), "Keep MMD Blend Shapes"},
         {nameof(DeleteUnusedComponents), "Delete Unused Components"},
         {nameof(DeleteUnusedGameObjects), "Delete Unused GameObjects"},
@@ -321,7 +315,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), false},
             {nameof(Settings.MergeSameDimensionTextures), false},
             {nameof(Settings.MergeMainTex), false},
-            {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -342,7 +335,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeMainTex), false},
-            {nameof(Settings.MergeBackFaceCullingWithCullingOff), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -363,7 +355,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.MergeDifferentPropertyMaterials), true},
             {nameof(Settings.MergeSameDimensionTextures), true},
             {nameof(Settings.MergeMainTex), true},
-            {nameof(Settings.MergeBackFaceCullingWithCullingOff), true},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), true},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
@@ -2881,7 +2872,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var parsedShader = new ParsedShader[sources.Count];
         var setShaderKeywords = new List<string>[sources.Count];
         var replace = new Dictionary<string, string>[sources.Count];
-        var cullReplace = new string[sources.Count];
         var texturesToMerge = new HashSet<string>[sources.Count];
         var propertyTextureArrayIndex = new Dictionary<string, int>[sources.Count];
         var arrayPropertyValues = new Dictionary<string, (string type, List<string> values)>[sources.Count];
@@ -2983,17 +2973,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             propertyArray.values.Add($"float4(1.0 / {texelSize.x}, 1.0 / {texelSize.y}, {texelSize.x}, {texelSize.y})");
                             break;
                     }
-                }
-            }
-
-            cullReplace[i] = null;
-            var cullProp = parsedShader[i].cullProperties.Length == 1 ? parsedShader[i].cullProperties[0] : null;
-            if (cullProp != null)
-            {
-                int firstCull = source[0].GetInt(cullProp.name);
-                if (source.Any(m => m.GetInt(cullProp.name) != firstCull))
-                {
-                    cullReplace[i] = cullProp.name;
                 }
             }
 
@@ -3128,10 +3107,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             foreach (var keyword in setShaderKeywords[i])
             {
                 optimizedMaterial.DisableKeyword(keyword);
-            }
-            if (cullReplace[i] != null)
-            {
-                optimizedMaterial.SetInt(cullReplace[i], 0);
             }
             optimizedMaterial.name = name;
             materials[i] = optimizedMaterial;
@@ -3365,8 +3340,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     break;
                 case ParsedShader.Property.Type.Int:
                 case ParsedShader.Property.Type.Float:
-                    if (prop.shaderLabParams.Count == 0 ||
-                        (MergeBackFaceCullingWithCullingOff && parsedShader.cullProperties.Length == 1 && prop.name == parsedShader.cullProperties[0].name))
+                    if (prop.shaderLabParams.Count == 0)
                         break;
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)

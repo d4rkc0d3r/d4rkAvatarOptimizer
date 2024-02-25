@@ -106,7 +106,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUI.indentLevel++;
             ToggleOptimizerProperty(nameof(optimizer.MergeMainTex));
             EditorGUI.indentLevel--;
-            ToggleOptimizerProperty(nameof(optimizer.MergeBackFaceCullingWithCullingOff));
             EditorGUI.indentLevel--;
         }
         ToggleOptimizerProperty(nameof(optimizer.OptimizeFXLayer));
