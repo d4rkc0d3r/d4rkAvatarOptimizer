@@ -12,6 +12,7 @@
 ### Bug Fixes
 * Fix materials getting merged even if they have different `VRCFallback` shaders set.
 * Fix copy of old material property animation when it is a color property.
+* Fix optimizer always injecting the animated property disambiguation code on merged material blobs that have at least one material that comes from the combined mesh path.
 
 ## v3.4.1
 ### Changes
