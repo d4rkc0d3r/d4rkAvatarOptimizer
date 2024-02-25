@@ -99,6 +99,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public bool mismatchedCurlyBraces = false;
         public Dictionary<string, List<string>> text = new Dictionary<string, List<string>>();
         public List<Property> properties = new List<Property>();
+        public List<Property> propertiesToCheckWhenMerging = new List<Property>();
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
@@ -1109,6 +1110,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (parsedShader.ifexParameters.Contains(prop.name))
                 {
                     prop.shaderLabParams.Add("ifex");
+                }
+                switch (prop.type)
+                {
+                    case ParsedShader.Property.Type.Int:
+                    case ParsedShader.Property.Type.Float:
+                        if (prop.shaderLabParams.Count == 0)
+                            break;
+                        parsedShader.propertiesToCheckWhenMerging.Add(prop);
+                        break;
+                    case ParsedShader.Property.Type.Texture2D:
+                    case ParsedShader.Property.Type.Texture2DArray:
+                    case ParsedShader.Property.Type.Texture3D:
+                    case ParsedShader.Property.Type.TextureCube:
+                    case ParsedShader.Property.Type.TextureCubeArray:
+                        parsedShader.propertiesToCheckWhenMerging.Add(prop);
+                        break;
                 }
             }
             parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;

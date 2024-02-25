@@ -3332,18 +3332,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         listMaterials = new HashSet<Material>(listMaterials).ToArray();
         bool mergeTextures = MergeSameDimensionTextures && parsedShader.CanMergeTextures();
-        foreach (var prop in parsedShader.properties)
+        foreach (var prop in parsedShader.propertiesToCheckWhenMerging)
         {
             switch (prop.type)
             {
-                case ParsedShader.Property.Type.Color:
-                case ParsedShader.Property.Type.ColorHDR:
-                case ParsedShader.Property.Type.Vector:
-                    break;
                 case ParsedShader.Property.Type.Int:
                 case ParsedShader.Property.Type.Float:
-                    if (prop.shaderLabParams.Count == 0)
-                        break;
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)
                         return false;
@@ -3354,15 +3348,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 case ParsedShader.Property.Type.TextureCube:
                 case ParsedShader.Property.Type.TextureCubeArray:
                     bool mergeTexture = mergeTextures && (prop.name != "_MainTex" || MergeMainTex);
-                    var cTex = candidateMat.GetTexture(prop.name);
-                    foreach (var mat in listMaterials)
-                    {
-                        var mTex = mat.GetTexture(prop.name);
-                        if (mergeTexture && !CanCombineTextures(mTex, cTex))
-                            return false;
-                        if (!mergeTexture && cTex != mTex)
-                            return false;
-                    }
+                    int propertyID = Shader.PropertyToID(prop.name);
+                    var cTex = candidateMat.GetTexture(propertyID);
+                    if (!mergeTexture && cTex != firstMat.GetTexture(propertyID))
+                        return false;
+                    if (mergeTexture && listMaterials.Any(mat => !CanCombineTextures(cTex, mat.GetTexture(propertyID))))
+                        return false;
                     break;
             }
         }
