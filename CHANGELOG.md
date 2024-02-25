@@ -8,6 +8,9 @@
   * This will trigger one last full texture reimport if you already used the optimizer in unity 2022 :(
 * Remove option `Merge Cull Back with Cull Off`, just set the culling of your materials to off if you want to merge them.
 
+### Bug Fixes
+* Fix materials getting merged even if they have different `VRCFallback` shaders set.
+
 ## v3.4.1
 ### Changes
 * Added BC6H & DXT1 compression to normal maps in the texture compression analyzer.

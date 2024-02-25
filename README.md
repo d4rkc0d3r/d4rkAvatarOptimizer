@@ -126,8 +126,6 @@ Can't merge materials if:
 ## Merge MainTex
 If disabled, the optimizer will not merge materials that have different textures assigned to the `_MainTex` property.  
 If you care about your avatar looking ok with disabled shaders you should disable this option.
-## Merge Cull Back with Cull Off
-Merges materials even if their culling properties differ. Forces culling to off.
 ## Merge Same Ratio Blend Shapes
 This option tries to merge blend shapes that always get animated in the same ratio.  
 For example you have two animations. The first animates `A` to 100, `B` to 50 and `C` to 100. The second animates `A` to 50, `B` to 25 and `D` to 100. In this case the optimizer would merge `A` and `B` in a 2:1 ratio as they are always animated in that ratio.

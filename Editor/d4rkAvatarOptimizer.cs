@@ -3312,6 +3312,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (firstMat.renderQueue != candidateMat.renderQueue)
             return false;
+        if (firstMat.GetTag("VRCFallback", false, "None") != candidateMat.GetTag("VRCFallback", false, "None"))
+            return false;
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
