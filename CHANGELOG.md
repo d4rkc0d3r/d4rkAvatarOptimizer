@@ -11,6 +11,7 @@
 
 ### Bug Fixes
 * Fix materials getting merged even if they have different `VRCFallback` shaders set.
+* Fix copy of old material property animation when it is a color property.
 
 ## v3.4.1
 ### Changes
