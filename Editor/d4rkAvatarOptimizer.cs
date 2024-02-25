@@ -38,8 +38,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         public bool OptimizeOnUpload = true;
         public bool WritePropertiesAsStaticValues = true;
         public bool MergeSkinnedMeshes = true;
-        public bool MergeSkinnedMeshesWithShaderToggle = true;
-        public bool MergeSkinnedMeshesWithNaNimation = true;
+        public int MergeSkinnedMeshesWithShaderToggle = 2;
+        public int MergeSkinnedMeshesWithNaNimation = 2;
         public bool NaNimationAllow3BoneSkinning = false;
         public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState = true;
         public bool MergeStaticMeshesAsSkinned = true;
@@ -206,11 +206,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         set { settings.WritePropertiesAsStaticValues = value; } }
     public bool MergeSkinnedMeshes { get { return settings.MergeSkinnedMeshes; } set { settings.MergeSkinnedMeshes = value; } }
     public bool MergeSkinnedMeshesWithShaderToggle {
-        get { return HasCustomShaderSupport && settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle; }
-        set { settings.MergeSkinnedMeshesWithShaderToggle = value; } }
+        get { return HasCustomShaderSupport && settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithShaderToggle != 0; }
+        set { settings.MergeSkinnedMeshesWithShaderToggle = value ? 1 : 0; } }
     public bool MergeSkinnedMeshesWithNaNimation {
-        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNimation; }
-        set { settings.MergeSkinnedMeshesWithNaNimation = value; } }
+        get { return settings.MergeSkinnedMeshes && settings.MergeSkinnedMeshesWithNaNimation != 0; }
+        set { settings.MergeSkinnedMeshesWithNaNimation = value ? 1 : 0; } }
     public bool NaNimationAllow3BoneSkinning {
         get { return MergeSkinnedMeshesWithNaNimation && settings.NaNimationAllow3BoneSkinning; }
         set { settings.NaNimationAllow3BoneSkinning = value; } }
@@ -313,8 +313,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.OptimizeOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), false},
             {nameof(Settings.MergeSkinnedMeshes), true},
-            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), false},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), false},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 0},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), 0},
             {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), false},
@@ -334,8 +334,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.OptimizeOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
-            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), true},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 1},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), 1},
             {nameof(Settings.NaNimationAllow3BoneSkinning), false},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), true},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
@@ -355,8 +355,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.OptimizeOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
-            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), true},
-            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), true},
+            {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 1},
+            {nameof(Settings.MergeSkinnedMeshesWithNaNimation), 1},
             {nameof(Settings.NaNimationAllow3BoneSkinning), true},
             {nameof(Settings.MergeSkinnedMeshesSeparatedByDefaultEnabledState), false},
             {nameof(Settings.MergeStaticMeshesAsSkinned), true},
@@ -387,6 +387,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var field = typeof(Settings).GetField(entry.Key);
             if (typeof(bool) == field.FieldType && !field.GetValue(settings).Equals(entry.Value))
                 return false;
+            if (typeof(int) == field.FieldType && (int)entry.Value == 1 && (int)field.GetValue(settings) == 0)
+                return false;
+            if (typeof(int) == field.FieldType && (int)entry.Value == 0 && (int)field.GetValue(settings) == 1)
+                return false;
         }
         return true;
     }
@@ -400,12 +404,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         ApplyAutoSettings();
     }
 
+    public static long MaxPolyCountForAutoShaderToggle = 150000;
+
     public void ApplyAutoSettings()
     {
         DoAutoSettings = false;
         if (settings.DeleteUnusedGameObjects == 2)
         {
             DeleteUnusedGameObjects = !UsesAnyLayerMasks();
+        }
+        if (settings.MergeSkinnedMeshesWithShaderToggle == 2)
+        {
+            MergeSkinnedMeshesWithShaderToggle = GetPolyCount() < MaxPolyCountForAutoShaderToggle;
+        }
+        if (settings.MergeSkinnedMeshesWithNaNimation == 2)
+        {
+            MergeSkinnedMeshesWithNaNimation = GetPolyCount() < MaxPolyCountForAutoShaderToggle;
         }
     }
 
@@ -637,6 +651,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 field.SetValue(this, null);
             }
         }
+    }
+
+    public long GetPolyCount()
+    {
+        long polyCount = 0;
+        foreach (var renderer in GetUsedComponentsInChildren<Renderer>())
+        {
+            if (!(renderer is SkinnedMeshRenderer || renderer is MeshRenderer))
+                continue;
+            var mesh = renderer.GetSharedMesh();
+            if (mesh == null)
+                continue;
+            polyCount += Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / 3);
+        }
+        return polyCount;
     }
 
     private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
