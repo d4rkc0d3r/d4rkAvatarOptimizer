@@ -7,6 +7,7 @@
 * Swap `OnPreprocessTexture` to `OnPreprocessAsset` to stop the optimizer from triggering a full project all texture reimport in unity 2022. [(more)](https://forum.unity.com/threads/unity-made-full-project-reimport-on-every-small-change.1066844/)
   * This will trigger one last full texture reimport if you already used the optimizer in unity 2022 :(
 * Remove option `Merge Cull Back with Cull Off`, just set the culling of your materials to off if you want to merge them.
+* When Shader or NaNimation toggles are enabled, it will still perform a basic merge of meshes that get animated in the same way. This reduces the amount of animated material properties needed.
 
 ### Bug Fixes
 * Fix materials getting merged even if they have different `VRCFallback` shaders set.

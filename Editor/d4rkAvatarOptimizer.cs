@@ -422,6 +422,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private List<Material> optimizedMaterials = new List<Material>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
     private List<List<string>> mergedMeshPaths = new List<List<string>>();
+    private Dictionary<string, List<string>> newPathToMergedPaths = new Dictionary<string, List<string>>();
     private Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
     private Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
@@ -2854,8 +2855,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         int meshToggleCount,
         string path,
         List<List<string>> originalMeshPaths = null,
-        List<List<int>> mergedMeshIndices = null,
-        List<string> allOriginalMeshPaths = null)
+        List<List<int>> mergedMeshIndices = null)
     {
         if (!(WritePropertiesAsStaticValues || sources.Any(list => list.Count > 1) || (meshToggleCount > 1 && MergeSkinnedMeshesWithShaderToggle)))
         {
@@ -2866,6 +2866,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (mergedMeshIndices == null)
             mergedMeshIndices = sources.Select(s => Enumerable.Range(0, meshToggleCount).ToList()).ToList();
         HashSet<(string name, bool isVector)> defaultAnimatedProperties = null;
+        newPathToMergedPaths.TryGetValue(path, out var allOriginalMeshPaths);
         if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1))
         {
             defaultAnimatedProperties = new HashSet<(string name, bool isVector)>();
@@ -3686,8 +3687,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => GetOriginalSlot((meshPath, slot.index)).path).Distinct().ToList()).ToList();
             var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            var allOriginalMeshPaths = Enumerable.Range(0, meshRenderer.sharedMaterials.Length).Select(i => GetOriginalSlot((meshPath, i)).path).Distinct().ToList();
-            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices, allOriginalMeshPaths);
+            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices);
 
             for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
             {
@@ -3757,6 +3757,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var combinableMeshList = FindPossibleSkinnedMeshMerges();
+        newPathToMergedPaths.Clear();
         mergedMeshPaths = combinableMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
@@ -3855,11 +3856,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
 
-            foreach (var skinnedMesh in combinableSkinnedMeshes)
+            newPathToMergedPaths[newPath] = basicMergedMeshes.Select(list => GetPathToRoot(list[0])).ToList();
+
+            var basicMergedMeshesList = basicMergedMeshes.SelectMany(list => list.Cast<SkinnedMeshRenderer>()).ToList();
+
+            foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
                 DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
 
-                var meshID = combinableSkinnedMeshes.FindIndex(s => s == skinnedMesh);
+                var blobMeshID = basicMergedMeshes.FindIndex(blob => blob.Contains(skinnedMesh));
                 var currentMeshPath = GetPathToRoot(skinnedMesh);
                 var mesh = skinnedMesh.sharedMesh;
                 var bindPoseIDMap = new Dictionary<int, int>();
@@ -3918,7 +3923,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBindPoses.Add(NaNimationBone.worldToLocalMatrix);
                     string key = "NaNimation";
                     if (MergeSkinnedMeshesWithShaderToggle) {
-                        key += $";{meshID};{newPath}";
+                        key += $";{blobMeshID};{newPath}";
                     }
                     AddAnimationPathChange((currentMeshPath, "m_IsActive", typeof(GameObject)),
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
@@ -3932,9 +3937,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.right * 0.2f));
                 } else if (basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle) {
                     AddAnimationPathChange((currentMeshPath, "m_IsActive", typeof(GameObject)),
-                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                            (newPath, "material._IsActiveMesh" + blobMeshID, typeof(SkinnedMeshRenderer)));
                     AddAnimationPathChange((currentMeshPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
-                            (newPath, "material._IsActiveMesh" + meshID, typeof(SkinnedMeshRenderer)));
+                            (newPath, "material._IsActiveMesh" + blobMeshID, typeof(SkinnedMeshRenderer)));
                 }
                 
                 if (sourceWeights.Length != sourceVertices.Length || bindPoseCount == 0)
@@ -4009,7 +4014,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, meshID << 12, 0));
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
                     var boneWeight = sourceWeights[vertIndex];
                     boneWeight.boneIndex0 = boneWeight.boneIndex0 >= bindPoseCount ? 0 : boneWeight.boneIndex0;
                     boneWeight.boneIndex1 = boneWeight.boneIndex1 >= bindPoseCount ? 0 : boneWeight.boneIndex1;
@@ -4117,14 +4122,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
             var usedBlendShapeNames = new HashSet<string>();
             var blendShapeMeshIDtoNewName = new Dictionary<(int meshID, int blendShapeID), string>();
-            var combinableMeshPaths = new HashSet<string>(combinableSkinnedMeshes.Select(s => GetPathToRoot(s)));
-            var meshPathToID = combinableSkinnedMeshes.Select((s, i) => (GetPathToRoot(s), i)).ToDictionary(s => s.Item1, s => s.Item2);
+            var combinableMeshPaths = new HashSet<string>(basicMergedMeshesList.Select(s => GetPathToRoot(s)));
+            var meshPathToID = basicMergedMeshesList.Select((s, i) => (GetPathToRoot(s), i)).ToDictionary(s => s.Item1, s => s.Item2);
             var usedBlendShapesInCombinedMesh = new HashSet<string>(
                 usedBlendShapes.Where(s => combinableMeshPaths.Contains(s.Substring(0, s.IndexOf("/blendShape.")))));
             var allMergedBlendShapes = new List<List<(string blendshape, float weight)>>();
             if (MergeSameRatioBlendShapes)
             {
-                allMergedBlendShapes.AddRange(FindMergeableBlendShapes(combinableSkinnedMeshes));
+                allMergedBlendShapes.AddRange(FindMergeableBlendShapes(basicMergedMeshesList));
                 var usedBlendShapesInMergedBlobs = new HashSet<string>(allMergedBlendShapes.SelectMany(s => s).Select(s => s.blendshape));
                 allMergedBlendShapes.AddRange(usedBlendShapesInCombinedMesh.Where(s => !usedBlendShapesInMergedBlobs.Contains(s)).Select(s => new List<(string blendshape, float weight)> { (s, 1) }));
             }
@@ -4133,9 +4138,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 allMergedBlendShapes.AddRange(usedBlendShapesInCombinedMesh.Select(s => new List<(string blendshape, float weight)> { (s, 1) }));
             }
             var vertexOffset = new List<int>() {0};
-            for (int i = 0; i < combinableSkinnedMeshes.Count - 1; i++)
+            for (int i = 0; i < basicMergedMeshesList.Count - 1; i++)
             {
-                vertexOffset.Add(vertexOffset[i] + combinableSkinnedMeshes[i].sharedMesh.vertexCount);
+                vertexOffset.Add(vertexOffset[i] + basicMergedMeshesList[i].sharedMesh.vertexCount);
             }
             int combinedMeshVertexCount = combinedMesh.vertexCount;
             foreach (var mergedBlendShapes in allMergedBlendShapes)
@@ -4226,7 +4231,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             
             var meshRenderer = combinableSkinnedMeshes[0];
             meshRenderer.rootBone = targetRootBone;
-            var materials = combinableSkinnedMeshes.SelectMany(r => r.sharedMaterials).ToArray();
+            var materials = basicMergedMeshesList.SelectMany(r => r.sharedMaterials).ToArray();
 
             if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
@@ -4265,16 +4270,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
 
-            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count && basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; meshID++)
+            for (int blobMeshID = 0; blobMeshID < basicMergedMeshes.Count && basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; blobMeshID++)
             {
-                var skinnedMesh = combinableSkinnedMeshes[meshID];
+                var skinnedMesh = basicMergedMeshes[blobMeshID][0];
                 var oldPath = GetPathToRoot(skinnedMesh);
                 var properties = new MaterialPropertyBlock();
                 if (meshRenderer.HasPropertyBlock())
                     meshRenderer.GetPropertyBlock(properties);
-                bool isActive = skinnedMesh.gameObject.activeSelf && skinnedMesh.enabled;
-                properties.SetFloat("_IsActiveMesh" + meshID, isActive ? 1f : 0f);
-                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", combinableSkinnedMeshes.Count);
+                bool isActive = GetRendererDefaultEnabledState(skinnedMesh);
+                properties.SetFloat($"_IsActiveMesh{blobMeshID}", isActive ? 1f : 0f);
+                properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", basicMergedMeshes.Count);
                 var animatedMaterialPropertiesToAdd = new List<string>();
                 if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
                 {
@@ -4291,10 +4296,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         {
                             continue;
                         }
-                        for (int mID = 0; mID < combinableSkinnedMeshes.Count; mID++)
+                        for (int mID = 0; mID < basicMergedMeshes.Count; mID++)
                         {
                             string newPropertyName = $"material.d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
-                            string path = GetPathToRoot(combinableSkinnedMeshes[mID]);
+                            string path = GetPathToRoot(basicMergedMeshes[mID][0]);
                             var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : isColor ? new [] { ".r", ".g", ".b", ".a" } : new [] { "" };
                             foreach (var component in vectorEnd)
                             {
