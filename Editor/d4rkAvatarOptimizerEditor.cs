@@ -653,6 +653,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "If the optimized copy is broken, try to disable the option.", MessageType.Warning);
         }
 
+        if ((optimizer.MergeSkinnedMeshesWithNaNimation || optimizer.MergeSkinnedMeshesWithShaderToggle)
+            && optimizer.GetPolyCount() > d4rkAvatarOptimizer.MaxPolyCountForAutoShaderToggle)
+        {
+            EditorGUILayout.HelpBox(
+                $"For avatars with a high poly count ({(int)(d4rkAvatarOptimizer.MaxPolyCountForAutoShaderToggle / 1000)}k or more)" +
+                " it might be disadvantageous to merge meshes with NaNimation or Shader toggles.", MessageType.Warning);
+        }
+
         if (optimizer.WritePropertiesAsStaticValues)
         {
             var allMaterials = optimizer.GetUsedComponentsInChildren<Renderer>()
