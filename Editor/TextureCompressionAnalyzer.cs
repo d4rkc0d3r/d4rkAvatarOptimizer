@@ -49,9 +49,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         class TextureImportPostprocessor : AssetPostprocessor
         {
-            void OnPreprocessTexture()
+            void OnPreprocessAsset()
             {
                 var textureImporter = assetImporter as TextureImporter;
+                if (textureImporter == null)
+                    return;
                 var refTextureImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(staticTexture)) as TextureImporter;
                 var match = Regex.Match(assetPath, @"/Z_IGNORE_([\w()\d]+)\.(\w+)$");
                 var parsedVariant = match.Groups[1].Success ? TextureVariant.Parse(match.Groups[1].Value) : null;
