@@ -181,6 +181,7 @@ It also deletes the assets from the previous optimized copy. You should never ch
 In addition to the selected optimizations there are some optimizations that are always performed:
 * Remove unused shape keys with zero weight. Unused here means not a viseme nor referenced in any animation in the fx layer.
 * Bake unused shape keys with non-zero weight into the mesh data. (only if the blend shape has a single frame)
+* Remove animation curves which reference a binding that doesn't exist on the avatar.
 * Merge identical material slots on skinned meshes.
 * Only reference bones if they have a non-zero weight on any vertex.
 * Remove everything with the EditorOnly tag.

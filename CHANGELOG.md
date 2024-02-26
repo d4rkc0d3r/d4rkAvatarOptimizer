@@ -2,6 +2,7 @@
 ### Features
 * Add auto settings for Shader and NaNimation toggles that disable them if the avatar has more than 150k tris.
   * Also shows a warning if Shader or NaNimation toggles are enabled and the avatar has more than 150k tris.
+* Always remove animation curves which reference a binding that doesn't exist on the avatar.
 
 ### Changes
 * Swap `OnPreprocessTexture` to `OnPreprocessAsset` to stop the optimizer from triggering a full project all texture reimport in unity 2022. [(more)](https://forum.unity.com/threads/unity-made-full-project-reimport-on-every-small-change.1066844/)

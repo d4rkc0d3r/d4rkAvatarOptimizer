@@ -1125,6 +1125,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         newCurve.postWrapMode = curve.postWrapMode;
         return newCurve;
     }
+
+
+    Dictionary<string, HashSet<(string property, Type type)>> cache_IsAnimatableBinding = null;
+    private bool IsAnimatableBinding(EditorCurveBinding binding)
+    {
+        if (cache_IsAnimatableBinding == null)
+            cache_IsAnimatableBinding = new Dictionary<string, HashSet<(string property, Type type)>>();
+        if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings))
+        {
+            animatableBindings = new HashSet<(string property, Type type)>();
+            GameObject targetObject = GetTransformFromPath(binding.path)?.gameObject;
+            if (targetObject != null) {
+                animatableBindings.UnionWith(AnimationUtility.GetAnimatableBindings(targetObject, gameObject).Select(b => (b.propertyName, b.type)));
+            }
+            cache_IsAnimatableBinding[binding.path] = animatableBindings;
+        }
+        return animatableBindings.Contains((binding.propertyName, binding.type));
+    }
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
@@ -1134,6 +1152,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         newClip.ClearCurves();
         newClip.name = clip.name;
         bool changed = false;
+        float lastUsedKeyframeTime = -1;
+        float lastUnusedKeyframeTime = -1;
+        void SetFloatCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, AnimationCurve curveToSet) {
+            if (IsAnimatableBinding(bindingToSet)) {
+                lastUsedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[curveToSet.length - 1].time : 0, lastUsedKeyframeTime);
+                AnimationUtility.SetEditorCurve(clipToSet, bindingToSet, curveToSet);
+            } else {
+                lastUnusedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[curveToSet.length - 1].time : 0, lastUnusedKeyframeTime);
+                changed = true;
+            }
+        }
+        void SetObjectReferenceCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, ObjectReferenceKeyframe[] curveToSet) {
+            if (IsAnimatableBinding(bindingToSet)) {
+                lastUsedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[curveToSet.Length - 1].time : 0, lastUsedKeyframeTime);
+                AnimationUtility.SetObjectReferenceCurve(clipToSet, bindingToSet, curveToSet);
+            } else {
+                lastUnusedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[curveToSet.Length - 1].time : 0, lastUnusedKeyframeTime);
+                changed = true;
+            }
+        }
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
@@ -1144,7 +1182,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var NaNCurve = ReplaceZeroWithNaN(curve);
                 for (int i = 0; i < propertyNames.Length; i++) {
                     fixedBinding.propertyName = propertyNames[i];
-                    AnimationUtility.SetEditorCurve(newClip, fixedBinding, NaNCurve);
+                    SetFloatCurve(newClip, fixedBinding, NaNCurve);
                 }
                 if (shaderToggleInfo.Length > 0) {
                     shaderToggleInfo = shaderToggleInfo.Substring(1);
@@ -1152,15 +1190,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     fixedBinding.path = shaderToggleInfo.Substring(semicolonIndex + 1);
                     fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
-                    AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(fixedBinding, ref changed), curve);
+                    SetFloatCurve(newClip, FixAnimationBindingPath(fixedBinding, ref changed), curve);
                 }
             } else {
-                AnimationUtility.SetEditorCurve(newClip, fixedBinding, curve);
+                SetFloatCurve(newClip, fixedBinding, curve);
                 if (fixedBinding.propertyName.StartsWith($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
                     var otherBinding = fixedBinding;
                     var match = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+(\.[a-z])?");
                     otherBinding.propertyName = $"material.{match.Groups[1].Value}{match.Groups[2].Value}";
-                    AnimationUtility.SetEditorCurve(newClip, otherBinding, curve);
+                    SetFloatCurve(newClip, otherBinding, curve);
                 }
             }
             bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
@@ -1173,7 +1211,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 foreach (var physBonePath in physBonePaths)
                 {
                     physBoneBinding.path = physBonePath;
-                    AnimationUtility.SetEditorCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);
+                    SetFloatCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);
                     changed = true;
                 }
             }
@@ -1198,7 +1236,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
             var newBinding = FixAnimationBinding(binding, ref changed);
-            AnimationUtility.SetObjectReferenceCurve(newClip, newBinding, curve);
+            SetObjectReferenceCurve(newClip, newBinding, curve);
+        }
+        if (lastUnusedKeyframeTime > lastUsedKeyframeTime) {
+            // add dummy curve referencing nothing to make sure the clip still has the same length as before
+            var dummyBinding = EditorCurveBinding.DiscreteCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
+            var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
+            AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
         }
         if (changed)
         {
