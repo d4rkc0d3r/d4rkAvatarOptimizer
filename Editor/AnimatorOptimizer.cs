@@ -329,12 +329,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (constantCurvesToAdd.Count > 0)
             {
                 var layerMotion = new AnimationClip() {
-                    hideFlags = HideFlags.HideInHierarchy,
-                    name = "d4rkAvatarOptimizer_MergedLayers_Constants"
+                    hideFlags = HideFlags.None,
+                    name = "d4rkAvatarOptimizer_MergedLayers_Constants",
+                    frameRate = 60,
+                    wrapMode = WrapMode.Default
                 };
                 foreach (var curve in constantCurvesToAdd)
                 {
-                    AnimationUtility.SetEditorCurve(layerMotion, curve.binding, new AnimationCurve(new Keyframe[] { new Keyframe(0, curve.value) }));
+                    AnimationUtility.SetEditorCurve(layerMotion, curve.binding, AnimationCurve.Constant(0, 1f / 60f, curve.value));
                 }
                 AssetDatabase.AddObjectToAsset(layerMotion, assetPath);
                 motions.Add(new ChildMotion() {
