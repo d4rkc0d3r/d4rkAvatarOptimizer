@@ -1141,7 +1141,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
         }
-        return animatableBindings.Contains((binding.propertyName, binding.type));
+        return animatableBindings.Contains((binding.propertyName, binding.type)) || binding.propertyName.StartsWith("material.d4rkAvatarOptimizer");
     }
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
@@ -1238,7 +1238,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var newBinding = FixAnimationBinding(binding, ref changed);
             SetObjectReferenceCurve(newClip, newBinding, curve);
         }
-        if (lastUnusedKeyframeTime > lastUsedKeyframeTime) {
+        if (lastUnusedKeyframeTime > lastUsedKeyframeTime && lastUnusedKeyframeTime > -1) {
             // add dummy curve referencing nothing to make sure the clip still has the same length as before
             var dummyBinding = EditorCurveBinding.DiscreteCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
             var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
