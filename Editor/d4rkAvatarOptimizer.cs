@@ -1126,22 +1126,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return newCurve;
     }
 
-
+    static Dictionary<char, char> otherVectorOrColorComponent = new Dictionary<char, char> {
+        { 'x', 'r' }, { 'y', 'g' }, { 'z', 'b' }, { 'w', 'a' },
+        { 'r', 'x' }, { 'g', 'y' }, { 'b', 'z' }, { 'a', 'w' },
+    };
     Dictionary<string, HashSet<(string property, Type type)>> cache_IsAnimatableBinding = null;
-    private bool IsAnimatableBinding(EditorCurveBinding binding)
-    {
+    private bool IsAnimatableBinding(EditorCurveBinding binding) {
         if (cache_IsAnimatableBinding == null)
             cache_IsAnimatableBinding = new Dictionary<string, HashSet<(string property, Type type)>>();
-        if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings))
-        {
+        if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings)) {
             animatableBindings = new HashSet<(string property, Type type)>();
             GameObject targetObject = GetTransformFromPath(binding.path)?.gameObject;
             if (targetObject != null) {
-                animatableBindings.UnionWith(AnimationUtility.GetAnimatableBindings(targetObject, gameObject).Select(b => (b.propertyName, b.type)));
+                foreach (var animatableBinding in AnimationUtility.GetAnimatableBindings(targetObject, gameObject)) {
+                    var name = animatableBinding.propertyName;
+                    animatableBindings.Add((name, animatableBinding.type));
+                    if (name.Length > 2 && name[name.Length - 2] == '.' && otherVectorOrColorComponent.TryGetValue(name[name.Length - 1], out var otherComponent)) {
+                        animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
+                    }
+                }
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
         }
-        return animatableBindings.Contains((binding.propertyName, binding.type)) || binding.propertyName.StartsWith("material.d4rkAvatarOptimizer");
+        return animatableBindings.Contains((binding.propertyName, binding.type));
     }
     
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
