@@ -2635,10 +2635,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (fxLayer == null)
             return new HashSet<Component>();
         var behaviourToggles = new HashSet<string>();
-        foreach (var binding in GetAllUsedFXLayerCurveBindings())
-        {
-            if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
-            {
+        foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
+            if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
+                behaviourToggles.Add(binding.path);
+            } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
                 behaviourToggles.Add(binding.path);
             }
         }
@@ -2647,6 +2647,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(b => b != null && !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
+
+        alwaysDisabledBehaviours.UnionWith(GetComponentsInChildren<Renderer>(true)
+            .Where(r => r != null && !r.enabled)
+            .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
             .SelectMany(t => t.GetComponents<Component>().Where(c => c != null && !(c is Transform))));
