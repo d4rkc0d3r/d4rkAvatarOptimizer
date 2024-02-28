@@ -421,8 +421,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
     private List<Material> optimizedMaterials = new List<Material>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
-    private List<List<string>> mergedMeshPaths = new List<List<string>>();
-    private Dictionary<string, List<string>> newPathToMergedPaths = new Dictionary<string, List<string>>();
+    private Dictionary<string, List<List<string>>> oldPathToMergedPaths = new Dictionary<string, List<List<string>>>();
     private Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
     private Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
@@ -2188,12 +2187,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             int mergedMeshCount = 1;
             int meshIndex = 0;
             string targetPath = entry.Key.path;
-            var currentMergedMeshes = mergedMeshPaths.FirstOrDefault(list => list.Any(path => path == entry.Key.path));
-            if (currentMergedMeshes != null)
+            if (oldPathToMergedPaths.TryGetValue(entry.Key.path, out var currentMergedMeshes))
             {
                 mergedMeshCount = currentMergedMeshes.Count;
-                meshIndex = currentMergedMeshes.IndexOf(entry.Key.path);
-                targetPath = currentMergedMeshes[0];
+                meshIndex = currentMergedMeshes.FindIndex(list => list.Contains(entry.Key.path));
+                targetPath = currentMergedMeshes[0][0];
             }
             if (!optimizedSlotSwapMaterials.TryGetValue(entry.Key, out var optimizedMaterials))
             {
@@ -3020,12 +3018,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (mergedMeshIndices == null)
             mergedMeshIndices = sources.Select(s => Enumerable.Range(0, meshToggleCount).ToList()).ToList();
         HashSet<(string name, bool isVector)> defaultAnimatedProperties = null;
-        newPathToMergedPaths.TryGetValue(path, out var allOriginalMeshPaths);
+        oldPathToMergedPaths.TryGetValue(path, out var allOriginalMeshPaths);
         var sameAnimatedProperties = GetSameAnimatedPropertiesOnMergedMesh(path);
         if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1)) {
             defaultAnimatedProperties = new HashSet<(string name, bool isVector)>();
             for (int i = 0; i < allOriginalMeshPaths.Count; i++) {
-                if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i], out var animatedProps)) {
+                if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i][0], out var animatedProps)) {
                     foreach (var prop in animatedProps) {
                         string name = prop;
                         bool isVector = name.EndsWith(".x") || name.EndsWith(".r");
@@ -3233,6 +3231,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var optimizedShader = new List<(string name, List<string> lines)>[sources.Count];
+        var basicMergedMeshPaths = allOriginalMeshPaths?.Select(list => string.Join(", ", list)).ToList();
         Profiler.StartSection("ShaderOptimizer.Run()");
         Parallel.For(0, sources.Count, i =>
         {
@@ -3242,7 +3241,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     parsedShader[i],
                     replace[i],
                     meshToggleCount,
-                    allOriginalMeshPaths,
+                    basicMergedMeshPaths,
                     i == 0 ? defaultAnimatedProperties : null,
                     mergedMeshIndices[i],
                     arrayPropertyValues[i],
@@ -3917,8 +3916,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var combinableMeshList = FindPossibleSkinnedMeshMerges();
-        newPathToMergedPaths.Clear();
-        mergedMeshPaths = combinableMeshList.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
+        oldPathToMergedPaths.Clear();
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
@@ -4016,9 +4014,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
 
-            newPathToMergedPaths[newPath] = basicMergedMeshes.Select(list => GetPathToRoot(list[0])).ToList();
-
             var basicMergedMeshesList = basicMergedMeshes.SelectMany(list => list.Cast<SkinnedMeshRenderer>()).ToList();
+
+            var mergedMeshPaths = basicMergedMeshes.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
+            basicMergedMeshesList.ForEach(r => oldPathToMergedPaths[GetPathToRoot(r)] = mergedMeshPaths);
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
