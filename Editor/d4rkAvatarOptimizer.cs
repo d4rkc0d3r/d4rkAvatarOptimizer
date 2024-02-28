@@ -853,6 +853,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         if (cache_RendererHaveSameAnimationCurves == null)
             cache_RendererHaveSameAnimationCurves = new Dictionary<(Renderer, Renderer), bool>();
+        var aPath = GetPathToRoot(a);
+        var bPath = GetPathToRoot(b);
+        if (aPath.CompareTo(bPath) > 0) {
+            var temp = aPath;
+            aPath = bPath;
+            bPath = temp;
+            var temp2 = a;
+            a = b;
+            b = temp2;
+        }
         if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
             return result;
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
@@ -888,16 +898,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             return cache_FindAllAnimationClipsAffectingRenderer;
         }
-        var aHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(a), out var aClips);
-        var bHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(GetPathToRoot(b), out var bClips);
+        var aHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(aPath, out var aClips);
+        var bHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(bPath, out var bClips);
         if (aHasClips != bHasClips)
             return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
         if (!aHasClips)
             return cache_RendererHaveSameAnimationCurves[(a, b)] = true;
         if (!aClips.SetEquals(bClips))
             return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
-        var aPath = GetPathToRoot(a);
-        var bPath = GetPathToRoot(b);
         foreach (var clip in aClips)
         {
             var bindings = AnimationUtility.GetCurveBindings(clip);
@@ -934,6 +942,99 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         return cache_RendererHaveSameAnimationCurves[(a, b)] = true;
+    }
+
+    private static List<string> ColorPropertyComponents = new List<string> { ".r", ".g", ".b", ".a" };
+    private static List<string> VectorPropertyComponents = new List<string> { ".x", ".y", ".z", ".w" };
+    private Dictionary<string, HashSet<AnimationClip>> cache_AllAnimationClipsAffectingRendererMaterialProperties = null;
+    private Dictionary<(string a, string b), HashSet<string>> cache_FindSameAnimatedMaterialProperties = null;
+    private HashSet<string> FindSameAnimatedMaterialProperties(string aPath, string bPath)
+    {
+        if (cache_FindSameAnimatedMaterialProperties == null)
+            cache_FindSameAnimatedMaterialProperties = new Dictionary<(string a, string b), HashSet<string>>();
+        if (aPath.CompareTo(bPath) > 0) {
+            var temp = aPath;
+            aPath = bPath;
+            bPath = temp;
+        }
+        if (cache_FindSameAnimatedMaterialProperties.TryGetValue((aPath, bPath), out var cachedResult))
+            return cachedResult;
+        bool IsRelevantBinding(EditorCurveBinding binding) {
+            return typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWith("material.");
+        }
+        if (cache_AllAnimationClipsAffectingRendererMaterialProperties == null) {
+            cache_AllAnimationClipsAffectingRendererMaterialProperties = new Dictionary<string, HashSet<AnimationClip>>();
+            foreach (var clip in GetAllUsedFXLayerAnimationClips()) {
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
+                    if (IsRelevantBinding(binding)) {
+                        if (!cache_AllAnimationClipsAffectingRendererMaterialProperties.TryGetValue(binding.path, out var clips)) {
+                            cache_AllAnimationClipsAffectingRendererMaterialProperties[binding.path] = clips = new HashSet<AnimationClip>();
+                        }
+                        clips.Add(clip);
+                    }
+                }
+            }
+        }
+        var allClips = new HashSet<AnimationClip>();
+        if (cache_AllAnimationClipsAffectingRendererMaterialProperties.TryGetValue(aPath, out var aClips))
+            allClips.UnionWith(aClips);
+        if (cache_AllAnimationClipsAffectingRendererMaterialProperties.TryGetValue(bPath, out var bClips))
+            allClips.UnionWith(bClips);
+        var result = new HashSet<string>();
+        foreach (var clip in allClips) {
+            var bindings = AnimationUtility.GetCurveBindings(clip);
+            foreach (var binding in bindings) {
+                if (IsRelevantBinding(binding) && (binding.path == aPath || binding.path == bPath)) {
+                    result.Add(binding.propertyName);
+                }
+            }
+        }
+        foreach (var clip in allClips) {
+            var bindings = AnimationUtility.GetCurveBindings(clip);
+            foreach (var binding in bindings) {
+                if (IsRelevantBinding(binding) && (binding.path == aPath || binding.path == bPath) && result.Contains(binding.propertyName)) {
+                    var otherBinding = binding;
+                    otherBinding.path = binding.path == aPath ? bPath : aPath;
+                    if (!bindings.Contains(otherBinding)) {
+                        result.Remove(binding.propertyName);
+                        continue;
+                    }
+                    var aKeys = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                    var bKeys = AnimationUtility.GetEditorCurve(clip, otherBinding).keys;
+                    if (aKeys.Length != bKeys.Length) {
+                        result.Remove(binding.propertyName);
+                        continue;
+                    }
+                    for (int i = 0; i < aKeys.Length; ++i) {
+                        if (aKeys[i].value != bKeys[i].value || aKeys[i].time != bKeys[i].time) {
+                            result.Remove(binding.propertyName);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        var colorProperties = new HashSet<string>();
+        var vectorProperties = new HashSet<string>();
+        foreach (var property in result) {
+            if (ColorPropertyComponents.Any(c => property.EndsWith(c)))
+                colorProperties.Add(property.Substring(0, property.Length - 2));
+            else if (VectorPropertyComponents.Any(c => property.EndsWith(c)))
+                vectorProperties.Add(property.Substring(0, property.Length - 2));
+        }
+        foreach (var colorProperty in colorProperties) {
+            if (ColorPropertyComponents.All(c => result.Contains(colorProperty + c))) {
+                result.Add(colorProperty);
+            }
+            ColorPropertyComponents.ForEach(c => result.Remove(colorProperty + c));
+        }
+        foreach (var vectorProperty in vectorProperties) {
+            if (VectorPropertyComponents.All(c => result.Contains(vectorProperty + c))) {
+                result.Add(vectorProperty);
+            }
+            VectorPropertyComponents.ForEach(c => result.Remove(vectorProperty + c));
+        }
+        return cache_FindSameAnimatedMaterialProperties[(aPath, bPath)] = new HashSet<string>(result.Select(p => p.Substring("material.".Length)));
     }
 
     private void AddAnimationPathChange((string path, string name, Type type) source, (string path, string name, Type type) target)
@@ -1250,6 +1351,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var dummyBinding = EditorCurveBinding.DiscreteCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
             var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
             AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
+            changed = true;
         }
         if (changed)
         {
@@ -2919,28 +3021,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             mergedMeshIndices = sources.Select(s => Enumerable.Range(0, meshToggleCount).ToList()).ToList();
         HashSet<(string name, bool isVector)> defaultAnimatedProperties = null;
         newPathToMergedPaths.TryGetValue(path, out var allOriginalMeshPaths);
-        if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1))
-        {
+        var sameAnimatedProperties = GetSameAnimatedPropertiesOnMergedMesh(path);
+        if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1)) {
             defaultAnimatedProperties = new HashSet<(string name, bool isVector)>();
-            for (int i = 0; i < allOriginalMeshPaths.Count; i++)
-            {
-                if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i], out var animatedProps))
-                {
-                    foreach (var prop in animatedProps)
-                    {
+            for (int i = 0; i < allOriginalMeshPaths.Count; i++) {
+                if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i], out var animatedProps)) {
+                    foreach (var prop in animatedProps) {
                         string name = prop;
                         bool isVector = name.EndsWith(".x") || name.EndsWith(".r");
-                        if (isVector)
-                        {
+                        if (isVector) {
                             name = name.Substring(0, name.Length - 2);
+                        } else if ((name.Length > 2 && name[name.Length - 2] == '.')
+                                || (!isVector && (animatedProps.Contains($"{name}.x") || animatedProps.Contains($"{name}.r")))) {
+                            continue;
                         }
-                        else if ((name.Length > 2 && name[name.Length - 2] == '.')
-                            || (!isVector && (animatedProps.Contains($"{name}.x") || animatedProps.Contains($"{name}.r"))))
-                        {
+                        if (sameAnimatedProperties.Contains(name)) {
                             continue;
                         }
                         defaultAnimatedProperties.Add(($"d4rkAvatarOptimizer{name}_ArrayIndex{i}", isVector));
-                        defaultAnimatedProperties.Add((name, isVector));
                     }
                 }
                 defaultAnimatedProperties.Add(($"_IsActiveMesh{i}", false));
@@ -3100,19 +3198,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
 
             animatedPropertyValues[i] = new Dictionary<string, string>();
-            if (meshToggleCount > 1)
-            {
-                foreach (var propName in usedMaterialProps)
-                {
-                    if (originalMeshPaths != null)
-                    {
+            if (meshToggleCount > 1) {
+                foreach (var propName in usedMaterialProps) {
+                    if (sameAnimatedProperties.Contains(propName)) {
+                        arrayPropertyValues[i].Remove(propName);
+                        replace[i].Remove(propName);
+                        continue;
+                    }
+                    if (originalMeshPaths != null) {
                         bool skipProp = true;
-                        foreach (var originalPath in originalMeshPaths[i])
-                        {
-                            if (animatedMaterialProperties.TryGetValue(originalPath, out var props))
-                            {
-                                if (props.Contains(propName) || props.Contains(propName + ".x") || props.Contains(propName + ".r"))
-                                {
+                        foreach (var originalPath in originalMeshPaths[i]) {
+                            if (animatedMaterialProperties.TryGetValue(originalPath, out var props)) {
+                                if (props.Contains(propName) || props.Contains(propName + ".x") || props.Contains(propName + ".r")) {
                                     skipProp = false;
                                     break;
                                 }
@@ -3121,8 +3218,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         if (skipProp)
                             continue;
                     }
-                    if (parsedShader[i].propertyTable.TryGetValue(propName, out var prop))
-                    {
+                    if (parsedShader[i].propertyTable.TryGetValue(propName, out var prop)) {
                         string type = "float4";
                         if (prop.type == ParsedShader.Property.Type.Float)
                             type = "float";
@@ -3805,6 +3901,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return bones.Count - 1;
     }
 
+    private Dictionary<string, HashSet<string>> cache_SameAnimatedPropertiesOnMergedMesh = null;
+    private HashSet<string> GetSameAnimatedPropertiesOnMergedMesh(string path)
+    {
+        if (cache_SameAnimatedPropertiesOnMergedMesh == null) {
+            cache_SameAnimatedPropertiesOnMergedMesh = new Dictionary<string, HashSet<string>>();
+        }
+        if (cache_SameAnimatedPropertiesOnMergedMesh.TryGetValue(path, out var result)) {
+            return result;
+        }
+        return cache_SameAnimatedPropertiesOnMergedMesh[path] = new HashSet<string>();
+    }
+
     private void CombineSkinnedMeshes()
     {
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
@@ -4322,8 +4430,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
 
-            for (int blobMeshID = 0; blobMeshID < basicMergedMeshes.Count && basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; blobMeshID++)
-            {
+            var sameAnimatedProperties = GetSameAnimatedPropertiesOnMergedMesh(newPath);
+            if (basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle) {
+                var pathA = GetPathToRoot(basicMergedMeshes[0][0]);
+                sameAnimatedProperties.UnionWith(FindSameAnimatedMaterialProperties(pathA, GetPathToRoot(basicMergedMeshes[1][0])));
+                for (int blobMeshID = 2; blobMeshID < basicMergedMeshes.Count; blobMeshID++) {
+                    sameAnimatedProperties.IntersectWith(FindSameAnimatedMaterialProperties(pathA, GetPathToRoot(basicMergedMeshes[blobMeshID][0])));
+                }
+            }
+
+            for (int blobMeshID = 0; blobMeshID < basicMergedMeshes.Count && basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle; blobMeshID++) {
                 var skinnedMesh = basicMergedMeshes[blobMeshID][0];
                 var oldPath = GetPathToRoot(skinnedMesh);
                 var properties = new MaterialPropertyBlock();
@@ -4333,28 +4449,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 properties.SetFloat($"_IsActiveMesh{blobMeshID}", isActive ? 1f : 0f);
                 properties.SetInt("d4rkAvatarOptimizer_CombinedMeshCount", basicMergedMeshes.Count);
                 var animatedMaterialPropertiesToAdd = new List<string>();
-                if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties))
-                {
-                    foreach (var animPropName in animatedProperties)
-                    {
+                if (animatedMaterialProperties.TryGetValue(oldPath, out var animatedProperties)) {
+                    foreach (var animPropName in animatedProperties) {
                         var propName = animPropName;
                         bool isVector = propName.EndsWith(".x");
                         bool isColor = propName.EndsWith(".r");
-                        if (isVector || isColor)
-                        {
+                        if (isVector || isColor) {
                             propName = propName.Substring(0, propName.Length - 2);
-                        }
-                        else if (propName[propName.Length - 2] == '.')
-                        {
+                        } else if (propName[propName.Length - 2] == '.') {
                             continue;
                         }
-                        for (int mID = 0; mID < basicMergedMeshes.Count; mID++)
-                        {
+                        if (sameAnimatedProperties.Contains(animPropName)) {
+                            continue;
+                        }
+                        for (int mID = 0; mID < basicMergedMeshes.Count; mID++) {
                             string newPropertyName = $"material.d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
                             string path = GetPathToRoot(basicMergedMeshes[mID][0]);
                             var vectorEnd = isVector ? new [] { ".x", ".y", ".z", ".w" } : isColor ? new [] { ".r", ".g", ".b", ".a" } : new [] { "" };
-                            foreach (var component in vectorEnd)
-                            {
+                            foreach (var component in vectorEnd) {
                                 AddAnimationPathChange(
                                     (path, "material." + propName + component, typeof(SkinnedMeshRenderer)),
                                     (newPath, newPropertyName + component, typeof(SkinnedMeshRenderer)));
@@ -4363,10 +4475,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         animatedMaterialPropertiesToAdd.Add(animPropName);
                     }
                 }
-                if (animatedMaterialPropertiesToAdd.Count > 0)
-                {
-                    if (!fusedAnimatedMaterialProperties.TryGetValue(newPath, out animatedProperties))
-                    {
+                if (animatedMaterialPropertiesToAdd.Count > 0) {
+                    if (!fusedAnimatedMaterialProperties.TryGetValue(newPath, out animatedProperties)) {
                         fusedAnimatedMaterialProperties[newPath] = animatedProperties = new HashSet<string>();
                     }
                     animatedProperties.UnionWith(animatedMaterialPropertiesToAdd);
