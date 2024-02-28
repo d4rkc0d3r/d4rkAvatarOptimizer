@@ -2443,10 +2443,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         var ratiosArray = ratiosDict.Select(x => {
-            var array = new float[blendShapeIDToName.Count];
-            System.Array.Fill(array, float.NegativeInfinity);
-            foreach (var entry in x)
-            {
+            var array = Enumerable.Repeat(float.NegativeInfinity, blendShapeIDToName.Count).ToArray();
+            foreach (var entry in x) {
                 array[entry.Key] = entry.Value;
             }
             return array;
@@ -2468,7 +2466,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         mergeableBlendShapes.RemoveAll(x => x.Count == 1);
-        return mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).Select(x => (blendShapeIDToName[x.blendshapeID], x.value)).ToList()).ToList();
+        return mergeableBlendShapes.Select(x => x.OrderByDescending(y => y.value).Select(z => (blendShapeIDToName[z.blendshapeID], z.value)).ToList()).ToList();
     }
 
     private void NormalizeBlendShapeValues(List<(int blendshape, float value)> blendShapeValues)
