@@ -2694,18 +2694,23 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     foreach (var animatedProperty in animatedPropertyValues)
                     {
-                        var prop = parsedShader.properties.FirstOrDefault(p => p.name == animatedProperty.Key);
+                        var prop = parsedShader.propertyTable[animatedProperty.Key];
                         string defaultValue = "0";
-                        string type = prop.type.ToString();
-                        if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.ColorHDR || prop.type == ParsedShader.Property.Type.Vector)
-                        {
+                        string type = "Float";
+                        string tagString = tagString = prop.hasGammaTag ? "[gamma] " : "";
+                        if (prop.type == ParsedShader.Property.Type.Vector) {
                             defaultValue = "(0,0,0,0)";
                             type = "Vector";
+                        } else if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.ColorHDR) {
+                            defaultValue = "(0,0,0,0)";
+                            type = "Color";
+                        } 
+                        if (prop.type == ParsedShader.Property.Type.ColorHDR) {
+                            tagString += "[hdr] ";
                         }
-                        foreach (int i in mergedMeshIndices)
-                        {
+                        foreach (int i in mergedMeshIndices) {
                             var fullPropertyName = $"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}";
-                            propertyBlock.Add($"{fullPropertyName}(\"{prop.name} {i}\", {type}) = {defaultValue}");
+                            propertyBlock.Add($"{tagString}{fullPropertyName}(\"{prop.name} {i}\", {type}) = {defaultValue}");
                             alreadyAdded.Add(fullPropertyName);
                         }
                     }
@@ -2715,13 +2720,29 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             continue;
                         string defaultValue = defaultAnimatedProperty.isVector ? "(0,0,0,0)" : "0";
                         string type = defaultAnimatedProperty.isVector ? "Vector" : "Float";
-                        string name = defaultAnimatedProperty.name;
-                        if (name.StartsWith("_IsActiveMesh"))
-                        {
-                            int meshIndex = int.Parse(name.Substring("_IsActiveMesh".Length));
-                            name = $"_IsActiveMesh{meshIndex} {mergedMeshNames[meshIndex]}";
+                        string displayName = defaultAnimatedProperty.name;
+                        string tagString = "";
+                        if (displayName.StartsWith("_IsActiveMesh")) {
+                            int meshIndex = int.Parse(displayName.Substring("_IsActiveMesh".Length));
+                            displayName = $"_IsActiveMesh{meshIndex} {mergedMeshNames[meshIndex]}";
                         }
-                        propertyBlock.Add($"{defaultAnimatedProperty.name}(\"{name}\", {type}) = {defaultValue}");
+                        if (!parsedShader.propertyTable.TryGetValue(defaultAnimatedProperty.name, out var nativeProperty)) {
+                            var match = Regex.Match(defaultAnimatedProperty.name,  @"d4rkAvatarOptimizer(\w+)_ArrayIndex(\d+)");
+                            if (match.Success) {
+                                parsedShader.propertyTable.TryGetValue(match.Groups[1].Value, out nativeProperty);
+                                displayName = $"{match.Groups[1].Value} {match.Groups[2].Value}";
+                            }
+                        }
+                        if (nativeProperty != null) {
+                            tagString = nativeProperty.hasGammaTag ? "[gamma] " : "";
+                            if (nativeProperty.type == ParsedShader.Property.Type.Color || nativeProperty.type == ParsedShader.Property.Type.ColorHDR) {
+                                type = "Color";
+                            }
+                            if (nativeProperty.type == ParsedShader.Property.Type.ColorHDR) {
+                                tagString += "[hdr] ";
+                            }
+                        }
+                        propertyBlock.Add($"{tagString}{defaultAnimatedProperty.name}(\"{displayName}\", {type}) = {defaultValue}");
                     }
                 }
             }

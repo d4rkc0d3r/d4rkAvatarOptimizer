@@ -17,6 +17,7 @@
 * Fix materials getting merged even if they have different `VRCFallback` shaders set.
 * Fix copy of old material property animation when it is a color property.
 * Fix optimizer always injecting the animated property disambiguation code on merged material blobs that have at least one material that comes from the combined mesh path.
+* Don't generate default properties which have names that are invalid ShaderLab property names. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/81)
 
 ## v3.4.1
 ### Changes

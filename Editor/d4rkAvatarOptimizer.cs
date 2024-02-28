@@ -2535,26 +2535,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     }
 
     private Dictionary<string, HashSet<string>> cache_FindAllAnimatedMaterialProperties;
-    public Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties()
-    {
+    public Dictionary<string, HashSet<string>> FindAllAnimatedMaterialProperties() {
         if (cache_FindAllAnimatedMaterialProperties != null)
             return cache_FindAllAnimatedMaterialProperties;
         var map = new Dictionary<string, HashSet<string>>();
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return map;
-        foreach (var binding in GetAllUsedFXLayerCurveBindings())
-        {
+        foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
             if (!binding.propertyName.StartsWith("material.") ||
                 (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
                 continue;
-            if (!map.TryGetValue(binding.path, out var props))
-            {
+            if (!map.TryGetValue(binding.path, out var props)) {
                 map[binding.path] = (props = new HashSet<string>());
             }
             var propName = binding.propertyName.Substring(9);
-            if (propName.Length > 2 && propName[propName.Length - 2] == '.')
-            {
+            if (!Regex.IsMatch(propName, @"^[#_a-zA-Z][#_a-zA-Z0-9]*(\.[rgbaxyzw])?$"))
+                continue;
+            if (propName.Length > 2 && propName[propName.Length - 2] == '.') {
                 props.Add(propName.Substring(0, propName.Length - 2));
             }
             props.Add(propName);
@@ -3037,6 +3035,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             continue;
                         }
                         defaultAnimatedProperties.Add(($"d4rkAvatarOptimizer{name}_ArrayIndex{i}", isVector));
+                        defaultAnimatedProperties.Add((name, isVector));
                     }
                 }
                 defaultAnimatedProperties.Add(($"_IsActiveMesh{i}", false));
