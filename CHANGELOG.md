@@ -1,3 +1,7 @@
+## v3.5.1
+### Bug Fixes
+* Fix root animator parameter animations getting removed as non animatable binding. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/82)
+
 ## v3.5.0
 ### Features
 * Add auto settings for Shader and NaNimation toggles that disable them if the avatar has more than 150k tris.

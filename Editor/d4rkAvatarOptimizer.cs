@@ -1248,6 +1248,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
         }
+        if (binding.path == "" && binding.type == typeof(Animator)) {
+            return true;
+        }
         return animatableBindings.Contains((binding.propertyName, binding.type));
     }
     
