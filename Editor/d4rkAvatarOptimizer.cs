@@ -1284,6 +1284,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return animatableBindings.Contains((binding.propertyName, binding.type));
     }
     
+    private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
         if (clip.name == "d4rkAvatarOptimizer_MergedLayers_Constants")
@@ -1384,6 +1385,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
             AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
             changed = true;
+            if (lastUsedKeyframeTime == -1) {
+                if (cache_DummyAnimationClipOfLength == null) {
+                    cache_DummyAnimationClipOfLength = new Dictionary<float, AnimationClip>();
+                }
+                if (!cache_DummyAnimationClipOfLength.TryGetValue(lastUnusedKeyframeTime, out var dummyClip)) {
+                    newClip.name = $"DummyClip_{lastUnusedKeyframeTime}";
+                    CreateUniqueAsset(newClip, newClip.name + ".anim");
+                    cache_DummyAnimationClipOfLength[lastUnusedKeyframeTime] = dummyClip = newClip;
+                }
+                return dummyClip;
+            }
         }
         if (changed)
         {
