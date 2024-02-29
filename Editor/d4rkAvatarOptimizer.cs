@@ -1248,6 +1248,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
         }
+        if (animatableBindings.Count == 0) {
+            // transform doesn't exist otherwise it would have at least 10 animatable bindings for position, rotation, and scale
+            return false;
+        }
+        if (binding.type == typeof(Transform)) {
+            return true;
+        }
         if (binding.path == "" && binding.type == typeof(Animator)) {
             return true;
         }

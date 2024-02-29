@@ -1,6 +1,7 @@
 ## v3.5.1
 ### Bug Fixes
 * Fix root animator parameter animations getting removed as non animatable binding. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/82)
+* Mark all bindings that reference a transform as animatable as long as the transform exists on the avatar. This is because there are more animatable bindings than the AnimationUtility tells us about. Thanks Haï~ for linking me to [this.](https://forum.unity.com/threads/new-animationclip-property-names.367288/#post-2384172)
 
 ## v3.5.0
 ### Features
