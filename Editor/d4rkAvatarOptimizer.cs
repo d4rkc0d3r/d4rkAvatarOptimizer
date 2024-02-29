@@ -422,6 +422,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private List<Material> optimizedMaterials = new List<Material>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
     private Dictionary<string, List<List<string>>> oldPathToMergedPaths = new Dictionary<string, List<List<string>>>();
+    private Dictionary<string, string> oldPathToMergedPath = new Dictionary<string, string>();
     private Dictionary<string, List<string>> physBonesToDisable = new Dictionary<string, List<string>>();
     private Dictionary<(string path, int slot), HashSet<Material>> slotSwapMaterials = new Dictionary<(string, int), HashSet<Material>>();
     private Dictionary<(string path, int slot), Dictionary<Material, Material>> optimizedSlotSwapMaterials = new Dictionary<(string, int), Dictionary<Material, Material>>();
@@ -1168,6 +1169,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return matchedSkinnedMeshes;
     }
 
+    private HashSet<string> cache_TargetPathHasAnyMaterialSwap = null;
+    private bool TargetPathHasAnyMaterialSwap(string path)
+    {
+        if (cache_TargetPathHasAnyMaterialSwap == null) {
+            cache_TargetPathHasAnyMaterialSwap = new HashSet<string>();
+            foreach (var oldPath in FindAllMaterialSwapMaterials().Keys.Select(key => key.Item1).Distinct()) {
+                var newPath = oldPath;
+                if (oldPathToMergedPath.TryGetValue(oldPath, out var mergedPath)) {
+                    newPath = mergedPath;
+                }
+                if (transformFromOldPath.TryGetValue(newPath, out var t) && t != null) {
+                    newPath = GetPathToRoot(t);
+                }
+                cache_TargetPathHasAnyMaterialSwap.Add(newPath);
+            }
+        }
+        return cache_TargetPathHasAnyMaterialSwap.Contains(path);
+    }
+
     private EditorCurveBinding FixAnimationBindingPath(EditorCurveBinding binding, ref bool changed)
     {
         var newBinding = binding;
@@ -1251,6 +1271,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (animatableBindings.Count == 0) {
             // transform doesn't exist otherwise it would have at least 10 animatable bindings for position, rotation, and scale
             return false;
+        }
+        if (binding.propertyName.StartsWith("material.") && TargetPathHasAnyMaterialSwap(binding.path)) {
+            return true;
         }
         if (binding.type == typeof(Transform)) {
             return true;
@@ -3928,6 +3951,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var combinableMeshList = FindPossibleSkinnedMeshMerges();
         oldPathToMergedPaths.Clear();
+        oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
@@ -4026,9 +4050,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
 
             var basicMergedMeshesList = basicMergedMeshes.SelectMany(list => list.Cast<SkinnedMeshRenderer>()).ToList();
-
             var mergedMeshPaths = basicMergedMeshes.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
             basicMergedMeshesList.ForEach(r => oldPathToMergedPaths[GetPathToRoot(r)] = mergedMeshPaths);
+            basicMergedMeshesList.ForEach(r => oldPathToMergedPath[GetPathToRoot(r)] = newPath);
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
