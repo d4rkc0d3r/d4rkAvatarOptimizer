@@ -1014,9 +1014,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         else
                         {
                             var property = ParseProperty(line, tags);
-                            if (property != null)
-                            {
+                            if (property != null) {
                                 parsedShader.properties.Add(property);
+                                if (property.type == ParsedShader.Property.Type.Texture2D || property.type == ParsedShader.Property.Type.Texture2DArray) {
+                                    var ST_property = new ParsedShader.Property();
+                                    ST_property.name = property.name + "_ST";
+                                    ST_property.type = ParsedShader.Property.Type.Vector;
+                                    ST_property.defaultValue = "float4(1,1,0,0)";
+                                    parsedShader.properties.Add(ST_property);
+                                }   
                             }
                             output.Add(line);
                         }

@@ -1,3 +1,7 @@
+## v3.5.2
+### Bug Fixes
+* Fix Texture2D_ST material property animations not working when using the `Use Shader Toggles` option.
+
 ## v3.5.1
 ### Bug Fixes
 * Fix root animator parameter animations getting removed as non animatable binding. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/82)
