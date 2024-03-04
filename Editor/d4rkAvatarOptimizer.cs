@@ -1262,8 +1262,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     var name = animatableBinding.propertyName;
                     animatableBindings.Add((name, animatableBinding.type));
                     if (name.Length > 2 && name[name.Length - 2] == '.' && otherVectorOrColorComponent.TryGetValue(name[name.Length - 1], out var otherComponent)) {
+                        // Color & Vector properties can both be animated by .xyzw or .rgba but only one of them gets returned by GetAnimatableBindings
                         animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
                     }
+                }
+                if (targetObject.TryGetComponent(out VRCStation station)) {
+                    // even if box collider doesn't exist right now, the station script will create one at runtime
+                    animatableBindings.Add(("m_IsTrigger", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Enabled", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Center.x", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Center.y", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Center.z", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Size.x", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Size.y", typeof(BoxCollider)));
+                    animatableBindings.Add(("m_Size.z", typeof(BoxCollider)));
                 }
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
@@ -1276,9 +1288,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return true;
         }
         if (binding.type == typeof(Transform)) {
+            // transforms have more animatable bindings than GetAnimatableBindings returns, so just assume it was one of those
             return true;
         }
         if (binding.path == "" && binding.type == typeof(Animator)) {
+            // the animator doesn't return all the animatable bindings since the animation controllers are still just in the avatar descriptor instead of the animator
             return true;
         }
         return animatableBindings.Contains((binding.propertyName, binding.type));

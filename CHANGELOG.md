@@ -1,3 +1,7 @@
+## v3.5.3
+### Bug Fixes
+* Fix BoxCollider animation bindings getting thrown away for the BoxCollider that gets implicitly added by VRCStation components. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/83)
+
 ## v3.5.2
 ### Bug Fixes
 * Fix Texture2D_ST material property animations not working when using the `Use Shader Toggles` option.
