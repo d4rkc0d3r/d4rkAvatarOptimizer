@@ -3982,7 +3982,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
-        fusedAnimatedMaterialProperties = animatedMaterialProperties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        fusedAnimatedMaterialProperties = animatedMaterialProperties.ToDictionary(kvp => kvp.Key, kvp => new HashSet<string>(kvp.Value));
         var combinableSkinnedMeshList = combinableMeshList
             .Select(l => l.Select(m => m as SkinnedMeshRenderer).Where(m => m != null).ToList())
             .Where(l => l.Count > 0)

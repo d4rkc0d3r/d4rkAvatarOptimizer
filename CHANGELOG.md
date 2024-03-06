@@ -1,3 +1,6 @@
+## v3.5.4
+* Fix first merged material blob on mesh generating all the animated property arrays instead of only the ones that are used by the meshes in the blob.
+
 ## v3.5.3
 ### Bug Fixes
 * Fix BoxCollider animation bindings getting thrown away for the BoxCollider that gets implicitly added by VRCStation components. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/83)
