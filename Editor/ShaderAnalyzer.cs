@@ -1065,12 +1065,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             var property = ParseProperty(line, tags);
                             if (property != null) {
                                 parsedShader.properties.Add(property);
+                                parsedShader.propertyTable[property.name] = property;
                                 if (property.type == ParsedShader.Property.Type.Texture2D || property.type == ParsedShader.Property.Type.Texture2DArray) {
                                     var ST_property = new ParsedShader.Property();
                                     ST_property.name = property.name + "_ST";
                                     ST_property.type = ParsedShader.Property.Type.Vector;
                                     ST_property.defaultValue = "float4(1,1,0,0)";
                                     parsedShader.properties.Add(ST_property);
+                                    parsedShader.propertyTable[ST_property.name] = ST_property;
                                 }   
                             }
                             output.Add(line);
@@ -1138,19 +1140,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             output.Add(line);
                             if (line.IndexOf('[') != -1)
                             {
-                                var matches = Regex.Matches(line, @"\[(\w+)\]");
+                                var matches = Regex.Matches(line, @"\[\s*(\w+)\s*\]");
                                 if (matches.Count > 0)
                                 {
                                     string shaderLabParam = Regex.Match(line, @"^[_a-zA-Z]+").Value;
                                     foreach (Match match in matches)
                                     {
                                         string propName = match.Groups[1].Value;
-                                        foreach (var prop in parsedShader.properties)
+                                        if (parsedShader.propertyTable.TryGetValue(propName, out var prop))
                                         {
-                                            if (propName == prop.name)
-                                            {
-                                                prop.shaderLabParams.Add(shaderLabParam);
-                                            }
+                                            prop.shaderLabParams.Add(shaderLabParam);
                                         }
                                     }
                                 }
@@ -1159,13 +1158,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         break;
                 }
             }
-            foreach (var prop in parsedShader.properties)
+            foreach (var ifexPropName in parsedShader.ifexParameters)
             {
-                parsedShader.propertyTable[prop.name] = prop;
-                if (parsedShader.ifexParameters.Contains(prop.name))
+                if (parsedShader.propertyTable.TryGetValue(ifexPropName, out var prop))
                 {
                     prop.shaderLabParams.Add("ifex");
                 }
+            }
+            foreach (var prop in parsedShader.properties)
+            {
                 switch (prop.type)
                 {
                     case ParsedShader.Property.Type.Int:
