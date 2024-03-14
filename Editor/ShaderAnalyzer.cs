@@ -531,25 +531,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int charIndex = 0;
             int endTagIndex = 0;
             string name = null;
-            while (charIndex < line.Length)
-            {
+            while (charIndex < line.Length) {
                 char c = line[charIndex];
                 if (c == '[') {
                     charIndex++;
                     while (charIndex < line.Length && (line[charIndex] == ' ' || line[charIndex] == '\t'))
                         charIndex++;
-                    int startTagIndex = charIndex;
-                    int lastNonWhitespace = startTagIndex;
+                    int startInsideTagIndex = charIndex;
+                    int endInsideTagIndex = startInsideTagIndex;
                     while (charIndex < line.Length && line[charIndex] != ']') {
-                        charIndex++;
                         if (line[charIndex] != ' ' && line[charIndex] != '\t')
-                            lastNonWhitespace = charIndex;
+                            endInsideTagIndex = charIndex + 1;
+                        charIndex++;
                     }
-                    tags.Add(line.Substring(startTagIndex, lastNonWhitespace - startTagIndex));
+                    tags.Add(line.Substring(startInsideTagIndex, endInsideTagIndex - startInsideTagIndex));
+                    charIndex++;
                     while (charIndex < line.Length && (line[charIndex] == ' ' || line[charIndex] == '\t'))
                         charIndex++;
                     endTagIndex = charIndex;
-                } else if (c == '(') {
+                } else if (c == '(' || c == ' ' || c == '\t') {
                     name = line.Substring(endTagIndex, charIndex - endTagIndex);
                     break;
                 } else {
