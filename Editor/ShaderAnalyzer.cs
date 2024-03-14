@@ -896,43 +896,49 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void ParsePragma(string line, ParsedShader.Pass pass)
         {
-            if (line[0] != '#' || !line.StartsWith("#pragma "))
+            if (line.Length < 8 || line[0] != '#' || line[1] != 'p' || !line.StartsWith("#pragma "))
                 return;
-            line = line.Substring("#pragma ".Length).TrimStart();
-            if (line.StartsWith("surface"))
-                throw new ParserException("Surface shader is not supported.");
-            var match = Regex.Match(line, @"^(vertex|hull|domain|geometry|fragment)\s+(\w+)");
-            if (match.Success)
-            {
-                var funcName = match.Groups[2].Value;
-                parsedShader.functions.TryGetValue(funcName, out ParsedShader.Function func);
-                func = func ?? new ParsedShader.Function() { name = funcName };
-                switch (match.Groups[1].Value)
-                {
-                    case "vertex":
-                        pass.vertex = func;
-                        break;
-                    case "hull":
-                        pass.hull = func;
-                        break;
-                    case "domain":
-                        pass.domain = func;
-                        break;
-                    case "geometry":
-                        pass.geometry = func;
-                        break;
-                    case "fragment":
-                        pass.fragment = func;
-                        break;
-                }
-            }
-            match = Regex.Match(line, @"^shader_feature(?:_local)?(?:\s+(\w+))+");
-            if (match.Success)
-            {
-                parsedShader.shaderFeatureKeyWords.UnionWith(
-                    match.Groups[1].Captures.Cast<Capture>().Select(c => c.Value));
-                pass.shaderFeatureKeyWords.UnionWith(
-                    match.Groups[1].Captures.Cast<Capture>().Select(c => c.Value));
+            int index = 8;
+            while (index < line.Length && (line[index] == ' ' || line[index] == '\t'))
+                index++;
+            var pragmaName = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (pragmaName == null)
+                return;
+            var nextIdentifier = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (nextIdentifier == null)
+                return;
+            ParsedShader.Function func;
+            switch (pragmaName) {
+                case "vertex":
+                    parsedShader.functions.TryGetValue(nextIdentifier, out func);
+                    pass.vertex = func ?? new ParsedShader.Function() { name = nextIdentifier };
+                    break;
+                case "hull":
+                    parsedShader.functions.TryGetValue(nextIdentifier, out func);
+                    pass.hull = func ?? new ParsedShader.Function() { name = nextIdentifier };
+                    break;
+                case "domain":
+                    parsedShader.functions.TryGetValue(nextIdentifier, out func);
+                    pass.domain = func ?? new ParsedShader.Function() { name = nextIdentifier };
+                    break;
+                case "geometry":
+                    parsedShader.functions.TryGetValue(nextIdentifier, out func);
+                    pass.geometry = func ?? new ParsedShader.Function() { name = nextIdentifier };
+                    break;
+                case "fragment":
+                    parsedShader.functions.TryGetValue(nextIdentifier, out func);
+                    pass.fragment = func ?? new ParsedShader.Function() { name = nextIdentifier };
+                    break;
+                case "shader_feature":
+                case "shader_feature_local":
+                    while (nextIdentifier != null) {
+                        pass.shaderFeatureKeyWords.Add(nextIdentifier);
+                        parsedShader.shaderFeatureKeyWords.Add(nextIdentifier);
+                        nextIdentifier = ParseIdentifierAndTrailingWhitespace(line, ref index);
+                    }
+                    break;
+                case "surface":
+                    throw new ParserException("Surface shader is not supported.");
             }
         }
 
