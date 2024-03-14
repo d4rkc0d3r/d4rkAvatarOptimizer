@@ -529,58 +529,66 @@ namespace d4rkpl4y3r.AvatarOptimizer
         ParsePropertyRaw(string line, List<string> tags)
         {
             int charIndex = 0;
-            int startTagIndex = 0;
             int endTagIndex = 0;
             string name = null;
             while (charIndex < line.Length)
             {
                 char c = line[charIndex];
-                if (c == '[')
-                {
-                    startTagIndex = charIndex;
-                    while (charIndex < line.Length && line[charIndex] != ']')
-                    {
+                if (c == '[') {
+                    charIndex++;
+                    while (charIndex < line.Length && (line[charIndex] == ' ' || line[charIndex] == '\t'))
                         charIndex++;
+                    int startTagIndex = charIndex;
+                    int lastNonWhitespace = startTagIndex;
+                    while (charIndex < line.Length && line[charIndex] != ']') {
+                        charIndex++;
+                        if (line[charIndex] != ' ' && line[charIndex] != '\t')
+                            lastNonWhitespace = charIndex;
                     }
-                    tags.Add(line.Substring(startTagIndex + 1, charIndex - startTagIndex - 1).Trim());
-                    endTagIndex = charIndex + 1;
-                }
-                else if (c == '(')
-                {
+                    tags.Add(line.Substring(startTagIndex, lastNonWhitespace - startTagIndex));
+                    while (charIndex < line.Length && (line[charIndex] == ' ' || line[charIndex] == '\t'))
+                        charIndex++;
+                    endTagIndex = charIndex;
+                } else if (c == '(') {
                     name = line.Substring(endTagIndex, charIndex - endTagIndex);
                     break;
+                } else {
+                    charIndex++;
                 }
-                charIndex++;
             }
-            if (name == null)
-            {
+            if (name == null) {
                 return null;
             }
             int quoteIndexStart = line.IndexOf('"', charIndex);
             int quoteIndexEnd = FindEndOfStringLiteral(line, quoteIndexStart + 1);
-            if (quoteIndexStart == -1 || quoteIndexEnd == -1)
-            {
+            if (quoteIndexStart == -1 || quoteIndexEnd == -1) {
                 return null;
             }
-            string stringLiteral = line.Substring(quoteIndexStart, quoteIndexEnd - quoteIndexStart + 1);
             int commaIndex = line.IndexOf(',', quoteIndexEnd);
-            if (commaIndex == -1)
-            {
+            if (commaIndex == -1) {
                 return null;
             }
             int equalsIndex = line.LastIndexOf('=');
-            if (equalsIndex == -1)
-            {
+            if (equalsIndex == -1) {
                 return null;
             }
             int parenthesesCloseIndex = line.LastIndexOf(')', equalsIndex, equalsIndex - commaIndex);
-            if (parenthesesCloseIndex == -1)
-            {
+            if (parenthesesCloseIndex == -1) {
                 return null;
             }
-            string type = line.Substring(commaIndex + 1, parenthesesCloseIndex - commaIndex - 1).Trim();
-            string defaultValue = line.Substring(equalsIndex + 1).Trim();
-            return (name.Trim(), stringLiteral, type, defaultValue);
+            int afterCommaIndex = commaIndex + 1;
+            while (afterCommaIndex < line.Length && (line[afterCommaIndex] == ' ' || line[afterCommaIndex] == '\t'))
+                afterCommaIndex++;
+            int preParenthesesCloseIndex = parenthesesCloseIndex;
+            while (preParenthesesCloseIndex > 0 && (line[preParenthesesCloseIndex - 1] == ' ' || line[preParenthesesCloseIndex - 1] == '\t'))
+                preParenthesesCloseIndex--;
+            string type = line.Substring(afterCommaIndex, preParenthesesCloseIndex - afterCommaIndex);
+            int afterEqualsIndex = equalsIndex + 1;
+            while (afterEqualsIndex < line.Length && (line[afterEqualsIndex] == ' ' || line[afterEqualsIndex] == '\t'))
+                afterEqualsIndex++;
+            string defaultValue = line.Substring(afterEqualsIndex);
+            string stringLiteral = line.Substring(quoteIndexStart, quoteIndexEnd - quoteIndexStart + 1);
+            return (name, stringLiteral, type, defaultValue);
         }
 
         public static ParsedShader.Property ParseProperty(string line, List<string> tags, bool clearTagsOnPropertyParse = true)
