@@ -664,10 +664,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return output;
         }
 
-        private static Regex functionParameter = new Regex(
-            @"((in|out|inout)\s+)?((const|point|line|triangle)\s+)?(\w+)(\s*<[\w,\s]+>)?\s+((\w+)(\[(\d+)\])?)(\s*:\s*(\w+))?",
-            RegexOptions.Compiled);
-
         public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
         {
             int startIndex = index;
@@ -729,6 +725,67 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (name, returnType);
         }
 
+        public static ParsedShader.Function.Parameter ParseNextFunctionParameter(string line, ref int index)
+        {
+            while (index < line.Length && char.IsWhiteSpace(line[index]))
+                index++;
+            if (index == line.Length)
+                return null;
+            if (line[index] == ',') {
+                index++;
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+            }
+            var potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
+            if (potentialType == null)
+                return null;
+            var param = new ParsedShader.Function.Parameter();
+            param.isInput = true;
+            if (potentialType == "in" || potentialType == "out" || potentialType == "inout") {
+                param.isInput = potentialType != "out";
+                param.isOutput = potentialType == "out" || potentialType == "inout";
+                potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
+                if (potentialType == null)
+                    return null;
+            }
+            if (potentialType == "const" || potentialType == "point" || potentialType == "line" || potentialType == "triangle") {
+                potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
+                if (potentialType == null)
+                    return null;
+            }
+            for (int i = 0; i < potentialType.Length; i++) {
+                if (char.IsWhiteSpace(potentialType[i])) {
+                    potentialType = potentialType.Remove(i, 1);
+                    i--;
+                }
+            }
+            param.type = potentialType;
+            var name = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            if (name == null)
+                return null;
+            param.name = name;
+            param.arraySize = -1;
+            if (index < line.Length && line[index] == '[') {
+                index++;
+                var endIndex = line.IndexOf(']', index);
+                if (!int.TryParse(line.Substring(index, endIndex - index).Trim(), out param.arraySize))
+                    return null;
+                index = endIndex + 1;
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+            }
+            param.semantic = null;
+            if (index == line.Length)
+                return param;
+            if (line[index] != ':')
+                return param;
+            index++;
+            while (index < line.Length && char.IsWhiteSpace(line[index]))
+                index++;
+            param.semantic = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            return param;
+        }
+
         public static ParsedShader.Function ParseFunctionDefinition(List<string> source, ref int lineIndex)
         {
             var match = ParseFunctionDefinition(source[lineIndex]);
@@ -746,24 +803,23 @@ namespace d4rkpl4y3r.AvatarOptimizer
             string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
             while (lineIndex < source.Count - 1)
             {
-                var matches = functionParameter.Matches(line);
-                foreach (Match m in matches)
+                int charIndex = 0;
+                while (charIndex < line.Length)
                 {
-                    var inout = m.Groups[2].Value;
-                    var geomType = m.Groups[4].Value;
-                    var param = new ParsedShader.Function.Parameter();
-                    param.type = m.Groups[5].Value;
-                    if (m.Groups[6].Value != "")
+                    int previousCharIndex = charIndex;
+                    var param = ParseNextFunctionParameter(line, ref charIndex);
+                    if (param != null)
                     {
-                        string s = m.Groups[6].Value;
-                        param.type += $"<{s.Substring(s.IndexOf('<') + 1, s.IndexOf('>') - s.IndexOf('<') - 1).Trim()}>";
+                        func.parameters.Add(param);
                     }
-                    param.name = m.Groups[8].Value;
-                    param.arraySize = m.Groups[10].Value != "" ? int.Parse(m.Groups[10].Value) : -1;
-                    param.semantic = m.Groups[12].Value != "" ? m.Groups[12].Value : null;
-                    param.isInput = inout != "out";
-                    param.isOutput = inout == "out" || inout == "inout";
-                    func.parameters.Add(param);
+                    if (charIndex == line.Length || line[charIndex] == ')')
+                    {
+                        break;
+                    }
+                    if (charIndex == previousCharIndex)
+                    {
+                        break;
+                    }
                 }
                 while (source[lineIndex + 1].StartsWith("#"))
                 {
