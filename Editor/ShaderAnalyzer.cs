@@ -544,7 +544,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             endInsideTagIndex = charIndex + 1;
                         charIndex++;
                     }
-                    tags.Add(line.Substring(startInsideTagIndex, endInsideTagIndex - startInsideTagIndex));
+                    if (endInsideTagIndex - startInsideTagIndex <= 5) {
+                        // currently we only care about [hdr] and [gamma] tags
+                        tags.Add(line.Substring(startInsideTagIndex, endInsideTagIndex - startInsideTagIndex));
+                    }
                     charIndex++;
                     while (charIndex < line.Length && (line[charIndex] == ' ' || line[charIndex] == '\t'))
                         charIndex++;
