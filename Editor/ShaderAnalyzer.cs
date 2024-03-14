@@ -2353,16 +2353,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return lineIndex - startLineIndex;
             }
             
-            var subLine = line.Substring(1);
-            if (subLine.StartsWith("if"))
+            if (line.Length > 3 && line[1] == 'i' && line[2] == 'f')
             {
                 string expr = "";
-                if (subLine.StartsWith("ifdef"))
-                    expr = $"defined({subLine.Substring("ifdef".Length).Trim()})";
-                else if (subLine.StartsWith("ifndef"))
-                    expr = $"!defined({subLine.Substring("ifndef".Length).Trim()})";
+                if (line.Length > 6 && line[3] == 'd' && line[4] == 'e' && line[5] == 'f')
+                    expr = $"defined({line.Substring(6).TrimStart()})";
+                else if (line.Length > 7 && line[3] == 'n' && line[4] == 'd' && line[5] == 'e' && line[6] == 'f')
+                    expr = $"!defined({line.Substring(7).TrimStart()})";
                 else
-                    expr = subLine.Substring("if".Length).Trim();
+                    expr = line.Substring(4).TrimStart();
                 var exprIndex = 0;
                 var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                 lastIfEvalResultStack.Push(evalResult);
@@ -2378,7 +2377,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 PushPreprocessorScope();
                 return line;
             }
-            else if (subLine.StartsWith("else") || subLine.StartsWith("elif"))
+            else if (line.Length > 4 && line[1] == 'e' && line[2] == 'l' && ((line[3] == 's' && line[4] == 'e') || (line[3] == 'i' && line[4] == 'f')))
             {
                 var lastEval = lastIfEvalResultStack.Pop();
                 if (lastEval == ConditionResult.True)
@@ -2392,9 +2391,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     PopPreprocessorScope();
                     PushPreprocessorScope();
                 }
-                if (subLine.StartsWith("elif"))
+                if (line[3] == 'i')
                 {
-                    string expr = subLine.Substring("elif".Length).Trim();
+                    string expr = line.Substring(6).TrimStart();
                     var exprIndex = 0;
                     var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                     if (evalResult == ConditionResult.Unknown)
@@ -2403,7 +2402,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         if (lastEval == ConditionResult.False)
                         {
                             PushPreprocessorScope();
-                            return $"#{subLine.Substring(2)}";
+                            return $"#{line.Substring(3)}";
                         }
                         return line;
                     }
@@ -2437,7 +2436,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return null;
                 }
             }
-            else if (subLine.StartsWith("endif"))
+            else if (line.Length > 5 && line[1] == 'e' && line[2] == 'n' && line[3] == 'd' && line[4] == 'i' && line[5] == 'f')
             {
                 if (lastIfEvalResultStack.Pop() == ConditionResult.Unknown)
                 {
@@ -2446,44 +2445,57 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 return null;
             }
-            else if (subLine.StartsWith("define"))
+            else if (line.Length > 7 && line[1] == 'd' && line[2] == 'e' && line[3] == 'f' && line[4] == 'i' && line[5] == 'n' && line[6] == 'e')
             {
-                var index = "define".Length;
-                SkipWhitespace(subLine, ref index);
-                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(subLine, ref index);
+                var index = 7;
+                SkipWhitespace(line, ref index);
+                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
                 if (identifier == null)
                 {
-                    output.Add($"// Expected identifier at {index}, got {subLine.Substring(index, System.Math.Min(10, subLine.Length - index))}");
+                    output.Add($"// Expected identifier at {index}, got {line.Substring(index, System.Math.Min(10, line.Length - index))}");
                     return line;
                 }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
                 knownDefines.Peek()[identifier] = (true, null);
                 return line;
             }
-            else if (subLine.StartsWith("undef"))
+            else if (line.Length > 5 && line[1] == 'u' && line[2] == 'n' && line[3] == 'd' && line[4] == 'e' && line[5] == 'f')
             {
-                var index = "undef".Length;
-                SkipWhitespace(subLine, ref index);
-                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(subLine, ref index);
+                var index = 6;
+                SkipWhitespace(line, ref index);
+                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
                 if (identifier == null)
                 {
-                    output.Add($"// Expected identifier at {index}, got {subLine.Substring(index, System.Math.Min(10, subLine.Length - index))}");
+                    output.Add($"// Expected identifier at {index}, got {line.Substring(index, System.Math.Min(10, line.Length - index))}");
                     return line;
                 }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
                 knownDefines.Peek()[identifier] = (false, null);
                 return line;
             }
-            else if (subLine.StartsWith("pragma"))
+            else if (line.Length > 6 && line[1] == 'p' && line[2] == 'r' && line[3] == 'a' && line[4] == 'g' && line[5] == 'm' && line[6] == 'a')
             {
-                if (((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)
-                    &&  Regex.IsMatch(line, @"^#pragma\s+vertex\s+\w+"))
-                {
-                    pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                var index = 7;
+                SkipWhitespace(line, ref index);
+                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+                if (identifier == null) {
+                    return null;
                 }
-                else if (!Regex.IsMatch(line, @"^#pragma\s+shader_feature") && !Regex.IsMatch(line, @"^#pragma\s+skip_optimizations"))
-                {
-                    pragmaOutput.Add(line);
+                switch (identifier) {
+                    case "vertex":
+                        if (((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)) {
+                            pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                        } else {
+                            pragmaOutput.Add(line);
+                        }
+                        break;
+                    case "shader_feature":
+                    case "shader_feature_local":
+                    case "skip_optimizations":
+                        break;
+                    default:
+                        pragmaOutput.Add(line);
+                        break;
                 }
                 return null;
             }
@@ -2663,7 +2675,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
-            if (!line.StartsWith("#ifex"))
+            if (line.Length < 5 || line[4] != 'x' || line[1] != 'i' || line[2] != 'f' || line[3] != 'e')
                 return;
             
             var match = Regex.Match(line, @"^#ifex\s+(\s*(&&)?\s*(\w+)\s*([!=])=\s*(\d+))+$");
@@ -2721,7 +2733,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     depth--;
                 }
-                else if (line.StartsWith("#ifex"))
+                else if (line.Length >= 5 && line[4] == 'x' && line[1] == 'i' && line[2] == 'f' && line[3] == 'e')
                 {
                     depth++;
                 }
