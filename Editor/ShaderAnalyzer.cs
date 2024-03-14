@@ -597,79 +597,87 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public static ParsedShader.Property ParseProperty(string line, List<string> tags, bool clearTagsOnPropertyParse = true)
         {
             var prop = ParsePropertyRaw(line, tags);
-            if (prop == null)
-            {
+            if (prop == null) {
                 return null;
             }
             var output = new ParsedShader.Property();
             output.name = prop.Value.name;
             string typeDefinition = prop.Value.type.ToLowerInvariant();
             output.defaultValue = prop.Value.defaultValue;
-            if (typeDefinition.StartsWith("range") || typeDefinition.StartsWith("float"))
-            {
-                output.type = ParsedShader.Property.Type.Float;
-                if (output.defaultValue.StartsWith("("))
-                {
+            output.hasGammaTag = false;
+            bool hasHdrTag = false;
+            for (int i = 0; i < tags.Count; i++) {
+                switch (tags[i].ToLowerInvariant()) {
+                    case "gamma":
+                        output.hasGammaTag = true;
+                        break;
+                    case "hdr":
+                        hasHdrTag = true;
+                        break;
+                }
+            }
+            switch (typeDefinition) {
+                case "int":
+                case "float":
+                    output.type = ParsedShader.Property.Type.Float;
+                    if (output.defaultValue[0] == '(') {
+                        output.type = ParsedShader.Property.Type.Vector;
+                        output.defaultValue = "float4" + output.defaultValue;
+                    }
+                    break;
+                case "vector":
                     output.type = ParsedShader.Property.Type.Vector;
                     output.defaultValue = "float4" + output.defaultValue;
-                }
+                    break;
+                case "color":
+                    output.type = hasHdrTag ? ParsedShader.Property.Type.ColorHDR : ParsedShader.Property.Type.Color;
+                    output.defaultValue = "float4" + output.defaultValue;
+                    break;
+                case "integer":
+                    output.type = ParsedShader.Property.Type.Int;
+                    break;
+                case "2d":
+                    output.type = ParsedShader.Property.Type.Texture2D;
+                    switch (output.defaultValue.Substring(1, output.defaultValue.IndexOf('"', 1))) {
+                        case "white": output.defaultValue = "float4(1,1,1,1)"; break;
+                        case "black": output.defaultValue = "float4(0,0,0,1)"; break;
+                        case "red": output.defaultValue = "float4(1,0,0,1)"; break;
+                        case "lineargrey":
+                        case "lineargray": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
+                        case "bump": output.defaultValue = "float4(0.5,0.5,1,1)"; break;
+                        case "grey":
+                        case "gray":
+                        default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
+                    }
+                    break;
+                case "2darray":
+                    output.type = ParsedShader.Property.Type.Texture2DArray;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                    break;
+                case "3d":
+                    output.type = ParsedShader.Property.Type.Texture3D;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                    break;
+                case "cube":
+                    output.type = ParsedShader.Property.Type.TextureCube;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                    break;
+                case "cubearray":
+                    output.type = ParsedShader.Property.Type.TextureCubeArray;
+                    output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
+                    break;
+                default:
+                    if (typeDefinition[0] == 'r' && typeDefinition[1] == 'a' && typeDefinition[2] == 'n' && typeDefinition[3] == 'g' && typeDefinition[4] == 'e') {
+                        output.type = ParsedShader.Property.Type.Float;
+                        if (output.defaultValue[0] == '(') {
+                            output.type = ParsedShader.Property.Type.Vector;
+                            output.defaultValue = "float4" + output.defaultValue;
+                        }
+                    } else {
+                        output.type = ParsedShader.Property.Type.Unknown;
+                    }
+                    break;
             }
-            else if (typeDefinition.StartsWith("vector"))
-            {
-                output.type = ParsedShader.Property.Type.Vector;
-                output.defaultValue = "float4" + output.defaultValue;
-            }
-            else if (typeDefinition == "int")
-            {
-                output.type = ParsedShader.Property.Type.Float;
-            }
-            else if (typeDefinition == "integer")
-            {
-                output.type = ParsedShader.Property.Type.Int;
-            }
-            else if (typeDefinition.StartsWith("color"))
-            {
-                output.type = tags.Any(t => t.ToLowerInvariant() == "hdr") ? ParsedShader.Property.Type.ColorHDR : ParsedShader.Property.Type.Color;
-                output.defaultValue = "float4" + output.defaultValue;
-            }
-            else if (typeDefinition.StartsWith("2darray"))
-            {
-                output.type = ParsedShader.Property.Type.Texture2DArray;
-            }
-            else if (typeDefinition.StartsWith("2d"))
-            {
-                output.type = ParsedShader.Property.Type.Texture2D;
-                var d = output.defaultValue.Substring(1);
-                d = d.Substring(0, d.IndexOf('"'));
-                switch (d)
-                {
-                    case "white": output.defaultValue = "float4(1,1,1,1)"; break;
-                    case "black": output.defaultValue = "float4(0,0,0,1)"; break;
-                    case "red": output.defaultValue = "float4(1,0,0,1)"; break;
-                    case "lineargrey":
-                    case "lineargray": output.defaultValue = "float4(0.5,0.5,0.5,1)"; break;
-                    case "bump": output.defaultValue = "float4(0.5,0.5,1,1)"; break;
-                    case "grey":
-                    case "gray":
-                    default: output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)"; break;
-                }
-            }
-            else if (typeDefinition.StartsWith("3d"))
-            {
-                output.type = ParsedShader.Property.Type.Texture3D;
-                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-            }
-            else if (typeDefinition.StartsWith("cube"))
-            {
-                output.type = ParsedShader.Property.Type.TextureCube;
-                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-            }
-            else if (typeDefinition.StartsWith("cubearray"))
-            {
-                output.type = ParsedShader.Property.Type.TextureCubeArray;
-                output.defaultValue = "float4(0.21582022,0.21582022,0.21582022,1)";
-            }
-            output.hasGammaTag = tags.Any(t => t.ToLowerInvariant() == "gamma");
             if (clearTagsOnPropertyParse)
                 tags.Clear();
             return output;
