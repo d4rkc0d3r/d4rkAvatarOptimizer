@@ -61,11 +61,13 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             shader = null;
             folder = null;
+            lastTime = 0;
         }
         if (ObjectField<Shader>(ref shader, "Shader"))
         {
             material = null;
             folder = null;
+            lastTime = 0;
         }
         if (ObjectField<DefaultAsset>(ref folder, "Folder"))
         {
@@ -126,12 +128,14 @@ public class ShaderAnalyzerDebugger : EditorWindow
         GUI.enabled = true;
         GUILayout.Space(15);
 
+        Stopwatch timer;
+
         if (folder != null)
         {
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
             EditorGUILayout.LabelField("Total Shaders in Folder: " + shaders.Count);
             // time the parsing
-            var timer = Stopwatch.StartNew();
+            timer = Stopwatch.StartNew();
             var parsedShaders = ShaderAnalyzer.ParseAndCacheAllShaders(shaders, false);
             timer.Stop();
             if (lastTime == 0)
@@ -229,7 +233,12 @@ public class ShaderAnalyzerDebugger : EditorWindow
             return;
         }
 
+        timer = Stopwatch.StartNew();
         parsedShader = ShaderAnalyzer.Parse(material == null ? shader : material.shader);
+        timer.Stop();
+        if (lastTime == 0)
+            lastTime = timer.ElapsedMilliseconds;
+        EditorGUILayout.LabelField("Last Parse Time: " + lastTime + "ms");
 
         if (parsedShader == null)
             return;
