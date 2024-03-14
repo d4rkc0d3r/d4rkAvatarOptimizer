@@ -976,7 +976,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             while (lineIndex < lines.Count - 1)
             {
                 string line = lines[++lineIndex];
-                if (line == "ENDCG" || line == "ENDHLSL")
+                if (line[0] == 'E' && (line == "ENDCG" || line == "ENDHLSL"))
                     break;
                 if (line[0] == '{')
                 {
