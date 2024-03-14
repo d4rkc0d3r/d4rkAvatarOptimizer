@@ -664,15 +664,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return output;
         }
 
+        public static bool IsIdentifierLetter(char c)
+        {
+            return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || c == '_';
+        }
+
         public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
         {
             int startIndex = index;
-            while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
+            while (index < str.Length && IsIdentifierLetter(str[index]))
                 index++;
             if (index == startIndex)
                 return null;
             int endIndex = index;
-            while (index < str.Length && char.IsWhiteSpace(str[index]))
+            while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
                 index++;
             return str.Substring(startIndex, endIndex - startIndex);
         }
@@ -680,12 +685,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public static string ParseTypeAndTrailingWhitespace(string str, ref int index)
         {
             int startIndex = index;
-            while (index < str.Length && (char.IsLetterOrDigit(str[index]) || str[index] == '_'))
+            while (index < str.Length && IsIdentifierLetter(str[index]))
                 index++;
             if (index == startIndex)
                 return null;
             int endIndex = index;
-            while (index < str.Length && char.IsWhiteSpace(str[index]))
+            while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
                 index++;
             if (index < str.Length && str[index] == '<')
             {
@@ -699,7 +704,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         depth--;
                 }
                 endIndex = ++index;
-                while (index < str.Length && char.IsWhiteSpace(str[index]))
+                while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
                     index++;
             }
             return str.Substring(startIndex, endIndex - startIndex);
@@ -713,7 +718,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 returnType = ParseTypeAndTrailingWhitespace(line, ref index);
             }
-            if (returnType == null || returnType == "return" || returnType == "else" || !char.IsWhiteSpace(line[index - 1]))
+            if (returnType == null || returnType == "return" || returnType == "else" || !(line[index - 1] == ' ' || line[index - 1] == '\t'))
             {
                 return (null, null);
             }
