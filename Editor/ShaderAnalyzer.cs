@@ -964,6 +964,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                 }
                 output.Add(line);
+                if (line.Length >= 29 && line[0] == 'U' && line[6] == 'I' && line.StartsWith("UNITY_INSTANCING_BUFFER_START"))
+                {
+                    throw new ParserException("Shader with instancing is not supported.");
+                }
             }
         }
 
@@ -1072,10 +1076,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             for (int programLineIndex = programLineIndexStart; programLineIndex < output.Count; programLineIndex++)
                             {
                                 ParsePragma(output[programLineIndex], currentPass);
-                                if (output[programLineIndex].StartsWith("UNITY_INSTANCING_BUFFER_START"))
-                                {
-                                    throw new ParserException("Shader with instancing is not supported.");
-                                }
                             }
                             ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
                             output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
