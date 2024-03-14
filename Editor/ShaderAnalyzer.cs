@@ -396,16 +396,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
             {
                 string trimmedLine = rawLines[lineIndex].Trim();
-                if (trimmedLine == "")
+                if (trimmedLine.Length == 0)
                     continue;
-                bool isPreprocessor = trimmedLine.StartsWith("#");
-                while (trimmedLine.EndsWith("\\"))
+                bool isPreprocessor = trimmedLine[0] == '#';
+                while (trimmedLine[trimmedLine.Length - 1] == '\\')
                 {
                     trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd() + " " + rawLines[++lineIndex].Trim();
                 }
                 if (trimmedLine.Length >= 6 && trimmedLine[0] == '/' && trimmedLine[1] == '/')
                 {
-                    if (trimmedLine.StartsWith("//ifex"))
+                    if (trimmedLine[2] == 'i' && trimmedLine.StartsWith("//ifex"))
                     {
                         var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*\d+(\s*&&\s*(\w+)\s*[!=]=\s*\d+)*$");
                         if (match.Success) {
@@ -416,7 +416,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         processedLines.Add($"#{trimmedLine.Substring(2)}");
                     }
-                    else if (trimmedLine.StartsWith("//endex"))
+                    else if (trimmedLine[2] == 'e' && trimmedLine.StartsWith("//endex"))
                     {
                         processedLines.Add("#endex");
                     }
@@ -489,7 +489,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                     }
                 }
-                if (trimmedLine == "")
+                if (trimmedLine.Length == 0)
                     continue;
                 if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM" ||trimmedLine == "HLSLINCLUDE" || trimmedLine == "HLSLPROGRAM"))
                 {
@@ -500,11 +500,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     processedLines.Add("#include \"UnityLightingCommon.cginc\"");
                     continue;
                 }
-                if (trimmedLine.StartsWith("UsePass"))
-                {
-                    throw new ParserException("UsePass is not supported.");
-                }
-                if (trimmedLine.StartsWith("#include "))
+                if (isPreprocessor && trimmedLine.StartsWith("#include "))
                 {
                     RecursiveParseFile(ParseIncludeDirective(trimmedLine), false, currentFilePath);
                 }
@@ -1083,6 +1079,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                             ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
                             output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
+                        }
+                        else if (line.StartsWith("UsePass"))
+                        {
+                            throw new ParserException("UsePass is not supported.");
                         }
                         else
                         {
