@@ -122,7 +122,10 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (prop.type == ParsedShader.Property.Type.ColorHDR)
                     replace[prop.name] = material.GetColor(prop.name).ToString("F6").Replace("RGBA", "float4");
             }
+            var optimizeTimer = Stopwatch.StartNew();
             ShaderOptimizer.Run(parsedShader, replace);
+            optimizeTimer.Stop();
+            lastTime = optimizeTimer.ElapsedMilliseconds;
         }
 
         GUI.enabled = true;
