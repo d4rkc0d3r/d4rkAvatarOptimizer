@@ -931,46 +931,34 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private void ParseCustomFunctionDeclarationMacro(string line)
-        {
-            if (!line.StartsWith("#define "))
-                return;
-            if (line.Contains("Texture2D ") || line.Contains("sampler2D ") || Regex.IsMatch(line, @"##_ST\s*(;|$)"))
-            {
-                if (!parsedShader.customTextureDeclarations.Contains(line))
-                    parsedShader.customTextureDeclarations.Add(line);
-            }
-        }
-
         private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
         {
             if (alreadyParsed == null)
                 alreadyParsed = new HashSet<string>();
-            for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++)
-            {
+            for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++) {
                 var currentLine = lines[lineIndex];
-                if (currentLine[0] == '#')
-                {
-                    if (currentLine.StartsWith("#include "))
-                    {
+                if (currentLine[0] == '#') {
+                    if (currentLine.Length > 8 && currentLine[3] == 'c' && currentLine.StartsWith("#include ")) {
                         var includeName = ParseIncludeDirective(currentLine);
-                        if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines))
-                        {
+                        if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines)) {
                             alreadyParsed.Add(includeName);
                             ParseFunctionDeclarationsRecursive(includeLines, currentPass, 0, alreadyParsed);
                         }
-                        continue;
                     }
-                    ParseCustomFunctionDeclarationMacro(currentLine);
+                    else if (currentLine.Length > 8 && currentLine[3] == 'f' && currentLine.StartsWith("#define ")) {
+                        if (currentLine.Contains("Texture2D ") || currentLine.Contains("sampler2D ") || currentLine.Contains("##_ST")) {
+                            if (!parsedShader.customTextureDeclarations.Contains(currentLine))
+                                parsedShader.customTextureDeclarations.Add(currentLine);
+                        }
+                    }
+                    continue;
                 }
                 int tempIndex = lineIndex;
                 var func = ParseFunctionDefinition(lines, ref tempIndex);
-                if (func != null)
-                {
+                if (func != null) {
                     parsedShader.functions[func.name] = func;
                     UpdateFunctionDefinition(func, currentPass);
-                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name)
-                    {
+                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name) {
                         ParseFunctionParametersWithPreprocessorStatements(lines, ref lineIndex);
                     }
                 }
