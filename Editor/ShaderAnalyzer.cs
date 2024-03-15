@@ -2042,9 +2042,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             foreach (var property in staticPropertyValues)
             {
-                if (property.Key.StartsWith("arrayIndex") && texturesToMerge.Contains(property.Key.Substring(10)))
+                string name = property.Key;
+                if (name.Length > 10 && name[0] == 'a' && name[5] == 'I' && name.StartsWith("arrayIndex") && texturesToMerge.Contains(name.Substring(10)))
                 {
-                    output.Add("static float " + property.Key + " = " + property.Value + ";");
+                    output.Add($"static float {name} = {property.Value};");
                 }
             }
             int textureWrapperCount = 0;
