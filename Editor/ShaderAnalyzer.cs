@@ -440,19 +440,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             parsedShader.text[fileID] = processedLines;
             alreadyIncludedThisPass.Add(fileID);
+            var trimWhiteSpaceChars = new char[] { ' ', '\t', '\r', '\n' };
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
             {
-                string trimmedLine = rawLines[lineIndex].Trim();
+                string trimmedLine = rawLines[lineIndex].Trim(trimWhiteSpaceChars);
                 if (trimmedLine.Length == 0)
                     continue;
                 bool isPreprocessor = trimmedLine[0] == '#';
                 while (trimmedLine[trimmedLine.Length - 1] == '\\')
                 {
-                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd() + " " + rawLines[++lineIndex].Trim();
+                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd(trimWhiteSpaceChars) + " " + rawLines[++lineIndex].Trim(trimWhiteSpaceChars);
                 }
                 if (trimmedLine.Length >= 6 && trimmedLine[0] == '/' && trimmedLine[1] == '/')
                 {
-                    if (trimmedLine[2] == 'i' && trimmedLine.StartsWith("//ifex"))
+                    if (trimmedLine[2] == 'i' && trimmedLine[3] == 'f' && trimmedLine[4] == 'e' && trimmedLine[5] == 'x')
                     {
                         string ifexLine = $"#{trimmedLine.Substring(2)}";
                         processedLines.Add(ifexLine);
@@ -463,7 +464,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             parsedShader.unableToParseIfexStatements.Add(trimmedLine);
                         }
                     }
-                    else if (trimmedLine[2] == 'e' && trimmedLine.StartsWith("//endex"))
+                    else if (trimmedLine.Length > 6 && trimmedLine[2] == 'e' && trimmedLine[3] == 'n' && trimmedLine[4] == 'd' && trimmedLine[5] == 'e' && trimmedLine[6] == 'x')
                     {
                         processedLines.Add("#endex");
                     }
@@ -474,16 +475,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (!isPreprocessor && trimmedLine[i] == ';')
                     {
                         processedLines.Add(trimmedLine.Substring(0, i + 1));
-                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart();
+                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
                     }
                     else if (!isPreprocessor && (trimmedLine[i] == '{' || trimmedLine[i] == '}'))
                     {
                         if (i != 0)
-                            processedLines.Add(trimmedLine.Substring(0, i).TrimEnd());
+                            processedLines.Add(trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars));
                         processedLines.Add(trimmedLine[i].ToString());
-                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart();
+                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
                     }
@@ -492,7 +493,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         int end = FindEndOfStringLiteral(trimmedLine, i + 1);
                         while (end == -1 && ++lineIndex < rawLines.Length)
                         {
-                            trimmedLine += System.Environment.NewLine + rawLines[lineIndex].Trim();
+                            trimmedLine += System.Environment.NewLine + rawLines[lineIndex].Trim(trimWhiteSpaceChars);
                             end = FindEndOfStringLiteral(trimmedLine, i + 1);
                         }
                         i = end;
@@ -504,7 +505,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     if (trimmedLine[i + 1] == '/')
                     {
-                        trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
+                        trimmedLine = trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars);
                         break;
                     }
                     else if (trimmedLine[i + 1] == '*')
@@ -524,7 +525,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                             else
                             {
-                                trimmedLine = trimmedLine.Substring(0, i).TrimEnd();
+                                trimmedLine = trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars);
                                 break;
                             }
                         }
@@ -547,7 +548,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     processedLines.Add("#include \"UnityLightingCommon.cginc\"");
                     continue;
                 }
-                if (isPreprocessor && trimmedLine.StartsWith("#include "))
+                if (isPreprocessor && trimmedLine.Length > 9 && trimmedLine[3] == 'c' && trimmedLine.StartsWith("#include "))
                 {
                     RecursiveParseFile(ParseIncludeDirective(trimmedLine), false, currentFilePath);
                 }

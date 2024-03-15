@@ -1,7 +1,7 @@
 ## v3.5.4
 ### Changes
 * Add timing of shader parse to single shader or material instead of just for whole folder parses in the Shader Analyzer Debugger.
-* Improved shader parser performance by doing simple checks instead of using `.StartsWith()` & `.EndsWith()` everywhere.
+* Improved shader parser performance massively by doing simple checks instead of using `.StartsWith()` & `.EndsWith()` everywhere and replacing some left over regex with string operations.
 
 ### Bug Fixes
 * Fix first merged material blob on mesh generating all the animated property arrays instead of only the ones that are used by the meshes in the blob.
