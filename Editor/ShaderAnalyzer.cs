@@ -845,16 +845,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         break;
                     }
                 }
-                while (source[lineIndex + 1].StartsWith("#"))
+                while (source[lineIndex + 1][0] == '#')
                 {
                     lineIndex++;
                 }
                 if (source[lineIndex + 1] == "{" || line.EndsWith(";"))
                 {
-                    var m = Regex.Match(line, @"\)\s*:\s*(\w+)");
-                    if (m.Success)
-                    {
-                        returnParam.semantic = m.Groups[1].Value;
+                    int lastParenthesesIndex = line.LastIndexOf(')');
+                    if (lastParenthesesIndex != -1) {
+                        int colonIndex = line.IndexOf(':', lastParenthesesIndex + 1);
+                        if (colonIndex != -1) {
+                            int startIndex = colonIndex + 1;
+                            while (startIndex < line.Length && (line[startIndex] == ' ' || line[startIndex] == '\t'))
+                                startIndex++;
+                            int endIndex = startIndex;
+                            returnParam.semantic = ParseIdentifierAndTrailingWhitespace(line, ref endIndex);
+                        }
                     }
                     break;
                 }
