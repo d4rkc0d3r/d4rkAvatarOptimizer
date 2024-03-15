@@ -2200,12 +2200,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             ConditionResult EvalPreprocessorCondition(string expr, ref int index)
             {
                 // hardcoded parse of poiyomi texture prop guards as OPTIMIZER_ENABLED is also rarely used for other cases which could break when properties are not inline replaced
-                var match = Regex.Match(expr, @"defined\((PROP\w+)\) || !defined\(OPTIMIZER_ENABLED\)");
-                if (match.Success)
-                {
-                    if (poiUsedPropertyDefines.TryGetValue(match.Groups[1].Value, out var used))
-                        return used ? ConditionResult.True : ConditionResult.False;
-                    return ConditionResult.Unknown;
+                if (index == 0 && expr.Length > 44 && expr[0] == 'd' && expr[8] == 'P') {
+                    var match = Regex.Match(expr, @"defined\((PROP\w+)\) || !defined\(OPTIMIZER_ENABLED\)");
+                    if (match.Success) {
+                        if (poiUsedPropertyDefines.TryGetValue(match.Groups[1].Value, out var used))
+                            return used ? ConditionResult.True : ConditionResult.False;
+                        return ConditionResult.Unknown;
+                    }
                 }
                 // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
                 var values = new List<ConditionResult>();
@@ -2258,12 +2259,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         values.Add(res);
                         continue;
                     }
-                    if (!expr.Substring(index).StartsWith("defined"))
+                    if (expr.Length - index < 7 || expr[index] != 'd' || expr[index + 1] != 'e' || expr[index + 2] != 'f' || expr[index + 3] != 'i' || expr[index + 4] != 'n' || expr[index + 5] != 'e' || expr[index + 6] != 'd')
                     {
                         output.Add($"// Expected defined at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
                         return ConditionResult.Unknown;
                     }
-                    index += "defined".Length;
+                    index += 7;
                     SkipWhitespace(expr, ref index);
                     if (expr[index] != '(')
                     {
@@ -2332,12 +2333,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var innerLine = source[lineIndex];
                     if (innerLine[0] != '#')
                         continue;
-                    var innerSubLine = innerLine.Substring(1);
-                    if (innerSubLine.StartsWith("if") && !innerSubLine.StartsWith("ifex"))
+                    if (innerLine.Length > 3 && innerLine[1] == 'i' && innerLine[2] == 'f' && innerLine[3] != 'e')
                     {
                         depth++;
                     }
-                    else if (innerSubLine.StartsWith("endif"))
+                    else if (innerLine.Length > 5 && innerLine[1] == 'e' && innerLine[2] == 'n' && innerLine[3] == 'd' && innerLine[4] == 'i' && innerLine[5] == 'f')
                     {
                         if (depth == 0)
                         {
@@ -2345,7 +2345,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         depth--;
                     }
-                    else if ((innerSubLine.StartsWith("else") || innerSubLine.StartsWith("elif")) && depth == 0)
+                    else if (depth == 0 && innerLine.Length > 4 && innerLine[1] == 'e' && innerLine[2] == 'l' && ((innerLine[3] == 's' && innerLine[4] == 'e') || (innerLine[3] == 'i' && innerLine[4] == 'f')))
                     {
                         return --lineIndex - startLineIndex;
                     }
