@@ -310,6 +310,53 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return -1;
         }
 
+        public static List<(string name, bool notEquals, float value)> ParseIfexConditions(string line)
+        {
+            var conditions = new List<(string name, bool notEquals, float value)>();
+            int index = 5;
+            while (index < line.Length) {
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+                if (index == line.Length)
+                    break;
+                if (line[index] == '&' && line[index + 1] == '&') {
+                    index += 2;
+                }
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+                var name = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
+                if (name == null) {
+                    return null;
+                }
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+                if (index == line.Length) {
+                    return null;
+                }
+                bool notEquals = line[index] == '!';
+                if ((line[index] != '!' && line[index] != '=') || line[index + 1] != '=') {
+                    return null;
+                }
+                index += 2;
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+                if (index == line.Length) {
+                    return null;
+                }
+                int valueStart = index;
+                int valueEnd = index;
+                while (valueEnd < line.Length && (char.IsDigit(line[valueEnd]))) {
+                    valueEnd++;
+                }
+                if (valueStart == valueEnd) {
+                    return null;
+                }
+                var value = float.Parse(line.Substring(valueStart, valueEnd - valueStart));
+                conditions.Add((name, notEquals, value));
+            }
+            return conditions;
+        }
+
         private bool RecursiveParseFile(string currentFileName, bool isTopLevelFile, string callerPath)
         {
             var processedLines = new List<string>();
@@ -407,14 +454,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (trimmedLine[2] == 'i' && trimmedLine.StartsWith("//ifex"))
                     {
-                        var match = Regex.Match(trimmedLine, @"^//ifex\s+(\w+)\s*[!=]=\s*\d+(\s*&&\s*(\w+)\s*[!=]=\s*\d+)*$");
-                        if (match.Success) {
-                            parsedShader.ifexParameters.Add(match.Groups[1].Value);
-                            match.Groups[3].Captures.Cast<Capture>().Select(c => c.Value).ToList().ForEach(p => parsedShader.ifexParameters.Add(p));
+                        string ifexLine = $"#{trimmedLine.Substring(2)}";
+                        processedLines.Add(ifexLine);
+                        var conditions = ParseIfexConditions(ifexLine);
+                        if (conditions != null) {
+                            conditions.ForEach(p => parsedShader.ifexParameters.Add(p.name));
                         } else {
                             parsedShader.unableToParseIfexStatements.Add(trimmedLine);
                         }
-                        processedLines.Add($"#{trimmedLine.Substring(2)}");
                     }
                     else if (trimmedLine[2] == 'e' && trimmedLine.StartsWith("//endex"))
                     {
@@ -2685,35 +2732,29 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (line.Length < 5 || line[4] != 'x' || line[1] != 'i' || line[2] != 'f' || line[3] != 'e')
                 return;
-            
-            var match = Regex.Match(line, @"^#ifex\s+(\s*(&&)?\s*(\w+)\s*([!=])=\s*(\d+))+$");
-            if (!match.Success)
-            {
+            var conditions = ShaderAnalyzer.ParseIfexConditions(line);
+            if (conditions == null) {
                 lineIndex++;
-                debugOutput?.Add($"// {line} failed to match regex, just skip statement");
+                debugOutput?.Add($"// {line} failed to parse conditions, just skip statement");
                 ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
             var outputString = $"// #ifex ";
             var firstCondition = true;
-            foreach (Capture capture in match.Groups[1].Captures)
-            {
-                var subMatch = Regex.Match(capture.Value, @"(\w+)\s*([!=])=\s*(\d+)");
-                var name = subMatch.Groups[1].Value;
-                var op = subMatch.Groups[2].Value;
-                var compValue = float.Parse(subMatch.Groups[3].Value);
-                if (!staticPropertyValues.TryGetValue(name, out var valueString))
-                {
+            foreach (var condition in conditions) {
+                var name = condition.name;
+                var notEquals = condition.notEquals;
+                var compValue = condition.value;
+                if (!staticPropertyValues.TryGetValue(name, out var valueString)) {
                     lineIndex++;
                     debugOutput?.Add($"// #ifex {name} not found in static properties");
                     ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                     return;
                 }
                 var value = float.Parse(valueString);
-                outputString += $"{(firstCondition ? "" : " && ")}{name}({value}) {op}= {compValue}";
+                outputString += $"{(firstCondition ? "" : " && ")}{name}({value}) {(notEquals ? '!' : '=')}= {compValue}";
                 firstCondition = false;
-                if ((compValue != value) ^ op == "!")
-                {
+                if ((compValue != value) ^ notEquals) {
                     lineIndex++;
                     debugOutput?.Add(outputString + ", FALSE");
                     ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
