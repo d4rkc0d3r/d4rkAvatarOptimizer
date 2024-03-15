@@ -2521,7 +2521,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return;
                 if (line[0] == '#')
                 {
-                    if (line.StartsWith("#include "))
+                    if (line.Length > 7 && line[3] == 'c' && line.StartsWith("#include "))
                     {
                         var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
                         if (parsedShader.text.TryGetValue(includeName, out var includeSource))
@@ -2566,7 +2566,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex);
                 }
-                else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.StartsWith("struct "))
+                else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.Length > 7 && line[0] == 's' && line[4] == 'c' && line.StartsWith("struct "))
                 {
                     output.Add(line);
                     var match = Regex.Match(line, @"struct\s+(\w+)");
@@ -2595,7 +2595,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                         continue;
                                     }
                                 }
-                                if (line.StartsWith("}"))
+                                if (line[0] == '}')
                                 {
                                     output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
                                     output.Add(line);
@@ -2615,12 +2615,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         foreach (var name in match.names)
                         {
                             bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWith("sampler");
-                            if (isTextureSamplerState && name.StartsWith("sampler") && !texturesToReplaceCalls.Contains(name.Substring("sampler".Length)))
+                            string referencedTexture = isTextureSamplerState ? name.Substring(7) : null;
+                            if (isTextureSamplerState && !texturesToReplaceCalls.Contains(referencedTexture))
                             {
-                                if (parsedShader.properties.Any(p => p.name == name.Substring("sampler".Length)))
+                                if (parsedShader.propertyTable.ContainsKey(referencedTexture))
                                 {
-                                    texturesToCallSoTheSamplerDoesntDisappear.Add(name.Substring("sampler".Length));
-                                    output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + name.Substring("sampler".Length));
+                                    texturesToCallSoTheSamplerDoesntDisappear.Add(referencedTexture);
+                                    output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + referencedTexture);
                                 }
                                 output.Add(type + " " + name + ";");
                             }
@@ -2633,13 +2634,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             else if (!arrayPropertyValues.ContainsKey(name)
                                 && !animatedPropertyValues.ContainsKey(name)
                                 && !texturesToReplaceCalls.Contains(name)
-                                && !(isTextureSamplerState && texturesToReplaceCalls.Contains(name.Substring("sampler".Length))))
+                                && !(isTextureSamplerState && texturesToReplaceCalls.Contains(referencedTexture)))
                             {
                                 output.Add(type + " " + name + ";");
                             }
                         }
                     }
-                    else if (line.StartsWith("UNITY_DECLARE_TEX2D"))
+                    else if (line.Length > 19 && line[0] == 'U' && line[6] == 'D' && line[17] == '2' && line.StartsWith("UNITY_DECLARE_TEX2D"))
                     {
                         var texName = line.Split('(')[1].Split(')')[0].Trim();
                         bool hasSampler = !line.Contains("_NOSAMPLER");
