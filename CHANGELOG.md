@@ -1,4 +1,7 @@
-## v3.5.4
+## v3.6.0
+### Features
+* Add support for `VRCHeadChop` component.
+
 ### Changes
 * Add timing of shader parse to single shader or material instead of just for whole folder parses in the Shader Analyzer Debugger.
 * Improved shader parser performance massively by doing simple checks instead of using `.StartsWith()` & `.EndsWith()` everywhere and replacing some left over regex with string operations.
