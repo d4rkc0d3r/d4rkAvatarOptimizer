@@ -548,9 +548,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     processedLines.Add("#include \"UnityLightingCommon.cginc\"");
                     continue;
                 }
-                if (isPreprocessor && trimmedLine.Length > 9 && trimmedLine[3] == 'c' && trimmedLine.StartsWith("#include "))
-                {
-                    RecursiveParseFile(ParseIncludeDirective(trimmedLine), false, currentFilePath);
+                if (isPreprocessor && trimmedLine.Length > 9 && trimmedLine[3] == 'c') {
+                    var includeFile = ParseIncludeDirective(trimmedLine);
+                    if (includeFile.Length > 0) {
+                        RecursiveParseFile(includeFile, false, currentFilePath);
+                        processedLines.Add($"#include \"{includeFile}\"");
+                        continue;
+                    }
                 }
                 processedLines.Add(trimmedLine);
             }
@@ -559,7 +563,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static string ParseIncludeDirective(string line)
         {
-            if (!line.StartsWith("#include "))
+            if (!line.StartsWith("#include"))
                 return "";
             int firstQuote = line.IndexOf('"');
             int lastQuote = line.LastIndexOf('"');

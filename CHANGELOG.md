@@ -9,6 +9,7 @@
 
 ### Bug Fixes
 * Fix first merged material blob on mesh generating all the animated property arrays instead of only the ones that are used by the meshes in the blob.
+* Fix `#include_with_pragmas` not getting parsed correctly. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/86)
 
 ## v3.5.3
 ### Bug Fixes
