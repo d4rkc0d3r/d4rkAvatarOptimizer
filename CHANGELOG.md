@@ -1,6 +1,7 @@
 ## v3.6.0
 ### Features
 * Add support for `VRCHeadChop` component.
+* Add support for `VRCAnimatorPlayAudio` state machine behavior.
 
 ### Changes
 * Add timing of shader parse to single shader or material instead of just for whole folder parses in the Shader Analyzer Debugger.

@@ -631,6 +631,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         l.outputParamHash = o.outputParamHash;
                         break;
                     }
+                default:
+                    {
+                        EditorUtility.CopySerialized(old, n);
+                        break;
+                    }
             }
         }
 
