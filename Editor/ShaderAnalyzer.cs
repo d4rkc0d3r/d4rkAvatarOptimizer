@@ -411,6 +411,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 try
                 {
                     rawLines = File.ReadAllLines(currentFilePath);
+                    if (fileName == "UnityLightingCommon.cginc") {
+                        // UnityLightingCommon.cginc has two fixed4 declarations which won't work in HLSLPROGRAM since it's a type defined in HLSLSupport.cginc
+                        rawLines = rawLines.Select(l => l.Replace("fixed4", "float4")).ToArray();
+                    }
                 }
                 catch (FileNotFoundException)
                 {
