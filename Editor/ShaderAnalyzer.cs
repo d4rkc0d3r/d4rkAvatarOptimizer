@@ -353,6 +353,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (valueStart == valueEnd) {
                     return null;
                 }
+                index = valueEnd;
                 var value = float.Parse(line.Substring(valueStart, valueEnd - valueStart));
                 conditions.Add((name, notEquals, value));
             }
@@ -2745,7 +2746,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
-            if (line.Length < 5 || line[4] != 'x' || line[1] != 'i' || line[2] != 'f' || line[3] != 'e')
+            if (!line.StartsWithSimple("#ifex"))
                 return;
             var conditions = ShaderAnalyzer.ParseIfexConditions(line);
             if (conditions == null) {
