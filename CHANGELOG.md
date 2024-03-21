@@ -2,7 +2,7 @@
 ### Features
 * Add support for `VRCHeadChop` component.
 * Add support for `VRCAnimatorPlayAudio` state machine behavior.
-* Add support for SPS Penetrators.
+* Add support for SPS Penetrators. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/89)
 
 ### Changes
 * Add timing of shader parse to single shader or material instead of just for whole folder parses in the Shader Analyzer Debugger.
@@ -12,6 +12,7 @@
 * Fix first merged material blob on mesh generating all the animated property arrays instead of only the ones that are used by the meshes in the blob.
 * Fix `#include_with_pragmas` not getting parsed correctly. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/86)
 * Fix `HLSLPROGRAM` not working since `UnityLightingCommon.cginc` got always included and it has `fixed4` variable declarations.
+* Fix first timing check for the UI not working correctly and upping the disable of the auto refresh to exceeding the time limit 3 times to give the JIT more time to optimize.
 
 ## v3.5.3
 ### Bug Fixes
