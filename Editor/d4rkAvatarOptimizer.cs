@@ -3026,10 +3026,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         if (weight == 0)
             return;
-        a.SetRow(0, a.GetRow(0) + b.GetRow(0) * weight);
-        a.SetRow(1, a.GetRow(1) + b.GetRow(1) * weight);
-        a.SetRow(2, a.GetRow(2) + b.GetRow(2) * weight);
-        a.SetRow(3, a.GetRow(3) + b.GetRow(3) * weight);
+        a.m00 += b.m00 * weight; a.m01 += b.m01 * weight; a.m02 += b.m02 * weight; a.m03 += b.m03 * weight;
+        a.m10 += b.m10 * weight; a.m11 += b.m11 * weight; a.m12 += b.m12 * weight; a.m13 += b.m13 * weight;
+        a.m20 += b.m20 * weight; a.m21 += b.m21 * weight; a.m22 += b.m22 * weight; a.m23 += b.m23 * weight;
+        a.m30 += b.m30 * weight; a.m31 += b.m31 * weight; a.m32 += b.m32 * weight; a.m33 += b.m33 * weight;
     }
 
     private void SearchForTextureArrayCreation(List<List<Material>> sources)
@@ -3956,9 +3956,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-6f)
     {
-        value.x = Mathf.Abs(value.x) < threshold ? 0 : value.x;
-        value.y = Mathf.Abs(value.y) < threshold ? 0 : value.y;
-        value.z = Mathf.Abs(value.z) < threshold ? 0 : value.z;
+        value.x = value.x < threshold && value.x > -threshold ? 0 : value.x;
+        value.y = value.y < threshold && value.y > -threshold ? 0 : value.y;
+        value.z = value.z < threshold && value.z > -threshold ? 0 : value.z;
         return value;
     }
 
@@ -4141,14 +4141,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (sourceBones[i] == null)
                         sourceBones[i] = rootBone;
                 }
-                var bindPoseCount = mesh.bindposes.Length;
+                var sourceBindPoses = mesh.bindposes;
+                var bindPoseCount = sourceBindPoses.Length;
                 if (sourceBones.Length != bindPoseCount)
                 {
                     Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
                     bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
                 }
                 var toWorldArray = Enumerable.Range(0, bindPoseCount).Select(i =>
-                    sourceBones[i].localToWorldMatrix * skinnedMesh.sharedMesh.bindposes[i]
+                    sourceBones[i].localToWorldMatrix * sourceBindPoses[i]
                     ).ToArray();
                 var aabb = skinnedMesh.localBounds;
                 var m = toLocal * rootBone.localToWorldMatrix;

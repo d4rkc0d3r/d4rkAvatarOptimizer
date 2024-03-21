@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using d4rkpl4y3r.AvatarOptimizer.Util;
+using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using System.Security.Cryptography;
 
 namespace d4rkpl4y3r.AvatarOptimizer
@@ -1857,7 +1858,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return;
             }
 
-            if (!func.parameters.Any(p => p.type == "sampler2D" || (p.type.StartsWith("Texture2D") && !p.type.StartsWith("Texture2DArray"))))
+            if (!func.parameters.Any(p => p.type == "sampler2D" || (p.type.StartsWithSimple("Texture2D") && !p.type.StartsWithSimple("Texture2DArray"))))
             {
                 output.Add(source[sourceLineIndex]);
                 return;
@@ -1867,14 +1868,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var functionDefinition = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
             for (int i = 0; i < functionDefinition.Count; i++)
             {
-                if (!functionDefinition[i].StartsWith("#"))
+                if (functionDefinition[i][0] != '#')
                 {
                     functionDefinition[i] = functionDefinition[i] + ",";
                 }
             }
             for (int i = functionDefinition.Count - 1; i >= 0; i--)
             {
-                if (!functionDefinition[i].StartsWith("#"))
+                if (functionDefinition[i][0] != '#')
                 {
                     functionDefinition[i] = functionDefinition[i].Substring(0, functionDefinition[i].Length - 1);
                     break;
@@ -1917,7 +1918,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 foreach (var line in functionDefinition)
                 {
-                    output.Add(Regex.Replace(line, "(sampler2D|Texture2D(<[^<>]*>)?) ", tex + "_Wrapper "));
+                    output.Add(line.Contains("2D") ? Regex.Replace(line, "(sampler2D|Texture2D(<[^<>]*>)?) ", tex + "_Wrapper ") : line);
                 }
                 output.AddRange(functionBody);
             }
@@ -2026,9 +2027,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     string type = animatedProperty.Value;
                     var currentOutput = scalarOutput;
                     var currentPackOffset = 0;
-                    type = Regex.Replace(type, "^(bool|int|uint)([1-4]?)$", "float$2");
                     if (type[type.Length - 1] == '4')
                     {
+                        type = "float4";
                         hasVectorCBufferAliasArray = true;
                         currentOutput = vectorOutput;
                         currentPackOffset = currentVectorPackOffset = AllocateCBufferRegisters(currentVectorPackOffset, usedVectorRegisters);
@@ -2036,6 +2037,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else
                     {
+                        type = "float";
                         currentPackOffset = currentScalarPackOffset = AllocateCBufferRegisters(currentScalarPackOffset, usedScalarRegisters);
                         CBufferAliasArray.Add(name, ("d4rkAvatarOptimizerAnimatedScalars", currentPackOffset));
                     }
@@ -2877,7 +2879,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         string type = defaultAnimatedProperty.isVector ? "Vector" : "Float";
                         string displayName = defaultAnimatedProperty.name;
                         string tagString = "";
-                        if (displayName.StartsWith("_IsActiveMesh")) {
+                        if (displayName.StartsWithSimple("_IsActiveMesh")) {
                             int meshIndex = int.Parse(displayName.Substring("_IsActiveMesh".Length));
                             displayName = $"_IsActiveMesh{meshIndex} {mergedMeshNames[meshIndex]}";
                         }
@@ -2972,7 +2974,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (parsedProperty == null)
                     continue;
                 var prop = parsedProperty.Value;
-                if (prop.name.StartsWith("_ShaderOptimizer"))
+                if (prop.name.StartsWithSimple("_ShaderOptimizer"))
                     continue;
                 if (defaultAnimatedProperties.Contains((prop.name, false)) || defaultAnimatedProperties.Contains((prop.name, true)))
                     continue;

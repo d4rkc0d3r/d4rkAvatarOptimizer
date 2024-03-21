@@ -67,20 +67,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private AnimatorController Run() {
             var sourceLayers = source.layers;
+            var sourceParameters = source.parameters;
 
             for (int i = 0; i < sourceLayers.Length; i++) {
                 if (layersToMerge.Contains(i) && sourceLayers[i].stateMachine.states.Length >= 2) {
                     foreach (var condition in sourceLayers[i].stateMachine.EnumerateAllTransitions().SelectMany(x => x.conditions)) {
-                        if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Int)) {
+                        if (sourceParameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Int)) {
                             intsToChangeToFloat.Add(condition.parameter);
-                        } else if (source.parameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Bool)) {
+                        } else if (sourceParameters.Any(x => x.name == condition.parameter && x.type == AnimatorControllerParameterType.Bool)) {
                             boolsToChangeToFloat.Add(condition.parameter);
                         }
                     }
                 }
             }
 
-            foreach (var p in source.parameters) {
+            var existingTargetParameters = new HashSet<string>(target.parameters.Select(x => x.name));
+            foreach (var p in sourceParameters) {
                 bool boolToFloat = boolsToChangeToFloat.Contains(p.name);
                 bool intToFloat = intsToChangeToFloat.Contains(p.name);
                 var newP = new AnimatorControllerParameter {
@@ -90,7 +92,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     defaultFloat = boolToFloat ? (p.defaultBool ? 1f : 0f) : intToFloat ? (float)p.defaultInt : p.defaultFloat,
                     defaultInt = p.defaultInt
                 };
-                if (target.parameters.Count(x => x.name.Equals(newP.name)) == 0) {
+                if (existingTargetParameters.Add(newP.name)) {
                     target.AddParameter(newP);
                 }
             }
