@@ -208,5 +208,22 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             return vec;
         }
     }
+
+    public static class StringExtensions
+    {
+        public static bool StartsWithSimple(this string str, string value)
+        {
+            if (str.Length < value.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < value.Length; i++) {
+                if (str[i] != value[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
 }
 #endif

@@ -1013,10 +1013,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 {
                     if (!parsed.CanMergeTextures())
                         continue;
-                    foreach (var prop in parsed.properties)
+                    foreach (var prop in parsed.texture2DProperties)
                     {
-                        if (prop.type != ParsedShader.Property.Type.Texture2D)
-                            continue;
                         var tex = mat.GetTexture(prop.name) as Texture2D;
                         if (tex != null && (tex.format == TextureFormat.DXT1Crunched || tex.format == TextureFormat.DXT5Crunched))
                             textures.Add(tex);
@@ -1037,30 +1035,25 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var exclusions = optimizer.GetAllExcludedTransforms();
                 var renderers = optimizer.GetUsedComponentsInChildren<Renderer>();
                 var textures = new HashSet<Texture2D>();
-                foreach (var renderer in renderers)
+                var materials = renderers
+                    .Where(r => !exclusions.Contains(r.transform))
+                    .SelectMany(r => r.sharedMaterials)
+                    .Where(mat => mat != null && mat.shader != null)
+                    .Distinct();
+                foreach (var material in materials)
                 {
-                    if (exclusions.Contains(renderer.transform))
+                    var parsed = ShaderAnalyzer.Parse(material.shader);
+                    if (parsed == null)
                         continue;
-                    var materials = renderer.sharedMaterials;
-                    foreach (var material in materials)
+                    foreach (var prop in parsed.texture2DProperties)
                     {
-                        if (material == null || material.shader == null)
-                            continue;
-                        var parsed = ShaderAnalyzer.Parse(material.shader);
-                        if (parsed == null)
-                            continue;
-                        foreach (var prop in parsed.properties)
+                        var tex = material.GetTexture(prop.name) as Texture2D;
+                        if (tex != null && tex.format != TextureFormat.BC5)
                         {
-                            if (prop.type != ParsedShader.Property.Type.Texture2D)
-                                continue;
-                            var tex = material.GetTexture(prop.name) as Texture2D;
-                            if (tex != null && tex.format != TextureFormat.BC5)
+                            var assetImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) as TextureImporter;
+                            if (assetImporter != null && assetImporter.textureType == TextureImporterType.NormalMap)
                             {
-                                var assetImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) as TextureImporter;
-                                if (assetImporter != null && assetImporter.textureType == TextureImporterType.NormalMap)
-                                {
-                                    textures.Add(tex);
-                                }
+                                textures.Add(tex);
                             }
                         }
                     }

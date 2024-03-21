@@ -100,6 +100,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public Dictionary<string, List<string>> text = new Dictionary<string, List<string>>();
         public List<Property> properties = new List<Property>();
         public List<Property> propertiesToCheckWhenMerging = new List<Property>();
+        public List<Property> texture2DProperties = new List<Property>();
         public Dictionary<string, Property> propertyTable = new Dictionary<string, Property>();
         public List<Pass> passes = new List<Pass>();
         public Dictionary<string, Function> functions = new Dictionary<string, Function>();
@@ -1153,6 +1154,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             if (property != null) {
                                 parsedShader.properties.Add(property);
                                 parsedShader.propertyTable[property.name] = property;
+                                if (property.type == ParsedShader.Property.Type.Texture2D) {
+                                    parsedShader.texture2DProperties.Add(property);
+                                }
                                 if (property.type == ParsedShader.Property.Type.Texture2D || property.type == ParsedShader.Property.Type.Texture2DArray) {
                                     var ST_property = new ParsedShader.Property();
                                     ST_property.name = property.name + "_ST";

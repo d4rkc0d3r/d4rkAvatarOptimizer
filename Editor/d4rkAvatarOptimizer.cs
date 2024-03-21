@@ -638,7 +638,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fields = GetType().GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         foreach (var field in fields)
         {
-            if (field.Name.StartsWith("cache_"))
+            if (field.Name.StartsWithSimple("cache_"))
             {
                 field.SetValue(this, null);
             }
@@ -868,10 +868,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
             if (withNaNimation && CanUseNaNimationOnMesh(binding.path)) {
                 if (typeof(Renderer).IsAssignableFrom(binding.type))
-                    return !binding.propertyName.StartsWith("blendShape.") && binding.propertyName != "m_Enabled";
+                    return !binding.propertyName.StartsWithSimple("blendShape.") && binding.propertyName != "m_Enabled";
             } else {
                 if (typeof(Renderer).IsAssignableFrom(binding.type))
-                    return !binding.propertyName.StartsWith("blendShape.");
+                    return !binding.propertyName.StartsWithSimple("blendShape.");
                 if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                     return true;
             }
@@ -960,7 +960,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_FindSameAnimatedMaterialProperties.TryGetValue((aPath, bPath), out var cachedResult))
             return cachedResult;
         bool IsRelevantBinding(EditorCurveBinding binding) {
-            return typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWith("material.");
+            return typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.");
         }
         if (cache_AllAnimationClipsAffectingRendererMaterialProperties == null) {
             cache_AllAnimationClipsAffectingRendererMaterialProperties = new Dictionary<string, HashSet<AnimationClip>>();
@@ -1284,7 +1284,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             // transform doesn't exist otherwise it would have at least 10 animatable bindings for position, rotation, and scale
             return false;
         }
-        if (binding.propertyName.StartsWith("material.") && TargetPathHasAnyMaterialSwap(binding.path)) {
+        if (binding.propertyName.StartsWithSimple("material.") && TargetPathHasAnyMaterialSwap(binding.path)) {
             return true;
         }
         if (binding.type == typeof(Transform)) {
@@ -1331,7 +1331,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
-            if (fixedBinding.propertyName.StartsWith("NaNimation")) {
+            if (fixedBinding.propertyName.StartsWithSimple("NaNimation")) {
                 var shaderToggleInfo = fixedBinding.propertyName.Substring("NaNimation".Length);
                 var propertyNames = new string[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z" };
                 var NaNCurve = ReplaceZeroWithNaN(curve);
@@ -1349,7 +1349,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             } else {
                 SetFloatCurve(newClip, fixedBinding, curve);
-                if (fixedBinding.propertyName.StartsWith($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
+                if (fixedBinding.propertyName.StartsWithSimple($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
                     var otherBinding = fixedBinding;
                     var match = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+(\.[a-z])?");
                     otherBinding.propertyName = $"material.{match.Groups[1].Value}{match.Groups[2].Value}";
@@ -1610,7 +1610,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         var fxLayerBindings = fxLayerLayers.Select(layer => GetAllCurveBindings(layer.stateMachine)).ToList();
         var uselessLayers = FindUselessFXLayers();
-        var intParams = new HashSet<string>(fxLayer.parameters.Where(p => p.type == AnimatorControllerParameterType.Int).Select(p => p.name));
+        var fxLayerParameters = fxLayer.parameters;
+        var intParams = new HashSet<string>(fxLayerParameters.Where(p => p.type == AnimatorControllerParameterType.Int).Select(p => p.name));
         var intParamsWithNotEqualConditions = new HashSet<string>();
 
         for (int i = 0; i < fxLayerLayers.Length; i++) {
@@ -1719,7 +1720,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
 
             var param = states.SelectMany(s => s.state.transitions).Concat(stateMachine.anyStateTransitions).SelectMany(t => t.conditions).Select(c => c.parameter).Distinct().ToList();
-            var paramLookup = param.ToDictionary(p => p, p => fxLayer.parameters.FirstOrDefault(p2 => p2.name == p));
+            var paramLookup = param.ToDictionary(p => p, p => fxLayerParameters.FirstOrDefault(p2 => p2.name == p));
             if (paramLookup.Values.Any(p => p == null)) {
                 errorMessages[i].Add($"didn't find parameter {paramLookup.First(p => p.Value == null).Key}");
                 continue;
@@ -2217,7 +2218,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
                 if (!typeof(Renderer).IsAssignableFrom(binding.type)
-                    || !binding.propertyName.StartsWith("m_Materials.Array.data["))
+                    || !binding.propertyName.StartsWithSimple("m_Materials.Array.data["))
                     continue;
                 int start = binding.propertyName.IndexOf('[') + 1;
                 int end = binding.propertyName.IndexOf(']') - start;
@@ -2332,7 +2333,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
                     if (binding.type != typeof(SkinnedMeshRenderer)
-                        || !binding.propertyName.StartsWith("blendShape."))
+                        || !binding.propertyName.StartsWithSimple("blendShape."))
                         continue;
                     var t = GetTransformFromPath(binding.path);
                     if (t == null)
@@ -2471,7 +2472,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
                 if (binding.type != typeof(SkinnedMeshRenderer)
-                    || !binding.propertyName.StartsWith("blendShape."))
+                    || !binding.propertyName.StartsWithSimple("blendShape."))
                     continue;
                 var path = $"{binding.path}/{binding.propertyName}";
                 if (!validPaths.Contains(path))
@@ -2515,8 +2516,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 var subList = mergeableBlendShapes[i];
                 var candidate = mergeableBlendShapes[j][0].blendshapeID;
                 float value = -1;
-                if (ratiosArray.All(x => TryAddBlendShapeToSubList(subList, candidate, ref value, x)) && value != -1)
-                {
+                bool canAddToRatio = true;
+                for (int k = 0; k < ratiosArray.Length; k++) {
+                    if (!TryAddBlendShapeToSubList(subList, candidate, ref value, ratiosArray[k])) {
+                        canAddToRatio = false;
+                        break;
+                    }
+                }
+                if (canAddToRatio && value != -1) {
                     subList.Add((candidate, value));
                     NormalizeBlendShapeValues(subList);
                     mergeableBlendShapes.RemoveAt(j);
@@ -2600,7 +2607,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (fxLayer == null)
             return map;
         foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
-            if (!binding.propertyName.StartsWith("material.") ||
+            if (!binding.propertyName.StartsWithSimple("material.") ||
                 (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
                 continue;
             if (!map.TryGetValue(binding.path, out var props)) {
@@ -3253,7 +3260,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
             if (!WritePropertiesAsStaticValues)
             {
-                foreach (string key in replace[i].Keys.Where(k => !k.StartsWith("arrayIndex")).ToArray())
+                foreach (string key in replace[i].Keys.Where(k => !k.StartsWithSimple("arrayIndex")).ToArray())
                 {
                     replace[i].Remove(key);
                 }
@@ -4710,7 +4717,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         used.Add(transform);
         used.UnionWith(GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
-        used.UnionWith(transform.Cast<Transform>().Where(t => t.name.StartsWith("NaNimation ")));
+        used.UnionWith(transform.Cast<Transform>().Where(t => t.name.StartsWithSimple("NaNimation ")));
 
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         used.Add(avDescriptor.collider_footL.transform);
