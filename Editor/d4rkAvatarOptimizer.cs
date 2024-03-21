@@ -2899,6 +2899,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return material.HasProperty("_TPSPenetratorEnabled") && material.GetFloat("_TPSPenetratorEnabled") > 0.5f;
     }
 
+    private bool IsSPSPenetratorRoot(Transform t) {
+		if(t == null)
+			return false;
+		if(t.GetComponentsInChildren<Renderer>(true).Count() != 1)
+			return false;
+		var meshRenderer = t.GetComponentsInChildren<Renderer>(true).First();
+		if(meshRenderer.sharedMaterials.Length == 0)
+			return false;
+		var material = meshRenderer.sharedMaterials[0];
+		if(material == null)
+			return false;
+		return material.HasProperty("_SPS_Length");
+	}
+
     private HashSet<Renderer> cache_FindAllPenetrators = null;
     public HashSet<Renderer> FindAllPenetrators()
     {
@@ -2919,7 +2933,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 penetrators.Add(candidate.GetComponentsInChildren<MeshRenderer>(true).First());
             }
         }
-        penetrators.UnionWith(GetComponentsInChildren<Renderer>(true).Where(m => IsTPSPenetratorRoot(m.transform)));
+        penetrators.UnionWith(GetComponentsInChildren<Renderer>(true).Where(m => IsTPSPenetratorRoot(m.transform) || IsSPSPenetratorRoot(m.transform)));
         return cache_FindAllPenetrators = penetrators;
     }
 
@@ -3890,7 +3904,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
 
                 Profiler.StartSection("Mesh.Optimize()");
-                newMesh.Optimize();
+
+                if(!IsSPSPenetratorRoot(meshRenderer.transform)) {
+					// this breaks sps...
+                    newMesh.Optimize();
+                }
+                
                 Profiler.EndSection();
 
                 CreateUniqueAsset(newMesh, newMesh.name + ".asset");
