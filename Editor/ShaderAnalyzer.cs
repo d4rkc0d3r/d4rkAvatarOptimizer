@@ -2114,9 +2114,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int textureWrapperCount = 0;
             foreach (var texName in texturesToReplaceCalls)
             {
-                if (texturesToNullCheck.TryGetValue(texName, out string nullCheck))
-                {
-                    nullCheck = "if (!shouldSample" + texName + ") return " + nullCheck + ";";
+                string nullCheck = null;
+                if (texturesToNullCheck.TryGetValue(texName, out string textureDefaultValue)) {
+                    nullCheck = $"if (!shouldSample{texName}) return {textureDefaultValue};";
                 }
 
                 bool isArray = texturesToMerge.Contains(texName);
@@ -2143,8 +2143,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Add($"float memberToDifferentiateWrapperClasses[{++textureWrapperCount}];");
 
                 output.Add($"{type} Sample(SamplerState sampl, float2 uv) {{");
+                output.Add("float2 ddxuv = ddx(uv);");
+                output.Add("float2 ddyuv = ddy(uv);");
                 if (nullCheck != null) output.Add(nullCheck);
-                output.Add($"return {newTexName}.Sample(sampl, {uv});}}");
+                output.Add($"return {newTexName}.SampleGrad(sampl, {uv}, ddxuv, ddyuv);}}");
 
                 output.Add($"{type} SampleGrad(SamplerState sampl, float2 uv, float2 ddxuv, float2 ddyuv) {{");
                 if (nullCheck != null) output.Add(nullCheck);

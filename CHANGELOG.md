@@ -9,6 +9,7 @@
 * Improved shader parser performance massively by doing simple checks instead of using `.StartsWith()` & `.EndsWith()` everywhere and replacing some left over regex with string operations.
 
 ### Bug Fixes
+* Fix wire frame showing up on materials on AMD gpus sometimes. (hopefully its gone for good)
 * Fix first merged material blob on mesh generating all the animated property arrays instead of only the ones that are used by the meshes in the blob.
 * Fix `#include_with_pragmas` not getting parsed correctly. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/86)
 * Fix `HLSLPROGRAM` not working since `UnityLightingCommon.cginc` got always included and it has `fixed4` variable declarations.
