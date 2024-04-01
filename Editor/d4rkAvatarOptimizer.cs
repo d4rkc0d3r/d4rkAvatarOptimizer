@@ -4,6 +4,8 @@ using System.Linq;
 using VRC.SDK3.Dynamics.Contact.Components;
 using VRC.SDK3.Dynamics.PhysBone.Components;
 using System.Text.RegularExpressions;
+using VRC.SDKBase;
+using VRCStation = VRC.SDK3.Avatars.Components.VRCStation;
 
 #if UNITY_EDITOR
 using System.Threading;
@@ -1298,6 +1300,40 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return animatableBindings.Contains((binding.propertyName, binding.type));
     }
     
+    private void FixPlayAudioBehavioursInStateMachine(AnimatorStateMachine stateMachine)
+    {
+        var behaviours = stateMachine.behaviours;
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            FixPlayAudioBehaviour(behaviours[i]);
+        }
+        var stateMachines = stateMachine.stateMachines;
+        for (int i = 0; i < stateMachines.Length; i++)
+        {
+            FixPlayAudioBehavioursInStateMachine(stateMachines[i].stateMachine);
+        }
+        var states = stateMachine.states;
+        for (int i = 0; i < states.Length; i++)
+        {
+            behaviours = states[i].state.behaviours;
+            for (int j = 0; j < behaviours.Length; j++)
+            {
+                FixPlayAudioBehaviour(behaviours[j]);
+            }
+        }
+    }
+
+    private void FixPlayAudioBehaviour(StateMachineBehaviour behaviour)
+    {
+        if (behaviour is VRC_AnimatorPlayAudio playAudio)
+        {
+            if (transformFromOldPath.TryGetValue(playAudio.SourcePath, out var transform))
+            {
+                playAudio.SourcePath = GetPathToRoot(transform);
+            }                
+        }
+    }
+    
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
@@ -1538,6 +1574,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
         }
+
+        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            
+            var targetLayers = controller.layers;
+            for (int layerIndex = 0; layerIndex < targetLayers.Length; layerIndex++)
+            {
+                FixPlayAudioBehavioursInStateMachine(targetLayers[layerIndex].stateMachine);
+            }
+        }
+
         Profiler.StartSection("AssetDatabase.SaveAssets()");
         AssetDatabase.SaveAssets();
         Profiler.EndSection();
