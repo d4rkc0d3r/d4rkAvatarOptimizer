@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`.
 * Fix empty Properties block not getting parsed correctly.
+* Fix `#pragma shader_feature` only getting replaced by defining the keywords instead of defining them as a true value.
 
 ## v3.6.0
 ### Features

@@ -2086,7 +2086,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             foreach(var keyword in setKeywords.Where(k => currentPass.shaderFeatureKeyWords.Contains(k)))
             {
-                output.Add("#define " + keyword);
+                output.Add($"#define {keyword} 1");
             }
             output.Add("uniform float d4rkAvatarOptimizer_Zero;");
             output.Add("static uint d4rkAvatarOptimizer_MaterialID = 0;");
