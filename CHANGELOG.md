@@ -1,3 +1,7 @@
+## v3.6.1
+### Bug Fixes
+* Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`
+
 ## v3.6.0
 ### Features
 * Add support for `VRCHeadChop` component.

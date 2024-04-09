@@ -225,7 +225,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             parsedShader = new ParsedShader();
             parsedShader.name = shaderName;
-            filePath = shaderPath;
+            filePath = Path.GetFullPath(shaderPath);
             maxIncludes = 1000;
             doneParsing = false;
             if (shaderPath.EndsWith(".orlshader"))
@@ -379,11 +379,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (rawLines == null)
             {
-                if (currentFilePath.StartsWith("/Assets/"))
+                if (currentFilePath.StartsWithSimple("/Assets/") || currentFilePath.StartsWithSimple("Assets/"))
                 {
                     var path = Path.GetDirectoryName(callerPath);
                     var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
-                    currentFilePath = assetFolderPath + currentFilePath;
+                    currentFilePath = Path.Combine(assetFolderPath, currentFilePath);
                 }
                 else if (!isTopLevelFile)
                 {
