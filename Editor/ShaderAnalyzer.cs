@@ -1191,6 +1191,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         {
                             state = ParseState.PropertyBlock;
                             output.Add(line);
+                            if (lines[lineIndex + 1] == "{")
+                            {
+                                lineIndex++;
+                                output.Add("{");
+                            }
                         }
                         else if (line == "Tags")
                         {

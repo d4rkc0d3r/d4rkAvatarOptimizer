@@ -1,6 +1,7 @@
 ## v3.6.1
 ### Bug Fixes
-* Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`
+* Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`.
+* Fix empty Properties block not getting parsed correctly.
 
 ## v3.6.0
 ### Features
