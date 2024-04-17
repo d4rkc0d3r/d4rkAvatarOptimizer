@@ -21,6 +21,7 @@ After that you can add and update the optimizer like any other packages in your 
 ### Basic
 This preset only uses optimizations that don't affect the behavior of the avatar.
 * Removes unused components and blendshapes & bones from skinned meshes
+* Bakes non animated blend shapes into the mesh
 * Merges all skinned meshes that are always animated in the same way
 * Merges material slots that use the same material
 * Merges toggles in the FXLayer into a direct blend tree
@@ -31,6 +32,7 @@ For this mode you should keep shaders unlocked as it can allow for more merging.
 * Merges meshes even if they are animated/toggled differently by injecting logic into the shaders
 * Merged materials with the same shader even if their properties differ
 * Applies a generalized version of "lock in" to the new shaders
+Due to the added shader logic this preset will slightly increase the GPU cost of the avatar as a trade off for less draw calls.
 
 Expect the following behavior changes (reduced due to NaNimation toggles):
 * World effects that rely on projectors/shader replacement don't understand shader toggles and will show like the merged meshes are always visible
