@@ -3,6 +3,8 @@
 * Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`.
 * Fix empty Properties block not getting parsed correctly.
 * Fix `#pragma shader_feature` only getting replaced by defining the keywords instead of defining them as a true value.
+* Fix always disabled ParticleSystemRenderers getting deleted when `Delete Unused Components` is enabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/91)
+  * Somehow the ParticleSystemRenderer component is important for the particle system to work even if it is disabled. Maybe something about sub emitters? idk
 
 ## v3.6.0
 ### Features

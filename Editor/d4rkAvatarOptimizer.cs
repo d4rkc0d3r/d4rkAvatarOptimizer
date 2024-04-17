@@ -2713,7 +2713,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
 
         alwaysDisabledBehaviours.UnionWith(GetComponentsInChildren<Renderer>(true)
-            .Where(r => r != null && !r.enabled)
+            .Where(r => r != null && !r.enabled && !(r is ParticleSystemRenderer))
             .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
