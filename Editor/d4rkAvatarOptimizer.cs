@@ -1536,6 +1536,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i]);
             }
 
+            if (DeleteUnusedGameObjects) {
+                var playAudioType = Type.GetType("VRC.SDKBase.VRC_AnimatorPlayAudio, VRCSDKBase");
+                if (playAudioType != null) {
+                    var pathField = playAudioType.GetField("SourcePath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                    foreach (var behaviour in newLayer.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours())) {
+                        if (playAudioType.IsAssignableFrom(behaviour.GetType())) {
+                            var path = (string)pathField.GetValue(behaviour) ?? "";
+                            if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null) {
+                                pathField.SetValue(behaviour, GetPathToRoot(transform));
+                            }
+                        }
+                    }
+                }
+            }
+
             avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
         }
         Profiler.StartSection("AssetDatabase.SaveAssets()");
