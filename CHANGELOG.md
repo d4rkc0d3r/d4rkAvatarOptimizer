@@ -1,3 +1,7 @@
+## v3.6.2
+### Changes
+* `Delete Unused GameObjects` prepends the name of the deleted GameObject to the name of its children.
+
 ## v3.6.1
 ### Bug Fixes
 * Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`.

@@ -4818,6 +4818,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 foreach (var child in current.Cast<Transform>().ToArray())
                 {
                     child.parent = current.parent;
+                    child.name = $"{current.name}_{child.name}";
                 }
                 DestroyImmediate(current.gameObject);
             }
