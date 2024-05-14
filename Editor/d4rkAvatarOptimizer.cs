@@ -4652,7 +4652,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
         var allExcludedTransforms = new HashSet<Transform>();
-        foreach (var excludedTransform in ExcludeTransforms) {
+        var hardCodedExclusions = new List<string>() {
+            "_VirtualLens_Root",
+        }.Select(s => GetTransformFromPath(s)).ToList();
+        foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
             if (excludedTransform == null)
                 continue;
             allExcludedTransforms.Add(excludedTransform);

@@ -2,6 +2,9 @@
 ### Changes
 * `Delete Unused GameObjects` prepends the name of the deleted GameObject to the name of its children.
 
+### Bug Fixes
+* Automatically add `_VirtualLens_Root` to exclusions so it doesn't break when running the optimizer.
+
 ## v3.6.1
 ### Bug Fixes
 * Fix ShaderAnalyzer not inline including absolute paths that start with `Assets/`.
