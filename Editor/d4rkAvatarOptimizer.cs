@@ -1395,7 +1395,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         if (lastUnusedKeyframeTime > lastUsedKeyframeTime && lastUnusedKeyframeTime > -1) {
             // add dummy curve referencing nothing to make sure the clip still has the same length as before
-            var dummyBinding = EditorCurveBinding.DiscreteCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
+            var dummyBinding = EditorCurveBinding.FloatCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
             var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
             AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
             changed = true;
@@ -4205,7 +4205,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
                     AddAnimationPathChange((currentMeshPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
                         (GetPathToRoot(NaNimationBone), key, typeof(Transform)));
-                    var curveBinding = EditorCurveBinding.DiscreteCurve(newPath, typeof(SkinnedMeshRenderer), "m_UpdateWhenOffscreen");
+                    var curveBinding = EditorCurveBinding.FloatCurve(newPath, typeof(SkinnedMeshRenderer), "m_UpdateWhenOffscreen");
                     constantAnimatedValuesToAdd[curveBinding] = 0f;
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f + Vector3.up * 0.2f));
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.up * 0.2f));
@@ -4631,7 +4631,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     meshRenderer.gameObject.SetActive(true);
                     meshRenderer.enabled = false;
-                    var curveBinding = EditorCurveBinding.DiscreteCurve(GetPathToRoot(meshRenderer), typeof(SkinnedMeshRenderer), "m_Enabled");
+                    var curveBinding = EditorCurveBinding.FloatCurve(GetPathToRoot(meshRenderer), typeof(SkinnedMeshRenderer), "m_Enabled");
                     constantAnimatedValuesToAdd[curveBinding] = 1f;
                 }
                 else
