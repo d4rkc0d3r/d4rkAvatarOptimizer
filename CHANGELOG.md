@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 * Automatically add `_VirtualLens_Root` to exclusions so it doesn't break when running the optimizer.
+* Fix shader optimizer breaking on shaders that have no `Properties` block.
 
 ## v3.6.1
 ### Bug Fixes

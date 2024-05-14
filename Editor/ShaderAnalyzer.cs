@@ -1133,6 +1133,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
             }
             var state = ParseState.ShaderLab;
+            bool foundProperties = false;
             curlyBraceDepth = 0;
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
             {
@@ -1190,6 +1191,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         if (line == "Properties")
                         {
                             state = ParseState.PropertyBlock;
+                            foundProperties = true;
                             output.Add(line);
                             if (lines[lineIndex + 1] == "{")
                             {
@@ -1255,6 +1257,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         break;
                 }
+            }
+            if (!foundProperties)
+            {
+                output.Insert(2, "Properties");
+                output.Insert(3, "{");
+                output.Insert(4, "}");
             }
             foreach (var ifexPropName in parsedShader.ifexParameters)
             {
