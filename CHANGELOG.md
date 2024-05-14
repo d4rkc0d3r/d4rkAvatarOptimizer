@@ -8,6 +8,7 @@
 * Change generated animations to use ` EditorCurveBinding.FloatCurve` instead of `EditorCurveBinding.DiscreteCurve`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/98)
   * This fixes issues with GoGoLoco & NaNimation keep default enabled state in unity 2022.3.22f1.
 * Fix mesh combining breaking when bones are scaled down by default.
+* Fix bounding box of mesh combining being off when the root transform is not at the origin.
 
 ## v3.6.1
 ### Bug Fixes

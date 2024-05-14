@@ -4047,6 +4047,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var allBones = combinableSkinnedMeshList.SelectMany(l => l).SelectMany(l => l.bones).Where(b => b != null).Distinct().ToList();
         var allBonesOriginalScale = allBones.Select(b => b.localScale).ToList();
         allBones.ForEach(b => b.localScale = Vector3.one);
+        var originalRootPosition = transform.position;
+        var originalRootRotation = transform.rotation;
+        transform.position = Vector3.zero;
+        transform.rotation = Quaternion.identity;
         int totalMeshCount = combinableSkinnedMeshList.Sum(l => l.Count);
         int currentMeshCount = 0;
         for (int combinedMeshID = 0; combinedMeshID < combinableSkinnedMeshList.Length; combinedMeshID++)
@@ -4652,6 +4656,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             allBones[i].localScale = allBonesOriginalScale[i];
         }
+        transform.position = originalRootPosition;
+        transform.rotation = originalRootRotation;
     }
 
     private HashSet<Transform> cache_GetAllExcludedTransforms;
