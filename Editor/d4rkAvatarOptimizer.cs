@@ -4044,9 +4044,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(l => l[0].sharedMesh != null)
             .Where(l => l.All(m => !exclusions.Contains(m.transform)))
             .ToArray();
-        var allBones = combinableSkinnedMeshList.SelectMany(l => l).SelectMany(l => l.bones).Where(b => b != null).Distinct().ToList();
-        var allBonesOriginalScale = allBones.Select(b => b.localScale).ToList();
-        allBones.ForEach(b => b.localScale = Vector3.one);
+        List<(Transform bone, Vector3 scale)> allBonesAndParentsWithOriginalScale = combinableSkinnedMeshList
+            .SelectMany(l => l).SelectMany(smr => smr.bones).Where(b => b != null).Distinct()
+            .SelectMany(bone => {
+                var result = new List<Transform>();
+                var currentBone = bone;
+                while (currentBone != null && currentBone != transform) {
+                    result.Add(currentBone);
+                    currentBone = currentBone.parent;
+                }
+                return result;
+            }).Distinct().Select(bone => (bone, bone.localScale)).ToList();
+        allBonesAndParentsWithOriginalScale.ForEach(pair => pair.bone.localScale = Vector3.one);
         var originalRootPosition = transform.position;
         var originalRootRotation = transform.rotation;
         transform.position = Vector3.zero;
@@ -4652,10 +4661,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
         }
-        for (int i = 0; i < allBones.Count; i++)
-        {
-            allBones[i].localScale = allBonesOriginalScale[i];
-        }
+        allBonesAndParentsWithOriginalScale.ForEach(pair => pair.bone.localScale = pair.scale);
         transform.position = originalRootPosition;
         transform.rotation = originalRootRotation;
     }

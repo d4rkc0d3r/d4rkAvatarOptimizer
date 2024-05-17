@@ -1,3 +1,7 @@
+## v3.6.3
+### Bug Fixes
+* Fix mesh combining bone scale fix not normalizing the scale of all the parents of the bones during bake.
+
 ## v3.6.2
 ### Changes
 * `Delete Unused GameObjects` prepends the name of the deleted GameObject to the name of its children.
