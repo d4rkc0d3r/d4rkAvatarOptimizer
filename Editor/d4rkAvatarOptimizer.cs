@@ -2867,6 +2867,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
+        transforms.UnionWith(transform.GetAllDescendants().Where(t => t.localScale != Vector3.one));
+
         return cache_FindAllMovingTransforms = transforms;
     }
 

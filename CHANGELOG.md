@@ -1,6 +1,7 @@
 ## v3.6.3
 ### Bug Fixes
 * Fix mesh combining bone scale fix not normalizing the scale of all the parents of the bones during bake.
+* Fix scaled bones not getting treated as "moving" bone when combining meshes.
 
 ## v3.6.2
 ### Changes
