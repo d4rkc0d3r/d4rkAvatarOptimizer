@@ -547,8 +547,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         }
 
-        var rootAnimator = optimizer.GetComponent<Animator>();
-        var isHumanoid = rootAnimator != null ? rootAnimator.avatar.isHuman : false;
+        var isHumanoid = optimizer.IsHumanoid();
         if (avDescriptor.baseAnimationLayers == null || avDescriptor.baseAnimationLayers.Length != (isHumanoid ? 5 : 3))
         {
             if (isHumanoid) {

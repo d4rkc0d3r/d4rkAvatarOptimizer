@@ -2286,11 +2286,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
     }
 
+    public bool IsHumanoid()
+    {
+        var rootAnimator = GetComponent<Animator>();
+        return rootAnimator != null && rootAnimator.avatar != null && rootAnimator.avatar.isHuman;
+    }
+
     public AnimatorController GetFXLayer()
     {
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
-        var rootAnimator = GetComponent<Animator>();
-        var baseLayerCount = rootAnimator != null ? (rootAnimator.avatar.isHuman ? 5 : 3) : 3;
+        var baseLayerCount = IsHumanoid() ? 5 : 3;
         if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != baseLayerCount)
             return null;
         return avDescriptor.baseAnimationLayers[baseLayerCount - 1].animatorController as AnimatorController;
