@@ -1,6 +1,7 @@
 ## v3.6.4
 ### Bug Fixes
 * Fix crash when the root Animator component has no avatar assigned to it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/102)
+* Fix fx layer 0 getting deleted when it has states or will be the only layer. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/100)
 
 ## v3.6.3
 ### Bug Fixes

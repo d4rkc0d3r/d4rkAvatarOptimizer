@@ -1999,7 +1999,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 (lastNonUselessLayer < fxLayerLayers.Length && fxLayerLayers[lastNonUselessLayer].avatarMask == layer.avatarMask
                     && fxLayerLayers[lastNonUselessLayer].defaultWeight == 1 && !isAffectedByLayerWeightControl.Contains(lastNonUselessLayer));
             var stateMachine = layer.stateMachine;
-            if (stateMachine == null)
+            if (stateMachine == null || (stateMachine.stateMachines.Length == 0 && stateMachine.states.Length == 0))
             {
                 if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst)
                 {
@@ -2007,17 +2007,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
                 continue;
             }
-            if (stateMachine.EnumerateAllBehaviours().Any())
+            if (i == 0 || stateMachine.EnumerateAllBehaviours().Any())
             {
                 lastNonUselessLayer = i;
                 continue;
             }
-            if (i != 0 && layer.defaultWeight == 0 && !isAffectedByLayerWeightControl.Contains(i))
-            {
-                uselessLayers.Add(i);
-                continue;
-            }
-            if (isNotFirstLayerOrLastNonUselessLayerCanBeFirst && stateMachine.stateMachines.Length == 0 && stateMachine.states.Length == 0)
+            if (layer.defaultWeight == 0 && !isAffectedByLayerWeightControl.Contains(i))
             {
                 uselessLayers.Add(i);
                 continue;
