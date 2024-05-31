@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -23,7 +23,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private static d4rkAvatarOptimizer optimizer;
     private static Material nullMaterial = null;
     private static long longestTimeUsed = -2;
-    
+
     public override void OnInspectorGUI()
     {
         optimizer = (d4rkAvatarOptimizer)target;
@@ -37,19 +37,25 @@ public class d4rkAvatarOptimizerEditor : Editor
             nullMaterial.name = "(null material slot)";
         }
 
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.FlexibleSpace();
-        EditorGUILayout.EndHorizontal();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.FlexibleSpace();
+        }
         float currentViewWidth = GUILayoutUtility.GetLastRect().width + 23;
 
         var path = AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this));
         var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
         EditorGUILayout.Space();
-        EditorGUI.indentLevel++;
-        EditorGUILayout.LabelField($"<size=20>d4rk{(currentViewWidth > 350 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
-        var settingsRect = GUILayoutUtility.GetLastRect();
-        EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
-        EditorGUI.indentLevel--;
+
+        Rect settingsRect = new Rect();
+
+        using (new EditorGUI.IndentLevelScope())
+        {
+            EditorGUILayout.LabelField($"<size=20>d4rk{(currentViewWidth > 350 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
+            settingsRect = GUILayoutUtility.GetLastRect();
+            EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
+        }
+
         settingsRect.width = 24;
         settingsRect.height = 24;
         bool pressedSettingsButton = GUI.Button(settingsRect, new GUIContent("", "Settings"));
@@ -68,50 +74,56 @@ public class d4rkAvatarOptimizerEditor : Editor
         var presets = optimizer.GetPresetNames();
         if (presets.Count > 0)
         {
-            EditorGUILayout.BeginHorizontal(GUI.skin.box);
-            EditorGUILayout.LabelField(GetLabelWithTooltip("Presets"), EditorStyles.boldLabel, GUILayout.Width(50));
-            foreach (var preset in presets)
+            using (new EditorGUILayout.HorizontalScope(GUI.skin.box))
             {
-                GUI.enabled = !optimizer.IsPresetActive(preset);
-                if (GUILayout.Button(GetLabelWithTooltip(preset)))
+                EditorGUILayout.LabelField(GetLabelWithTooltip("Presets"), EditorStyles.boldLabel, GUILayout.Width(50));
+                foreach (var preset in presets)
                 {
-                    optimizer.SetPreset(preset);
-                    ClearUICaches();
-                    EditorUtility.SetDirty(optimizer);
+                    GUI.enabled = !optimizer.IsPresetActive(preset);
+                    if (GUILayout.Button(GetLabelWithTooltip(preset)))
+                    {
+                        optimizer.SetPreset(preset);
+                        ClearUICaches();
+                        EditorUtility.SetDirty(optimizer);
+                    }
+                    GUI.enabled = true;
                 }
-                GUI.enabled = true;
             }
-            EditorGUILayout.EndHorizontal();
         }
 
         ToggleOptimizerProperty(nameof(optimizer.OptimizeOnUpload));
         if (d4rkAvatarOptimizer.HasCustomShaderSupport)
             ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshes));
-        EditorGUI.indentLevel++;
-        if (d4rkAvatarOptimizer.HasCustomShaderSupport)
-            ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
-        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithNaNimation));
-        EditorGUI.indentLevel++;
-        ToggleOptimizerProperty(nameof(optimizer.NaNimationAllow3BoneSkinning));
-        ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesSeparatedByDefaultEnabledState));
-        EditorGUI.indentLevel--;
-        ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
-        EditorGUI.indentLevel--;
+        using (new EditorGUI.IndentLevelScope())
+        {
+            if (d4rkAvatarOptimizer.HasCustomShaderSupport)
+                ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithShaderToggle));
+            ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesWithNaNimation));
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ToggleOptimizerProperty(nameof(optimizer.NaNimationAllow3BoneSkinning));
+                ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshesSeparatedByDefaultEnabledState));
+            }
+            ToggleOptimizerProperty(nameof(optimizer.MergeStaticMeshesAsSkinned));
+        }
         if (d4rkAvatarOptimizer.HasCustomShaderSupport)
         {
             ToggleOptimizerProperty(nameof(optimizer.MergeDifferentPropertyMaterials));
-            EditorGUI.indentLevel++;
-            ToggleOptimizerProperty(nameof(optimizer.MergeSameDimensionTextures));
-            EditorGUI.indentLevel++;
-            ToggleOptimizerProperty(nameof(optimizer.MergeMainTex));
-            EditorGUI.indentLevel--;
-            EditorGUI.indentLevel--;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ToggleOptimizerProperty(nameof(optimizer.MergeSameDimensionTextures));
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    ToggleOptimizerProperty(nameof(optimizer.MergeMainTex));
+                }
+            }
         }
         ToggleOptimizerProperty(nameof(optimizer.OptimizeFXLayer));
-        EditorGUI.indentLevel++;
-        ToggleOptimizerProperty(nameof(optimizer.CombineApproximateMotionTimeAnimations));
-        EditorGUI.indentLevel--;
+        using (new EditorGUI.IndentLevelScope())
+        {
+            ToggleOptimizerProperty(nameof(optimizer.CombineApproximateMotionTimeAnimations));
+        }
         ToggleOptimizerProperty(nameof(optimizer.DisablePhysBonesWhenUnused));
         ToggleOptimizerProperty(nameof(optimizer.MergeSameRatioBlendShapes));
         ToggleOptimizerProperty(nameof(optimizer.KeepMMDBlendShapes));
@@ -123,9 +135,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             optimizer.ExcludeTransforms = new List<Transform>();
         if (Foldout($"Exclusions ({optimizer.ExcludeTransforms.Count})", ref optimizer.ShowExcludedTransforms))
         {
-            EditorGUI.indentLevel++;
-            DynamicTransformList(ref optimizer.ExcludeTransforms);
-            EditorGUI.indentLevel--;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                DynamicTransformList(ref optimizer.ExcludeTransforms);
+            }
         }
 
         Profiler.enabled = optimizer.ProfileTimeUsed;
@@ -269,19 +282,21 @@ public class d4rkAvatarOptimizerEditor : Editor
                         perfRating = PerformanceRating.Medium;
                     if (uselessLayers.Contains(i))
                         perfRating = PerformanceRating.Excellent;
-                    
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(20));
-                    EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayerLayers[i].name}", string.Join("\n", errorMessages[i])));
-                    EditorGUILayout.EndHorizontal();
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(20));
+                        EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayerLayers[i].name}", string.Join("\n", errorMessages[i])));
+                    }
                     if (optimizer.ShowFXLayerMergeErrors)
                     {
-                        EditorGUI.indentLevel+=2;
-                        foreach (var error in errorMessages[i].Where(e => !nonErrors.Contains(e)))
+                        using (new EditorGUI.IndentLevelScope(2))
                         {
-                            EditorGUILayout.LabelField(error);
+                            foreach (var error in errorMessages[i].Where(e => !nonErrors.Contains(e)))
+                            {
+                                EditorGUILayout.LabelField(error);
+                            }
                         }
-                        EditorGUI.indentLevel-=2;
                     }
                 }
                 Profiler.EndSection();
@@ -391,20 +406,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (optimizer.MergeSameRatioBlendShapes && Foldout("Same Ratio Blend Shapes", ref optimizer.DebugShowMergeableBlendShapes))
             {
                 Profiler.StartSection("Same Ratio Blend Shapes");
-                foreach (var list in MergeableBlendShapes) 
+                foreach (var list in MergeableBlendShapes)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.Space(15, false);
-                    EditorGUILayout.BeginVertical(GUI.skin.box);
-                    foreach (var ratio in list)
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField($"{ratio.value * 100:F1}".Replace(".0", ""), GUILayout.Width(60));
-                        EditorGUILayout.LabelField(ratio.blendshape.Replace("/blendShape.", "."));
-                        EditorGUILayout.EndHorizontal();
+                        EditorGUILayout.Space(15, false);
+                        using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+                        {
+                            foreach (var ratio in list)
+                            {
+                                using (new EditorGUILayout.HorizontalScope())
+                                {
+                                    EditorGUILayout.LabelField($"{ratio.value * 100:F1}".Replace(".0", ""), GUILayout.Width(60));
+                                    EditorGUILayout.LabelField(ratio.blendshape.Replace("/blendShape.", "."));
+                                }
+                            }
+                        }
                     }
-                    EditorGUILayout.EndVertical();
-                    EditorGUILayout.EndHorizontal();
                     EditorGUILayout.Separator();
                 }
                 Profiler.EndSection();
@@ -422,38 +440,43 @@ public class d4rkAvatarOptimizerEditor : Editor
                     .ToArray();
                 foreach (var tuple in statsList)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.Space(15, false);
-                    EditorGUILayout.BeginVertical(GUI.skin.box);
-                    EditorGUILayout.ObjectField(tuple.mesh, typeof(Mesh), false);
-                    var stats = tuple.Item2;
-                    if (stats[0].count == 0)
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        EditorGUILayout.LabelField("No bone weights");
-                    }
-                    else
-                    {
-                        var entryWidth = GUILayout.Width(60f);
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField($"Index", entryWidth);
-                        EditorGUILayout.LabelField($"Count", entryWidth);
-                        EditorGUILayout.LabelField($"Max", entryWidth);
-                        EditorGUILayout.LabelField($"Median", entryWidth);
-                        EditorGUILayout.EndHorizontal();
-                        for (int i = 0; i < 4; i++)
+                        EditorGUILayout.Space(15, false);
+                        using (new EditorGUILayout.VerticalScope(GUI.skin.box))
                         {
-                            if (stats[i].count == 0)
-                                continue;
-                            EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField($"{i}", entryWidth);
-                            EditorGUILayout.LabelField($"{stats[i].count}", entryWidth);
-                            EditorGUILayout.LabelField($"{stats[i].maxValue:F2}", entryWidth);
-                            EditorGUILayout.LabelField($"{stats[i].medianValue:F2}", entryWidth);
-                            EditorGUILayout.EndHorizontal();
+                            EditorGUILayout.ObjectField(tuple.mesh, typeof(Mesh), false);
+                            var stats = tuple.Item2;
+                            if (stats[0].count == 0)
+                            {
+                                EditorGUILayout.LabelField("No bone weights");
+                            }
+                            else
+                            {
+                                var entryWidth = GUILayout.Width(60f);
+                                using (new EditorGUILayout.HorizontalScope())
+                                {
+                                    EditorGUILayout.LabelField($"Index", entryWidth);
+                                    EditorGUILayout.LabelField($"Count", entryWidth);
+                                    EditorGUILayout.LabelField($"Max", entryWidth);
+                                    EditorGUILayout.LabelField($"Median", entryWidth);
+                                }
+                                for (int i = 0; i < 4; i++)
+                                {
+                                    if (stats[i].count == 0)
+                                        continue;
+
+                                    using (new EditorGUILayout.HorizontalScope())
+                                    {
+                                        EditorGUILayout.LabelField($"{i}", entryWidth);
+                                        EditorGUILayout.LabelField($"{stats[i].count}", entryWidth);
+                                        EditorGUILayout.LabelField($"{stats[i].maxValue:F2}", entryWidth);
+                                        EditorGUILayout.LabelField($"{stats[i].medianValue:F2}", entryWidth);
+                                    }
+                                }
+                            }
                         }
                     }
-                    EditorGUILayout.EndVertical();
-                    EditorGUILayout.EndHorizontal();
                     EditorGUILayout.Separator();
                 }
                 Profiler.EndSection();
@@ -466,9 +489,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                     if (pair.Key.gameObject.CompareTag("EditorOnly"))
                         continue;
                     EditorGUILayout.ObjectField(pair.Key, typeof(VRCPhysBoneBase), true);
-                    EditorGUI.indentLevel++;
-                    DrawDebugList(pair.Value.ToArray());
-                    EditorGUI.indentLevel--;
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        DrawDebugList(pair.Value.ToArray());
+                    }
                 }
             }
             if (Foldout("Unused Components", ref optimizer.DebugShowUnusedComponents))
@@ -490,9 +514,10 @@ public class d4rkAvatarOptimizerEditor : Editor
                 foreach (var pair in map)
                 {
                     EditorGUILayout.LabelField(pair.Key.path + " -> " + pair.Key.index);
-                    EditorGUI.indentLevel++;
-                    DrawDebugList(pair.Value.ToArray());
-                    EditorGUI.indentLevel--;
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        DrawDebugList(pair.Value.ToArray());
+                    }
                 }
                 if (map.Count == 0)
                 {
@@ -530,13 +555,14 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
         stopWatch.Stop();
-        if (stopWatch.ElapsedMilliseconds > longestTimeUsed && stopWatch.ElapsedMilliseconds > AvatarOptimizerSettings.AutoRefreshPreviewTimeout) {
+        if (stopWatch.ElapsedMilliseconds > longestTimeUsed && stopWatch.ElapsedMilliseconds > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
+        {
             // longestTimeUsed < 0 means it's one of the first times the optimizer is used
             // first couple times are always slower since the JIT compiler has to compile the code
             longestTimeUsed = longestTimeUsed < 0 ? longestTimeUsed + 1 : stopWatch.ElapsedMilliseconds;
         }
     }
-    
+
     private bool Validate()
     {
         var avDescriptor = optimizer.GetComponent<VRCAvatarDescriptor>();
@@ -550,10 +576,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         var isHumanoid = optimizer.IsHumanoid();
         if (avDescriptor.baseAnimationLayers == null || avDescriptor.baseAnimationLayers.Length != (isHumanoid ? 5 : 3))
         {
-            if (isHumanoid) {
+            if (isHumanoid)
+            {
                 EditorGUILayout.HelpBox("Humanoid rig but playable base layer count in the avatar descriptor is not 5.\n" +
                     "Try to reimport the avatar fbx.", MessageType.Error);
-            } else {
+            }
+            else
+            {
                 EditorGUILayout.HelpBox("Generic rig but playable base layer count in the avatar descriptor is not 3.\n" +
                     "Try to reimport the avatar fbx.", MessageType.Error);
             }
@@ -671,19 +700,23 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var mergeInfoList = new List<string>();
 
-            if (correctlyParsedMaterials.Length != allMaterials.Length) {
+            if (correctlyParsedMaterials.Length != allMaterials.Length)
+            {
                 mergeInfoList.Add("Some materials could not be parsed.\n");
             }
 
-            if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge())) {
+            if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
+            {
                 mergeInfoList.Add("Some materials do not support merging.\n");
             }
 
-            if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures())) {
+            if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
+            {
                 mergeInfoList.Add("Some materials do not support merging textures.\n");
             }
-            
-            if (mergeInfoList.Count > 0) {
+
+            if (mergeInfoList.Count > 0)
+            {
                 EditorGUILayout.HelpBox(
                     string.Join("", mergeInfoList) +
                     "Swapping their shaders to compatible ones might help reduce material count further.\n" +
@@ -1148,11 +1181,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Button(string label)
     {
-        GUILayout.BeginHorizontal();
-        GUILayout.Space(15 * EditorGUI.indentLevel);
-        var result = GUILayout.Button(label);
-        GUILayout.EndHorizontal();
-        return result;
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.Space(15 * EditorGUI.indentLevel);
+            return GUILayout.Button(label);
+        }
     }
 
     private bool ToggleOptimizerProperty(string propertyName)
@@ -1218,14 +1251,15 @@ public class d4rkAvatarOptimizerEditor : Editor
     private void DrawMatchedMaterialSlot(MaterialSlot slot, int indent)
     {
         indent *= 15;
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Space(indent);
-        EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true, GUILayout.Width(EditorGUIUtility.currentViewWidth / 2 - 20 - (indent)));
-        int originalIndent = EditorGUI.indentLevel;
-        EditorGUI.indentLevel = 0;
-        EditorGUILayout.ObjectField(slot.material, typeof(Material), false);
-        EditorGUI.indentLevel = originalIndent;
-        EditorGUILayout.EndHorizontal();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.Space(indent);
+            EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true, GUILayout.Width(EditorGUIUtility.currentViewWidth / 2 - 20 - (indent)));
+            int originalIndent = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = 0;
+            EditorGUILayout.ObjectField(slot.material, typeof(Material), false);
+            EditorGUI.indentLevel = originalIndent;
+        }
     }
 
     public void DrawDebugList<T>(T[] array) where T : Object
@@ -1268,17 +1302,19 @@ public class d4rkAvatarOptimizerEditor : Editor
         list.Add(null);
         for (int i = 0; i < list.Count; i++)
         {
-            EditorGUILayout.BeginHorizontal();
-            var output = EditorGUILayout.ObjectField(list[i], typeof(Transform), true) as Transform;
-            if (i == list.Count - 1)
+            Transform output = null;
+            using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Space(23);
+                output = EditorGUILayout.ObjectField(list[i], typeof(Transform), true) as Transform;
+                if (i == list.Count - 1)
+                {
+                    GUILayout.Space(23);
+                }
+                else if (GUILayout.Button("X", GUILayout.Width(20)))
+                {
+                    output = null;
+                }
             }
-            else if (GUILayout.Button("X", GUILayout.Width(20)))
-            {
-                output = null;
-            }
-            EditorGUILayout.EndHorizontal();
             if (list[i] != output)
             {
                 ClearUICaches();
@@ -1374,14 +1410,15 @@ public class d4rkAvatarOptimizerEditor : Editor
             newRating = GetPerfRank(newValue, perfLevels[category]);
         }
 
-        EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(20));
-        EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
-        EditorGUILayout.LabelField($"->", GUILayout.Width(20));
-        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(20));
-        EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
-        EditorGUILayout.LabelField(label);
-        EditorGUILayout.EndHorizontal();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(20));
+            EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
+            EditorGUILayout.LabelField($"->", GUILayout.Width(20));
+            EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(20));
+            EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
+            EditorGUILayout.LabelField(label);
+        }
     }
 }
 #endif
