@@ -383,7 +383,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     var path = Path.GetDirectoryName(callerPath);
                     var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
-                    currentFilePath = Path.Combine(assetFolderPath, currentFilePath);
+                    currentFilePath = Path.Combine(assetFolderPath, currentFilePath.TrimStart('/'));
                 }
                 else if (!isTopLevelFile)
                 {
