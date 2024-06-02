@@ -697,7 +697,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     break;
                 case "2d":
                     output.type = ParsedShader.Property.Type.Texture2D;
-                    switch (output.defaultValue.Substring(1, output.defaultValue.IndexOf('"', 1))) {
+                    switch (output.defaultValue.Trim('"')) {
                         case "white": output.defaultValue = "float4(1,1,1,1)"; break;
                         case "black": output.defaultValue = "float4(0,0,0,1)"; break;
                         case "red": output.defaultValue = "float4(1,0,0,1)"; break;

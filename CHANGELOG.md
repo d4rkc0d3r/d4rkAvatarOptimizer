@@ -1,3 +1,7 @@
+## v3.6.5
+### Bug Fixes
+* Fix texture merging default value parsing not working.
+
 ## v3.6.4
 ### Bug Fixes
 * Fix crash when the root Animator component has no avatar assigned to it. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/102)
