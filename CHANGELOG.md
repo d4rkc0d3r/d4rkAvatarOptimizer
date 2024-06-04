@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Fix texture merging default value parsing not working.
 * Fix global includes with leading slash like `/Assets/...` not working. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/106)
+* Fix texture tile and offset values being wrong when materials get merged with different values.
 
 ## v3.6.4
 ### Bug Fixes
@@ -20,7 +21,7 @@
 ### Bug Fixes
 * Automatically add `_VirtualLens_Root` to exclusions so it doesn't break when running the optimizer.
 * Fix shader optimizer breaking on shaders that have no `Properties` block.
-* Change generated animations to use ` EditorCurveBinding.FloatCurve` instead of `EditorCurveBinding.DiscreteCurve`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/98)
+* Change generated animations to use `EditorCurveBinding.FloatCurve` instead of `EditorCurveBinding.DiscreteCurve`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/98)
   * This fixes issues with GoGoLoco & NaNimation keep default enabled state in unity 2022.3.22f1.
 * Fix mesh combining breaking when bones are scaled down by default.
 * Fix bounding box of mesh combining being off when the root transform is not at the origin.

@@ -3240,15 +3240,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             }
                             arrayPropertyValues[i]["arrayIndex" + prop.name].values.Add("" + index);
                             arrayPropertyValues[i]["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
-                            if (!arrayPropertyValues[i].TryGetValue(prop.name + "_ST", out propertyArray))
-                            {
-                                propertyArray.type = "float4";
-                                propertyArray.values = new List<string>();
-                                arrayPropertyValues[i][prop.name + "_ST"] = propertyArray;
-                            }
-                            var scale = mat.GetTextureScale(prop.name);
-                            var offset = mat.GetTextureOffset(prop.name);
-                            propertyArray.values.Add($"float4({scale.x}, {scale.y}, {offset.x}, {offset.y})");
                             if (!arrayPropertyValues[i].TryGetValue(prop.name + "_TexelSize", out propertyArray))
                             {
                                 propertyArray.type = "float4";
