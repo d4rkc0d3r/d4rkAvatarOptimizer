@@ -6,6 +6,7 @@
 * Fix texture merging default value parsing not working.
 * Fix global includes with leading slash like `/Assets/...` not working. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/106)
 * Fix texture tile and offset values being wrong when materials get merged with different values.
+* Only apply the rescaling of bones during mesh combining to bones that have scale animations. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/105)
 
 ## v3.6.4
 ### Bug Fixes

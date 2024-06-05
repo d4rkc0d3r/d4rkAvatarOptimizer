@@ -1037,6 +1037,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return cache_FindSameAnimatedMaterialProperties[(aPath, bPath)] = new HashSet<string>(result.Select(p => p.Substring("material.".Length)));
     }
 
+    private HashSet<Transform> cache_FindAllTransformsWithScaleAnimation = null;
+    private HashSet<Transform> FindAllTransformsWithScaleAnimation()
+    {
+        if (cache_FindAllTransformsWithScaleAnimation == null)
+        {
+            cache_FindAllTransformsWithScaleAnimation = new HashSet<Transform>();
+            foreach (var clip in GetAllUsedAnimationClips())
+            {
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                {
+                    if (binding.type == typeof(Transform) && binding.propertyName == "m_LocalScale.x" && GetTransformFromPath(binding.path) != null)
+                    {
+                        cache_FindAllTransformsWithScaleAnimation.Add(GetTransformFromPath(binding.path));
+                    }
+                }
+            }
+        }
+        return cache_FindAllTransformsWithScaleAnimation;
+    }
+
     private void AddAnimationPathChange((string path, string name, Type type) source, (string path, string name, Type type) target)
     {
         if (source == target)
@@ -2055,6 +2075,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
         return cache_GetAllUsedFXLayerAnimationClips = usedClips;
+    }
+
+    private HashSet<AnimationClip> cache_GetAllUsedAnimationClips = null;
+    private HashSet<AnimationClip> GetAllUsedAnimationClips()
+    {
+        if (cache_GetAllUsedAnimationClips != null)
+            return cache_GetAllUsedAnimationClips;
+        var usedClips = new HashSet<AnimationClip>();
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+        if (avDescriptor == null)
+            return usedClips;
+        var fxLayer = GetFXLayer();
+        foreach (var layer in avDescriptor.baseAnimationLayers)
+        {
+            var controller = layer.animatorController as AnimatorController;
+            if (controller == null || controller == fxLayer)
+                continue;
+            usedClips.UnionWith(controller.animationClips);
+        }
+        usedClips.UnionWith(GetAllUsedFXLayerAnimationClips());
+        return cache_GetAllUsedAnimationClips = usedClips;
     }
 
     private HashSet<EditorCurveBinding> cache_GetAllUsedFXLayerCurveBindings = null;
@@ -4039,15 +4080,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .ToArray();
         List<(Transform bone, Vector3 scale)> allBonesAndParentsWithOriginalScale = combinableSkinnedMeshList
             .SelectMany(l => l).SelectMany(smr => smr.bones).Where(b => b != null).Distinct()
-            .SelectMany(bone => {
-                var result = new List<Transform>();
-                var currentBone = bone;
-                while (currentBone != null && currentBone != transform) {
-                    result.Add(currentBone);
-                    currentBone = currentBone.parent;
-                }
-                return result;
-            }).Distinct().Select(bone => (bone, bone.localScale)).ToList();
+            .Intersect(FindAllTransformsWithScaleAnimation())
+            .Select(bone => (bone, bone.localScale)).ToList();
         allBonesAndParentsWithOriginalScale.ForEach(pair => pair.bone.localScale = Vector3.one);
         var originalRootPosition = transform.position;
         var originalRootRotation = transform.rotation;
