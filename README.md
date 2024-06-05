@@ -157,7 +157,8 @@ Multi toggles are layers that:
   * The int parameter can't be used with a not equals condition in any transition condition anywhere in the fxlayer.
 ## Combine Motion Time Approximation
 This tries to combine layers that have a single motion time state into the direct blend tree.  
-It samples the original motion time at the snapping points of a radial puppet (0, 25, 50, 75, 100) and then uses those samples to approximate the motion time with a 1D blend tree.
+By default it samples the original motion time at the snapping points of a radial puppet (0, 25, 50, 75, 100) and then uses those samples to approximate the motion time with a 1D blend tree.  
+The amount of sample points can be changed in the `Motion Time Approximation Sample Count` global option. Samples that don't improve the approximation by more than 1% are discarded.
 ## Disable Phys Bones When Unused
 Creates animation curves for all phys bone components that are used by only one SkinnedMeshRenderer. Those curves get added to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag.
 ## Keep MMD Blend Shapes

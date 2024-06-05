@@ -230,6 +230,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 AssetDatabase.AddObjectToAsset(tree, assetPath);
                 return tree;
             }
+            var motionTimeSampleCount = AvatarOptimizerSettings.MotionTimeApproximationSampleCount;
+            var motionTimeSamplePoints = Enumerable.Range(0, motionTimeSampleCount).Select(x => (float)x / (motionTimeSampleCount - 1)).ToArray();
             Motion ConvertStateToMotion(AnimatorState s) {
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
@@ -239,7 +241,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
-                    var interpolationPoints = new List<float>() { 0, 0.25f, 0.5f, 0.75f, 1f };
+                    var interpolationPoints = motionTimeSamplePoints.ToList();
                     bool removedSomePoint = true;
                     while (removedSomePoint) {
                         removedSomePoint = false;
@@ -266,7 +268,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                     }
                     var childMotions = interpolationPoints.Select(x => new ChildMotion() {
-                        motion = CloneFromTime(clip, x * maxKeyframeTime, $"{clip.name} ({x * 100}%)"),
+                        motion = CloneFromTime(clip, x * maxKeyframeTime, $"{clip.name} ({Mathf.RoundToInt(x * 100)}%)"),
                         threshold = x }).ToArray();
                     return CreateBlendTree(s.timeParameter, childMotions);
                 }

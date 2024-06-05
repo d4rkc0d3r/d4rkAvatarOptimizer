@@ -1,4 +1,7 @@
-## v3.6.5
+## v3.7.0
+### Features
+* Add global setting `MotionTimeApproximationSampleCount` to adjust the amount of samples used for the motion time approximation.
+
 ### Bug Fixes
 * Fix texture merging default value parsing not working.
 * Fix global includes with leading slash like `/Assets/...` not working. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/106)

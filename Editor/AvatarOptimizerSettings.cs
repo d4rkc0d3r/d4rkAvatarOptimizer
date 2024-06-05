@@ -24,6 +24,12 @@ public class AvatarOptimizerSettings : EditorWindow
         get => EditorPrefs.GetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", 500);
         private set => EditorPrefs.SetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", value);
     }
+
+    public static int MotionTimeApproximationSampleCount
+    {
+        get => Mathf.Clamp(EditorPrefs.GetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", 5), 2, 101);
+        private set => EditorPrefs.SetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", value);
+    }
     
     [MenuItem("Tools/d4rkpl4y3r/Avatar Optimizer Settings")]
     static void Init()
@@ -43,6 +49,9 @@ public class AvatarOptimizerSettings : EditorWindow
         AutoRefreshPreviewTimeout = IntFieldLeft(
             new GUIContent("Auto Refresh Preview Timeout", "In milliseconds. If the preview takes longer than this to refresh, the auto refresh will be disabled."),
             AutoRefreshPreviewTimeout);
+        MotionTimeApproximationSampleCount = IntFieldLeft(
+            new GUIContent("Motion Time Approximation Sample Count", "The amount of samples used to approximate motion time states. Higher values are more accurate but generate more animation clips."),
+            MotionTimeApproximationSampleCount);
         EndSection();
         EditorGUILayout.Space();
         BeginSection("Default Settings");
