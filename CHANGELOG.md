@@ -1,3 +1,7 @@
+## v3.7.1
+### Bug Fixes
+* Fix `RenderersHaveSameAnimationCurves` only checking if the keyframe values match and ignoring the keyframe times.
+
 ## v3.7.0
 ### Features
 * Add global setting `MotionTimeApproximationSampleCount` to adjust the amount of samples used for the motion time approximation.

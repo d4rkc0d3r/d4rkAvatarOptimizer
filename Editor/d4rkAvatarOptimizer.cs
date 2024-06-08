@@ -936,7 +936,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
                 for (int i = 0; i < curve.keys.Length; ++i)
                 {
-                    if (curve.keys[i].value != otherCurve.keys[i].value)
+                    if (curve.keys[i].value != otherCurve.keys[i].value || curve.keys[i].time != otherCurve.keys[i].time)
                         return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
                 }
             }
