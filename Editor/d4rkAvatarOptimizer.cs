@@ -1308,21 +1308,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return true;
         }
         if (animatableBindings.Count == 0) {
-            // transform doesn't exist otherwise it would have at least 10 animatable bindings for position, rotation, and scale
             return false;
         }
         if (binding.propertyName.StartsWithSimple("material.") && TargetPathHasAnyMaterialSwap(binding.path)) {
             return true;
         }
-        if (binding.type == typeof(Transform)) {
-            // transforms have more animatable bindings than GetAnimatableBindings returns, so just assume it was one of those
-            return true;
-        }
-        if (binding.path == "" && binding.type == typeof(Animator)) {
-            // the animator doesn't return all the animatable bindings since the animation controllers are still just in the avatar descriptor instead of the animator
-            return true;
-        }
-        return animatableBindings.Contains((binding.propertyName, binding.type));
+        // only check for the property name when the type is a Renderer as GetAnimatableBindings seems to be very unreliable
+        // otherwise only check if the component exists
+        return animatableBindings.Contains((typeof(Renderer).IsAssignableFrom(binding.type) ? binding.propertyName : "ComponentExists", binding.type));
     }
     
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;

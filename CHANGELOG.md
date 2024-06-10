@@ -1,4 +1,7 @@
 ## v3.7.1
+### Changes
+* Removing unused bindings from clips only checks for specific property existence for Renderer bindings. All other types just check if the component exists for now.
+
 ### Bug Fixes
 * Fix `RenderersHaveSameAnimationCurves` only checking if the keyframe values match and ignoring the keyframe times.
 * Fix removing unused animation clip bindings not respecting the Exclusions list.
