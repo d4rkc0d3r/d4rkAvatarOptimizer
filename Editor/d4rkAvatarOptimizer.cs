@@ -1286,8 +1286,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
                     }
                 }
+                foreach (var component in targetObject.GetComponents<Component>()) {
+                    animatableBindings.Add(("ComponentExists", component.GetType()));
+                }
                 if (targetObject.TryGetComponent(out VRCStation station)) {
                     // even if box collider doesn't exist right now, the station script will create one at runtime
+                    animatableBindings.Add(("ComponentExists", typeof(BoxCollider)));
                     animatableBindings.Add(("m_IsTrigger", typeof(BoxCollider)));
                     animatableBindings.Add(("m_Enabled", typeof(BoxCollider)));
                     animatableBindings.Add(("m_Center.x", typeof(BoxCollider)));
@@ -1299,6 +1303,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
+        }
+        if (GetAllExcludedTransformPaths().Contains(binding.path)) {
+            return true;
         }
         if (animatableBindings.Count == 0) {
             // transform doesn't exist otherwise it would have at least 10 animatable bindings for position, rotation, and scale
@@ -4708,6 +4715,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
         }
         return cache_GetAllExcludedTransforms = allExcludedTransforms;
+    }
+
+    private HashSet<string> cache_GetAllExcludedTransformPaths;
+    public HashSet<string> GetAllExcludedTransformPaths() {
+        if (cache_GetAllExcludedTransformPaths != null)
+            return cache_GetAllExcludedTransformPaths;
+        return cache_GetAllExcludedTransformPaths = new HashSet<string>(GetAllExcludedTransforms().Select(t => GetPathToRoot(t)));
     }
 
     private void DestroyEditorOnlyGameObjects()

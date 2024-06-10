@@ -1,6 +1,7 @@
 ## v3.7.1
 ### Bug Fixes
 * Fix `RenderersHaveSameAnimationCurves` only checking if the keyframe values match and ignoring the keyframe times.
+* Fix removing unused animation clip bindings not respecting the Exclusions list.
 
 ## v3.7.0
 ### Features
