@@ -166,7 +166,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             CGProgram
         }
 
-        private class ParserException : System.Exception
+        public class ParserException : System.Exception
         {
             public ParserException(string message) : base(message) { }
         }
@@ -801,7 +801,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return (null, null);
             }
             string name = ParseIdentifierAndTrailingWhitespace(line, ref index);
-            if (name == null || index == line.Length || line[index] != '(')
+            if (name == null || name == "if" || name == "for" || name == "while" || index == line.Length || line[index] != '(')
             {
                 return (null, null);
             }
@@ -1864,13 +1864,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void DuplicateFunctionWithTextureParameter(List<string> source, ref int sourceLineIndex)
         {
-            int lineIndex = sourceLineIndex;
-            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref lineIndex);
-            if (func == null || texturesToReplaceCalls.Count == 0)
+            if (texturesToReplaceCalls.Count == 0)
             {
                 output.Add(source[sourceLineIndex]);
                 return;
             }
+
+            int lineIndex = sourceLineIndex;
+            var func = ShaderAnalyzer.ParseFunctionDefinition(source, ref lineIndex);
 
             if (!func.parameters.Any(p => p.type == "sampler2D" || (p.type.StartsWithSimple("Texture2D") && !p.type.StartsWithSimple("Texture2DArray"))))
             {
@@ -1879,7 +1880,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
 
             string functionDefinitionStart = source[sourceLineIndex].Split('(')[0] + "(";
-            var functionDefinition = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref sourceLineIndex);
+            List<string> functionDefinition;
+            try {
+                lineIndex = sourceLineIndex;
+                functionDefinition = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref lineIndex);
+                sourceLineIndex = lineIndex;
+            } catch (ShaderAnalyzer.ParserException) {
+                Debug.LogWarning($"Failed to parse function parameters for function {func.name}. Skipping duplication.");
+                output.Add(source[sourceLineIndex]);
+                return;
+            }
             for (int i = 0; i < functionDefinition.Count; i++)
             {
                 if (functionDefinition[i][0] != '#')
@@ -2645,43 +2655,41 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     DuplicateFunctionWithTextureParameter(source, ref sourceLineIndex);
                 }
-                else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.Length > 7 && line[0] == 's' && line[4] == 'c' && line.StartsWith("struct "))
+                else if ((arrayPropertyValues.Count > 0 || mergedMeshCount > 1) && line.StartsWithSimple("struct "))
                 {
                     output.Add(line);
-                    var match = Regex.Match(line, @"struct\s+(\w+)");
-                    if (match.Success)
+                    int dummyIndex = 0;
+                    ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref dummyIndex);
+                    var structName = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref dummyIndex);
+                    var vertIn = currentPass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
+                    if (structName == vertIn?.type)
                     {
-                        var structName = match.Groups[1].Value;
-                        var vertIn = currentPass.vertex.parameters.FirstOrDefault(p => p.isInput && p.semantic == null);
-                        if (structName == vertIn?.type)
+                        while (++sourceLineIndex < source.Count)
                         {
-                            while (++sourceLineIndex < source.Count)
+                            line = source[sourceLineIndex];
+                            var match = Regex.Match(line, @"^(\w+\s+)*(\w+)\s+(\w+)\s*:\s*(\w+)\s*;");
+                            if (match.Success)
                             {
-                                line = source[sourceLineIndex];
-                                match = Regex.Match(line, @"^(\w+\s+)*(\w+)\s+(\w+)\s*:\s*(\w+)\s*;");
-                                if (match.Success)
+                                var semantic = match.Groups[4].Value.ToLowerInvariant();
+                                var type = match.Groups[2].Value;
+                                if (semantic == "texcoord" || semantic == "texcoord0")
                                 {
-                                    var semantic = match.Groups[4].Value.ToLowerInvariant();
-                                    var type = match.Groups[2].Value;
-                                    if (semantic == "texcoord" || semantic == "texcoord0")
-                                    {
-                                        line = line.Replace(type, "float4");
-                                        if (type == "float2") vertexInUv0EndSwizzle = ".xy";
-                                        else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
-                                        else vertexInUv0EndSwizzle = "";
-                                        vertexInUv0Member = match.Groups[3].Value;
-                                        output.Add($"//{line}");
-                                        continue;
-                                    }
+                                    line = line.Replace(type, "float4");
+                                    if (type == "float2") vertexInUv0EndSwizzle = ".xy";
+                                    else if (type == "float3") vertexInUv0EndSwizzle = ".xyz";
+                                    else vertexInUv0EndSwizzle = "";
+                                    vertexInUv0Member = match.Groups[3].Value;
+                                    output.Add($"//{line}");
+                                    continue;
                                 }
-                                if (line[0] == '}')
-                                {
-                                    output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
-                                    output.Add(line);
-                                    break;
-                                }
-                                output.Add(line);
                             }
+                            if (line[0] == '}')
+                            {
+                                output.Add($"float4 {vertexInUv0Member} : TEXCOORD0;");
+                                output.Add(line);
+                                break;
+                            }
+                            output.Add(line);
                         }
                     }
                 }
@@ -2693,7 +2701,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var type = match.type;
                         foreach (var name in match.names)
                         {
-                            bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWith("sampler");
+                            bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWithSimple("sampler");
                             string referencedTexture = isTextureSamplerState ? name.Substring(7) : null;
                             if (isTextureSamplerState && !texturesToReplaceCalls.Contains(referencedTexture))
                             {
@@ -2719,13 +2727,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                         }
                     }
-                    else if (line.Length > 19 && line[0] == 'U' && line[6] == 'D' && line[17] == '2' && line.StartsWith("UNITY_DECLARE_TEX2D"))
+                    else if (line.StartsWithSimple("UNITY_DECLARE_TEX2D"))
                     {
                         var texName = line.Split('(')[1].Split(')')[0].Trim();
-                        bool hasSampler = !line.Contains("_NOSAMPLER");
                         if (!texturesToReplaceCalls.Contains(texName))
                         {
-                            if (hasSampler && parsedShader.properties.Any(p => p.name == texName))
+                            if (!line.Contains("_NOSAMPLER") && parsedShader.properties.Any(p => p.name == texName))
                             {
                                 texturesToCallSoTheSamplerDoesntDisappear.Add(texName);
                                 output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + texName);
