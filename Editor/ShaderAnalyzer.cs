@@ -47,6 +47,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 public string type;
                 public string name;
                 public string semantic;
+                public string defaultValue;
                 public bool isOutput = false;
                 public bool isInput = false;
                 public int arraySize = -1;
@@ -801,12 +802,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return (null, null);
             }
             string name = ParseIdentifierAndTrailingWhitespace(line, ref index);
-            if (name == null || name == "if" || name == "for" || name == "while" || index == line.Length || line[index] != '(')
+            if (name == null || name == "if" || name == "for" || name == "while" || name == "switch" || index == line.Length || line[index] != '(')
             {
                 return (null, null);
             }
             return (name, returnType);
         }
+
+        private static HashSet<string> FunctionParameterModifiers = new HashSet<string> {
+            "in", "out", "inout",
+            "point", "line", "triangle",
+            "precise", "const", "uniform",
+            "centroid", "linear", "sample", "noperspective", "nointerpolation" };
 
         public static ParsedShader.Function.Parameter ParseNextFunctionParameter(string line, ref int index)
         {
@@ -824,14 +831,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return null;
             var param = new ParsedShader.Function.Parameter();
             param.isInput = true;
-            if (potentialType == "in" || potentialType == "out" || potentialType == "inout") {
-                param.isInput = potentialType != "out";
-                param.isOutput = potentialType == "out" || potentialType == "inout";
-                potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
-                if (potentialType == null)
-                    return null;
-            }
-            if (potentialType == "const" || potentialType == "point" || potentialType == "line" || potentialType == "triangle") {
+            while (FunctionParameterModifiers.Contains(potentialType)) {
+                if (potentialType == "out")
+                    param.isInput = false;
+                else if (potentialType == "inout") {
+                    param.isOutput = true;
+                }
                 potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
                 if (potentialType == null)
                     return null;
@@ -860,12 +865,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
             param.semantic = null;
             if (index == line.Length)
                 return param;
-            if (line[index] != ':')
+            if (line[index] == ':') {
+                index++;
+                while (index < line.Length && char.IsWhiteSpace(line[index]))
+                    index++;
+                param.semantic = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            }
+            if (index == line.Length || line[index] != '=')
                 return param;
             index++;
-            while (index < line.Length && char.IsWhiteSpace(line[index]))
+            int defaultValueStart = index;
+            int parenthesisDepth = 0;
+            while (index < line.Length) {
+                if (line[index] == '(')
+                    parenthesisDepth++;
+                else if (line[index] == ')')
+                    parenthesisDepth--;
+                if ((parenthesisDepth == 0 && line[index] == ',') || parenthesisDepth < 0)
+                    break;
                 index++;
-            param.semantic = ParseIdentifierAndTrailingWhitespace(line, ref index);
+            }
+            param.defaultValue = line.Substring(defaultValueStart, index - defaultValueStart);
             return param;
         }
 
@@ -934,23 +954,47 @@ namespace d4rkpl4y3r.AvatarOptimizer
             string line = source[sourceLineIndex].Substring(source[sourceLineIndex].IndexOf('(') + 1);
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
+                if (line.Length != 0 && line[line.Length - 1] == ';')
+                {
+                    return new List<string>();
+                }
                 line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
-                if (line.StartsWith("#"))
+                if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                 }
                 else
                 {
-                    output.AddRange(line.Split(',').Select(s => s.Trim()).Where(s => s != ""));
+                    for (int i = 0; i < line.Length; i++)
+                    {
+                        while (i < line.Length && (line[i] == ',' || line[i] == ' ' || line[i] == '\t'))
+                            i++;
+                        if (i == line.Length || line[i] == ')')
+                        {
+                            break;
+                        }
+                        int previousCharIndex = i;
+                        var param = ParseNextFunctionParameter(line, ref i);
+                        if (param != null)
+                        {
+                            output.Add(line.Substring(previousCharIndex, i - previousCharIndex).Trim(' ', '\t'));
+                        }
+                        else if (line.Substring(previousCharIndex, i - previousCharIndex) != "void")
+                        {
+                            throw new ParserException($"Failed to parse function parameter : {line.Substring(previousCharIndex)} in:\n"
+                                + string.Join("\n", source.GetRange(sourceLineIndex-5, 6)));
+                        }
+                        if (i == line.Length || line[i] == ')')
+                        {
+                            break;
+                        }
+                    }
                 }
                 line = source[++sourceLineIndex];
             }
-            output[output.Count - 1] = output[output.Count - 1].Split(')')[0];
-            if (output[output.Count - 1].Length == 0)
-                output.RemoveAt(output.Count - 1);
             foreach (var declaration in output)
             {
-                if (declaration.StartsWith("#"))
+                if (declaration.StartsWithSimple("#"))
                     continue;
                 var match = Regex.Match(declaration, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
                 if (!match.Success)

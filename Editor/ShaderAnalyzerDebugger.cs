@@ -155,15 +155,23 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 EditorGUI.indentLevel--;
             }
             var parseErrors = parsedShaders.Where(s => !s.parsedCorrectly).ToList();
+            void ShowShaderWithLabel(ParsedShader s, string label)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (label.Contains('\n'))
+                        EditorGUILayout.LabelField(new GUIContent(label.Split('\n')[0], label));
+                    else
+                        EditorGUILayout.LabelField(label);
+                    EditorGUILayout.ObjectField(Shader.Find(s.name), typeof(Shader), false);
+                }
+            }
             if (Foldout(ref showParseErrors, $"Parse Errors ({parseErrors.Count})"))
             {
                 EditorGUI.indentLevel++;
                 foreach (var shader in parseErrors)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(shader.errorMessage);
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                    EditorGUILayout.EndHorizontal();
+                    ShowShaderWithLabel(shader, shader.errorMessage);
                 }
                 EditorGUI.indentLevel--;
             }
@@ -173,10 +181,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 EditorGUI.indentLevel++;
                 foreach (var shader in unmergable)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(shader.CantMergeReason());
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                    EditorGUILayout.EndHorizontal();
+                    ShowShaderWithLabel(shader, shader.CantMergeReason());
                 }
                 EditorGUI.indentLevel--;
             }
@@ -186,10 +191,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 EditorGUI.indentLevel++;
                 foreach (var shader in customTextureDeclarations)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField($"Has {shader.customTextureDeclarations.Count} macros");
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                    EditorGUILayout.EndHorizontal();
+                    ShowShaderWithLabel(shader, $"Has {shader.customTextureDeclarations.Count} macros");
                     EditorGUI.indentLevel++;
                     foreach (var declaration in shader.customTextureDeclarations)
                     {
@@ -205,10 +207,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 EditorGUI.indentLevel++;
                 foreach (var shader in hasMultiIncludeFiles)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField($"Has {shader.multiIncludeFileCount.Values.Count(v => v > 1)} multi include files");
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                    EditorGUILayout.EndHorizontal();
+                    ShowShaderWithLabel(shader, $"Has {shader.multiIncludeFileCount.Values.Count(v => v > 1)} multi include files");
                     EditorGUI.indentLevel++;
                     foreach (var file in shader.multiIncludeFileCount.Where(f => f.Value > 1))
                     {
@@ -225,10 +224,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 EditorGUI.indentLevel++;
                 foreach (var shader in errorLess)
                 {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(shader.name);
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                    EditorGUILayout.EndHorizontal();
+                    ShowShaderWithLabel(shader, shader.name);
                 }
                 EditorGUI.indentLevel--;
             }

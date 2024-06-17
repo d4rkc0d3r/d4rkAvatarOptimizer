@@ -1,3 +1,7 @@
+## v3.7.2
+### Bug Fixes
+* Fix shader analyzer not parsing default values for function parameters. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/109)
+
 ## v3.7.1
 ### Changes
 * Removing unused bindings from clips only checks for specific property existence for Renderer bindings. All other types just check if the component exists for now.
