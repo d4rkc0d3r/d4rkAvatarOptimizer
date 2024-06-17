@@ -1264,6 +1264,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Insert(3, "{");
                 output.Insert(4, "}");
             }
+            if (state != ParseState.ShaderLab)
+            {
+                throw new ParserException("Parse state is not ShaderLab at the end of the file.");
+            }
             foreach (var ifexPropName in parsedShader.ifexParameters)
             {
                 if (parsedShader.propertyTable.TryGetValue(ifexPropName, out var prop))
