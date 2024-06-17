@@ -1271,7 +1271,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         { 'r', 'x' }, { 'g', 'y' }, { 'b', 'z' }, { 'a', 'w' },
     };
     Dictionary<string, HashSet<(string property, Type type)>> cache_IsAnimatableBinding = null;
-    private bool IsAnimatableBinding(EditorCurveBinding binding) {
+    public bool IsAnimatableBinding(EditorCurveBinding binding) {
         if (cache_IsAnimatableBinding == null)
             cache_IsAnimatableBinding = new Dictionary<string, HashSet<(string property, Type type)>>();
         if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings)) {
@@ -1286,6 +1286,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
                     }
                 }
+                animatableBindings.Add(("ComponentExists", typeof(GameObject)));
                 foreach (var component in targetObject.GetComponents<Component>()) {
                     animatableBindings.Add(("ComponentExists", component.GetType()));
                 }
