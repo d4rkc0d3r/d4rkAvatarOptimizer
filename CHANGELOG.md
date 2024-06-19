@@ -1,4 +1,8 @@
 ## v3.7.2
+### Changes
+* Moved the code to ensure texture samplers exist at the end of the fragment instead of the beginning.
+  * This improves performance with poi fur.
+
 ### Bug Fixes
 * Fix shader analyzer not parsing default values for function parameters. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/109)
 * Fix `Merge Same Dimension Textures` merging textures with different filter or wrap settings.

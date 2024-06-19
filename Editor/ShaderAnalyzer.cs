@@ -1339,6 +1339,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
+            if (parsedShader.mismatchedCurlyBraces)
+            {
+                throw new ParserException("Mismatched curly braces.");
+            }
             if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
             {
                 throw new ParserException("A pass is missing a vertex or fragment shader.");
@@ -1369,6 +1373,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private string vertexInUv0EndSwizzle = "";
         private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
         private List<string> setKeywords;
+        private int curlyBraceDepth = 0;
 
         private ShaderOptimizer() {}
 
@@ -1687,7 +1692,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             InjectIsActiveMeshCheck(nullReturn);
             InjectArrayPropertyInitialization();
             InjectAnimatedPropertyInitialization();
-            int braceDepth = 0;
+            curlyBraceDepth++;
             while (++sourceLineIndex < source.Count)
             {
                 ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
@@ -1708,7 +1713,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 originalVertexShader?.Add(line);
                 if (line == "}")
                 {
-                    if (braceDepth-- == 0)
+                    if (--curlyBraceDepth == 0)
                     {
                         if (isVoidReturn && needToPassOnMeshOrMaterialID)
                         {
@@ -1724,9 +1729,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 else if (line == "{")
                 {
                     output.Add(line);
-                    braceDepth++;
+                    curlyBraceDepth++;
                 }
-                else if (needToPassOnMeshOrMaterialID && line.StartsWith("return"))
+                else if (needToPassOnMeshOrMaterialID && line.StartsWithSimple("return"))
                 {
                     output.Add("{");
                     if (!isVoidReturn)
@@ -1783,6 +1788,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 line = source[++sourceLineIndex];
             }
+            curlyBraceDepth++;
             string geometryType = inParam.arraySize == 1 ? "point" : inParam.arraySize == 2 ? "line" : "triangle";
             output.Add($"void {func.name}({geometryType} "
                 + (usesInputWrapper ? "geometryInputWrapper d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
@@ -1811,23 +1817,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 return;
             }
-            int braceDepth = 0;
             while (++sourceLineIndex < source.Count)
             {
                 ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 line = source[sourceLineIndex];
                 if (line == "}")
                 {
-                    if (braceDepth-- == 0)
+                    output.Add(line);
+                    if (--curlyBraceDepth == 0)
                     {
                         break;
                     }
-                    output.Add(line);
                 }
                 else if (line == "{")
                 {
                     output.Add(line);
-                    braceDepth++;
+                    curlyBraceDepth++;
                 }
                 else if (line.Contains(outParam.name + ".Append("))
                 {
@@ -1844,7 +1849,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                 }
             }
-            output.Add("}");
         }
 
         private void InjectFragmentShaderCode(
@@ -1885,29 +1889,51 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                 }
             }
+            curlyBraceDepth++;
             if (texturesToCallSoTheSamplerDoesntDisappear.Count > 0)
             {
-                output.Add("if (d4rkAvatarOptimizer_Zero)");
-                output.Add("{");
-                output.Add("float d4rkAvatarOptimizer_sum = 0;");
-                foreach (var tex in texturesToCallSoTheSamplerDoesntDisappear)
-                {
-                    output.Add($"#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_{tex}");
-                    var texType = parsedShader.properties.Find(p => p.name == tex)?.type;
-                    if (texType == ParsedShader.Property.Type.TextureCube
-                        || texType == ParsedShader.Property.Type.TextureCubeArray)
-                    {
-                        output.Add($"d4rkAvatarOptimizer_sum += {tex}.Sample(sampler{tex}, 0).x;");
-                    }
-                    else
-                    {
-                        output.Add($"d4rkAvatarOptimizer_sum += {tex}.Load(0).x;");
-                    }
-                    output.Add("#endif");
-                }
-                output.Add($"if (d4rkAvatarOptimizer_sum) {nullReturn}");
-                output.Add("}");
+                shouldInjectDummyTextureUsage = true;
+                dummyTextureNullReturn = nullReturn;
             }
+        }
+
+        private bool shouldInjectDummyTextureUsage = false;
+        private string dummyTextureNullReturn = null;
+        private void InjectDummyTextureUsage()
+        {
+            if (!shouldInjectDummyTextureUsage)
+                return;
+            shouldInjectDummyTextureUsage = false;
+            string returnStatement = null;
+            output.RemoveAt(output.Count - 1);
+            if (output[output.Count - 1].StartsWithSimple("return"))
+            {
+                returnStatement = output[output.Count - 1];
+                output.RemoveAt(output.Count - 1);
+            }
+            output.Add("if (d4rkAvatarOptimizer_Zero)");
+            output.Add("{");
+            output.Add("float d4rkAvatarOptimizer_sum = 0;");
+            foreach (var tex in texturesToCallSoTheSamplerDoesntDisappear)
+            {
+                output.Add($"#ifdef DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_{tex}");
+                var texType = parsedShader.properties.Find(p => p.name == tex)?.type;
+                if (texType == ParsedShader.Property.Type.TextureCube
+                    || texType == ParsedShader.Property.Type.TextureCubeArray)
+                {
+                    output.Add($"d4rkAvatarOptimizer_sum += {tex}.Sample(sampler{tex}, 0).x;");
+                }
+                else
+                {
+                    output.Add($"d4rkAvatarOptimizer_sum += {tex}.Load(0).x;");
+                }
+                output.Add("#endif");
+            }
+            output.Add($"if (d4rkAvatarOptimizer_sum) {dummyTextureNullReturn}");
+            output.Add("}");
+            if (returnStatement != null)
+                output.Add(returnStatement);
+            output.Add("}");
         }
 
         private void DuplicateFunctionWithTextureParameter(List<string> source, ref int sourceLineIndex)
@@ -1959,8 +1985,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
             output.AddRange(functionDefinition);
             
-            int braceDepth = 0;
             var functionBody = new List<string>();
+            int exitCurlyBraceDepth = curlyBraceDepth++;
             while (++sourceLineIndex < source.Count)
             {
                 ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
@@ -1975,14 +2001,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 functionBody.Add(line);
                 if (line == "}")
                 {
-                    if (braceDepth-- == 0)
+                    if (--curlyBraceDepth == exitCurlyBraceDepth)
                     {
                         break;
                     }
                 }
                 else if (line == "{")
                 {
-                    braceDepth++;
+                    curlyBraceDepth++;
                 }
             }
             output.AddRange(functionBody);
@@ -2686,6 +2712,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     continue;
                 }
+                if (line == "{")
+                {
+                    output.Add(line);
+                    curlyBraceDepth++;
+                    continue;
+                }
+                if (line == "}")
+                {
+                    output.Add(line);
+                    if (--curlyBraceDepth == 0 && shouldInjectDummyTextureUsage)
+                        InjectDummyTextureUsage();
+                    continue;
+                }
                 var func = ShaderAnalyzer.ParseFunctionDefinition(line);
                 if (currentPass.vertex != null && func.name == currentPass.vertex.name)
                 {
@@ -3026,7 +3065,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     lineIndex++;
+                    curlyBraceDepth = 0;
                     ParseCodeLinesRecursive(lines, ref lineIndex, endSymbol);
+                    if (curlyBraceDepth != 0)
+                    {
+                        throw new ShaderAnalyzer.ParserException($"Unbalanced curly braces in {parsedShader.name} pass {passID}");
+                    }
                     var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
