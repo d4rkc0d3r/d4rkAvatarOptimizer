@@ -1,6 +1,7 @@
 ## v3.7.2
 ### Bug Fixes
 * Fix shader analyzer not parsing default values for function parameters. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/109)
+* Fix `Merge Same Dimension Textures` merging textures with different filter or wrap settings.
 
 ## v3.7.1
 ### Changes

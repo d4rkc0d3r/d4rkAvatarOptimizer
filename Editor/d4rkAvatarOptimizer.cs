@@ -3071,12 +3071,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             textures.Count, textures[0].format, textures[0].mipmapCount > 1, isLinear);
         texArray.anisoLevel = textures[0].anisoLevel;
         texArray.wrapMode = textures[0].wrapMode;
+        texArray.filterMode = textures[0].filterMode;
         for (int i = 0; i < textures.Count; i++)
         {
             Graphics.CopyTexture(textures[i], 0, texArray, i);
         }
         Profiler.EndSection();
-        texArray.name = $"{textures[0].width}x{textures[0].height}_{textures[0].format}_{(isLinear ? "linear" : "sRGB")}_2DArray";
+        texArray.name = $"{texArray.width}x{texArray.height}_{texArray.format}_{(isLinear ? "linear" : "sRGB")}_{texArray.wrapMode}_{texArray.filterMode}_2DArray";
         CreateUniqueAsset(texArray, $"{texArray.name}.asset");
         return texArray;
     }
@@ -3598,6 +3599,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (a2D.format == TextureFormat.DXT1Crunched || a2D.format == TextureFormat.DXT5Crunched)
             return false;
         if (a2D.mipmapCount != b2D.mipmapCount)
+            return false;
+        if (a2D.filterMode != b2D.filterMode)
+            return false;
+        if (a2D.wrapMode != b2D.wrapMode)
             return false;
         if (IsTextureLinear(a2D) != IsTextureLinear(b2D))
             return false;
