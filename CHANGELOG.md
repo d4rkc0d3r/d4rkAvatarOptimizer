@@ -6,6 +6,7 @@
 ### Bug Fixes
 * Fix shader analyzer not parsing default values for function parameters. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/109)
 * Fix `Merge Same Dimension Textures` merging textures with different filter or wrap settings.
+* Fix `Delete Unused GameObjects` not marking the phys bone root as moving when it has multiple children that are all but one ignored.
 
 ## v3.7.1
 ### Changes
