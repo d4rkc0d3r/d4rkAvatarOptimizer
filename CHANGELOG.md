@@ -1,4 +1,7 @@
 ## v3.7.2
+### Features
+* Strip Meta pass from shaders that have it.
+
 ### Changes
 * Moved the code to ensure texture samplers exist at the end of the fragment instead of the beginning.
   * This improves performance with poi fur.

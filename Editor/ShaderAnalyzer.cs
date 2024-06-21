@@ -3077,6 +3077,23 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
                     }
+                    if (lightMode == "Meta")
+                    {
+                        while (output[output.Count - 1] != "Pass")
+                        {
+                            output.RemoveAt(output.Count - 1);
+                        }
+                        output.RemoveAt(output.Count - 1);
+                        int curlyBraceDepthUntilEndOfPass = 2;
+                        while (curlyBraceDepthUntilEndOfPass > 0)
+                        {
+                            line = lines[++lineIndex];
+                            curlyBraceDepthUntilEndOfPass += line == "{" ? 1 : 0;
+                            curlyBraceDepthUntilEndOfPass -= line == "}" ? 1 : 0;
+                            passID += line == "CGPROGRAM" || line == "HLSLPROGRAM" ? 1 : 0;
+                        }
+                        output.Add("// Meta pass removed");
+                    }
                 }
                 else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                 {
