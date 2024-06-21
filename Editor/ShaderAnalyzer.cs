@@ -251,6 +251,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 parsedShader.errorMessage = "ORLShader Generator 6.2 is not installed.";
                 #endif
             }
+            else if (!shaderPath.EndsWith(".shader"))
+            {
+                parsedShader.parsedCorrectly = false;
+                doneParsing = true;
+                parsedShader.errorMessage = $"Unsupported shader file type: {Path.GetExtension(shaderPath)}";
+            }
         }
 
         private ParsedShader Parse()

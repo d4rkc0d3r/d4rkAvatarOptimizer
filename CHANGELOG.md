@@ -2,6 +2,7 @@
 ### Changes
 * Moved the code to ensure texture samplers exist at the end of the fragment instead of the beginning.
   * This improves performance with poi fur.
+* Shaders that don't end in `.shader` or `.orlshader` are now explicitly marked as not supported.
 
 ### Bug Fixes
 * Fix shader analyzer not parsing default values for function parameters. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/109)
