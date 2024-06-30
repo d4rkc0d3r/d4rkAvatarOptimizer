@@ -1,3 +1,7 @@
+## v3.7.3
+### Bug Fixes
+* Fix the hardcoded `_VirtualLens_Root` exclusion not working for the `Delete Unused GameObjects` option.
+
 ## v3.7.2
 ### Features
 * Strip Meta pass from shaders that have it.
