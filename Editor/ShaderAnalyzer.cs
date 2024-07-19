@@ -2839,7 +2839,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             else if (!arrayPropertyValues.ContainsKey(name)
                                 && !animatedPropertyValues.ContainsKey(name)
                                 && !texturesToReplaceCalls.Contains(name)
-                                && !(isTextureSamplerState && texturesToReplaceCalls.Contains(referencedTexture)))
+                                && !(isTextureSamplerState && texturesToReplaceCalls.Contains(referencedTexture))
+                                && ((name != "_LightColor0" && name != "_SpecColor")
+                                    || alreadyIncludedFiles.Peek().LastOrDefault() == "UnityLightingCommon.cginc"))
                             {
                                 output.Add(type + " " + name + ";");
                             }

@@ -1,6 +1,7 @@
 ## v3.7.3
 ### Bug Fixes
 * Fix the hardcoded `_VirtualLens_Root` exclusion not working for the `Delete Unused GameObjects` option.
+* Fix shader optimizer not handling shaders correctly that declare `_LightColor0` or `_SpecColor` manually instead of using the unity include. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/111)
 
 ## v3.7.2
 ### Features
