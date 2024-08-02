@@ -1,6 +1,7 @@
 ## v3.7.4
 ### Bug Fixes
 * Fix viseme blendshapes and eyelid blendshapes sometimes not getting reassigned correctly if they aren't on a mesh named `Body`.
+* Fix crash with missing scripts on the avatar.
 
 ## v3.7.3
 ### Bug Fixes

@@ -1111,7 +1111,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var obj = skinnedMeshRenderer.gameObject;
             DestroyImmediate(skinnedMeshRenderer);
-            if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetComponents<Component>().Length == 1))
+            if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1))
                 DestroyImmediate(obj);
         }
     }
@@ -1287,7 +1287,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
                 animatableBindings.Add(("ComponentExists", typeof(GameObject)));
-                foreach (var component in targetObject.GetComponents<Component>()) {
+                foreach (var component in targetObject.GetNonNullComponents()) {
                     animatableBindings.Add(("ComponentExists", component.GetType()));
                 }
                 if (targetObject.TryGetComponent(out VRCStation station)) {
@@ -2003,7 +2003,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     // AnimationUtility.GetAnimatableBindings(transform.gameObject, gameObject)
                     // is too slow, so we just check if the components mentioned in the bindings exist at that path
-                    possibleTypeNames.UnionWith(transform.GetComponents<Component>().Select(c => c.GetType().FullName));
+                    possibleTypeNames.UnionWith(transform.GetNonNullComponents().Select(c => c.GetType().FullName));
                     possibleTypeNames.Add(typeof(GameObject).FullName);
                 }
                 possibleBindingTypes[binding.path] = possibleTypeNames;
@@ -2224,7 +2224,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     result[physBone].UnionWith(dependencies);
                 }
-                result[physBone].UnionWith(current.GetComponents<Component>().Where(c => c != physBone && !(c is Transform)));
+                result[physBone].UnionWith(current.GetNonNullComponents().Where(c => c != physBone && !(c is Transform)));
             }
         }
 
@@ -2774,7 +2774,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
-            .SelectMany(t => t.GetComponents<Component>().Where(c => c != null && !(c is Transform))));
+            .SelectMany(t => t.GetNonNullComponents().Where(c => !(c is Transform))));
         
         var exclusions = GetAllExcludedTransforms();
 
@@ -4643,7 +4643,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
-                if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetComponents<Component>().Length == 1))
+                if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1))
                     DestroyImmediate(obj);
             }
 
@@ -4834,7 +4834,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         foreach (var obj in transform.GetAllDescendants())
         {
-            if (obj.GetComponents<Component>().Length > 1)
+            if (obj.GetNonNullComponents().Length > 1)
             {
                 used.Add(obj);
             }

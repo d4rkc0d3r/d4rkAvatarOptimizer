@@ -83,11 +83,35 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
                 }
             }
         }
+
+        public static Component[] GetNonNullComponents(this Transform transform)
+        {
+            var components = transform.GetComponents<Component>();
+            if (components.All(c => c != null))
+            {
+                return components;
+            }
+            var path = new List<string>();
+            var current = transform;
+            while (current != null)
+            {
+                path.Add(current.name);
+                current = current.parent;
+            }
+            string pathString = string.Join("/", path.Reverse<string>());
+            var nonNullComponents = components.Where(c => c != null).ToArray();
+            Debug.LogWarning($"Found {components.Length - nonNullComponents.Length} null components on {pathString}. You might be missing some scripts.");
+            return nonNullComponents;
+        }
+
+        public static Component[] GetNonNullComponents(this GameObject gameObject)
+        {
+            return gameObject.transform.GetNonNullComponents();
+        }
     }
 
     public static class AnimatorControllerExtensions
     {
-
         public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
         {
             var queue = new Queue<AnimatorStateMachine>();
