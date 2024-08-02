@@ -4557,9 +4557,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     if (ids[i] < 0)
                         continue;
-                    for (int meshID = 0; meshID < combinableSkinnedMeshes.Count; meshID++)
+                    for (int meshID = 0; meshID < basicMergedMeshesList.Count; meshID++)
                     {
-                        if (combinableSkinnedMeshes[meshID] == eyeLookMeshRenderer)
+                        if (basicMergedMeshesList[meshID] == eyeLookMeshRenderer)
                         {
                             avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh = meshRenderer;
                             ids[i] = combinedMesh.GetBlendShapeIndex(blendShapeMeshIDtoNewName[(meshID, ids[i])]);
@@ -4569,9 +4569,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 avDescriptor.customEyeLookSettings.eyelidsBlendshapes = ids;
             }
 
-            for (int meshID = 0; meshID < combinableSkinnedMeshes.Count; meshID++)
+            for (int meshID = 0; meshID < basicMergedMeshesList.Count; meshID++)
             {
-                var oldVisemeMesh = combinableSkinnedMeshes[meshID];
+                var oldVisemeMesh = basicMergedMeshesList[meshID];
                 if (avDescriptor.VisemeSkinnedMesh == oldVisemeMesh)
                 {
                     avDescriptor.VisemeSkinnedMesh = meshRenderer;

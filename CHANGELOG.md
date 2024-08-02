@@ -1,3 +1,7 @@
+## v3.7.4
+### Bug Fixes
+* Fix viseme blendshapes and eyelid blendshapes sometimes not getting reassigned correctly if they aren't on a mesh named `Body`.
+
 ## v3.7.3
 ### Bug Fixes
 * Fix the hardcoded `_VirtualLens_Root` exclusion not working for the `Delete Unused GameObjects` option.
