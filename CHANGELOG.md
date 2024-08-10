@@ -1,3 +1,7 @@
+## v3.8.0
+### Features
+* Add support for VRChat constraints.
+
 ## v3.7.4
 ### Bug Fixes
 * Fix viseme blendshapes and eyelid blendshapes sometimes not getting reassigned correctly if they aren't on a mesh named `Body`.

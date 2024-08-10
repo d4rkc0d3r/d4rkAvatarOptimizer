@@ -2879,7 +2879,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         var constraints = GetComponentsInChildren<Behaviour>(true)
             .Where(b => !alwaysDisabledComponents.Contains(b))
-            .Where(b => b is IConstraint).ToList();
+            .Where(b => b.GetType().Name.Contains("Constraint")).ToList();
         foreach (var constraint in constraints)
         {
             transforms.Add(constraint.transform);
@@ -2888,7 +2888,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var headChopType = Type.GetType("VRC.SDK3.Avatars.Components.VRCHeadChop, VRCSDK3A");
         if (headChopType != null) {
             foreach (var headChop in GetComponentsInChildren(headChopType, true)) {
-                var so = new SerializedObject(headChop);
+                using var so = new SerializedObject(headChop);
                 var targetBonesProperty = so.FindProperty("targetBones");
                 for (int i = 0; i < targetBonesProperty.arraySize; i++) {
                     var targetBone = targetBonesProperty.GetArrayElementAtIndex(i).FindPropertyRelative("transform").objectReferenceValue as Transform;
@@ -4712,6 +4712,35 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return cache_GetAllExcludedTransformPaths;
         return cache_GetAllExcludedTransformPaths = new HashSet<string>(GetAllExcludedTransforms().Select(t => GetPathToRoot(t)));
     }
+    
+    HashSet<Transform> FindReferencedTransforms(Component component)
+    {
+        using var serializedObject = new SerializedObject(component);
+        var visitedIds = new HashSet<long>();
+        var iterator = serializedObject.GetIterator();
+        var referencedTransforms = new HashSet<Transform>();
+        bool enterChildren = true;
+        while (iterator.Next(enterChildren))
+        {
+            enterChildren = true;
+            if (iterator.propertyType == SerializedPropertyType.ObjectReference && iterator.objectReferenceValue != null)
+            {
+                if (iterator.objectReferenceValue is Transform transform)
+                {
+                    referencedTransforms.Add(transform);
+                }
+            }
+            else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
+            {
+                var id = iterator.managedReferenceId;
+                if (!visitedIds.Add(id))
+                {
+                    enterChildren = false;
+                }
+            }
+        }
+        return referencedTransforms;
+    }
 
     private void DestroyEditorOnlyGameObjects()
     {
@@ -4764,54 +4793,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (!DeleteUnusedGameObjects)
             return;
 
-        var used = new HashSet<Transform>(
-            GetComponentsInChildren<SkinnedMeshRenderer>(true).SelectMany(s => s.bones));
+        var used = new HashSet<Transform>();
 
         var movingTransforms = FindAllMovingTransforms();
         used.UnionWith(movingTransforms);
         used.UnionWith(movingTransforms.Select(t => t != null ? t.parent : null));
-        
-        foreach (var constraint in GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
-        {
-            used.Add((constraint as Component).transform.parent);
-            for (int i = 0; i < constraint.sourceCount; i++)
-            {
-                used.Add(constraint.GetSource(i).sourceTransform);
-            }
-            used.Add((constraint as AimConstraint)?.worldUpObject);
-            used.Add((constraint as LookAtConstraint)?.worldUpObject);
-        }
 
         used.Add(transform);
         used.UnionWith(GetComponentsInChildren<Animator>(true)
             .Select(a => a.transform.Find("Armature")).Where(t => t != null));
         used.UnionWith(transform.Cast<Transform>().Where(t => t.name.StartsWithSimple("NaNimation ")));
-
-        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
-        used.Add(avDescriptor.collider_footL.transform);
-        used.Add(avDescriptor.collider_footR.transform);
-        used.Add(avDescriptor.collider_handL.transform);
-        used.Add(avDescriptor.collider_handR.transform);
-        used.Add(avDescriptor.collider_head.transform);
-        used.Add(avDescriptor.collider_torso.transform);
-        used.Add(avDescriptor.collider_fingerIndexL.transform);
-        used.Add(avDescriptor.collider_fingerIndexR.transform);
-        used.Add(avDescriptor.collider_fingerMiddleL.transform);
-        used.Add(avDescriptor.collider_fingerMiddleR.transform);
-        used.Add(avDescriptor.collider_fingerRingL.transform);
-        used.Add(avDescriptor.collider_fingerRingR.transform);
-        used.Add(avDescriptor.collider_fingerLittleL.transform);
-        used.Add(avDescriptor.collider_fingerLittleR.transform);
-
-        foreach (var skinnedRenderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
-        {
-            used.Add(skinnedRenderer.rootBone);
-        }
-
-        foreach (var renderer in GetComponentsInChildren<Renderer>(true))
-        {
-            used.Add(renderer.probeAnchor);
-        }
 
         foreach (var contact in GetComponentsInChildren<ContactBase>(true))
         {
@@ -4832,12 +4823,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             used.Add(collider.GetRootTransform().parent);
         }
 
-        foreach (var obj in transform.GetAllDescendants())
+        foreach (var c in GetComponentsInChildren<Component>(true).Where(c => c != null && !(c is Transform)))
         {
-            if (obj.GetNonNullComponents().Length > 1)
+            used.Add(c.transform);
+            if (c.GetType().Name.Contains("Constraint"))
             {
-                used.Add(obj);
+                used.Add(c.transform.parent);
             }
+            used.UnionWith(FindReferencedTransforms(c));
         }
 
         used.UnionWith(FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)).Where(t => t != null));
