@@ -392,6 +392,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
                     currentFilePath = Path.Combine(assetFolderPath, currentFilePath.TrimStart('/'));
                 }
+                if (currentFilePath.StartsWithSimple("/Packages/") || currentFilePath.StartsWithSimple("Packages/"))
+                {
+                    var path = Path.GetDirectoryName(callerPath);
+                    var packageFolderPath = path.IndexOf("Packages") != -1 ? path.Substring(0, path.IndexOf("Packages") - 1) : path;
+                    currentFilePath = Path.Combine(packageFolderPath, currentFilePath.TrimStart('/'));
+                }
                 else if (!isTopLevelFile)
                 {
                     currentFilePath = Path.GetDirectoryName(callerPath) + "/" + currentFilePath;
