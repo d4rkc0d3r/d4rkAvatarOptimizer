@@ -1,9 +1,10 @@
 ## v3.8.0
 ### Features
 * Add support for VRChat constraints.
-* Add support for FinalIK components with the `Delete Unused GameObjects` option.
-* Add support for material variants.
+* Add support for FinalIK components with the `Delete Unused GameObjects` option. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/115)
+* Add support for material variants. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/116)
 * Add support for global `Packages` include paths for local packages.
+* Add support for prefab variants. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/112)
 
 ### Changes
 * Changed default settings to match the `Basic` preset.

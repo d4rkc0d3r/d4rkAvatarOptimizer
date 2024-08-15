@@ -137,7 +137,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             using (new EditorGUI.IndentLevelScope())
             {
-                DynamicTransformList(ref optimizer.ExcludeTransforms);
+                DynamicTransformList(optimizer, nameof(optimizer.ExcludeTransforms));
             }
         }
 
@@ -1297,16 +1297,27 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    private void DynamicTransformList(ref List<Transform> list)
+    private void DynamicTransformList(Object obj, string propertyPath)
     {
-        list.Add(null);
-        for (int i = 0; i < list.Count; i++)
+        using var serializedObject = new SerializedObject(obj);
+        // Find the SerializedProperty representing the list of Transforms
+        SerializedProperty listProperty = serializedObject.FindProperty(propertyPath);
+
+        // Add a null element at the end of the list for the user to add new elements
+        listProperty.InsertArrayElementAtIndex(listProperty.arraySize);
+        SerializedProperty newElement = listProperty.GetArrayElementAtIndex(listProperty.arraySize - 1);
+        newElement.objectReferenceValue = null;
+
+        for (int i = 0; i < listProperty.arraySize; i++)
         {
+            SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
             Transform output = null;
+
             using (new EditorGUILayout.HorizontalScope())
             {
-                output = EditorGUILayout.ObjectField(list[i], typeof(Transform), true) as Transform;
-                if (i == list.Count - 1)
+                output = EditorGUILayout.ObjectField(element.objectReferenceValue, typeof(Transform), true) as Transform;
+
+                if (i == listProperty.arraySize - 1)
                 {
                     GUILayout.Space(23);
                 }
@@ -1315,17 +1326,32 @@ public class d4rkAvatarOptimizerEditor : Editor
                     output = null;
                 }
             }
-            if (list[i] != output)
+
+            if (element.objectReferenceValue != output)
             {
                 ClearUICaches();
             }
+
             if (output != null && optimizer.GetTransformPathToRoot(output) == null)
             {
                 output = null;
             }
-            list[i] = output;
+
+            element.objectReferenceValue = output;
         }
-        list = list.Where(o => o != null).ToList();
+
+        // Remove any null elements from the list
+        for (int i = listProperty.arraySize - 1; i >= 0; i--)
+        {
+            SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
+            if (element.objectReferenceValue == null)
+            {
+                listProperty.DeleteArrayElementAtIndex(i);
+            }
+        }
+
+        // Apply the modified properties to the serializedObject
+        serializedObject.ApplyModifiedProperties();
     }
 
     static Texture _perfIcon_Excellent;
