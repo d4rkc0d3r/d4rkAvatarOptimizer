@@ -91,7 +91,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        ToggleOptimizerProperty(nameof(optimizer.OptimizeOnUpload));
+        ToggleOptimizerProperty(nameof(optimizer.ApplyOnUpload));
         if (d4rkAvatarOptimizer.HasCustomShaderSupport)
             ToggleOptimizerProperty(nameof(optimizer.WritePropertiesAsStaticValues));
         ToggleOptimizerProperty(nameof(optimizer.MergeSkinnedMeshes));

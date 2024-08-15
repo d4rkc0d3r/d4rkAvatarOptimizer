@@ -35,7 +35,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     [System.Serializable]
     public class Settings
     {
-        public bool OptimizeOnUpload = true;
+        public bool ApplyOnUpload = true;
         public bool WritePropertiesAsStaticValues = false;
         public bool MergeSkinnedMeshes = true;
         public int MergeSkinnedMeshesWithShaderToggle = 0;
@@ -196,9 +196,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public static bool HasCustomShaderSupport { get => EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64; }
 
     #if HAS_IEDITOR_ONLY
-    public bool OptimizeOnUpload { get { return settings.OptimizeOnUpload; } set { settings.OptimizeOnUpload = value; } }
+    public bool ApplyOnUpload { get { return settings.ApplyOnUpload; } set { settings.ApplyOnUpload = value; } }
     #else
-    public bool OptimizeOnUpload { get { return false; } set { settings.OptimizeOnUpload = false; } }
+    public bool ApplyOnUpload { get { return false; } set { settings.ApplyOnUpload = false; } }
     #endif
     public bool WritePropertiesAsStaticValues {
         get { return HasCustomShaderSupport && (settings.WritePropertiesAsStaticValues || MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials); }
@@ -260,7 +260,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             case nameof(CombineApproximateMotionTimeAnimations):
                 return settings.OptimizeFXLayer;
             #if !HAS_IEDITOR_ONLY
-            case nameof(OptimizeOnUpload):
+            case nameof(ApplyOnUpload):
                 return false;
             #endif
             default:
@@ -269,7 +269,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     }
 
     private static Dictionary<string, string> FieldDisplayName = new Dictionary<string, string>() {
-        {nameof(OptimizeOnUpload), "Apply on Upload"},
+        {nameof(ApplyOnUpload), "Apply on Upload"},
         {nameof(WritePropertiesAsStaticValues), "Write Properties as Static Values"},
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},
@@ -304,7 +304,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private static List<(string name, Dictionary<string, object>)> SettingsPresets = new List<(string name, Dictionary<string, object>)>()
     {
         ("Basic", new Dictionary<string, object>() {
-            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.ApplyOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), false},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 0},
@@ -324,7 +324,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.DeleteUnusedGameObjects), 0},
         }),
         ("Shader Toggles", new Dictionary<string, object>() {
-            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.ApplyOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 1},
@@ -344,7 +344,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {nameof(Settings.DeleteUnusedGameObjects), 0},
         }),
         ("Full", new Dictionary<string, object>() {
-            {nameof(Settings.OptimizeOnUpload), true},
+            {nameof(Settings.ApplyOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},
             {nameof(Settings.MergeSkinnedMeshesWithShaderToggle), 1},

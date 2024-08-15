@@ -26,9 +26,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 optimizer = avatarGameObject.AddComponent<d4rkAvatarOptimizer>();
                 AvatarOptimizerSettings.ApplyDefaults(optimizer);
                 optimizer.ApplyAutoSettings();
-                optimizer.OptimizeOnUpload = true;
+                optimizer.ApplyOnUpload = true;
             }
-            if (optimizer == null || !optimizer.OptimizeOnUpload)
+            if (optimizer == null || !optimizer.ApplyOnUpload)
             {
                 return true;
             }
