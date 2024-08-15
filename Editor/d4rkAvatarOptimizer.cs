@@ -2878,7 +2878,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var constraints = GetComponentsInChildren<Behaviour>(true)
-            .Where(b => !alwaysDisabledComponents.Contains(b))
+            .Where(b => b != null && !alwaysDisabledComponents.Contains(b))
             .Where(b => b.GetType().Name.Contains("Constraint")).ToList();
         foreach (var constraint in constraints)
         {
@@ -2886,7 +2886,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
 
         var finalIKScripts = GetComponentsInChildren<Behaviour>(true)
-            .Where(b => !alwaysDisabledComponents.Contains(b))
+            .Where(b => b != null && !alwaysDisabledComponents.Contains(b))
             .Where(b => b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")).ToList();
         foreach (var finalIKScript in finalIKScripts)
         {
