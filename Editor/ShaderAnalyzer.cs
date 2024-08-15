@@ -93,6 +93,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
         }
         public string name;
+        public string filePath;
         public bool parsedCorrectly = false;
         public string errorMessage = "";
         public bool hasDisableBatchingTag = false;
@@ -227,6 +228,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             parsedShader = new ParsedShader();
             parsedShader.name = shaderName;
             filePath = Path.GetFullPath(shaderPath);
+            parsedShader.filePath = filePath;
             maxIncludes = 1000;
             doneParsing = false;
             if (shaderPath.EndsWith(".orlshader"))
@@ -1386,6 +1388,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
         private List<string> setKeywords;
         private int curlyBraceDepth = 0;
+        private string sanitizedMaterialName;
 
         private ShaderOptimizer() {}
 
@@ -1400,7 +1403,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             HashSet<string> texturesToMerge = null,
             Dictionary<string, string> animatedPropertyValues = null,
             List<string> setKeywords = null,
-            Dictionary<string, bool> poiUsedPropertyDefines = null
+            Dictionary<string, bool> poiUsedPropertyDefines = null,
+            string sanitizedMaterialName = null
             )
         {
             if (source == null || !source.parsedCorrectly)
@@ -1430,7 +1434,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 texturesToCallSoTheSamplerDoesntDisappear = new HashSet<string>(),
                 poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
-                setKeywords = setKeywords ?? new List<string>()
+                setKeywords = setKeywords ?? new List<string>(),
+                sanitizedMaterialName = sanitizedMaterialName ?? Path.GetFileNameWithoutExtension(source.filePath)
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -3127,7 +3132,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         throw new ShaderAnalyzer.ParserException($"Unbalanced curly braces in {parsedShader.name} pass {passID}");
                     }
-                    var includeName = $"ZZZ{GetMD5Hash(output)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
+                    var includeName = $"{sanitizedMaterialName}_{GetMD5Hash(output).Substring(0, 8)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
                     output.Add($"#include \"{includeName}\"");

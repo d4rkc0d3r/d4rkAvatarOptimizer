@@ -21,6 +21,7 @@ using VRC.SDK3.Avatars.Components;
 
 using Math = System.Math;
 using Type = System.Type;
+using Path = System.IO.Path;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 #endif
@@ -563,7 +564,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection("AssetDatabase.CreateAsset()");
-        var invalids = System.IO.Path.GetInvalidFileNameChars();
+        var invalids = Path.GetInvalidFileNameChars();
         var sanitizedName = string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
         if (asset is Material)
         {
@@ -3197,6 +3198,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
+        var sanitizedMaterialNames = new string[sources.Count];
         var setShaderKeywords = new List<string>[sources.Count];
         var replace = new Dictionary<string, string>[sources.Count];
         var texturesToMerge = new HashSet<string>[sources.Count];
@@ -3214,6 +3216,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 materials[i] = source[0];
                 continue;
             }
+            sanitizedMaterialNames[i] = "s_" + Path.GetFileNameWithoutExtension(parsedShader[i].filePath)
+                + " " + string.Join("_", source[0].name.Split(Path.GetInvalidFileNameChars(), System.StringSplitOptions.RemoveEmptyEntries));
             texturesToMerge[i] = new HashSet<string>();
             propertyTextureArrayIndex[i] = new Dictionary<string, int>();
             arrayPropertyValues[i] = new Dictionary<string, (string type, List<string> values)>();
@@ -3393,7 +3397,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     texturesToMerge[i],
                     animatedPropertyValues[i],
                     setShaderKeywords[i],
-                    poiUsedPropertyDefines[i]);
+                    poiUsedPropertyDefines[i],
+                    sanitizedMaterialNames[i]);
             }
         });
         Profiler.EndSection();
@@ -3405,10 +3410,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
 
             DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
-            var name = System.IO.Path.GetFileName(source[0].shader.name);
-            name = string.Join("_", source[0].name.Split(System.IO.Path.GetInvalidFileNameChars(), System.StringSplitOptions.RemoveEmptyEntries)) + " " + name;
-            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + name + ".shader");
-            name = System.IO.Path.GetFileNameWithoutExtension(shaderFilePath);
+            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + sanitizedMaterialNames[i] + ".shader");
+            var name = Path.GetFileNameWithoutExtension(shaderFilePath);
             optimizedShader[i][0].lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"//" + optimizedShader[i][0].lines[0];
             foreach (var opt in optimizedShader[i])
             {
@@ -3426,7 +3429,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 optimizedMaterial.DisableKeyword(keyword);
             }
-            optimizedMaterial.name = name;
+            optimizedMaterial.name = "m_" + name.Substring(2);
             materials[i] = optimizedMaterial;
             optimizedMaterials.Add(optimizedMaterial);
             int renderQueue = optimizedMaterial.renderQueue;
@@ -3475,7 +3478,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var mat = optimizedMaterials[i];
             DisplayProgressBar($"Loading optimized shader {mat.name}", 0.7f + 0.2f * (i / (float)optimizedMaterials.Count));
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + mat.name + ".shader");
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + "s_" + mat.name.Substring(2) + ".shader");
             Profiler.StartNextSection("mat.shader = shader");
             int renderQueue = mat.renderQueue;
             mat.shader = shader;

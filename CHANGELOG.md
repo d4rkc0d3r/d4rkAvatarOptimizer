@@ -9,6 +9,7 @@
 ### Changes
 * Changed default settings to match the `Basic` preset.
 * `Optimize on Upload` is now called `Apply on Upload`.
+* Generated shader include files now have more readable names than just hashes.
 
 ## v3.7.4
 ### Bug Fixes
