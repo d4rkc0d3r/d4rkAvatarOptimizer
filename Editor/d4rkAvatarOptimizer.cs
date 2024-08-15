@@ -3634,7 +3634,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (firstMat.renderQueue != candidateMat.renderQueue)
             return false;
-        if (firstMat.GetTag("VRCFallback", false, "None") != candidateMat.GetTag("VRCFallback", false, "None"))
+        #if UNITY_2022_1_OR_NEWER
+            bool hasAnyMaterialVariant = listMaterials.Any(m => m.isVariant) || candidateMat.isVariant;
+        #else
+            bool hasAnyMaterialVariant = false;
+        #endif
+        if (!hasAnyMaterialVariant && firstMat.GetTag("VRCFallback", false, "None") != candidateMat.GetTag("VRCFallback", false, "None"))
             return false;
         foreach (var pass in parsedShader.passes)
         {
