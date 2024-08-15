@@ -269,7 +269,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     }
 
     private static Dictionary<string, string> FieldDisplayName = new Dictionary<string, string>() {
-        {nameof(OptimizeOnUpload), "Optimize on Upload"},
+        {nameof(OptimizeOnUpload), "Apply on Upload"},
         {nameof(WritePropertiesAsStaticValues), "Write Properties as Static Values"},
         {nameof(MergeSkinnedMeshes), "Merge Skinned Meshes"},
         {nameof(MergeSkinnedMeshesWithShaderToggle), "Use Shader Toggles"},

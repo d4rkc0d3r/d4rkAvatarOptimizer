@@ -6,6 +6,7 @@
 
 ### Changes
 * Changed default settings to match the `Basic` preset.
+* `Optimize on Upload` is now called `Apply on Upload`.
 
 ## v3.7.4
 ### Bug Fixes

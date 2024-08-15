@@ -63,8 +63,8 @@ Once you have done that make a bug report on the [issue tracker](https://github.
 There are also some settings to tweak the optimization. You can read about their effects in more detail here:
 
 ![Example Screenshot](./Documentation~/img/example0.png)
-## Optimize on Upload
-Automatically optimizes the avatar before uploading it to vrc. This is non destructive, the avatar in your scene will stay as it is.
+## Apply on Upload
+Automatically applies the optimizer to the avatar before uploading it to vrc. This is non destructive, the avatar in your scene will stay as it is.
 ## Write Properties as Static Values
 This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader.
 
