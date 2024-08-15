@@ -2796,7 +2796,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         alwaysDisabledBehaviours.UnionWith(GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
             .Where(c => !usedPhysBoneColliders.Contains(c)));
 
-        alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform));
+        alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform) || c.transform == transform);
 
         return cache_FindAllUnusedComponents = alwaysDisabledBehaviours;
     }
