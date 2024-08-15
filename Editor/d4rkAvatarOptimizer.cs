@@ -3420,7 +3420,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 System.IO.File.WriteAllLines(filePath, opt.lines);
                 optimizedMaterialImportPaths.Add(filePath);
             }
-            var optimizedMaterial = Instantiate(source[0]);
+            var optimizedMaterial = new Material(source[0].shader);
+            optimizedMaterial.CopyPropertiesFromMaterial(source[0]);
             foreach (var keyword in setShaderKeywords[i])
             {
                 optimizedMaterial.DisableKeyword(keyword);

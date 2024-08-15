@@ -2,6 +2,7 @@
 ### Features
 * Add support for VRChat constraints.
 * Add support for FinalIK components with the `Delete Unused GameObjects` option.
+* Add support for material variants.
 
 ## v3.7.4
 ### Bug Fixes
