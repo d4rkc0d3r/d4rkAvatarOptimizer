@@ -2885,6 +2885,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             transforms.Add(constraint.transform);
         }
 
+        var finalIKScripts = GetComponentsInChildren<Behaviour>(true)
+            .Where(b => !alwaysDisabledComponents.Contains(b))
+            .Where(b => b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")).ToList();
+        foreach (var finalIKScript in finalIKScripts)
+        {
+            transforms.UnionWith(FindReferencedTransforms(finalIKScript));
+        }
+
         var headChopType = Type.GetType("VRC.SDK3.Avatars.Components.VRCHeadChop, VRCSDK3A");
         if (headChopType != null) {
             foreach (var headChop in GetComponentsInChildren(headChopType, true)) {
