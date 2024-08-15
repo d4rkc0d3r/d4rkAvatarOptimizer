@@ -36,15 +36,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     public class Settings
     {
         public bool OptimizeOnUpload = true;
-        public bool WritePropertiesAsStaticValues = true;
+        public bool WritePropertiesAsStaticValues = false;
         public bool MergeSkinnedMeshes = true;
-        public int MergeSkinnedMeshesWithShaderToggle = 2;
-        public int MergeSkinnedMeshesWithNaNimation = 2;
+        public int MergeSkinnedMeshesWithShaderToggle = 0;
+        public int MergeSkinnedMeshesWithNaNimation = 0;
         public bool NaNimationAllow3BoneSkinning = false;
         public bool MergeSkinnedMeshesSeparatedByDefaultEnabledState = true;
-        public bool MergeStaticMeshesAsSkinned = true;
-        public bool MergeDifferentPropertyMaterials = true;
-        public bool MergeSameDimensionTextures = true;
+        public bool MergeStaticMeshesAsSkinned = false;
+        public bool MergeDifferentPropertyMaterials = false;
+        public bool MergeSameDimensionTextures = false;
         public bool MergeMainTex = false;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;

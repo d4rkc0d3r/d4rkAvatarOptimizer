@@ -4,6 +4,9 @@
 * Add support for FinalIK components with the `Delete Unused GameObjects` option.
 * Add support for material variants.
 
+### Changes
+* Changed default settings to match the `Basic` preset.
+
 ## v3.7.4
 ### Bug Fixes
 * Fix viseme blendshapes and eyelid blendshapes sometimes not getting reassigned correctly if they aren't on a mesh named `Body`.
