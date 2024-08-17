@@ -1299,59 +1299,61 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private void DynamicTransformList(Object obj, string propertyPath)
     {
-        using var serializedObject = new SerializedObject(obj);
-        // Find the SerializedProperty representing the list of Transforms
-        SerializedProperty listProperty = serializedObject.FindProperty(propertyPath);
-
-        // Add a null element at the end of the list for the user to add new elements
-        listProperty.InsertArrayElementAtIndex(listProperty.arraySize);
-        SerializedProperty newElement = listProperty.GetArrayElementAtIndex(listProperty.arraySize - 1);
-        newElement.objectReferenceValue = null;
-
-        for (int i = 0; i < listProperty.arraySize; i++)
+        using (var serializedObject = new SerializedObject(obj))
         {
-            SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
-            Transform output = null;
+            // Find the SerializedProperty representing the list of Transforms
+            SerializedProperty listProperty = serializedObject.FindProperty(propertyPath);
 
-            using (new EditorGUILayout.HorizontalScope())
+            // Add a null element at the end of the list for the user to add new elements
+            listProperty.InsertArrayElementAtIndex(listProperty.arraySize);
+            SerializedProperty newElement = listProperty.GetArrayElementAtIndex(listProperty.arraySize - 1);
+            newElement.objectReferenceValue = null;
+
+            for (int i = 0; i < listProperty.arraySize; i++)
             {
-                output = EditorGUILayout.ObjectField(element.objectReferenceValue, typeof(Transform), true) as Transform;
+                SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
+                Transform output = null;
 
-                if (i == listProperty.arraySize - 1)
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.Space(23);
+                    output = EditorGUILayout.ObjectField(element.objectReferenceValue, typeof(Transform), true) as Transform;
+
+                    if (i == listProperty.arraySize - 1)
+                    {
+                        GUILayout.Space(23);
+                    }
+                    else if (GUILayout.Button("X", GUILayout.Width(20)))
+                    {
+                        output = null;
+                    }
                 }
-                else if (GUILayout.Button("X", GUILayout.Width(20)))
+
+                if (element.objectReferenceValue != output)
+                {
+                    ClearUICaches();
+                }
+
+                if (output != null && optimizer.GetTransformPathToRoot(output) == null)
                 {
                     output = null;
                 }
+
+                element.objectReferenceValue = output;
             }
 
-            if (element.objectReferenceValue != output)
+            // Remove any null elements from the list
+            for (int i = listProperty.arraySize - 1; i >= 0; i--)
             {
-                ClearUICaches();
+                SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
+                if (element.objectReferenceValue == null)
+                {
+                    listProperty.DeleteArrayElementAtIndex(i);
+                }
             }
 
-            if (output != null && optimizer.GetTransformPathToRoot(output) == null)
-            {
-                output = null;
-            }
-
-            element.objectReferenceValue = output;
+            // Apply the modified properties to the serializedObject
+            serializedObject.ApplyModifiedProperties();
         }
-
-        // Remove any null elements from the list
-        for (int i = listProperty.arraySize - 1; i >= 0; i--)
-        {
-            SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
-            if (element.objectReferenceValue == null)
-            {
-                listProperty.DeleteArrayElementAtIndex(i);
-            }
-        }
-
-        // Apply the modified properties to the serializedObject
-        serializedObject.ApplyModifiedProperties();
     }
 
     static Texture _perfIcon_Excellent;

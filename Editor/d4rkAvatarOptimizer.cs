@@ -2897,12 +2897,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var headChopType = Type.GetType("VRC.SDK3.Avatars.Components.VRCHeadChop, VRCSDK3A");
         if (headChopType != null) {
             foreach (var headChop in GetComponentsInChildren(headChopType, true)) {
-                using var so = new SerializedObject(headChop);
-                var targetBonesProperty = so.FindProperty("targetBones");
-                for (int i = 0; i < targetBonesProperty.arraySize; i++) {
-                    var targetBone = targetBonesProperty.GetArrayElementAtIndex(i).FindPropertyRelative("transform").objectReferenceValue as Transform;
-                    if (targetBone != null) {
-                        transforms.Add(targetBone);
+                using (var so = new SerializedObject(headChop)) {
+                    var targetBonesProperty = so.FindProperty("targetBones");
+                    for (int i = 0; i < targetBonesProperty.arraySize; i++) {
+                        var targetBone = targetBonesProperty.GetArrayElementAtIndex(i).FindPropertyRelative("transform").objectReferenceValue as Transform;
+                        if (targetBone != null) {
+                            transforms.Add(targetBone);
+                        }
                     }
                 }
             }
@@ -4732,31 +4733,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     
     HashSet<Transform> FindReferencedTransforms(Component component)
     {
-        using var serializedObject = new SerializedObject(component);
-        var visitedIds = new HashSet<long>();
-        var iterator = serializedObject.GetIterator();
-        var referencedTransforms = new HashSet<Transform>();
-        bool enterChildren = true;
-        while (iterator.Next(enterChildren))
+        using (var serializedObject = new SerializedObject(component))
         {
-            enterChildren = true;
-            if (iterator.propertyType == SerializedPropertyType.ObjectReference && iterator.objectReferenceValue != null)
+            var visitedIds = new HashSet<long>();
+            var iterator = serializedObject.GetIterator();
+            var referencedTransforms = new HashSet<Transform>();
+            bool enterChildren = true;
+            while (iterator.Next(enterChildren))
             {
-                if (iterator.objectReferenceValue is Transform transform)
+                enterChildren = true;
+                if (iterator.propertyType == SerializedPropertyType.ObjectReference && iterator.objectReferenceValue != null)
                 {
-                    referencedTransforms.Add(transform);
+                    if (iterator.objectReferenceValue is Transform transform)
+                    {
+                        referencedTransforms.Add(transform);
+                    }
+                }
+                else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
+                {
+                    #if UNITY_2022_1_OR_NEWER
+                        if (!visitedIds.Add(iterator.managedReferenceId))
+                        {
+                            enterChildren = false;
+                        }
+                    #else
+                        enterChildren = false;
+                    #endif
                 }
             }
-            else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
-            {
-                var id = iterator.managedReferenceId;
-                if (!visitedIds.Add(id))
-                {
-                    enterChildren = false;
-                }
-            }
+            return referencedTransforms;
         }
-        return referencedTransforms;
     }
 
     private void DestroyEditorOnlyGameObjects()

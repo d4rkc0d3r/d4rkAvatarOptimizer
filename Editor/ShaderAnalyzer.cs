@@ -2551,15 +2551,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (source[lineIndex + 4] != "#endif") 
                     return null;
                 int charIndex = 10;
-                var line = source[lineIndex + 3];
-                SkipWhitespace(line, ref charIndex);
-                string instanceParameter = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref charIndex);
+                var instanceCountLine = source[lineIndex + 3];
+                SkipWhitespace(instanceCountLine, ref charIndex);
+                string instanceParameter = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(instanceCountLine, ref charIndex);
                 if (animatedPropertyValues.ContainsKey(instanceParameter) || arrayPropertyValues.ContainsKey(instanceParameter))
                     return null;
                 if (!staticPropertyValues.TryGetValue(instanceParameter, out var instanceValue))
                     return null;
                 lineIndex += 4;
-                return line.Replace(instanceParameter, instanceValue);
+                return instanceCountLine.Replace(instanceParameter, instanceValue);
             }
             if (line.Length > 3 && line[1] == 'i' && line[2] == 'f')
             {
