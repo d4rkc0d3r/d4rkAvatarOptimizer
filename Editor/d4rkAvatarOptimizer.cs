@@ -3411,9 +3411,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
 
             DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
-            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + sanitizedMaterialNames[i] + ".shader");
+            var shaderName = optimizedShader[i][0].lines[0].Substring("Shader \"d4rkpl4y3r/Optimizer/".Length);
+            shaderName = shaderName.Substring(0, shaderName.IndexOf('"'));
+            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + shaderName + ".shader");
             var name = Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[i][0].lines[0] = "Shader \"d4rkpl4y3r/Optimizer/" + name + "\"//" + optimizedShader[i][0].lines[0];
+            optimizedShader[i][0].lines[0] = optimizedShader[i][0].lines[0].Replace(shaderName, name);
             foreach (var opt in optimizedShader[i])
             {
                 var filePath = shaderFilePath;

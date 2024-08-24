@@ -3172,6 +3172,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 tags.Clear();
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
+            var shaderHash = GetMD5Hash(output);
+            output[0] = $"Shader \"d4rkpl4y3r/Optimizer/{sanitizedMaterialName} {shaderHash.Substring(0, 8)}\" //{output[0]}";
             return output;
         }
     }

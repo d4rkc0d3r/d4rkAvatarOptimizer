@@ -1,3 +1,7 @@
+## v3.8.1
+### Changes
+* Generated shader names now have a hash suffix.
+
 ## v3.8.0
 ### Features
 * Add support for VRChat constraints.
