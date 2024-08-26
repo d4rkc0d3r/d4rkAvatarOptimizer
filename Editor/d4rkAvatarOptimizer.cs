@@ -1465,6 +1465,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             newTree.children = childNodes;
             fixedMotions[motion] = newTree;
             newTree.hideFlags = HideFlags.HideInHierarchy;
+            AnimatorOptimizer.CopyNormalizedBlendValuesProperty(oldTree, newTree);
             Profiler.StartSection("AssetDatabase.AddObjectToAsset()");
             AssetDatabase.AddObjectToAsset(newTree, assetPath);
             Profiler.EndSection();

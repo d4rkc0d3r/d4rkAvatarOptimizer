@@ -534,7 +534,28 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             pastedTree.children = children;
 
+            CopyNormalizedBlendValuesProperty(oldTree, pastedTree);
+
             return pastedTree;
+        }
+
+        public static void CopyNormalizedBlendValuesProperty(BlendTree source, BlendTree target)
+        {
+            if (source.blendType != BlendTreeType.Direct)
+            {
+                return;
+            }
+            using (var sourceSO = new SerializedObject(source))
+            {
+                using (var targetSO = new SerializedObject(target))
+                {
+                    // copy the Normalized Blend Values toggle via serialized object since no api exists for it
+                    var sourceProperty = sourceSO.FindProperty("m_NormalizedBlendValues");
+                    var targetProperty = targetSO.FindProperty("m_NormalizedBlendValues");
+                    targetProperty.boolValue = sourceProperty.boolValue;
+                    targetSO.ApplyModifiedProperties();
+                }
+            }
         }
 
         private void CloneBehaviourParameters(StateMachineBehaviour old, StateMachineBehaviour n)

@@ -2,6 +2,9 @@
 ### Changes
 * Generated shader names now have a hash suffix.
 
+### Bug Fixes
+* Copy the toggle `Normalized Blend Values` of direct blend trees. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/120)
+
 ## v3.8.0
 ### Features
 * Add support for VRChat constraints.
