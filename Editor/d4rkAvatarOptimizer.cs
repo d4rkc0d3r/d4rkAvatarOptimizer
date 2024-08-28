@@ -420,7 +420,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
-    private List<Material> optimizedMaterials = new List<Material>();
+    private List<(Material target, Material source, ShaderOptimizer.OptimizedShader optimizerResult)> optimizedMaterials = new List<(Material, Material, ShaderOptimizer.OptimizedShader)>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
     private Dictionary<string, List<List<string>>> oldPathToMergedPaths = new Dictionary<string, List<List<string>>>();
     private Dictionary<string, string> oldPathToMergedPath = new Dictionary<string, string>();
@@ -3380,7 +3380,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             setShaderKeywords[i] = parsedShader[i].shaderFeatureKeyWords.Where(k => source[0].IsKeywordEnabled(k)).ToList();
         }
 
-        var optimizedShader = new List<(string name, List<string> lines)>[sources.Count];
+        var optimizedShader = new ShaderOptimizer.OptimizedShader[sources.Count];
         var basicMergedMeshPaths = allOriginalMeshPaths?.Select(list => string.Join(", ", list)).ToList();
         Profiler.StartSection("ShaderOptimizer.Run()");
         Parallel.For(0, sources.Count, i =>
@@ -3412,12 +3412,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
 
             DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
-            var shaderName = optimizedShader[i][0].lines[0].Substring("Shader \"d4rkpl4y3r/Optimizer/".Length);
-            shaderName = shaderName.Substring(0, shaderName.IndexOf('"'));
+            var shaderName = optimizedShader[i].name;
             var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + shaderName + ".shader");
             var name = Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[i][0].lines[0] = optimizedShader[i][0].lines[0].Replace(shaderName, name);
-            foreach (var opt in optimizedShader[i])
+            optimizedShader[i].SetName(name);
+            foreach (var opt in optimizedShader[i].files)
             {
                 var filePath = shaderFilePath;
                 if (opt.name != "Shader")
@@ -3427,29 +3426,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 System.IO.File.WriteAllLines(filePath, opt.lines);
                 optimizedMaterialImportPaths.Add(filePath);
             }
-            var optimizedMaterial = new Material(source[0].shader);
-            optimizedMaterial.CopyPropertiesFromMaterial(source[0]);
-            foreach (var keyword in setShaderKeywords[i])
-            {
-                optimizedMaterial.DisableKeyword(keyword);
-            }
+            var optimizedMaterial = new Material(Shader.Find("Unlit/Texture"));
+            optimizedMaterial.shader = null;
             optimizedMaterial.name = "m_" + name.Substring(2);
             materials[i] = optimizedMaterial;
-            optimizedMaterials.Add(optimizedMaterial);
-            int renderQueue = optimizedMaterial.renderQueue;
-            optimizedMaterial.shader = null;
-            optimizedMaterial.renderQueue = renderQueue;
+            optimizedMaterials.Add((optimizedMaterial, source[0], optimizedShader[i]));
             foreach (var prop in parsedShader[i].properties)
             {
                 if (prop.type != ParsedShader.Property.Type.Texture2D)
                     continue;
                 var tex = source.Select(m => m.GetTexture(prop.name)).FirstOrDefault(t => t != null);
-                optimizedMaterial.SetTexture(prop.name, tex);
             }
             var arrayList = new List<(string name, Texture2DArray array)>();
             foreach (var texArray in propertyTextureArrayIndex[i])
             {
-                optimizedMaterial.SetTexture(texArray.Key, null);
                 arrayList.Add((texArray.Key, textureArrays[texArray.Value]));
             }
             if (arrayList.Count > 0)
@@ -3479,15 +3469,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         for (int i = 0; i < optimizedMaterials.Count; i++)
         {
-            var mat = optimizedMaterials[i];
+            var mat = optimizedMaterials[i].target;
+            var source = optimizedMaterials[i].source;
+            var optimizedShader = optimizedMaterials[i].optimizerResult;
             DisplayProgressBar($"Loading optimized shader {mat.name}", 0.7f + 0.2f * (i / (float)optimizedMaterials.Count));
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(trashBinPath + "s_" + mat.name.Substring(2) + ".shader");
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>($"{trashBinPath}{optimizedShader.name}.shader");
             Profiler.StartNextSection("mat.shader = shader");
-            int renderQueue = mat.renderQueue;
             mat.shader = shader;
-            mat.renderQueue = renderQueue;
-            Profiler.StartNextSection("SetTextureArrayProperties");
+            mat.renderQueue = source.renderQueue;
+            Profiler.StartNextSection("CopyMaterialProperties");
+            var texArrayProperties = new HashSet<string>();
             if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
             {
                 foreach (var texArray in texArrays)
@@ -3498,39 +3490,47 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         texArrayName = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                     }
                     mat.SetTexture(texArrayName, texArray.array);
-                    mat.SetTextureOffset(texArrayName, mat.GetTextureOffset(texArray.name));
-                    mat.SetTextureScale(texArrayName, mat.GetTextureScale(texArray.name));
+                    mat.SetTextureOffset(texArrayName, source.GetTextureOffset(texArray.name));
+                    mat.SetTextureScale(texArrayName, source.GetTextureScale(texArray.name));
+                    texArrayProperties.Add(texArrayName);
                 }
             }
-            Profiler.StartNextSection("RemoveUnusedProperties");
-            using (var so = new SerializedObject(mat))
+            foreach (var prop in optimizedShader.tex2DProperties)
             {
-                int RemoveUnusedProperties(string propertiesPath)
-                {
-                    var properties = so.FindProperty(propertiesPath);
-                    if (properties == null || !properties.isArray)
-                        return 0;
-                    int removed = 0;
-                    for (int i = properties.arraySize - 1; i >= 0; i--)
-                    {
-                        var displayName = properties.GetArrayElementAtIndex(i).displayName;
-                        if (!mat.HasProperty(displayName))
-                        {
-                            properties.DeleteArrayElementAtIndex(i);
-                            removed++;
-                        }
-                    }
-                    return removed;
-                }
-                int removedPropertyCount = 0;
-                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_TexEnvs");
-                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_Floats");
-                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_Colors");
-                if (removedPropertyCount > 0)
-                {
-                    so.ApplyModifiedProperties();
-                    Debug.Log($"Removed {removedPropertyCount} unused properties from {mat.name}");
-                }
+                if (!source.HasProperty(prop) || texArrayProperties.Contains(prop))
+                    continue;
+                mat.SetTexture(prop, source.GetTexture(prop));
+                mat.SetTextureOffset(prop, source.GetTextureOffset(prop));
+                mat.SetTextureScale(prop, source.GetTextureScale(prop));
+            }
+            foreach (var prop in optimizedShader.tex3DCubeProperties)
+            {
+                if (!source.HasProperty(prop))
+                    continue;
+                mat.SetTexture(prop, source.GetTexture(prop));
+            }
+            foreach (var prop in optimizedShader.floatProperties)
+            {
+                if (!source.HasProperty(prop))
+                    continue;
+                mat.SetFloat(prop, source.GetFloat(prop));
+            }
+            foreach (var prop in optimizedShader.colorProperties)
+            {
+                if (!source.HasProperty(prop))
+                    continue;
+                mat.SetColor(prop, source.GetColor(prop));
+            }
+            foreach (var prop in optimizedShader.integerProperties)
+            {
+                if (!source.HasProperty(prop))
+                    continue;
+                mat.SetInteger(prop, source.GetInt(prop));
+            }
+            var vrcFallback = source.GetTag("VRCFallback", false, "not_set");
+            if (vrcFallback != "not_set")
+            {
+                mat.SetOverrideTag("VRCFallback", vrcFallback);
             }
             Profiler.EndSection();
         }
@@ -3600,7 +3600,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
         }
 
-        foreach (var mat in optimizedMaterials)
+        foreach (var mat in optimizedMaterials.Select(o => o.target))
         {
             CreateUniqueAsset(mat, mat.name + ".mat");
         }

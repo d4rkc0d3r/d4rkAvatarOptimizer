@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using d4rkpl4y3r.AvatarOptimizer.Util;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using System.Security.Cryptography;
+using System.Configuration;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
@@ -1366,6 +1367,62 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
     public class ShaderOptimizer
     {
+        public class OptimizedShader
+        {
+            public string name;
+            public List<(string name, List<string> lines)> files;
+            public List<string> floatProperties = new List<string>();
+            public List<string> colorProperties = new List<string>();
+            public List<string> integerProperties = new List<string>();
+            public List<string> tex2DProperties = new List<string>();
+            public List<string> tex3DCubeProperties = new List<string>();
+            public List<string> unknownTypeProperties = new List<string>();
+            public ParsedShader originalShader;
+
+            public void AddProperty(string name, string type)
+            {
+                switch (type.ToLowerInvariant())
+                {
+                    case "float":
+                    case "int":
+                        floatProperties.Add(name);
+                        break;
+                    case "integer":
+                        integerProperties.Add(name);
+                        break;
+                    case "color":
+                    case "vector":
+                        colorProperties.Add(name);
+                        break;
+                    case "2d":
+                    case "2darray":
+                        tex2DProperties.Add(name);
+                        break;
+                    case "3d":
+                    case "cube":
+                    case "cubearray":
+                        tex3DCubeProperties.Add(name);
+                        break;
+                    default:
+                        if (type.StartsWithSimple("range"))
+                        {
+                            floatProperties.Add(name);
+                        }
+                        else
+                        {
+                            unknownTypeProperties.Add(name);
+                        }
+                        break;
+                }
+            }
+
+            public void SetName(string name)
+            {
+                this.name = name;
+                files[0].lines[0] = $"Shader \"d4rkpl4y3r/Optimizer/{name}\" // {originalShader.name}";
+            }
+        }
+
         private List<string> output;
         private ParsedShader.Pass currentPass;
         private List<(string name, List<string> lines)> outputIncludes = new List<(string name, List<string> lines)>();
@@ -1389,10 +1446,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<string> setKeywords;
         private int curlyBraceDepth = 0;
         private string sanitizedMaterialName;
+        private OptimizedShader optimizedShader = new OptimizedShader();
 
         private ShaderOptimizer() {}
 
-        public static List<(string name, List<string> lines)> Run(ParsedShader source,
+        public static OptimizedShader Run(ParsedShader source,
             Dictionary<string, string> staticPropertyValues = null,
             int mergedMeshCount = 0,
             List<string> mergedMeshNames = null,
@@ -1439,6 +1497,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
+            optimizer.optimizedShader.originalShader = source;
             try
             {
                 optimizer.Run();
@@ -1456,7 +1515,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var outputFiles = new List<(string name, List<string> lines)>();
             outputFiles.Add(("Shader", optimizer.output));
             outputFiles.AddRange(optimizer.outputIncludes);
-            return outputFiles;
+            return optimizer.optimizedShader;
         }
 
         private void InjectArrayPropertyInitialization()
@@ -2959,7 +3018,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             debugOutput?.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
         }
 
-        private List<string> Run()
+        private void Run()
         {
             lastIfEvalResultStack = new Stack<ConditionResult>();
             alreadyIncludedFiles.Push(new HashSet<string>());
@@ -3001,6 +3060,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         var name = $"_IsActiveMesh{i}";
                         propertyBlock.Add($"{name}(\"{name} {mergedMeshNames[i]}\", Float) = 1");
+                        optimizedShader.AddProperty(name, "Float");
                         alreadyAdded.Add(name);
                     }
                     foreach (var animatedProperty in animatedPropertyValues)
@@ -3022,6 +3082,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         foreach (int i in mergedMeshIndices) {
                             var fullPropertyName = $"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}";
                             propertyBlock.Add($"{tagString}{fullPropertyName}(\"{prop.name} {i}\", {type}) = {defaultValue}");
+                            optimizedShader.AddProperty(fullPropertyName, type);
                             alreadyAdded.Add(fullPropertyName);
                         }
                     }
@@ -3054,6 +3115,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                         }
                         propertyBlock.Add($"{tagString}{defaultAnimatedProperty.name}(\"{displayName}\", {type}) = {defaultValue}");
+                        optimizedShader.AddProperty(defaultAnimatedProperty.name, type);
                     }
                 }
             }
@@ -3174,11 +3236,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         prop.name = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                 }
                 propertyBlock.Add($"{tagString}{prop.name}(\"{prop.name}\", {prop.type}) = {prop.defaultValue}");
+                optimizedShader.AddProperty(prop.name, prop.type);
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
             var shaderHash = GetMD5Hash(output);
-            output[0] = $"Shader \"d4rkpl4y3r/Optimizer/{sanitizedMaterialName} {shaderHash.Substring(0, 8)}\" //{output[0]}";
-            return output;
+            optimizedShader.files = new List<(string name, List<string> lines)>();
+            optimizedShader.files.Add(("Shader", output));
+            optimizedShader.files.AddRange(outputIncludes);
+            optimizedShader.SetName($"{sanitizedMaterialName} {shaderHash.Substring(0, 8)}");
         }
     }
 }
