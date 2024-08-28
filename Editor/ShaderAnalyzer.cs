@@ -3149,10 +3149,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var parsedProperty = ShaderAnalyzer.ParsePropertyRaw(line, tags);
                 if (parsedProperty == null)
                     continue;
+                string tagString = "";
+                foreach (var tag in tags)
+                {
+                    if (tag.Length > 5 || (tag.ToLowerInvariant() != "hdr" && tag.ToLowerInvariant() != "gamma"))
+                        continue;
+                    tagString += $"[{tag}] ";
+                }
+                tags.Clear();
                 var prop = parsedProperty.Value;
                 if (prop.name.StartsWithSimple("_ShaderOptimizer"))
                     continue;
                 if (defaultAnimatedProperties.Contains((prop.name, false)) || defaultAnimatedProperties.Contains((prop.name, true)))
+                    continue;
+                if ((staticPropertyValues.ContainsKey(prop.name) || arrayPropertyValues.ContainsKey(prop.name)) 
+                    && !animatedPropertyValues.ContainsKey(prop.name)
+                    && parsedShader.propertyTable[prop.name].shaderLabParams.Count == 0)
                     continue;
                 if (texturesToMerge.Contains(prop.name))
                 {
@@ -3161,15 +3173,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (prop.name == "_MainTex")
                         prop.name = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                 }
-                string tagString = "";
-                foreach (var tag in tags)
-                {
-                    if (tag.Length > 5 || (tag.ToLowerInvariant() != "hdr" && tag.ToLowerInvariant() != "gamma"))
-                        continue;
-                    tagString += $"[{tag}] ";
-                }
                 propertyBlock.Add($"{tagString}{prop.name}(\"{prop.name}\", {prop.type}) = {prop.defaultValue}");
-                tags.Clear();
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
             var shaderHash = GetMD5Hash(output);

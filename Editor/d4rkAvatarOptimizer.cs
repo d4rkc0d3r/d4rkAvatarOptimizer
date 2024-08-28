@@ -3502,6 +3502,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     mat.SetTextureScale(texArrayName, mat.GetTextureScale(texArray.name));
                 }
             }
+            Profiler.StartNextSection("RemoveUnusedProperties");
+            using (var so = new SerializedObject(mat))
+            {
+                int RemoveUnusedProperties(string propertiesPath)
+                {
+                    var properties = so.FindProperty(propertiesPath);
+                    if (properties == null || !properties.isArray)
+                        return 0;
+                    int removed = 0;
+                    for (int i = properties.arraySize - 1; i >= 0; i--)
+                    {
+                        var displayName = properties.GetArrayElementAtIndex(i).displayName;
+                        if (!mat.HasProperty(displayName))
+                        {
+                            properties.DeleteArrayElementAtIndex(i);
+                            removed++;
+                        }
+                    }
+                    return removed;
+                }
+                int removedPropertyCount = 0;
+                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_TexEnvs");
+                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_Floats");
+                removedPropertyCount += RemoveUnusedProperties("m_SavedProperties.m_Colors");
+                if (removedPropertyCount > 0)
+                {
+                    so.ApplyModifiedProperties();
+                    Debug.Log($"Removed {removedPropertyCount} unused properties from {mat.name}");
+                }
+            }
             Profiler.EndSection();
         }
 

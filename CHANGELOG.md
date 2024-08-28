@@ -1,4 +1,8 @@
-## v3.8.1
+## v3.9.0
+### Features
+* Generated shaders and materials are now stripped of all properties that got baked into the shader.
+  * This reduces avatar download and uncompressed size slightly.
+
 ### Changes
 * Generated shader names now have a hash suffix.
 
