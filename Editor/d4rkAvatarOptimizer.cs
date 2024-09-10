@@ -420,7 +420,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
-    private List<(Material target, Material source, ShaderOptimizer.OptimizedShader optimizerResult)> optimizedMaterials = new List<(Material, Material, ShaderOptimizer.OptimizedShader)>();
+    private List<(Material target, List<Material> sources, ShaderOptimizer.OptimizedShader optimizerResult)> optimizedMaterials = new List<(Material, List<Material>, ShaderOptimizer.OptimizedShader)>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
     private Dictionary<string, List<List<string>>> oldPathToMergedPaths = new Dictionary<string, List<List<string>>>();
     private Dictionary<string, string> oldPathToMergedPath = new Dictionary<string, string>();
@@ -3428,13 +3428,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             optimizedMaterial.shader = null;
             optimizedMaterial.name = "m_" + name.Substring(2);
             materials[i] = optimizedMaterial;
-            optimizedMaterials.Add((optimizedMaterial, source[0], optimizedShader[i]));
-            foreach (var prop in parsedShader[i].properties)
-            {
-                if (prop.type != ParsedShader.Property.Type.Texture2D)
-                    continue;
-                var tex = source.Select(m => m.GetTexture(prop.name)).FirstOrDefault(t => t != null);
-            }
+            optimizedMaterials.Add((optimizedMaterial, source, optimizedShader[i]));
             var arrayList = new List<(string name, Texture2DArray array)>();
             foreach (var texArray in propertyTextureArrayIndex[i])
             {
@@ -3468,7 +3462,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         for (int i = 0; i < optimizedMaterials.Count; i++)
         {
             var mat = optimizedMaterials[i].target;
-            var source = optimizedMaterials[i].source;
+            var sources = optimizedMaterials[i].sources;
+            var source = sources[0];
             var optimizedShader = optimizedMaterials[i].optimizerResult;
             DisplayProgressBar($"Loading optimized shader {mat.name}", 0.7f + 0.2f * (i / (float)optimizedMaterials.Count));
             Profiler.StartSection("AssetDatabase.LoadAssetAtPath<Shader>()");
@@ -3497,7 +3492,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 if (!source.HasProperty(prop) || texArrayProperties.Contains(prop))
                     continue;
-                mat.SetTexture(prop, source.GetTexture(prop));
+                var tex = sources.Select(m => m.GetTexture(prop)).FirstOrDefault(t => t != null);
+                mat.SetTexture(prop, tex);
                 mat.SetTextureOffset(prop, source.GetTextureOffset(prop));
                 mat.SetTextureScale(prop, source.GetTextureScale(prop));
             }
@@ -3505,7 +3501,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             {
                 if (!source.HasProperty(prop))
                     continue;
-                mat.SetTexture(prop, source.GetTexture(prop));
+                var tex = sources.Select(m => m.GetTexture(prop)).FirstOrDefault(t => t != null);
+                mat.SetTexture(prop, tex);
             }
             foreach (var prop in optimizedShader.floatProperties)
             {
