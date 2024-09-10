@@ -1240,7 +1240,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             newBinding.type = modifiedPath.Item3;
             changed = true;
         }
-        else if (binding.type == typeof(MeshRenderer) && newAnimationPaths.TryGetValue((binding.path, binding.propertyName, typeof(SkinnedMeshRenderer)), out modifiedPath))
+        else if (typeof(Renderer).IsAssignableFrom(binding.type) && newAnimationPaths.TryGetValue((binding.path, binding.propertyName, typeof(SkinnedMeshRenderer)), out modifiedPath))
         {
             newBinding.path = modifiedPath.Item1;
             newBinding.propertyName = modifiedPath.Item2;
@@ -2665,8 +2665,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (fxLayer == null)
             return map;
         foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
-            if (!binding.propertyName.StartsWithSimple("material.") ||
-                (binding.type != typeof(SkinnedMeshRenderer) && binding.type != typeof(MeshRenderer)))
+            if (!binding.propertyName.StartsWithSimple("material.") || !typeof(Renderer).IsAssignableFrom(binding.type))
                 continue;
             if (!map.TryGetValue(binding.path, out var props)) {
                 map[binding.path] = (props = new HashSet<string>());
