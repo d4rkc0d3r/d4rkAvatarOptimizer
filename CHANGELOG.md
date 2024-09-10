@@ -5,6 +5,7 @@
 
 ### Changes
 * Generated shader names now have a hash suffix.
+* `Keep MMD Blend Shapes` is now `MMD Compatibility` and also prevents the first 3 fx layers to get merged or deleted. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/122)
 
 ### Bug Fixes
 * Copy the toggle `Normalized Blend Values` of direct blend trees. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/120)

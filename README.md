@@ -161,8 +161,9 @@ By default it samples the original motion time at the snapping points of a radia
 The amount of sample points can be changed in the `Motion Time Approximation Sample Count` global option. Samples that don't improve the approximation by more than 1% are discarded.
 ## Disable Phys Bones When Unused
 Creates animation curves for all phys bone components that are used by only one SkinnedMeshRenderer. Those curves get added to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag.
-## Keep MMD Blend Shapes
-When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.
+## MMD Compatibility
+When enabled the optimizer will keep the blend shapes that are used by MMD animations from getting removed or merged.  
+It also prevents `Optimize FX Layer` from deleting or merging layers 0, 1 & 2 as they are used by MMD worlds.
 ## Delete Unused Components
 * Deletes all components that are turned off and never get enabled by animations.
 * Deletes all phys bones whose dependencies got deleted in the previous step.

@@ -126,7 +126,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         ToggleOptimizerProperty(nameof(optimizer.DisablePhysBonesWhenUnused));
         ToggleOptimizerProperty(nameof(optimizer.MergeSameRatioBlendShapes));
-        ToggleOptimizerProperty(nameof(optimizer.KeepMMDBlendShapes));
+        ToggleOptimizerProperty(nameof(optimizer.MMDCompatibility));
         ToggleOptimizerProperty(nameof(optimizer.DeleteUnusedComponents));
         ToggleOptimizerProperty(nameof(optimizer.DeleteUnusedGameObjects));
         ToggleOptimizerProperty(nameof(optimizer.UseRingFingerAsFootCollider));
