@@ -1512,9 +1512,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Thread.CurrentThread.CurrentCulture = oldCulture;
                 Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
-            var outputFiles = new List<(string name, List<string> lines)>();
-            outputFiles.Add(("Shader", optimizer.output));
-            outputFiles.AddRange(optimizer.outputIncludes);
             return optimizer.optimizedShader;
         }
 

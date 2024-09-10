@@ -2195,14 +2195,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        foreach (var constraint in GetComponentsInChildren<Behaviour>(true).OfType<IConstraint>())
+        foreach (var behavior in GetComponentsInChildren<Behaviour>(true)
+            .Where(b => b != null && (b.GetType().Name.Contains("Constraint") || b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK"))))
         {
-            for (int i = 0; i < constraint.sourceCount; i++)
+            foreach (var t in FindReferencedTransforms(behavior))
             {
-                AddDependency(constraint.GetSource(i).sourceTransform, constraint as Object);
+                AddDependency(t, behavior);
             }
-            AddDependency((constraint as LookAtConstraint)?.worldUpObject, constraint as Object);
-            AddDependency((constraint as AimConstraint)?.worldUpObject, constraint as Object);
         }
         foreach (var skinnedRenderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
