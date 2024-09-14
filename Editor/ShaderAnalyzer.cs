@@ -1854,7 +1854,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 wrapperStructs.Add(outParamType + " d4rkAvatarOptimizer_geometryOutput;");
                 wrapperStructs.Add("};");
             }
-            int insertIndex = output.FindLastIndex(s => !s.StartsWith("#") && !s.StartsWith("[")) + 1;
+            int insertIndex = output.FindLastIndex(s => !(s.StartsWith("#") && !s.StartsWith("#if")) && !s.StartsWith("[")) + 1;
             output.InsertRange(insertIndex, wrapperStructs);
             string line = source[sourceLineIndex];
             while (line != "{" && sourceLineIndex < source.Count - 1)
