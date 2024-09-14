@@ -1838,9 +1838,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var wrapperStructs = new List<string>();
             bool usesOutputWrapper = animatedPropertyValues.Count > 0 || arrayPropertyValues.Count > 0;
             bool usesInputWrapper = usesOutputWrapper || mergedMeshCount > 1;
+            var inputWrapperName = $"geometryInputWrapper_l{dummyLineIndex}";
+            var outputWrapperName = $"geometryOutputWrapper_l{dummyLineIndex}";
             if (usesInputWrapper)
             {
-                wrapperStructs.Add("struct geometryInputWrapper");
+                wrapperStructs.Add("struct " + inputWrapperName);
                 wrapperStructs.Add("{");
                 wrapperStructs.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
                 wrapperStructs.Add(inParam.type + " d4rkAvatarOptimizer_geometryInput;");
@@ -1848,7 +1850,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (usesOutputWrapper)
             {
-                wrapperStructs.Add("struct geometryOutputWrapper");
+                wrapperStructs.Add("struct " + outputWrapperName);
                 wrapperStructs.Add("{");
                 wrapperStructs.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
                 wrapperStructs.Add(outParamType + " d4rkAvatarOptimizer_geometryOutput;");
@@ -1864,10 +1866,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             curlyBraceDepth++;
             string geometryType = inParam.arraySize == 1 ? "point" : inParam.arraySize == 2 ? "line" : "triangle";
             output.Add($"void {func.name}({geometryType} "
-                + (usesInputWrapper ? "geometryInputWrapper d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
+                + (usesInputWrapper ? inputWrapperName + " d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
                 + $"[{inParam.arraySize}], inout "
                 + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
-                + (usesOutputWrapper ? "geometryOutputWrapper" : outParamType)
+                + (usesOutputWrapper ? outputWrapperName : outParamType)
                 + "> " + outParam.name
                 + string.Join("", func.parameters.Where(p => p.isInput && p != inParam && p != outParam).Select(p => ", " + p))
                 + ")");
@@ -1910,7 +1912,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 else if (line.Contains(outParam.name + ".Append("))
                 {
                     output.Add("{");
-                    output.Add("geometryOutputWrapper d4rkAvatarOptimizer_geomOutput;");
+                    output.Add(outputWrapperName + " d4rkAvatarOptimizer_geomOutput;");
                     output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_geometryOutput = " + line.Substring(line.IndexOf(".Append(") + 7));
                     output.Add("d4rkAvatarOptimizer_geomOutput.d4rkAvatarOptimizer_MeshMaterialID = "
                         + "d4rkAvatarOptimizer_MaterialID | (d4rkAvatarOptimizer_MeshID << 16);");
