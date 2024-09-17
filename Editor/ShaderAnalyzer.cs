@@ -1404,7 +1404,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         tex3DCubeProperties.Add(name);
                         break;
                     default:
-                        if (type.StartsWithSimple("range"))
+                        if (type.ToLowerInvariant().StartsWithSimple("range"))
                         {
                             floatProperties.Add(name);
                         }
