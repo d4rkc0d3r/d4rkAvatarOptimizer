@@ -3214,6 +3214,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var texturesToCheckNull = new Dictionary<string, string>[sources.Count];
         var animatedPropertyValues = new Dictionary<string, string>[sources.Count];
         var poiUsedPropertyDefines = new Dictionary<string, bool>[sources.Count];
+        var stripShadowVariants = new bool[sources.Count];
         for (int i = 0; i < sources.Count; i++)
         {
             var source = sources[i];
@@ -3223,6 +3224,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 materials[i] = source[0];
                 continue;
             }
+            stripShadowVariants[i] = source[0].renderQueue >= 2500;
             sanitizedMaterialNames[i] = "s_" + Path.GetFileNameWithoutExtension(parsedShader[i].filePath)
                 + " " + string.Join("_", source[0].name.Split(Path.GetInvalidFileNameChars(), System.StringSplitOptions.RemoveEmptyEntries));
             texturesToMerge[i] = new HashSet<string>();
@@ -3405,7 +3407,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     animatedPropertyValues[i],
                     setShaderKeywords[i],
                     poiUsedPropertyDefines[i],
-                    sanitizedMaterialNames[i]);
+                    sanitizedMaterialNames[i],
+                    stripShadowVariants[i]);
             }
         });
         Profiler.EndSection();

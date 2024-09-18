@@ -2,6 +2,9 @@
 ### Features
 * Generated shaders and materials are now stripped of all properties that got baked into the shader.
   * This reduces avatar download and uncompressed size slightly.
+* Reduced the amount of shader variants generated when using `Write Properties as Static Values`.
+  * Forward base passes don't generate variants without the `LIGHTPROBE_SH` keyword anymore.
+  * Materials with render queue > 2500 don't generate any shadow related variants and strip the shadow caster pass.
 
 ### Changes
 * Generated shader names now have a hash suffix.

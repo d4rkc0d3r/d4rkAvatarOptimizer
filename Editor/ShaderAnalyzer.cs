@@ -357,7 +357,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 int valueStart = index;
                 int valueEnd = index;
-                while (valueEnd < line.Length && (char.IsDigit(line[valueEnd]))) {
+                while (valueEnd < line.Length && char.IsDigit(line[valueEnd])) {
                     valueEnd++;
                 }
                 if (valueStart == valueEnd) {
@@ -1446,6 +1446,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<string> setKeywords;
         private int curlyBraceDepth = 0;
         private string sanitizedMaterialName;
+        private bool stripShadowVariants = false;
         private OptimizedShader optimizedShader = new OptimizedShader();
 
         private ShaderOptimizer() {}
@@ -1462,7 +1463,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Dictionary<string, string> animatedPropertyValues = null,
             List<string> setKeywords = null,
             Dictionary<string, bool> poiUsedPropertyDefines = null,
-            string sanitizedMaterialName = null
+            string sanitizedMaterialName = null,
+            bool stripShadowVariants = false
             )
         {
             if (source == null || !source.parsedCorrectly)
@@ -1493,7 +1495,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>(),
-                sanitizedMaterialName = sanitizedMaterialName ?? Path.GetFileNameWithoutExtension(source.filePath)
+                sanitizedMaterialName = sanitizedMaterialName ?? Path.GetFileNameWithoutExtension(source.filePath),
+                stripShadowVariants = stripShadowVariants
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -2752,7 +2755,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 switch (identifier) {
                     case "vertex":
-                        if (((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0)) {
+                        if ((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0) {
                             pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                         } else {
                             pragmaOutput.Add(line);
@@ -2761,6 +2764,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     case "shader_feature":
                     case "shader_feature_local":
                     case "skip_optimizations":
+                        break;
+                    case "multi_compile_fwdbase":
+                        pragmaOutput.Add("#pragma multi_compile DIRECTIONAL");
+                        pragmaOutput.Add("#pragma multi_compile LIGHTPROBE_SH");
+                        if (!stripShadowVariants)
+                            pragmaOutput.Add("#pragma multi_compile _ SHADOWS_SCREEN");
+                        break;
+                    case "multi_compile_fwdadd_fullshadows":
+                        pragmaOutput.Add(stripShadowVariants ? "#pragma multi_compile_fwdadd" : "#pragma multi_compile_fwdadd_fullshadows");
                         break;
                     default:
                         pragmaOutput.Add(line);
@@ -3151,7 +3163,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
                     }
-                    if (lightMode == "Meta")
+                    if (lightMode == "Meta" || (lightMode == "ShadowCaster" && stripShadowVariants))
                     {
                         while (output[output.Count - 1] != "Pass")
                         {
@@ -3166,7 +3178,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             curlyBraceDepthUntilEndOfPass -= line == "}" ? 1 : 0;
                             passID += line == "CGPROGRAM" || line == "HLSLPROGRAM" ? 1 : 0;
                         }
-                        output.Add("// Meta pass removed");
+                        output.Add($"// {lightMode} pass removed");
                     }
                 }
                 else if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
