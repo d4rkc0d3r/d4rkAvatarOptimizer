@@ -115,8 +115,8 @@ public class ShaderAnalyzerDebugger : EditorWindow
                     continue;
                 if (prop.type == ParsedShader.Property.Type.Float)
                     replace[prop.name] = "" + material.GetFloat(prop.name);
-                if (prop.type == ParsedShader.Property.Type.Int)
-                    replace[prop.name] = "" + material.GetInt(prop.name);
+                if (prop.type == ParsedShader.Property.Type.Integer)
+                    replace[prop.name] = "" + material.GetInteger(prop.name);
                 if (prop.type == ParsedShader.Property.Type.Color)
                     replace[prop.name] = material.GetColor(prop.name).linear.ToString("F6").Replace("RGBA", "float4");
                 if (prop.type == ParsedShader.Property.Type.ColorHDR)

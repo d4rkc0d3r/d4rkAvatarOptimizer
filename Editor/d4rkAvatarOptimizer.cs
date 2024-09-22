@@ -3251,14 +3251,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             value = (prop.hasGammaTag) ? Mathf.GammaToLinearSpace(value) : value;
                             propertyArray.values.Add($"{value}");
                         break;
-                        case ParsedShader.Property.Type.Int:
+                        case ParsedShader.Property.Type.Integer:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "int";
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
-                            propertyArray.values.Add("" + mat.GetInt(prop.name));
+                            propertyArray.values.Add("" + mat.GetInteger(prop.name));
                         break;
                         case ParsedShader.Property.Type.Color:
                         case ParsedShader.Property.Type.ColorHDR:
@@ -3377,7 +3377,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         string type = "float4";
                         if (prop.type == ParsedShader.Property.Type.Float)
                             type = "float";
-                        if (prop.type == ParsedShader.Property.Type.Int)
+                        if (prop.type == ParsedShader.Property.Type.Integer)
                             type = "int";
                         animatedPropertyValues[i][propName] = type;
                     }
@@ -3705,10 +3705,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             switch (prop.type)
             {
-                case ParsedShader.Property.Type.Int:
                 case ParsedShader.Property.Type.Float:
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)
+                        return false;
+                    break;
+                case ParsedShader.Property.Type.Integer:
+                    var candidateIntValue = candidateMat.GetInteger(prop.name);
+                    if (listMaterials[0].GetInteger(prop.name) != candidateIntValue)
                         return false;
                     break;
                 case ParsedShader.Property.Type.Texture2D:

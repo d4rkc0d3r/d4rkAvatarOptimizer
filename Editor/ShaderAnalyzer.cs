@@ -28,7 +28,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 ColorHDR,
                 Float,
                 Vector,
-                Int,
+                Integer,
                 Texture2D,
                 Texture2DArray,
                 Texture3D,
@@ -586,7 +586,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static string ParseIncludeDirective(string line)
         {
-            if (!line.StartsWith("#include"))
+            if (!line.StartsWithSimple("#include"))
                 return "";
             int firstQuote = line.IndexOf('"');
             int lastQuote = line.LastIndexOf('"');
@@ -709,7 +709,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.defaultValue = "float4" + output.defaultValue;
                     break;
                 case "integer":
-                    output.type = ParsedShader.Property.Type.Int;
+                    output.type = ParsedShader.Property.Type.Integer;
                     break;
                 case "2d":
                     output.type = ParsedShader.Property.Type.Texture2D;
@@ -1039,7 +1039,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void ParsePragma(string line, ParsedShader.Pass pass)
         {
-            if (line.Length < 8 || line[0] != '#' || line[1] != 'p' || !line.StartsWith("#pragma "))
+            if (!line.StartsWithSimple("#pragma "))
                 return;
             int index = 8;
             while (index < line.Length && (line[index] == ' ' || line[index] == '\t'))
@@ -1092,14 +1092,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++) {
                 var currentLine = lines[lineIndex];
                 if (currentLine[0] == '#') {
-                    if (currentLine.Length > 8 && currentLine[3] == 'c' && currentLine.StartsWith("#include ")) {
+                    if (currentLine.StartsWithSimple("#include ")) {
                         var includeName = ParseIncludeDirective(currentLine);
                         if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines)) {
                             alreadyParsed.Add(includeName);
                             ParseFunctionDeclarationsRecursive(includeLines, currentPass, 0, alreadyParsed);
                         }
                     }
-                    else if (currentLine.Length > 8 && currentLine[3] == 'f' && currentLine.StartsWith("#define ")) {
+                    else if (currentLine.StartsWithSimple("#define ")) {
                         if (currentLine.Contains("Texture2D ") || currentLine.Contains("sampler2D ") || currentLine.Contains("##_ST")) {
                             if (!parsedShader.customTextureDeclarations.Contains(currentLine))
                                 parsedShader.customTextureDeclarations.Add(currentLine);
@@ -1144,7 +1144,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         && lines[lineIndex + 1][0] != '{'
                         && lines[lineIndex + 1][0] != '}'
                         && lines[lineIndex + 1][0] != '#'
-                        && (lines[lineIndex + 1][0] != 'r' || !lines[lineIndex + 1].StartsWith("return")))
+                        && !lines[lineIndex + 1].StartsWithSimple("return"))
                     {
                         lineIndex++;
                     }
@@ -1162,7 +1162,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                 }
                 output.Add(line);
-                if (line.Length >= 29 && line[0] == 'U' && line[6] == 'I' && line.StartsWith("UNITY_INSTANCING_BUFFER_START"))
+                if (line.StartsWithSimple("UNITY_INSTANCING_BUFFER_START"))
                 {
                     throw new ParserException("Shader with instancing is not supported.");
                 }
@@ -1290,7 +1290,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
                             output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
                         }
-                        else if (line.StartsWith("UsePass"))
+                        else if (line.StartsWithSimple("UsePass"))
                         {
                             throw new ParserException("UsePass is not supported.");
                         }
@@ -1338,7 +1338,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 switch (prop.type)
                 {
-                    case ParsedShader.Property.Type.Int:
+                    case ParsedShader.Property.Type.Integer:
                     case ParsedShader.Property.Type.Float:
                         if (prop.shaderLabParams.Count == 0)
                             break;
@@ -1608,7 +1608,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
             foreach (var line in funcParams)
             {
-                if (line.StartsWith("#"))
+                if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                     continue;
@@ -1635,7 +1635,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             foreach (var line in funcParams)
             {
-                if (line.StartsWith("#"))
+                if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                     continue;
@@ -1669,7 +1669,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             foreach (var line in funcParams)
             {
-                if (line.StartsWith("#"))
+                if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                     continue;
@@ -1691,7 +1691,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             foreach (var line in funcParams)
             {
-                if (line.StartsWith("#"))
+                if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                     continue;
@@ -1859,7 +1859,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 wrapperStructs.Add(outParamType + " d4rkAvatarOptimizer_geometryOutput;");
                 wrapperStructs.Add("};");
             }
-            int insertIndex = output.FindLastIndex(s => !s.StartsWith("#") && !s.StartsWith("[")) + 1;
+            int insertIndex = output.FindLastIndex(s => !s.StartsWithSimple("#") && !s.StartsWithSimple("[")) + 1;
             output.InsertRange(insertIndex, wrapperStructs);
             string line = source[sourceLineIndex];
             while (line != "{" && sourceLineIndex < source.Count - 1)
@@ -2281,7 +2281,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var property in staticPropertyValues)
             {
                 string name = property.Key;
-                if (name.Length > 10 && name[0] == 'a' && name[5] == 'I' && name.StartsWith("arrayIndex") && texturesToMerge.Contains(name.Substring(10)))
+                if (name.StartsWithSimple("arrayIndex") && texturesToMerge.Contains(name.Substring(10)))
                 {
                     output.Add($"static float {name} = {property.Value};");
                 }
@@ -2796,7 +2796,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return;
                 if (line[0] == '#')
                 {
-                    if (line.Length > 7 && line[3] == 'c' && line.StartsWith("#include "))
+                    if (line.StartsWithSimple("#include "))
                     {
                         var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
                         if (parsedShader.text.TryGetValue(includeName, out var includeSource))
@@ -3142,7 +3142,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 ParseAndEvaluateIfex(lines, ref lineIndex, output);
                 string line = lines[lineIndex];
-                if (line.StartsWith("CustomEditor"))
+                if (line.StartsWithSimple("CustomEditor"))
                     continue;
                 output.Add(line);
                 if (line == "Pass")
