@@ -883,7 +883,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (cache_FindAllAnimationClipsAffectingRenderer != null)
                 return cache_FindAllAnimationClipsAffectingRenderer;
             cache_FindAllAnimationClipsAffectingRenderer = new Dictionary<string, HashSet<AnimationClip>>();
-            foreach (var clip in GetAllUsedFXLayerAnimationClips())
+            foreach (var clip in GetAllUsedAnimationClips())
             {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
@@ -965,7 +965,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         if (cache_AllAnimationClipsAffectingRendererMaterialProperties == null) {
             cache_AllAnimationClipsAffectingRendererMaterialProperties = new Dictionary<string, HashSet<AnimationClip>>();
-            foreach (var clip in GetAllUsedFXLayerAnimationClips()) {
+            foreach (var clip in GetAllUsedAnimationClips()) {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
                     if (IsRelevantBinding(binding)) {
                         if (!cache_AllAnimationClipsAffectingRendererMaterialProperties.TryGetValue(binding.path, out var clips)) {
@@ -1480,14 +1480,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (avDescriptor == null)
             return;
         
-        var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
-        var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
-        {
-            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (layer == null)
-                continue;
-        }
+        int totalControllerCount = avDescriptor.baseAnimationLayers.Length + avDescriptor.specialAnimationLayers.Length;
+        var layerCopyPaths = new string[totalControllerCount];
+        var optimizedControllers = new AnimatorController[totalControllerCount];
 
         var fxLayersToMerge = new List<int>();
         var fxLayersToDestroy = new List<int>();
@@ -1531,6 +1526,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
             optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
+            avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
+        }
+        for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.specialAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            var index = i + avDescriptor.baseAnimationLayers.Length;
+            layerCopyPaths[index] = $"{trashBinPath}SpecialAnimationLayer{index}{controller.name}(OptimizedCopy).controller";
+            optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
+            optimizedControllers[index].name = $"SpecialAnimationLayer{index}{controller.name}(OptimizedCopy)";
+            avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
         }
         Profiler.EndSection();
 
@@ -1573,8 +1580,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
             }
-
-            avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
         }
         Profiler.StartSection("AssetDatabase.SaveAssets()");
         AssetDatabase.SaveAssets();
@@ -2104,6 +2109,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             usedClips.UnionWith(controller.animationClips);
         }
+        foreach (var clip in avDescriptor.specialAnimationLayers)
+        {
+            var controller = clip.animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            usedClips.UnionWith(controller.animationClips);
+        }
         usedClips.UnionWith(GetAllUsedFXLayerAnimationClips());
         return cache_GetAllUsedAnimationClips = usedClips;
     }
@@ -2147,7 +2159,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
@@ -2270,10 +2282,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_FindAllMaterialSwapMaterials != null)
             return cache_FindAllMaterialSwapMaterials;
         var result = new Dictionary<(string path, int index), HashSet<Material>>();
-        var fxLayer = GetFXLayer();
-        if (fxLayer == null)
-            return result;
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
@@ -2393,7 +2402,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
             }
-            foreach (var clip in GetAllUsedFXLayerAnimationClips())
+            foreach (var clip in GetAllUsedAnimationClips())
             {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
@@ -2530,7 +2539,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         var mergeableBlendShapes = new List<List<(int blendshapeID, float value)>>();
         var hasEntryInMergeableBlendShapes = new HashSet<int>();
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             var blendShapes = new List<(int blendShapeID, EditorCurveBinding binding)>();
             var keyframes = new HashSet<float>();
@@ -2836,11 +2845,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             transforms.Add(avDescriptor.lipSyncJawBone);
         }
 
-        var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
-        layers.AddRange(avDescriptor.specialAnimationLayers.Select(a => a.animatorController));
-        foreach (var layer in layers.Where(a => a != null))
+        foreach (var clip in GetAllUsedAnimationClips())
         {
-            foreach (var binding in layer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
                 if (binding.type == typeof(Transform))
                 {

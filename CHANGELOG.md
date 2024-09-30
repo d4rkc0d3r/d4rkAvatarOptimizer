@@ -15,6 +15,8 @@
 * Fix `FindAllPhysBoneDependencies` not checking VRCConstraints or FinalIK components. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/123)
 * Fix animation bindings of the base type `Renderer` not getting respected properly. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/121)
 * Shader parser now handles `ColorMask 0` passes with no code block correctly and throws a parse error for other non code block passes.
+* Fix optimizer not checking all the animator controllers in the avatar descriptor for some things.
+* Fix special animation layers not getting updated animation clips.
 
 ## v3.8.0
 ### Features
