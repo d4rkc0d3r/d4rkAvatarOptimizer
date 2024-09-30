@@ -3243,7 +3243,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         {
                             knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
                         }
-                        if (lightMode == "Meta" || (lightMode == "ShadowCaster" && stripShadowVariants))
+                        if (lightMode == "Meta")
                         {
                             output.Add($"// {lightMode} pass removed, skipped {currentPass.lineCount} lines");
                             lineIndex = currentPass.startLineIndex + currentPass.lineCount - 1;
