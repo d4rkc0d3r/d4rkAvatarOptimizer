@@ -1519,6 +1519,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private Dictionary<string, string> staticPropertyValues;
         private Dictionary<string, (string type, List<string> values)> arrayPropertyValues;
         private Dictionary<string, string> animatedPropertyValues;
+        private Dictionary<string, bool[]> animatedPropertyOnMeshID;
         private Dictionary<string, string> texturesToNullCheck;
         private HashSet<string> texturesToMerge;
         private HashSet<string> texturesToReplaceCalls;
@@ -1547,7 +1548,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             List<string> setKeywords = null,
             Dictionary<string, bool> poiUsedPropertyDefines = null,
             string sanitizedMaterialName = null,
-            bool stripShadowVariants = false
+            bool stripShadowVariants = false,
+            Dictionary<string, bool[]> animatedPropertyOnMeshID = null
             )
         {
             if (source == null || !source.parsedCorrectly)
@@ -1579,7 +1581,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>(),
                 sanitizedMaterialName = sanitizedMaterialName ?? Path.GetFileNameWithoutExtension(source.filePath),
-                stripShadowVariants = stripShadowVariants
+                stripShadowVariants = stripShadowVariants,
+                animatedPropertyOnMeshID = animatedPropertyOnMeshID ?? new Dictionary<string, bool[]>()
             };
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
@@ -1676,10 +1679,28 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var animatedProperty in animatedPropertyValues)
             {
                 string name = animatedProperty.Key;
-                string value = localMeshCount > 1
+                string animatedValue = localMeshCount > 1
                     ? $"{CBufferAliasArray[name].name}[{CBufferAliasArray[name].offset} + d4rkAvatarOptimizer_MeshID]"
                     : $"d4rkAvatarOptimizer{name}_ArrayIndex{mergedMeshIndices.First()}";
-                output.Add($"{name} = isnan(asfloat(asuint({value}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {value};");
+                if (animatedPropertyOnMeshID.TryGetValue(name, out var onMeshID))
+                {
+                    if (mergedMeshIndices.All(i => onMeshID[i]))
+                    {
+                        output.Add($"{name} = {animatedValue};");
+                    }
+                    else if (localMeshCount > 32)
+                    {
+                        output.Add($"{name} = d4rkAvatarOptimizer{name}_IsAnimated[d4rkAvatarOptimizer_MeshID] ? {animatedValue} : {name};");
+                    }
+                    else
+                    {
+                        output.Add($"{name} = ((1u << d4rkAvatarOptimizer_MeshID) & d4rkAvatarOptimizer{name}_IsAnimatedMask) != 0 ? {animatedValue} : {name};");
+                    }
+                }
+                else
+                {
+                    output.Add($"{name} = isnan(asfloat(asuint({animatedValue}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {animatedValue};");
+                }
             }
         }
 
@@ -2320,6 +2341,31 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.AddRange(vectorOutput);
                     output.Add("};");
                 }
+                foreach (var animatedPropertyMask in animatedPropertyOnMeshID)
+                {
+                    string name = animatedPropertyMask.Key;
+                    bool[] data = animatedPropertyMask.Value;
+                    if (localMeshCount > 32)
+                    {
+                        output.Add($"static const bool d4rkAvatarOptimizer{name}_IsAnimated[{localMeshCount}] = ");
+                        output.Add("{");
+                        for (int i = 0; i < localMeshCount; i++)
+                        {
+                            output.Add(data[i + mergedMeshIndices.First()] ? "true," : "false,");
+                        }
+                        output.Add("};");
+                    }
+                    else
+                    {
+                        uint bitField = 0;
+                        for (int i = 0; i < localMeshCount; i++)
+                        {
+                            if (data[i + mergedMeshIndices.First()])
+                                bitField |= 1u << i;
+                        }
+                        output.Add($"static const uint d4rkAvatarOptimizer{name}_IsAnimatedMask = {bitField};");
+                    }
+                }
             }
             var staticParamDefines = new HashSet<(string type, string name)>();
             staticParamDefines.UnionWith(
@@ -2351,8 +2397,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var (type, values) = arrayProperty.Value;
                     if (!ArrayPropertyNeedsIndexing(values))
                         continue;
-                    string name = "d4rkAvatarOptimizerArray" + arrayProperty.Key;
-                    output.Add("static const " + type + " " + name + "[" + values.Count + "] = ");
+                    output.Add($"static const {type} d4rkAvatarOptimizerArray{arrayProperty.Key}[{values.Count}] = ");
                     output.Add("{");
                     for (int i = 0; i < values.Count; i++)
                     {
