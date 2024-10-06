@@ -663,7 +663,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
     {
-        return material == null ? false : ShaderAnalyzer.Parse(material.shader).CanMerge();
+        return material != null && ShaderAnalyzer.Parse(material.shader).CanMerge();
     }
 
     private bool IsBasicCombinableRenderer(Renderer candidate)
@@ -778,14 +778,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
         if (renderer == null)
             return cache_CanUseNaNimationOnMesh[path] = false;
-        return cache_CanUseNaNimationOnMesh[path] = GetRendererDefaultEnabledState(renderer) || !FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Contains(path);
+        return cache_CanUseNaNimationOnMesh[path] = GetRendererDefaultEnabledState(renderer) || !FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation().Contains(path);
     }
 
-    private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = null;
-    public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+    private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = null;
+    public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation()
     {
-        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation == null) {
-            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = new HashSet<string>();
+        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation == null) {
+            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = new HashSet<string>();
             var goOffPaths = new HashSet<string>();
             var goOnPaths = new HashSet<string>();
             var meshOffPaths = new HashSet<string>();
@@ -827,18 +827,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         }
                     }
                 }
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOffPaths.Except(goOnPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOnPaths.Except(goOffPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOffPaths.Except(meshOnPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(goOnPaths.Except(goOffPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
             }
-            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.ToList()) {
+            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.ToList()) {
                 var t = GetTransformFromPath(path);
                 if (t == null || (t.GetComponent<MeshRenderer>() == null && t.GetComponent<SkinnedMeshRenderer>() == null))
-                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.Remove(path);
+                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.Remove(path);
             }
         }
-        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation;
+        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation;
     }
 
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
@@ -2109,9 +2107,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 continue;
             usedClips.UnionWith(controller.animationClips);
         }
-        foreach (var clip in avDescriptor.specialAnimationLayers)
+        foreach (var layer in avDescriptor.specialAnimationLayers)
         {
-            var controller = clip.animatorController as AnimatorController;
+            var controller = layer.animatorController as AnimatorController;
             if (controller == null)
                 continue;
             usedClips.UnionWith(controller.animationClips);
