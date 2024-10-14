@@ -4862,6 +4862,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var hardCodedExclusions = new List<string>() {
             "_VirtualLens_Root",
         }.Select(s => GetTransformFromPath(s)).ToList();
+        hardCodedExclusions.AddRange(transform.GetComponentsInChildren<VRCContactSender>(true)
+            .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
+            .Select(c => c.transform.parent)
+            .Where(t => t != null)
+            .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
+            .Where(t => t != null));
         foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
             if (excludedTransform == null)
                 continue;
