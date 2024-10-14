@@ -1267,41 +1267,54 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return newCurve;
     }
 
-    static Dictionary<char, char> otherVectorOrColorComponent = new Dictionary<char, char> {
+    private static readonly Dictionary<char, char> otherVectorOrColorComponent = new Dictionary<char, char> {
         { 'x', 'r' }, { 'y', 'g' }, { 'z', 'b' }, { 'w', 'a' },
         { 'r', 'x' }, { 'g', 'y' }, { 'b', 'z' }, { 'a', 'w' },
     };
-    Dictionary<string, HashSet<(string property, Type type)>> cache_IsAnimatableBinding = null;
+    Dictionary<string, Dictionary<Type, HashSet<string>>> cache_IsAnimatableBinding = null;
     public bool IsAnimatableBinding(EditorCurveBinding binding) {
         if (cache_IsAnimatableBinding == null)
-            cache_IsAnimatableBinding = new Dictionary<string, HashSet<(string property, Type type)>>();
+            cache_IsAnimatableBinding = new Dictionary<string, Dictionary<Type, HashSet<string>>>();
+
         if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings)) {
-            animatableBindings = new HashSet<(string property, Type type)>();
+            animatableBindings = new Dictionary<Type, HashSet<string>>();
             GameObject targetObject = GetTransformFromPath(binding.path)?.gameObject;
             if (targetObject != null) {
                 foreach (var animatableBinding in AnimationUtility.GetAnimatableBindings(targetObject, gameObject)) {
                     var name = animatableBinding.propertyName;
-                    animatableBindings.Add((name, animatableBinding.type));
+                    var type = animatableBinding.type;
+                    if (!animatableBindings.TryGetValue(type, out var animatableProperties)) {
+                        animatableProperties = new HashSet<string>();
+                        animatableBindings[type] = animatableProperties;
+                    }
+                    animatableProperties.Add(name);
                     if (name.Length > 2 && name[name.Length - 2] == '.' && otherVectorOrColorComponent.TryGetValue(name[name.Length - 1], out var otherComponent)) {
                         // Color & Vector properties can both be animated by .xyzw or .rgba but only one of them gets returned by GetAnimatableBindings
-                        animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
+                        animatableProperties.Add(name.Substring(0, name.Length - 1) + otherComponent);
                     }
                 }
-                animatableBindings.Add(("ComponentExists", typeof(GameObject)));
+                if (!animatableBindings.ContainsKey(typeof(GameObject))) {
+                    animatableBindings[typeof(GameObject)] = new HashSet<string>();
+                }
+                animatableBindings[typeof(GameObject)].Add("ComponentExists");
                 foreach (var component in targetObject.GetNonNullComponents()) {
-                    animatableBindings.Add(("ComponentExists", component.GetType()));
+                    var componentType = component.GetType();
+                    if (!animatableBindings.ContainsKey(componentType)) {
+                        animatableBindings[componentType] = new HashSet<string>();
+                    }
+                    animatableBindings[componentType].Add("ComponentExists");
                 }
                 if (targetObject.TryGetComponent(out VRCStation station)) {
                     // even if box collider doesn't exist right now, the station script will create one at runtime
-                    animatableBindings.Add(("ComponentExists", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_IsTrigger", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Enabled", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.x", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.y", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.z", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.x", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.y", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.z", typeof(BoxCollider)));
+                    var boxColliderType = typeof(BoxCollider);
+                    if (!animatableBindings.ContainsKey(boxColliderType)) {
+                        animatableBindings[boxColliderType] = new HashSet<string>();
+                    }
+                    animatableBindings[boxColliderType].UnionWith(new string[] {
+                        "ComponentExists", "m_IsTrigger", "m_Enabled",
+                        "m_Center.x", "m_Center.y", "m_Center.z",
+                        "m_Size.x", "m_Size.y", "m_Size.z"
+                    });
                 }
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
@@ -1317,7 +1330,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         // only check for the property name when the type is a Renderer as GetAnimatableBindings seems to be very unreliable
         // otherwise only check if the component exists
-        return animatableBindings.Contains((typeof(Renderer).IsAssignableFrom(binding.type) ? binding.propertyName : "ComponentExists", binding.type));
+        foreach (var kvp in animatableBindings) {
+            if (binding.type.IsAssignableFrom(kvp.Key) && (!typeof(Renderer).IsAssignableFrom(binding.type) || kvp.Value.Contains(binding.propertyName))) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;

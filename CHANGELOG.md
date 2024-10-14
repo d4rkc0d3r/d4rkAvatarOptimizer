@@ -20,6 +20,7 @@
 * Fix optimizer not checking all the animator controllers in the avatar descriptor for some things.
 * Fix special animation layers not getting updated animation clips.
 * Layers with only a off animation no longer block default disabled meshes from using NaNimation. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/126)
+* Fix `IsAnimatableBinding` not checking if the bindings type is a base type of the component types.
 
 ## v3.8.0
 ### Features
