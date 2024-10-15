@@ -1,3 +1,7 @@
+## v3.9.1
+### Bug Fixes
+* Fix crash when the avatar has a skinned mesh with out of bounds bone indices. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/129)
+
 ## v3.9.0
 ### Features
 * Generated shaders and materials are now stripped of all properties that got baked into the shader.

@@ -2242,15 +2242,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var meshBones = skinnedMesh.bones;
             var usedBoneIDs = new bool[meshBones.Length];
             var boneWeights = skinnedMesh.sharedMesh.boneWeights;
+            int outOfRangeBoneCount = 0;
+            void MarkUsedBone(int boneIndex) {
+                if (boneIndex < 0 || boneIndex >= meshBones.Length) {
+                    outOfRangeBoneCount++;
+                    return;
+                }
+                usedBoneIDs[boneIndex] = true;
+            }
             for (int i = 0; i < boneWeights.Length; i++)
             {
-                usedBoneIDs[boneWeights[i].boneIndex0] = true;
+                MarkUsedBone(boneWeights[i].boneIndex0);
                 if (boneWeights[i].weight1 > 0) {
-                    usedBoneIDs[boneWeights[i].boneIndex1] = true;
+                    MarkUsedBone(boneWeights[i].boneIndex1);
                     if (boneWeights[i].weight2 > 0) {
-                        usedBoneIDs[boneWeights[i].boneIndex2] = true;
+                        MarkUsedBone(boneWeights[i].boneIndex2);
                         if (boneWeights[i].weight3 > 0) {
-                            usedBoneIDs[boneWeights[i].boneIndex3] = true;
+                            MarkUsedBone(boneWeights[i].boneIndex3);
                         }
                     }
                 }
@@ -2261,6 +2269,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     AddDependency(meshBones[i], skinnedMesh);
                 }
+            }
+            if (outOfRangeBoneCount > 0)
+            {
+                Debug.LogWarning($"Skinned mesh renderer {GetPathToRoot(skinnedMesh)} has {outOfRangeBoneCount} out of range bone indices");
             }
         }
         foreach (var behavior in GetComponentsInChildren<Behaviour>(true)
