@@ -1301,7 +1301,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
                     currentPass.codeBlockLineCount = output.Count - currentPass.startLineIndex - currentPass.codeBlockStartIndex;
                 }
-                else if (line == "Pass")
+                else if (line.ToLower() == "pass")
                 {
                     if (lines[lineIndex + 1] != "{")
                     {
