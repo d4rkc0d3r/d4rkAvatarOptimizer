@@ -964,7 +964,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (cantMergeNaNimationBecauseOfWDONAnimationsCache != null)
                 return cantMergeNaNimationBecauseOfWDONAnimationsCache;
             return cantMergeNaNimationBecauseOfWDONAnimationsCache =
-                optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+                optimizer.FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation()
                     .Select(p => optimizer.GetTransformFromPath(p))
                     .Where(t => t != null)
                     .Select(t => t.GetComponent<Renderer>())

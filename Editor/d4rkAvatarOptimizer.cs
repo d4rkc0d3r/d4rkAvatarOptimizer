@@ -138,6 +138,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
             constantAnimatedValuesToAdd.Clear();
+            animatedMaterialPropertyDefaultValues.Clear();
             ClearCaches();
             DisplayProgressBar("Destroying unused components", 0.2f);
             Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
@@ -430,6 +431,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private Dictionary<(string path, int index), (string path, int index)> materialSlotRemap = new Dictionary<(string, int), (string, int)>();
     private Dictionary<string, HashSet<string>> animatedMaterialProperties = new Dictionary<string, HashSet<string>>();
     private Dictionary<string, HashSet<string>> fusedAnimatedMaterialProperties = new Dictionary<string, HashSet<string>>();
+    private Dictionary<string, Dictionary<string, Vector4>> animatedMaterialPropertyDefaultValues = new Dictionary<string, Dictionary<string, Vector4>>();
     private List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
@@ -663,7 +665,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
     {
-        return material == null ? false : ShaderAnalyzer.Parse(material.shader).CanMerge();
+        return material != null && ShaderAnalyzer.Parse(material.shader).CanMerge();
     }
 
     private bool IsBasicCombinableRenderer(Renderer candidate)
@@ -778,14 +780,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
         if (renderer == null)
             return cache_CanUseNaNimationOnMesh[path] = false;
-        return cache_CanUseNaNimationOnMesh[path] = GetRendererDefaultEnabledState(renderer) || !FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation().Contains(path);
+        return cache_CanUseNaNimationOnMesh[path] = GetRendererDefaultEnabledState(renderer) || !FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation().Contains(path);
     }
 
-    private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = null;
-    public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation()
+    private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = null;
+    public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation()
     {
-        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation == null) {
-            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation = new HashSet<string>();
+        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation == null) {
+            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = new HashSet<string>();
             var goOffPaths = new HashSet<string>();
             var goOnPaths = new HashSet<string>();
             var meshOffPaths = new HashSet<string>();
@@ -827,18 +829,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         }
                     }
                 }
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOffPaths.Except(goOnPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(goOnPaths.Except(goOffPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOffPaths.Except(meshOnPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(goOnPaths.Except(goOffPaths));
+                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
             }
-            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.ToList()) {
+            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.ToList()) {
                 var t = GetTransformFromPath(path);
                 if (t == null || (t.GetComponent<MeshRenderer>() == null && t.GetComponent<SkinnedMeshRenderer>() == null))
-                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation.Remove(path);
+                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.Remove(path);
             }
         }
-        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnOrOffAnimation;
+        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation;
     }
 
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
@@ -883,7 +883,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (cache_FindAllAnimationClipsAffectingRenderer != null)
                 return cache_FindAllAnimationClipsAffectingRenderer;
             cache_FindAllAnimationClipsAffectingRenderer = new Dictionary<string, HashSet<AnimationClip>>();
-            foreach (var clip in GetAllUsedFXLayerAnimationClips())
+            foreach (var clip in GetAllUsedAnimationClips())
             {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
@@ -965,7 +965,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         if (cache_AllAnimationClipsAffectingRendererMaterialProperties == null) {
             cache_AllAnimationClipsAffectingRendererMaterialProperties = new Dictionary<string, HashSet<AnimationClip>>();
-            foreach (var clip in GetAllUsedFXLayerAnimationClips()) {
+            foreach (var clip in GetAllUsedAnimationClips()) {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
                     if (IsRelevantBinding(binding)) {
                         if (!cache_AllAnimationClipsAffectingRendererMaterialProperties.TryGetValue(binding.path, out var clips)) {
@@ -1267,41 +1267,54 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return newCurve;
     }
 
-    static Dictionary<char, char> otherVectorOrColorComponent = new Dictionary<char, char> {
+    private static readonly Dictionary<char, char> otherVectorOrColorComponent = new Dictionary<char, char> {
         { 'x', 'r' }, { 'y', 'g' }, { 'z', 'b' }, { 'w', 'a' },
         { 'r', 'x' }, { 'g', 'y' }, { 'b', 'z' }, { 'a', 'w' },
     };
-    Dictionary<string, HashSet<(string property, Type type)>> cache_IsAnimatableBinding = null;
+    Dictionary<string, Dictionary<Type, HashSet<string>>> cache_IsAnimatableBinding = null;
     public bool IsAnimatableBinding(EditorCurveBinding binding) {
         if (cache_IsAnimatableBinding == null)
-            cache_IsAnimatableBinding = new Dictionary<string, HashSet<(string property, Type type)>>();
+            cache_IsAnimatableBinding = new Dictionary<string, Dictionary<Type, HashSet<string>>>();
+
         if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings)) {
-            animatableBindings = new HashSet<(string property, Type type)>();
+            animatableBindings = new Dictionary<Type, HashSet<string>>();
             GameObject targetObject = GetTransformFromPath(binding.path)?.gameObject;
             if (targetObject != null) {
                 foreach (var animatableBinding in AnimationUtility.GetAnimatableBindings(targetObject, gameObject)) {
                     var name = animatableBinding.propertyName;
-                    animatableBindings.Add((name, animatableBinding.type));
+                    var type = animatableBinding.type;
+                    if (!animatableBindings.TryGetValue(type, out var animatableProperties)) {
+                        animatableProperties = new HashSet<string>();
+                        animatableBindings[type] = animatableProperties;
+                    }
+                    animatableProperties.Add(name);
                     if (name.Length > 2 && name[name.Length - 2] == '.' && otherVectorOrColorComponent.TryGetValue(name[name.Length - 1], out var otherComponent)) {
                         // Color & Vector properties can both be animated by .xyzw or .rgba but only one of them gets returned by GetAnimatableBindings
-                        animatableBindings.Add((name.Substring(0, name.Length - 1) + otherComponent, animatableBinding.type));
+                        animatableProperties.Add(name.Substring(0, name.Length - 1) + otherComponent);
                     }
                 }
-                animatableBindings.Add(("ComponentExists", typeof(GameObject)));
+                if (!animatableBindings.ContainsKey(typeof(GameObject))) {
+                    animatableBindings[typeof(GameObject)] = new HashSet<string>();
+                }
+                animatableBindings[typeof(GameObject)].Add("ComponentExists");
                 foreach (var component in targetObject.GetNonNullComponents()) {
-                    animatableBindings.Add(("ComponentExists", component.GetType()));
+                    var componentType = component.GetType();
+                    if (!animatableBindings.ContainsKey(componentType)) {
+                        animatableBindings[componentType] = new HashSet<string>();
+                    }
+                    animatableBindings[componentType].Add("ComponentExists");
                 }
                 if (targetObject.TryGetComponent(out VRCStation station)) {
                     // even if box collider doesn't exist right now, the station script will create one at runtime
-                    animatableBindings.Add(("ComponentExists", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_IsTrigger", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Enabled", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.x", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.y", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Center.z", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.x", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.y", typeof(BoxCollider)));
-                    animatableBindings.Add(("m_Size.z", typeof(BoxCollider)));
+                    var boxColliderType = typeof(BoxCollider);
+                    if (!animatableBindings.ContainsKey(boxColliderType)) {
+                        animatableBindings[boxColliderType] = new HashSet<string>();
+                    }
+                    animatableBindings[boxColliderType].UnionWith(new string[] {
+                        "ComponentExists", "m_IsTrigger", "m_Enabled",
+                        "m_Center.x", "m_Center.y", "m_Center.z",
+                        "m_Size.x", "m_Size.y", "m_Size.z"
+                    });
                 }
             }
             cache_IsAnimatableBinding[binding.path] = animatableBindings;
@@ -1317,7 +1330,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         // only check for the property name when the type is a Renderer as GetAnimatableBindings seems to be very unreliable
         // otherwise only check if the component exists
-        return animatableBindings.Contains((typeof(Renderer).IsAssignableFrom(binding.type) ? binding.propertyName : "ComponentExists", binding.type));
+        foreach (var kvp in animatableBindings) {
+            if (binding.type.IsAssignableFrom(kvp.Key) && (!typeof(Renderer).IsAssignableFrom(binding.type) || kvp.Value.Contains(binding.propertyName))) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
@@ -1480,14 +1499,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (avDescriptor == null)
             return;
         
-        var layerCopyPaths = new string[avDescriptor.baseAnimationLayers.Length];
-        var optimizedControllers = new AnimatorController[avDescriptor.baseAnimationLayers.Length];
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
-        {
-            var layer = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (layer == null)
-                continue;
-        }
+        int totalControllerCount = avDescriptor.baseAnimationLayers.Length + avDescriptor.specialAnimationLayers.Length;
+        var layerCopyPaths = new string[totalControllerCount];
+        var optimizedControllers = new AnimatorController[totalControllerCount];
 
         var fxLayersToMerge = new List<int>();
         var fxLayersToDestroy = new List<int>();
@@ -1531,6 +1545,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                 : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
             optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
+            avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
+        }
+        for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
+        {
+            var controller = avDescriptor.specialAnimationLayers[i].animatorController as AnimatorController;
+            if (controller == null)
+                continue;
+            var index = i + avDescriptor.baseAnimationLayers.Length;
+            layerCopyPaths[index] = $"{trashBinPath}SpecialAnimationLayer{index}{controller.name}(OptimizedCopy).controller";
+            optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
+            optimizedControllers[index].name = $"SpecialAnimationLayer{index}{controller.name}(OptimizedCopy)";
+            avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
         }
         Profiler.EndSection();
 
@@ -1573,8 +1599,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
             }
-
-            avDescriptor.baseAnimationLayers[i].animatorController = newLayer;
         }
         Profiler.StartSection("AssetDatabase.SaveAssets()");
         AssetDatabase.SaveAssets();
@@ -2087,6 +2111,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return cache_GetAllUsedFXLayerAnimationClips = usedClips;
     }
 
+    private bool? cache_DoesFXLayerUseWriteDefaults = null;
+    public bool DoesFXLayerUseWriteDefaults()
+    {
+        if (cache_DoesFXLayerUseWriteDefaults != null)
+            return cache_DoesFXLayerUseWriteDefaults.Value;
+        var fxLayer = GetFXLayer();
+        if (fxLayer == null)
+            return false;
+        var fxLayerLayers = GetFXLayerLayers();
+        for (int i = 0; i < fxLayerLayers.Length; i++)
+        {
+            var stateMachine = fxLayerLayers[i].stateMachine;
+            if (stateMachine == null || (OptimizeFXLayer && IsMergeableFXLayer(i)))
+                continue;
+            foreach (var state in stateMachine.EnumerateAllStates())
+            {
+                if (state.motion is BlendTree blendTree && blendTree.blendType == BlendTreeType.Direct)
+                    continue;
+                if (state.writeDefaultValues)
+                {
+                    cache_DoesFXLayerUseWriteDefaults = true;
+                    return true;
+                }
+            }
+        }
+        cache_DoesFXLayerUseWriteDefaults = false;
+        return false;
+    }
+
+
     private HashSet<AnimationClip> cache_GetAllUsedAnimationClips = null;
     private HashSet<AnimationClip> GetAllUsedAnimationClips()
     {
@@ -2101,6 +2155,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var controller = layer.animatorController as AnimatorController;
             if (controller == null || controller == fxLayer)
+                continue;
+            usedClips.UnionWith(controller.animationClips);
+        }
+        foreach (var layer in avDescriptor.specialAnimationLayers)
+        {
+            var controller = layer.animatorController as AnimatorController;
+            if (controller == null)
                 continue;
             usedClips.UnionWith(controller.animationClips);
         }
@@ -2147,7 +2208,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
         }
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
@@ -2181,15 +2242,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var meshBones = skinnedMesh.bones;
             var usedBoneIDs = new bool[meshBones.Length];
             var boneWeights = skinnedMesh.sharedMesh.boneWeights;
+            int outOfRangeBoneCount = 0;
+            void MarkUsedBone(int boneIndex) {
+                if (boneIndex < 0 || boneIndex >= meshBones.Length) {
+                    outOfRangeBoneCount++;
+                    return;
+                }
+                usedBoneIDs[boneIndex] = true;
+            }
             for (int i = 0; i < boneWeights.Length; i++)
             {
-                usedBoneIDs[boneWeights[i].boneIndex0] = true;
+                MarkUsedBone(boneWeights[i].boneIndex0);
                 if (boneWeights[i].weight1 > 0) {
-                    usedBoneIDs[boneWeights[i].boneIndex1] = true;
+                    MarkUsedBone(boneWeights[i].boneIndex1);
                     if (boneWeights[i].weight2 > 0) {
-                        usedBoneIDs[boneWeights[i].boneIndex2] = true;
+                        MarkUsedBone(boneWeights[i].boneIndex2);
                         if (boneWeights[i].weight3 > 0) {
-                            usedBoneIDs[boneWeights[i].boneIndex3] = true;
+                            MarkUsedBone(boneWeights[i].boneIndex3);
                         }
                     }
                 }
@@ -2200,6 +2269,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     AddDependency(meshBones[i], skinnedMesh);
                 }
+            }
+            if (outOfRangeBoneCount > 0)
+            {
+                Debug.LogWarning($"Skinned mesh renderer {GetPathToRoot(skinnedMesh)} has {outOfRangeBoneCount} out of range bone indices");
             }
         }
         foreach (var behavior in GetComponentsInChildren<Behaviour>(true)
@@ -2270,10 +2343,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_FindAllMaterialSwapMaterials != null)
             return cache_FindAllMaterialSwapMaterials;
         var result = new Dictionary<(string path, int index), HashSet<Material>>();
-        var fxLayer = GetFXLayer();
-        if (fxLayer == null)
-            return result;
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
@@ -2322,10 +2392,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
                     DisplayProgressBar("Optimizing swap material: " + material.name);
-                    var matWrapper = new List<List<Material>>() { new List<Material>() { material } };
-                    var sourcePathWrapper = new List<List<string>>() { Enumerable.Repeat(entry.Key.path, mergedMeshCount).ToList() };
+                    var matWrapper = new List<List<(Material, List<string>)>>() { new List<(Material, List<string>)>() { (material, new List<string> { entry.Key.path } ) } };
                     var mergedMeshIndexWrapper = new List<List<int>>() { new List<int>() { meshIndex } };
-                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, targetPath, sourcePathWrapper, mergedMeshIndexWrapper)[0];
+                    optimizedMaterials[material] = CreateOptimizedMaterials(matWrapper, mergedMeshCount, targetPath, mergedMeshIndexWrapper)[0];
                 }
             }
         }
@@ -2393,7 +2462,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     }
                 }
             }
-            foreach (var clip in GetAllUsedFXLayerAnimationClips())
+            foreach (var clip in GetAllUsedAnimationClips())
             {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
@@ -2530,7 +2599,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         var mergeableBlendShapes = new List<List<(int blendshapeID, float value)>>();
         var hasEntryInMergeableBlendShapes = new HashSet<int>();
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             var blendShapes = new List<(int blendShapeID, EditorCurveBinding binding)>();
             var keyframes = new HashSet<float>();
@@ -2836,11 +2905,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             transforms.Add(avDescriptor.lipSyncJawBone);
         }
 
-        var layers = avDescriptor.baseAnimationLayers.Select(a => a.animatorController).ToList();
-        layers.AddRange(avDescriptor.specialAnimationLayers.Select(a => a.animatorController));
-        foreach (var layer in layers.Where(a => a != null))
+        foreach (var clip in GetAllUsedAnimationClips())
         {
-            foreach (var binding in layer.animationClips.SelectMany(clip => AnimationUtility.GetCurveBindings(clip)))
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
                 if (binding.type == typeof(Transform))
                 {
@@ -3162,27 +3229,48 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return name + " " + count;
     }
 
+    private Dictionary<string, Material> cache_GetFirstMaterialOnPath = null;
+    public Material GetFirstMaterialOnPath(string path)
+    {
+        if (cache_GetFirstMaterialOnPath == null)
+            cache_GetFirstMaterialOnPath = new Dictionary<string, Material>();
+        if (cache_GetFirstMaterialOnPath.TryGetValue(path, out var mat))
+            return mat;
+        var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
+        if (renderer == null || renderer.sharedMaterials.Length == 0)
+            return cache_GetFirstMaterialOnPath[path] = null;
+        return cache_GetFirstMaterialOnPath[path] = renderer.sharedMaterials[0];
+    }
+
     private Material[] CreateOptimizedMaterials(
-        List<List<Material>> sources,
+        List<List<(Material mat, List<string> paths)>> sources,
         int meshToggleCount,
         string path,
-        List<List<string>> originalMeshPaths = null,
         List<List<int>> mergedMeshIndices = null)
     {
         if (!(WritePropertiesAsStaticValues || sources.Any(list => list.Count > 1) || (meshToggleCount > 1 && MergeSkinnedMeshesWithShaderToggle)))
         {
-            return sources.Select(list => list[0]).ToArray();
+            return sources.Select(list => list[0].mat).ToArray();
         }
         if (!fusedAnimatedMaterialProperties.TryGetValue(path, out var usedMaterialProps))
             usedMaterialProps = new HashSet<string>();
         if (mergedMeshIndices == null)
             mergedMeshIndices = sources.Select(s => Enumerable.Range(0, meshToggleCount).ToList()).ToList();
         HashSet<(string name, bool isVector)> defaultAnimatedProperties = null;
+        var animatedPropertyOnMeshID = new Dictionary<string, bool[]>();
         oldPathToMergedPaths.TryGetValue(path, out var allOriginalMeshPaths);
         var sameAnimatedProperties = GetSameAnimatedPropertiesOnMergedMesh(path);
+        var originalMeshPaths = sources.Select(l => l.SelectMany(t => t.paths).Distinct().ToList()).ToList();
         if (allOriginalMeshPaths != null && (sources.Count != 1 || sources[0].Count != 1)) {
             defaultAnimatedProperties = new HashSet<(string name, bool isVector)>();
             for (int i = 0; i < allOriginalMeshPaths.Count; i++) {
+                Dictionary<string, Vector4> defaultValuesForCurrentPath = null;
+                Material defaultMaterialForCurrentPath = GetFirstMaterialOnPath(allOriginalMeshPaths[i][0]);
+                if (!animatedMaterialPropertyDefaultValues.TryGetValue(path, out defaultValuesForCurrentPath))
+                {
+                    defaultValuesForCurrentPath = new Dictionary<string, Vector4>();
+                    animatedMaterialPropertyDefaultValues[path] = defaultValuesForCurrentPath;
+                }
                 if (animatedMaterialProperties.TryGetValue(allOriginalMeshPaths[i][0], out var animatedProps)) {
                     foreach (var prop in animatedProps) {
                         string name = prop;
@@ -3198,11 +3286,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         }
                         defaultAnimatedProperties.Add(($"d4rkAvatarOptimizer{name}_ArrayIndex{i}", isVector));
                         defaultAnimatedProperties.Add((name, isVector));
+                        if (!animatedPropertyOnMeshID.TryGetValue(name, out var animatedOnMesh)) {
+                            animatedOnMesh = new bool[allOriginalMeshPaths.Count];
+                            animatedPropertyOnMeshID[name] = animatedOnMesh;
+                        }
+                        animatedOnMesh[i] = true;
+                        if (defaultMaterialForCurrentPath != null && defaultMaterialForCurrentPath.HasProperty(name)) 
+                        {
+                            defaultValuesForCurrentPath[$"d4rkAvatarOptimizer{name}_ArrayIndex{i}"] = isVector
+                                ? defaultMaterialForCurrentPath.GetVector(name)
+                                : new Vector4(defaultMaterialForCurrentPath.GetFloat(name), 0, 0, 0);
+                        }
                     }
                 }
                 defaultAnimatedProperties.Add(($"_IsActiveMesh{i}", false));
             }
         }
+        if (!DoesFXLayerUseWriteDefaults())
+            animatedPropertyOnMeshID = null;
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
         var sanitizedMaterialNames = new string[sources.Count];
@@ -3214,15 +3315,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var texturesToCheckNull = new Dictionary<string, string>[sources.Count];
         var animatedPropertyValues = new Dictionary<string, string>[sources.Count];
         var poiUsedPropertyDefines = new Dictionary<string, bool>[sources.Count];
+        var stripShadowVariants = new bool[sources.Count];
         for (int i = 0; i < sources.Count; i++)
         {
-            var source = sources[i];
+            var source = sources[i].Select(t => t.mat).ToList();
             parsedShader[i] = ShaderAnalyzer.Parse(source[0]?.shader);
             if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
             {
                 materials[i] = source[0];
                 continue;
             }
+            stripShadowVariants[i] = source[0].renderQueue >= 2500;
             sanitizedMaterialNames[i] = "s_" + Path.GetFileNameWithoutExtension(parsedShader[i].filePath)
                 + " " + string.Join("_", source[0].name.Split(Path.GetInvalidFileNameChars(), System.StringSplitOptions.RemoveEmptyEntries));
             texturesToMerge[i] = new HashSet<string>();
@@ -3249,14 +3352,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                             value = (prop.hasGammaTag) ? Mathf.GammaToLinearSpace(value) : value;
                             propertyArray.values.Add($"{value}");
                         break;
-                        case ParsedShader.Property.Type.Int:
+                        case ParsedShader.Property.Type.Integer:
                             if (!arrayPropertyValues[i].TryGetValue(prop.name, out propertyArray))
                             {
                                 propertyArray.type = "int";
                                 propertyArray.values = new List<string>();
                                 arrayPropertyValues[i][prop.name] = propertyArray;
                             }
-                            propertyArray.values.Add("" + mat.GetInt(prop.name));
+                            propertyArray.values.Add("" + mat.GetInteger(prop.name));
                         break;
                         case ParsedShader.Property.Type.Color:
                         case ParsedShader.Property.Type.ColorHDR:
@@ -3375,7 +3478,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         string type = "float4";
                         if (prop.type == ParsedShader.Property.Type.Float)
                             type = "float";
-                        if (prop.type == ParsedShader.Property.Type.Int)
+                        if (prop.type == ParsedShader.Property.Type.Integer)
                             type = "int";
                         animatedPropertyValues[i][propName] = type;
                     }
@@ -3405,14 +3508,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     animatedPropertyValues[i],
                     setShaderKeywords[i],
                     poiUsedPropertyDefines[i],
-                    sanitizedMaterialNames[i]);
+                    sanitizedMaterialNames[i],
+                    stripShadowVariants[i],
+                    animatedPropertyOnMeshID
+                );
             }
         });
         Profiler.EndSection();
 
         for (int i = 0; i < sources.Count; i++)
         {
-            var source = sources[i];
+            var source = sources[i].Select(t => t.mat).ToList();
             if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
                 continue;
 
@@ -3558,29 +3664,38 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     foreach (var animPropName in animatedProperties)
                     {
                         var propName = animPropName;
-                        bool isVector = propName.EndsWith(".x");
-                        bool isColor = propName.EndsWith(".r");
-                        if (isColor || isVector) {
+                        bool isVector = propName.EndsWith(".x") || propName.EndsWith(".r");
+                        if (isVector) {
                             propName = propName.Substring(0, propName.Length - 2);
                         } else if (propName[propName.Length - 2] == '.') {
                             continue;
-                        } else if (animatedProperties.Contains($"{propName}.x")) {
+                        } else if (animatedProperties.Contains($"{propName}.x") || animatedProperties.Contains($"{propName}.r")) {
                             isVector = true;
-                        } else if (animatedProperties.Contains($"{propName}.r")) {
-                            isColor = true;
                         }
                         for (int mID = 0; mID < meshCount; mID++)
                         {
                             var propArrayName = $"d4rkAvatarOptimizer{propName}_ArrayIndex{mID}";
                             if (!mat.HasProperty(propArrayName))
                                 continue;
-                            var signal = float.NaN;
+                            var signal = DoesFXLayerUseWriteDefaults() ? 0.0f : float.NaN;
                             if (isVector) {
                                 mat.SetVector(propArrayName, new Vector4(signal, signal, signal, signal));
-                            } else if(isColor) {
-                                mat.SetColor(propArrayName, new Color(signal, signal, signal, signal));
                             } else {
                                 mat.SetFloat(propArrayName, signal);
+                            }
+                        }
+                    }
+                    if (DoesFXLayerUseWriteDefaults() && animatedMaterialPropertyDefaultValues.TryGetValue(GetPathToRoot(meshRenderer), out var defaultValues))
+                    {
+                        foreach (var defaultProp in defaultValues)
+                        {
+                            if (mat.HasFloat(defaultProp.Key))
+                            {
+                                mat.SetFloat(defaultProp.Key, defaultProp.Value.x);
+                            }
+                            else if (mat.HasVector(defaultProp.Key))
+                            {
+                                mat.SetVector(defaultProp.Key, defaultProp.Value);
                             }
                         }
                     }
@@ -3702,10 +3817,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             switch (prop.type)
             {
-                case ParsedShader.Property.Type.Int:
                 case ParsedShader.Property.Type.Float:
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)
+                        return false;
+                    break;
+                case ParsedShader.Property.Type.Integer:
+                    var candidateIntValue = candidateMat.GetInteger(prop.name);
+                    if (listMaterials[0].GetInteger(prop.name) != candidateIntValue)
                         return false;
                     break;
                 case ParsedShader.Property.Type.Texture2D:
@@ -3746,7 +3865,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
             }
             var toOptimize = mats.Select(t => t.material).Where(m => !alreadyOptimizedMaterials.Contains(m)).Distinct().ToList();
-            var optimizeMaterialWrapper = toOptimize.Select(m => new List<Material>() { m }).ToList();
+            var optimizeMaterialWrapper = toOptimize.Select(m => new List<(Material, List<string>)>() { (m, new List<string> { path } ) }).ToList();
             var optimizedMaterialsList = CreateOptimizedMaterials(optimizeMaterialWrapper, 0, GetPathToRoot(meshRenderer));
             var optimizedMaterials = toOptimize.Select((mat, index) => (mat, index))
                 .ToDictionary(t => t.mat, t => optimizedMaterialsList[t.index]);
@@ -4030,13 +4149,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return remap;
             }
 
-            var originalMeshPaths = matchedSlots.Select(list => list.Select(slot => GetOriginalSlot((meshPath, slot.index)).path).Distinct().ToList()).ToList();
-            var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot => slot.material).ToList()).ToList();
-            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, originalMeshPaths, mergedMeshIndices);
+            var allSlots = matchedSlots.SelectMany(list => list).ToList();
+            var uniqueMatchedMaterials = uniqueMatchedSlots.Select(list => list.Select(slot =>
+                (slot.material, allSlots.Where(slot2 => slot2.material == slot.material).Select(slot2 => GetOriginalSlot((meshPath, slot2.index)).path).ToList())
+            ).ToList()).ToList();
+            var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, mergedMeshIndices);
 
             for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
             {
-                if (uniqueMatchedMaterials[i].Count != 1 || uniqueMatchedMaterials[i][0] == null)
+                if (uniqueMatchedMaterials[i].Count != 1 || uniqueMatchedMaterials[i][0].material == null)
                     continue;
                 var originalSlot = GetOriginalSlot((meshPath, matchedSlots[i][0].index));
                 AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
@@ -4045,7 +4166,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     optimizedSlotSwapMaterials[originalSlot] = optimizedSwapMaterials = new Dictionary<Material, Material>();
                 }
-                optimizedSwapMaterials[uniqueMatchedMaterials[i][0]] = optimizedMaterials[i];
+                optimizedSwapMaterials[uniqueMatchedMaterials[i][0].material] = optimizedMaterials[i];
             }
 
             meshRenderer.sharedMaterials = optimizedMaterials;
@@ -4226,6 +4347,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var mergedMeshPaths = basicMergedMeshes.Select(list => list.Select(r => GetPathToRoot(r)).ToList()).ToList();
             basicMergedMeshesList.ForEach(r => oldPathToMergedPaths[GetPathToRoot(r)] = mergedMeshPaths);
             basicMergedMeshesList.ForEach(r => oldPathToMergedPath[GetPathToRoot(r)] = newPath);
+
+            // this caches the results for later use when optimizing the materials
+            basicMergedMeshesList.ForEach(r => GetFirstMaterialOnPath(GetPathToRoot(r)));
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
@@ -4750,6 +4874,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var hardCodedExclusions = new List<string>() {
             "_VirtualLens_Root",
         }.Select(s => GetTransformFromPath(s)).ToList();
+        hardCodedExclusions.AddRange(transform.GetComponentsInChildren<VRCContactSender>(true)
+            .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
+            .Select(c => c.transform.parent)
+            .Where(t => t != null)
+            .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
+            .Where(t => t != null));
         foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
             if (excludedTransform == null)
                 continue;
