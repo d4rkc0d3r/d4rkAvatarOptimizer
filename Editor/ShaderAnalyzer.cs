@@ -1069,16 +1069,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.fragment = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
-                case "shader_feature":
-                case "shader_feature_local":
-                    while (nextIdentifier != null) {
-                        pass.shaderFeatureKeyWords.Add(nextIdentifier);
-                        parsedShader.shaderFeatureKeyWords.Add(nextIdentifier);
-                        nextIdentifier = ParseIdentifierAndTrailingWhitespace(line, ref index);
-                    }
-                    break;
                 case "surface":
                     throw new ParserException("Surface shader is not supported.");
+                default:
+                    if (pragmaName.StartsWithSimple("shader_feature"))
+                    {
+                        while (nextIdentifier != null) {
+                            pass.shaderFeatureKeyWords.Add(nextIdentifier);
+                            parsedShader.shaderFeatureKeyWords.Add(nextIdentifier);
+                            nextIdentifier = ParseIdentifierAndTrailingWhitespace(line, ref index);
+                        }
+                    }
+                    break;
+
             }
         }
 
@@ -2889,8 +2892,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             pragmaOutput.Add(line);
                         }
                         break;
-                    case "shader_feature":
-                    case "shader_feature_local":
                     case "skip_optimizations":
                         break;
                     case "multi_compile_fwdbase":
@@ -2903,7 +2904,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         pragmaOutput.Add(stripShadowVariants ? "#pragma multi_compile_fwdadd" : "#pragma multi_compile_fwdadd_fullshadows");
                         break;
                     default:
-                        pragmaOutput.Add(line);
+                        if (!identifier.StartsWithSimple("shader_feature")) {
+                            pragmaOutput.Add(line);
+                        }
                         break;
                 }
                 return null;

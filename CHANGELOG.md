@@ -1,3 +1,7 @@
+## v3.9.2
+### Bug Fixes
+* Fix shader analyzer not handling `_fragment` and other per pass suffixes for `shader_feature` pragmas.
+
 ## v3.9.1
 ### Bug Fixes
 * Fix crash when the avatar has a skinned mesh with out of bounds bone indices. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/129)
