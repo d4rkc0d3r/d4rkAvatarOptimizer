@@ -1,6 +1,7 @@
 ## v3.9.2
 ### Bug Fixes
 * Fix shader analyzer not handling `_fragment` and other per pass suffixes for `shader_feature` pragmas.
+* Fix shader analyzer parsing ShaderLab case sensitive even though its not supposed to be. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/130)
 
 ## v3.9.1
 ### Bug Fixes
