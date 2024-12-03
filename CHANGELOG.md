@@ -1,3 +1,7 @@
+## v3.9.3
+### Bug Fixes
+* Fix meshes with different cast & receive shadow settings getting merged together.
+
 ## v3.9.2
 ### Bug Fixes
 * Fix shader analyzer not handling `_fragment` and other per pass suffixes for `shader_feature` pragmas.

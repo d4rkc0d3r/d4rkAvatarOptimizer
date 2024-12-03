@@ -713,6 +713,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (list[0].gameObject.layer != candidate.gameObject.layer)
             return false;
+        if (list[0].shadowCastingMode != candidate.shadowCastingMode)
+            return false;
+        if (list[0].receiveShadows != candidate.receiveShadows)
+            return false;
         bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
         {
             while ((t = t.parent) != transform)
