@@ -4884,6 +4884,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(t => t != null)
             .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
             .Where(t => t != null));
+        hardCodedExclusions.AddRange(FindAllPenetrators().Select(p => p.transform));
         foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
             if (excludedTransform == null)
                 continue;

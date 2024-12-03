@@ -1,4 +1,7 @@
 ## v3.9.3
+### Changes
+* Use the existing auto detection of penetrators to add them to exclusions instead of trying to do partial optimizations on them.
+
 ### Bug Fixes
 * Fix meshes with different cast & receive shadow settings getting merged together.
 
