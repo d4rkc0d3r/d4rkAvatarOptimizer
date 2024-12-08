@@ -3357,7 +3357,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if ((staticPropertyValues.ContainsKey(prop.name) || arrayPropertyValues.ContainsKey(prop.name)) 
                     && !animatedPropertyValues.ContainsKey(prop.name)
-                    && parsedShader.propertyTable[prop.name].shaderLabParams.Count == 0)
+                    && parsedShader.propertyTable[prop.name].shaderLabParams.Count == 0
+                    && !(prop.name == "_Color" || prop.name == "_TintColor")) // particle systems with skinned mesh renderer as source might inherit these
                     continue;
                 if (texturesToMerge.Contains(prop.name))
                 {

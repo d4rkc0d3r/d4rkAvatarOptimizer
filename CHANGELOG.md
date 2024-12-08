@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 * Fix meshes with different cast & receive shadow settings getting merged together.
+* Fix ParticleSystems with skinned mesh renderer shape breaking when merging meshes & materials.
 
 ## v3.9.2
 ### Bug Fixes
