@@ -673,12 +673,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             cache_ParticleSystemsUsingRenderer = new Dictionary<Renderer, List<ParticleSystem>>();
             foreach (var ps in GetUsedComponentsInChildren<ParticleSystem>())
             {
-                if (ps.shape.skinnedMeshRenderer != null)
+                Renderer renderer = ps.shape.shapeType == ParticleSystemShapeType.SkinnedMeshRenderer ? ps.shape.skinnedMeshRenderer : null;
+                renderer = ps.shape.shapeType == ParticleSystemShapeType.MeshRenderer ? ps.shape.meshRenderer : renderer;
+                if (renderer != null)
                 {
-                    if (!cache_ParticleSystemsUsingRenderer.TryGetValue(ps.shape.skinnedMeshRenderer, out var list))
+                    if (!cache_ParticleSystemsUsingRenderer.TryGetValue(renderer, out var list))
                     {
                         list = new List<ParticleSystem>();
-                        cache_ParticleSystemsUsingRenderer[ps.shape.skinnedMeshRenderer] = list;
+                        cache_ParticleSystemsUsingRenderer[renderer] = list;
                     }
                     list.Add(ps);
                 }
@@ -700,7 +702,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (candidate is MeshRenderer && (candidate.gameObject.layer == 12 || !MergeStaticMeshesAsSkinned))
             return false;
-        if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex))
+        if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
             return false;
         return true;
     }
