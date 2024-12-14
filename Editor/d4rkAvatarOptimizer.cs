@@ -147,6 +147,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             DestroyEditorOnlyGameObjects();
             Profiler.StartNextSection("DestroyUnusedComponents()");
             DestroyUnusedComponents();
+            DisplayProgressBar("Removing duplicate materials", 0.05f);
+            Profiler.StartNextSection("DeduplicateMaterials()");
+            DeduplicateMaterials();
             if (WritePropertiesAsStaticValues)
             {
                 DisplayProgressBar("Parsing Shaders", 0.05f);
@@ -3814,7 +3817,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (GetParticleSystemsUsingRenderer(candidate.renderer).Any(ps => ps.shape.useMeshMaterialIndex && ps.shape.meshMaterialIndex == candidate.index))
             return false;
         var listMaterials = list.Select(slot => slot.material).ToArray();
-        bool allTheSameAsCandidate = listMaterials.All(mat => mat == candidateMat);
+        var materialComparer = new MaterialAssetComparer();
+        bool allTheSameAsCandidate = listMaterials.All(mat => mat == candidateMat) || (listMaterials.All(mat => materialComparer.Equals(mat, candidateMat)));
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate;
         if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
@@ -5188,6 +5192,106 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
             convertedMeshRendererPaths.Add(GetPathToRoot(obj));
+        }
+    }
+
+    public class MaterialAssetComparer : IEqualityComparer<Material> {
+        public bool Equals(Material a, Material b) {
+            //TODO: find a more elegant way to compare materials
+
+            // trivial cases
+            if (a == b) return true;
+            if (a == null || b == null) return false;
+
+            // check the basics
+            if (a.shader != b.shader) return false;
+            if (a.renderQueue != b.renderQueue) return false;
+            if (a.doubleSidedGI != b.doubleSidedGI) return false;
+            if (a.enableInstancing != b.enableInstancing) return false;
+            if (a.globalIlluminationFlags != b.globalIlluminationFlags) return false;
+            if (!a.shaderKeywords.SequenceEqual(b.shaderKeywords)) return false;
+
+            // check the same passes are enabled
+            for (int i=0; i<a.passCount; i++) {
+                if (a.GetShaderPassEnabled(a.GetPassName(i)) != b.GetShaderPassEnabled(b.GetPassName(i))) return false;
+            }
+
+            // Floats
+            string[] afloats = a.GetPropertyNames(MaterialPropertyType.Float);
+            string[] bfloats = b.GetPropertyNames(MaterialPropertyType.Float);
+            if (!afloats.SequenceEqual(bfloats)) return false;
+            if (!afloats.Select(x => a.GetFloat(x)).SequenceEqual(bfloats.Select(x => b.GetFloat(x)))) return false;
+
+            // Integers
+            string[] anums = a.GetPropertyNames(MaterialPropertyType.Int);
+            string[] bnums = b.GetPropertyNames(MaterialPropertyType.Int);
+            if (!anums.SequenceEqual(bnums)) return false;
+            if (!anums.Select(x => a.GetInt(x)).SequenceEqual(bnums.Select(x => b.GetInt(x)))) return false;
+
+            // Vectors (and colours)
+            string[] avectors = a.GetPropertyNames(MaterialPropertyType.Vector);
+            string[] bvectors = b.GetPropertyNames(MaterialPropertyType.Vector);
+            if (!avectors.SequenceEqual(bvectors)) return false;
+            if (!avectors.Select(x => a.GetVector(x)).SequenceEqual(bvectors.Select(x => b.GetVector(x)))) return false;
+
+            // Textures
+            string[] atextures = a.GetPropertyNames(MaterialPropertyType.Texture);
+            string[] btextures = b.GetPropertyNames(MaterialPropertyType.Texture);
+            if (!atextures.SequenceEqual(btextures)) return false;
+            if (!atextures.Select(x => a.GetTexture(x)).SequenceEqual(btextures.Select(x => b.GetTexture(x)))) return false;
+
+            // Matrices
+            string[] amatrices = a.GetPropertyNames(MaterialPropertyType.Matrix);
+            string[] bmatrices = b.GetPropertyNames(MaterialPropertyType.Matrix);
+            if (!amatrices.SequenceEqual(bmatrices)) return false;
+            if (!amatrices.Select(x => a.GetMatrix(x)).SequenceEqual(bmatrices.Select(x => b.GetMatrix(x)))) return false;
+
+            // ConstantBuffer and ComputeBuffer aren't present on avatars right?
+
+            // Materials should be matching
+            return true;
+        }
+
+        public int GetHashCode(Material m) {
+            // not a great hash function, but it's enough to work
+            return (
+                m.shader.GetHashCode() ^ 
+                ((m.mainTexture == null) ? 0 : m.mainTexture.GetHashCode()) ^
+                m.renderQueue ^
+                m.color.GetHashCode()
+            );
+        }
+    }
+
+    private void DeduplicateMaterials()
+    {   
+        // Get all renderers and materials in the hierarchy
+        var allRenderers = GetComponentsInChildren<Renderer>(true);
+        var allUsedMaterials = allRenderers.SelectMany(x => x.sharedMaterials).Distinct().ToArray();
+
+        // group the material assets into groups of identical materials
+        var materialGroups = allUsedMaterials.GroupBy(x => x, new MaterialAssetComparer()).ToList();
+
+        // Materials are now in groups that the comparer considers identical
+        // though they might be different assets
+
+        // The following block of code will replace all materials in the same group with the first material in the group
+        // this deduplicates them and allows existing logic to merge them
+
+        foreach (var group in materialGroups) {
+            // this is the material that everything in the group will be set to
+            Material finalMaterial = group.Key;
+
+            // exclude the final material from the group
+            var mats = group.Except(new Material[] {finalMaterial}).ToList();
+
+            // count==0 implies that there is only one material in the group
+            if (mats.Count == 0) continue;
+
+            // replace all found materials with the final material
+            foreach (Renderer r in allRenderers) {
+                r.sharedMaterials = r.sharedMaterials.Select(x => mats.Contains(x) ? finalMaterial : x).ToArray();
+            }
         }
     }
 #endif
