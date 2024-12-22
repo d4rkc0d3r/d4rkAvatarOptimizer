@@ -26,6 +26,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<string> boolsToChangeToFloat = new HashSet<string>();
         private HashSet<string> intsToChangeToFloat = new HashSet<string>();
         private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
+        private bool isFxLayer = false;
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source)
         {
@@ -61,6 +62,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             optimizer.layersToMerge = new HashSet<int>(layersToMerge);
             optimizer.layersToDestroy = new HashSet<int>(layersToDestroy);
+            optimizer.isFxLayer = constantCurvesToAdd != null;
             optimizer.constantCurvesToAdd = constantCurvesToAdd ?? new List<(EditorCurveBinding binding, float value)>();
             return optimizer.Run();
         }
@@ -390,6 +392,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 iKPass = old.iKPass,
                 name = old.name,
                 syncedLayerAffectsTiming = old.syncedLayerAffectsTiming,
+                syncedLayerIndex = isFxLayer && fxLayerMap.TryGetValue(old.syncedLayerIndex, out int newLayerIndex) ? newLayerIndex : old.syncedLayerIndex,
                 stateMachine = CloneStateMachine(old.stateMachine)
             };
             CloneTransitions(old.stateMachine, n.stateMachine);

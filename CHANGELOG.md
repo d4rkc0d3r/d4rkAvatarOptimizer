@@ -6,6 +6,7 @@
 * Fix meshes with different cast & receive shadow settings getting merged together.
 * Fix ParticleSystems with skinned mesh renderer shape breaking when merging meshes & materials.
 * Add missing MMD blendshape names to the list of known MMD blendshape names. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/137)
+* Fix synced animator controller layers breaking when layers get merged or removed. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/138)
 
 ## v3.9.2
 ### Bug Fixes
