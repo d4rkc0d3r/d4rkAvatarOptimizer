@@ -92,6 +92,8 @@ This will add an extra bone per original mesh that gets added to each vertex wit
 Unlike the `Use Shader Toggles` option this does not require the shaders to be changed.  
 It also doesn't have the problems of projectors and blocked shaders not understanding the toggles.
 
+Might cause some issues with name plate & chat box position. If they are inside your head / way too far above your head you should disable this option.
+
 It can't merge meshes that use a WD ON workflow when they are off by default unless the toggles are simple enough that they can get optimized by `Optimize FX Layer`.
 ## Allow 3 Bone Skinning
 Allows NaNimation Toggles to be used on meshes that use 4 bone weights on some vertices reducing the skinning quality to only 3 effective bone weights.
