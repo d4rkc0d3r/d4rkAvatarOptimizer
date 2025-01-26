@@ -1,3 +1,9 @@
+## v3.9.4
+### Bug Fixes
+* Fix optimizer build hook running on multiple avatars when entering play mode. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/139)
+  * This caused every avatars generated assets beside the last one to be deleted.
+  * It now optimizes the first one and the logs a warning for all others.
+
 ## v3.9.3
 ### Changes
 * Use the existing auto detection of penetrators to add them to exclusions instead of trying to do partial optimizations on them.

@@ -18,6 +18,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public int callbackOrder => -1025;
         #endif
 
+        static private bool didRunInPlayMode = false;
+
         public bool OnPreprocessAvatar(GameObject avatarGameObject)
         {
             var optimizer = avatarGameObject.GetComponent<d4rkAvatarOptimizer>();
@@ -34,6 +36,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             try
             {
+                if (Application.isPlaying && didRunInPlayMode)
+                {
+                    Debug.LogWarning($"Only one avatar can be optimized per play mode session. Skipping optimization of {avatarGameObject.name}");
+                    return true;
+                }
+                didRunInPlayMode = Application.isPlaying;
                 optimizer.Optimize();
                 return true;
             }
