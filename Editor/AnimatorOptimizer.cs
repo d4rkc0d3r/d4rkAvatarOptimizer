@@ -238,8 +238,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
                 } else if (s.motion is AnimationClip clip) {
-                    var curves = AnimationUtility.GetCurveBindings(clip).Select(binding => AnimationUtility.GetEditorCurve(clip, binding)).ToList();
-                    float maxKeyframeTime = curves.Max(x => (float?)x.keys.Max(y => y.time)) ?? 0;
+                    (AnimationCurve curve, bool isEulerAngleBinding)[] curves = AnimationUtility.GetCurveBindings(clip)
+                        .Select(binding => (AnimationUtility.GetEditorCurve(clip, binding), binding.propertyName.Contains("localEulerAngles"))).ToArray();
+                    float maxKeyframeTime = curves.Max(x => (float?)x.curve.keys.Max(y => y.time)) ?? 0;
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
@@ -253,12 +254,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             var timeCandidate = interpolationPoints[i] * maxKeyframeTime;
                             bool allClose = true;
                             foreach (var curve in curves) {
-                                var valueA = curve.Evaluate(timeA);
-                                var valueB = curve.Evaluate(timeB);
-                                var valueCandidate = curve.Evaluate(timeCandidate);
+                                var valueA = curve.curve.Evaluate(timeA);
+                                var valueB = curve.curve.Evaluate(timeB);
+                                var valueCandidate = curve.curve.Evaluate(timeCandidate);
                                 var valueInterpolated = Mathf.Lerp(valueA, valueB, (timeCandidate - timeA) / (timeB - timeA));
                                 var threshold = 0.01f * Mathf.Max(Mathf.Abs(valueA), Mathf.Abs(valueB), 1e-6f);
-                                if (Mathf.Abs(valueCandidate - valueInterpolated) > threshold) {
+                                if ((Mathf.Abs(valueCandidate - valueInterpolated) > threshold)
+                                    || (curve.isEulerAngleBinding && Mathf.Abs(valueA - valueB) > 90.5f)) {
                                     allClose = false;
                                     break;
                                 }
