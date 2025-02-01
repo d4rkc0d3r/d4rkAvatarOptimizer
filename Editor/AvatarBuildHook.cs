@@ -19,6 +19,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
         #endif
 
         static private bool didRunInPlayMode = false;
+        [InitializeOnEnterPlayMode]
+        static void OnEnterPlaymodeInEditor(EnterPlayModeOptions options)
+        {
+            didRunInPlayMode = false;
+        }
 
         public bool OnPreprocessAvatar(GameObject avatarGameObject)
         {

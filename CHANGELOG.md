@@ -1,3 +1,7 @@
+## v3.9.6
+### Bug Fixes
+* Fix optimizer not running when entering playmode a second time when domain reload on play mode is disabled.
+
 ## v3.9.5
 ### Bug Fixes
 * Fix `Combine Motion Time Approximation` breaking motion time states that linearly animate euler angles.
