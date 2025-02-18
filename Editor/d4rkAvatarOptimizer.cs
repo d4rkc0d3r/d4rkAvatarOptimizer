@@ -3037,6 +3037,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         foreach (var constraint in constraints)
         {
             transforms.Add(constraint.transform);
+            if (constraint.GetType().Name.StartsWithSimple("VRC"))
+            {
+                using (var so = new SerializedObject(constraint))
+                {
+                    var targetTransformProperty = so.FindProperty("TargetTransform");
+                    if (targetTransformProperty != null)
+                    {
+                        var targetTransform = targetTransformProperty.objectReferenceValue as Transform;
+                        if (targetTransform != null)
+                        {
+                            transforms.Add(targetTransform);
+                        }
+                    }
+                }
+            }
         }
 
         var finalIKScripts = GetComponentsInChildren<Behaviour>(true)

@@ -1,6 +1,7 @@
 ## v3.9.7
 ### Bug Fixes
 * Fix shader toggles removing the game object toggles causing child object to no longer get toggled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/133)
+* Fix VRCConstraint Target Transform not marking bones as moving. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/143)
 
 ## v3.9.6
 ### Bug Fixes
