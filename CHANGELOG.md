@@ -1,3 +1,7 @@
+## v3.9.8
+### Bug Fixes
+* Fix regression bug from last fix causing mesh toggles with basic merge to not work.
+
 ## v3.9.7
 ### Bug Fixes
 * Fix shader toggles removing the game object toggles causing child object to no longer get toggled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/133)

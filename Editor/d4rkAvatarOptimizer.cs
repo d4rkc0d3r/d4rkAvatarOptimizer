@@ -4041,11 +4041,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     
     private void CombineAndOptimizeMaterials()
     {
-        transformFromOldPath = new Dictionary<string, Transform>();
-        foreach (var t in transform.GetAllDescendants())
-        {
-            transformFromOldPath[GetPathToRoot(t)] = t;
-        }
         var exclusions = GetAllExcludedTransforms();
         var skinnedMeshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true)
             .Where(smr => !exclusions.Contains(smr.transform) && smr.sharedMesh != null).ToArray();
@@ -4282,34 +4277,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     shape.meshMaterialIndex = uniqueMatchedSlots.FindIndex(l => l.Any(slot => slot.index == shape.meshMaterialIndex));
                 }
             }
-
-            var go = meshRenderer.gameObject;
-            var subContainer = new GameObject("d4rkAO_mergeTargetRoot");
-            subContainer.transform.parent = go.transform;
-            subContainer.transform.localPosition = Vector3.zero;
-            subContainer.transform.localRotation = Quaternion.identity;
-            subContainer.transform.localScale = Vector3.one;
-            transformFromOldPath[GetPathToRoot(go)] = subContainer.transform;
-
-            var children = new List<Transform>();
-            foreach (Transform child in go.transform)
-            {
-                if (child != subContainer.transform)
-                    children.Add(child);
-            }
-            foreach (Transform child in children)
-            {
-                child.parent = subContainer.transform;
-            }
-
-            foreach (Component comp in go.GetComponents<Component>())
-            {
-                if (comp is Transform || comp is SkinnedMeshRenderer)
-                    continue;
-                UnityEditorInternal.ComponentUtility.CopyComponent(comp);
-                UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
-                DestroyImmediate(comp);
-            }
         }
     }
 
@@ -4373,6 +4340,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private void CombineSkinnedMeshes()
     {
+        transformFromOldPath = new Dictionary<string, Transform>();
+        foreach (var t in transform.GetAllDescendants())
+        {
+            transformFromOldPath[GetPathToRoot(t)] = t;
+        }
         var avDescriptor = GetComponent<VRCAvatarDescriptor>();
         var combinableMeshList = FindPossibleSkinnedMeshMerges();
         oldPathToMergedPaths.Clear();
@@ -4989,6 +4961,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             if (basicMergedMeshes.Count > 1)
             {
+                var go = targetRenderer.gameObject;
+                var children = go.transform.Cast<Transform>().ToList();
+                var componentsToMove = go.GetComponents<Component>().Where(c => !(c is Transform) && !(c is SkinnedMeshRenderer)).ToList();
+                if (children.Count > 0 || componentsToMove.Count > 0)
+                {
+                    var subContainer = new GameObject("d4rkAO_mergeTargetRoot");
+                    subContainer.transform.parent = go.transform;
+                    subContainer.transform.localPosition = Vector3.zero;
+                    subContainer.transform.localRotation = Quaternion.identity;
+                    subContainer.transform.localScale = Vector3.one;
+                    subContainer.SetActive(targetRenderer.gameObject.activeSelf);
+                    transformFromOldPath[GetPathToRoot(go)] = subContainer.transform;
+
+                    foreach (Transform child in children)
+                    {
+                        child.parent = subContainer.transform;
+                    }
+
+                    foreach (Component comp in componentsToMove)
+                    {
+                        UnityEditorInternal.ComponentUtility.CopyComponent(comp);
+                        UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
+                        DestroyImmediate(comp);
+                    }
+                }
+
                 if (MergeSkinnedMeshesSeparatedByDefaultEnabledState && !GetRendererDefaultEnabledState(targetRenderer))
                 {
                     targetRenderer.gameObject.SetActive(true);
