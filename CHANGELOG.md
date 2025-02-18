@@ -1,3 +1,7 @@
+## v3.9.7
+### Bug Fixes
+* Fix shader toggles removing the game object toggles causing child object to no longer get toggled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/133)
+
 ## v3.9.6
 ### Bug Fixes
 * Fix optimizer not running when entering playmode a second time when domain reload on play mode is disabled.

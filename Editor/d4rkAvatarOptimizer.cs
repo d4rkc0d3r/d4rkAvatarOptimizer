@@ -1266,6 +1266,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             if (transform != null)
             {
                 var path = GetPathToRoot(transform);
+                // merged meshes move all their sibling components to a new child object
+                // the general remap in transformFromOldPath points to that new child object
+                // which means transform and renderer animations should still point to the original parent object
+                // while gameobject toggles as well as other component animations should not
+                if (path.EndsWith("/d4rkAO_mergeTargetRoot") &&
+                    (binding.type == typeof(Transform) || typeof(Renderer).IsAssignableFrom(binding.type)))
+                {
+                    path = path.Substring(0, path.Length - "/d4rkAO_mergeTargetRoot".Length);
+                }
                 changed = changed || path != newBinding.path;
                 newBinding.path = path;
                 if (binding.type == typeof(MeshRenderer) && !transform.TryGetComponent(out MeshRenderer renderer))
@@ -1421,6 +1430,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+            {
+                SetFloatCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
+            }
             if (fixedBinding.propertyName.StartsWithSimple("NaNimation")) {
                 var shaderToggleInfo = fixedBinding.propertyName.Substring("NaNimation".Length);
                 var propertyNames = new string[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z" };
@@ -4013,6 +4026,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     
     private void CombineAndOptimizeMaterials()
     {
+        transformFromOldPath = new Dictionary<string, Transform>();
+        foreach (var t in transform.GetAllDescendants())
+        {
+            transformFromOldPath[GetPathToRoot(t)] = t;
+        }
         var exclusions = GetAllExcludedTransforms();
         var skinnedMeshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true)
             .Where(smr => !exclusions.Contains(smr.transform) && smr.sharedMesh != null).ToArray();
@@ -4248,6 +4266,34 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     shape.meshMaterialIndex = uniqueMatchedSlots.FindIndex(l => l.Any(slot => slot.index == shape.meshMaterialIndex));
                 }
+            }
+
+            var go = meshRenderer.gameObject;
+            var subContainer = new GameObject("d4rkAO_mergeTargetRoot");
+            subContainer.transform.parent = go.transform;
+            subContainer.transform.localPosition = Vector3.zero;
+            subContainer.transform.localRotation = Quaternion.identity;
+            subContainer.transform.localScale = Vector3.one;
+            transformFromOldPath[GetPathToRoot(go)] = subContainer.transform;
+
+            var children = new List<Transform>();
+            foreach (Transform child in go.transform)
+            {
+                if (child != subContainer.transform)
+                    children.Add(child);
+            }
+            foreach (Transform child in children)
+            {
+                child.parent = subContainer.transform;
+            }
+
+            foreach (Component comp in go.GetComponents<Component>())
+            {
+                if (comp is Transform || comp is SkinnedMeshRenderer)
+                    continue;
+                UnityEditorInternal.ComponentUtility.CopyComponent(comp);
+                UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
+                DestroyImmediate(comp);
             }
         }
     }
@@ -5069,12 +5115,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
     private void DestroyUnusedGameObjects()
     {
-        transformFromOldPath = new Dictionary<string, Transform>();
-        foreach (var transform in transform.GetAllDescendants())
-        {
-            transformFromOldPath[GetPathToRoot(transform)] = transform;
-        }
-
         if (!DeleteUnusedGameObjects)
             return;
 
