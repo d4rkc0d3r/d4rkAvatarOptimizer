@@ -1,3 +1,7 @@
+## v3.9.9
+### Changes
+* Remove `#pragma enable_d3d11_debug_symbols` from the generated shaders.
+
 ## v3.9.8
 ### Bug Fixes
 * Fix regression bug from last fix causing mesh toggles with basic merge to not work.

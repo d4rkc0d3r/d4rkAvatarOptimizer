@@ -2894,6 +2894,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         break;
                     case "skip_optimizations":
+                    case "enable_d3d11_debug_symbols":
                         break;
                     case "multi_compile_fwdbase":
                         pragmaOutput.Add("#pragma multi_compile DIRECTIONAL");
