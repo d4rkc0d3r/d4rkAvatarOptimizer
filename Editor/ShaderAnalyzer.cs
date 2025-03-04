@@ -1978,7 +1978,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             string geometryType = inParam.arraySize == 1 ? "point" : inParam.arraySize == 2 ? "line" : "triangle";
             output.Add($"void {func.name}({geometryType} "
                 + (usesInputWrapper ? inputWrapperName + " d4rkAvatarOptimizer_inputWrapper" : inParam.type + " " + inParam.name)
-                + $"[{inParam.arraySize}], inout "
+                + $"[{inParam.arraySize}]"
+                + (inParam.semantic == null ? "" : $" : {inParam.semantic}")
+                + ", inout "
                 + outParam.type.Substring(0, 7 + outParam.type.IndexOf('S'))
                 + (usesOutputWrapper ? outputWrapperName : outParamType)
                 + "> " + outParam.name

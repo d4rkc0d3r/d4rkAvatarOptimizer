@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 * Fixed modular avatar and VRCFury warning to still use the old name of the `Apply on Upload` option.
+* Fix geometry shader input parameter semantic not getting copied.
 
 ## v3.9.8
 ### Bug Fixes
