@@ -793,7 +793,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.HelpBox(
                 "VRCFury is used on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +
                 "To test in editor built a VRCFury test avatar and use the optimizer on that.\n" +
-                "For uploading use the Optimize on Upload feature as that ensures fury and the optimizer get used in the correct order.", MessageType.Warning);
+                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures fury and the optimizer get used in the correct order.", MessageType.Warning);
             return false;
         }
 
@@ -804,7 +804,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "Modular Avatar is used on the avatar. This means the perf rank change and merge result previews " + 
                 "can be inaccurate as the optimizer does not take Modular Avatar into account for those.\n" +
                 "To test in editor use \"Manual bake avatar\" before clicking the optimize button.\n" +
-                "For uploading use the Optimize on Upload feature as that ensures Modular Avatar and the optimizer get used in the correct order.", MessageType.Warning);
+                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures Modular Avatar and the optimizer get used in the correct order.", MessageType.Warning);
             return false;
         }
         #endif

@@ -1,6 +1,10 @@
 ## v3.9.9
 ### Changes
 * Remove `#pragma enable_d3d11_debug_symbols` from the generated shaders.
+* Refactored the settings GUI to use GUI scopes.
+
+### Bug Fixes
+* Fixed modular avatar and VRCFury warning to still use the old name of the `Apply on Upload` option.
 
 ## v3.9.8
 ### Bug Fixes
