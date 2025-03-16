@@ -2743,7 +2743,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return null;
                 if (!source[lineIndex + 3].StartsWithSimple("[instance("))
                     return null;
-                if (source[lineIndex + 4] != "#endif") 
+                if (source[lineIndex + 4] != "#endif")
                     return null;
                 int charIndex = 10;
                 var instanceCountLine = source[lineIndex + 3];
@@ -3296,7 +3296,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         {
                             knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
                         }
-                        if (lightMode == "Meta")
+                        if (lightMode == "Meta" && parsedShader.passes.Count > 1)
                         {
                             output.Add($"// {lightMode} pass removed, skipped {currentPass.lineCount} lines");
                             lineIndex = currentPass.startLineIndex + currentPass.lineCount - 1;
