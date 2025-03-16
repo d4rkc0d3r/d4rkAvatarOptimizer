@@ -6,6 +6,7 @@
 ### Bug Fixes
 * Fixed modular avatar and VRCFury warning to still use the old name of the `Apply on Upload` option.
 * Fix geometry shader input parameter semantic not getting copied.
+* Fix GameObject toggle animations not getting deleted from the GO that had stuff merged into it but had itself no children or components on it when shader toggles got enabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/145)
 
 ## v3.9.8
 ### Bug Fixes

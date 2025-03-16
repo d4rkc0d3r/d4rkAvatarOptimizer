@@ -136,6 +136,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             optimizedMaterialImportPaths.Clear();
             optimizedSlotSwapMaterials.Clear();
             newAnimationPaths.Clear();
+            pathsToDeleteGameObjectTogglesOn.Clear();
             texArrayPropertiesToSet.Clear();
             keepTransforms.Clear();
             convertedMeshRendererPaths.Clear();
@@ -423,6 +424,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
+    private HashSet<string> pathsToDeleteGameObjectTogglesOn = new HashSet<string>();
     private List<(Material target, List<Material> sources, ShaderOptimizer.OptimizedShader optimizerResult)> optimizedMaterials = new List<(Material, List<Material>, ShaderOptimizer.OptimizedShader)>();
     private List<string> optimizedMaterialImportPaths = new List<string>();
     private Dictionary<string, List<List<string>>> oldPathToMergedPaths = new Dictionary<string, List<List<string>>>();
@@ -1430,7 +1432,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
-            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive" && !pathsToDeleteGameObjectTogglesOn.Contains(binding.path))
             {
                 SetFloatCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
             }
@@ -4985,6 +4987,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
                         DestroyImmediate(comp);
                     }
+                }
+                else
+                {
+                    pathsToDeleteGameObjectTogglesOn.Add(GetPathToRoot(go));
                 }
 
                 if (MergeSkinnedMeshesSeparatedByDefaultEnabledState && !GetRendererDefaultEnabledState(targetRenderer))
