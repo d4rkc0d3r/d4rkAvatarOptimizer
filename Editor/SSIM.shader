@@ -8,6 +8,7 @@
         [ToggleUI] _NormalMap ("Normal Map", Float) = 0
         [IntRange] _KernelSize ("Kernel Size", Range(2, 11)) = 8
         [IntRange] _TargetMipBias ("Target Mip Bias", Range(0, 2)) = 0
+        [ToggleUI] _IgnoreAlpha ("Ignore Alpha", Float) = 0
     }
     SubShader
     {
@@ -43,6 +44,7 @@
             bool _NormalMap;
             float _KernelSize;
             float _TargetMipBias;
+            bool _IgnoreAlpha;
 
             v2f vert (appdata v)
             {
@@ -112,6 +114,10 @@
                 float c1 = 0.01 * 0.01;
                 float c2 = 0.03 * 0.03;
                 float4 ssim = (2 * meanA * meanB + c1) * (2 * covAB + c2) / ((meanA * meanA + meanB * meanB + c1) * (varA + varB + c2));
+                if (_IgnoreAlpha)
+                {
+                    ssim.a = 1;
+                }
                 return min(min(ssim.r, ssim.g), min(ssim.b, ssim.a));
             }
             ENDCG
