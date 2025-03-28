@@ -20,6 +20,18 @@ public class d4rkTextureAtlasEditor : Editor
     private static float ssimThreshold = 0.98f;
     private static Material[] ssimDisplayMaterials;
 
+    private void ClearCaches()
+    {
+        var fields = GetType().GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        foreach (var field in fields)
+        {
+            if (field.Name.StartsWithSimple("cache_"))
+            {
+                field.GetType().GetMethod("Clear")?.Invoke(field.GetValue(this), null);
+            }
+        }
+    }
+
     public override void OnInspectorGUI()
     {
         settings = settings == null ? target as d4rkTextureAtlas : settings;
@@ -49,6 +61,7 @@ public class d4rkTextureAtlasEditor : Editor
         kernelSize = EditorGUILayout.IntSlider("SSIM Kernel Size", kernelSize, 3, 11);
         if (settings.ssimDebugAvatar == null && GUILayout.Button("Create SSIM Debug Avatar"))
         {
+            ClearCaches();
             AssetDatabase.DeleteAsset(TextureAtlasPath);
             AssetDatabase.CreateFolder(packageRootPath, textureAtlasFolder);
             clone = Instantiate(settings.gameObject);
@@ -64,10 +77,7 @@ public class d4rkTextureAtlasEditor : Editor
             clone = null;
         }
 
-        var materials = settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null).Distinct().Where(m => m.HasProperty("_MainTex")).ToArray();
-        var textures = materials.Select(m => m.mainTexture as Texture2D).Where(t => t != null).Distinct().ToArray();
-
-        foreach (var tex in textures)
+        foreach (var tex in GetReferencedTextures())
         {
             var error = IsTextureEligible(tex);
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
@@ -82,22 +92,20 @@ public class d4rkTextureAtlasEditor : Editor
                 {
                     if (showMaterialsAndMeshes)
                     {
-                        EditorGUILayout.LabelField("Materials using this texture:");
+                        if (GetReferencedMaterials(tex).Count > 0)
+                            EditorGUILayout.LabelField("Materials using this texture:");
                         using (new EditorGUI.IndentLevelScope())
                         {
-                            foreach (var mat in materials.Where(m => m.mainTexture == tex))
+                            foreach (var mat in GetReferencedMaterials(tex))
                             {
                                 EditorGUILayout.ObjectField(mat, typeof(Material), false);
                             }
                         }
-                        EditorGUILayout.LabelField("Meshes using this texture:");
+                        if (GetReferencedMeshes(tex).Count > 0)
+                            EditorGUILayout.LabelField("Meshes using this texture:");
                         using (new EditorGUI.IndentLevelScope())
                         {
-                            foreach (var mesh in settings.GetComponentsInChildren<Renderer>(true)
-                                .Where(r => r.sharedMaterials.Any(m => m != null && m.mainTexture == tex))
-                                .Select(r => r.GetSharedMesh())
-                                .Where(m => m != null)
-                                .Distinct())
+                            foreach (var mesh in GetReferencedMeshes(tex))
                             {
                                 EditorGUILayout.ObjectField(mesh, typeof(Mesh), false);
                             }
@@ -105,10 +113,7 @@ public class d4rkTextureAtlasEditor : Editor
                     }
                     if (error != null)
                     {
-                        using (new EditorGUI.IndentLevelScope())
-                        {
-                            EditorGUILayout.LabelField(error, new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleLeft });
-                        }
+                        EditorGUILayout.LabelField($"! {error}", EditorStyles.boldLabel);
                     }
                 }
             }
@@ -127,8 +132,43 @@ public class d4rkTextureAtlasEditor : Editor
         }
     }
 
-    private static HashSet<Texture2D> hideMaterialAndMeshReferences = new ();
+    private HashSet<Texture2D> cache_textureReferences = new ();
+    private HashSet<Texture2D> GetReferencedTextures()
+    {
+        if (cache_textureReferences.Count > 0)
+        {
+            return cache_textureReferences;
+        }
+        cache_textureReferences = new (settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.HasProperty("_MainTex")).Select(m => m.mainTexture as Texture2D).Where(t => t != null));
+        return cache_textureReferences;
+    }
 
+    private Dictionary<Texture2D, HashSet<Material>> cache_textureMaterialReferences = new ();
+    private HashSet<Material> GetReferencedMaterials(Texture2D tex)
+    {
+        if (cache_textureMaterialReferences.TryGetValue(tex, out var materials))
+        {
+            return materials;
+        }
+        materials = new (settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.mainTexture == tex));
+        cache_textureMaterialReferences[tex] = materials;
+        return materials;
+    }
+
+    private Dictionary<Texture2D, HashSet<Mesh>> cache_textureMeshReferences = new ();
+    private HashSet<Mesh> GetReferencedMeshes(Texture2D tex)
+    {
+        if (cache_textureMeshReferences.TryGetValue(tex, out var meshes))
+        {
+            return meshes;
+        }
+        var materials = GetReferencedMaterials(tex);
+        meshes = new (settings.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => materials.Contains(m))).Select(r => r.GetSharedMesh()).Where(m => m != null));
+        cache_textureMeshReferences[tex] = meshes;
+        return meshes;
+    }
+
+    private static HashSet<Texture2D> hideMaterialAndMeshReferences = new ();
     private bool ShowMaterialsAndMeshesFoldoutButton(Texture2D tex)
     {
         bool showMaterialsAndMeshes = !hideMaterialAndMeshReferences.Contains(tex);
@@ -183,15 +223,22 @@ public class d4rkTextureAtlasEditor : Editor
         {
             return $"Texture path {path} is not eligible. Only {string.Join(", ", eligibleExtensions)} are eligible.";
         }
+        if (GetReferencedMaterials(tex).Count == 0)
+        {
+            return $"Texture {tex.name} is not referenced by any material.";
+        }
+        if (GetReferencedMeshes(tex).Count == 0)
+        {
+            return $"Texture {tex.name} is not referenced by any mesh.";
+        }
         return null;
     }
 
-    private static Dictionary<string, Texture2D> rawTextures = new();
-
+    private Dictionary<string, Texture2D> cache_rawTextures = new ();
     private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel)
     {
         var path = AssetDatabase.GetAssetPath(tex);
-        if (rawTextures.TryGetValue(path, out var updatedTex))
+        if (cache_rawTextures.TryGetValue(path, out var updatedTex))
         {
             tex = updatedTex;
         }
@@ -210,16 +257,16 @@ public class d4rkTextureAtlasEditor : Editor
                     texWithMips.Apply(true);
                     texWithMips.name = $"{tex.name}_raw";
                     tex = texWithMips;
-                    rawTextures[path] = texWithMips;
+                    cache_rawTextures[path] = texWithMips;
                 }
                 else
                 {
-                    rawTextures[path] = tex;
+                    cache_rawTextures[path] = tex;
                 }
             }
             else
             {
-                rawTextures[path] = tex;
+                cache_rawTextures[path] = tex;
             }
         }
         var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
@@ -254,8 +301,7 @@ public class d4rkTextureAtlasEditor : Editor
 
     private void InitializeClone()
     {
-        var materials = clone.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null).Distinct().Where(m => m.HasProperty("_MainTex")).ToArray();
-        var textures = materials.Select(m => m.mainTexture as Texture2D).Where(t => t != null).Distinct().ToArray();
+        var textures = GetReferencedTextures().Where(t => IsTextureEligible(t) == null).ToArray();
         var ssimDisplayMaterialMap = new Dictionary<Texture2D, Material>();
         for (int i = 0; i < textures.Length; i++)
         {
