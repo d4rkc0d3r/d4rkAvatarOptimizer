@@ -180,20 +180,20 @@ public class d4rkTextureAtlasEditor : Editor
         return meshes;
     }
 
-    private static HashSet<Texture2D> hideMaterialAndMeshReferences = new ();
+    private static HashSet<Texture2D> showMaterialAndMeshReferences = new ();
     private bool ShowMaterialsAndMeshesFoldoutButton(Texture2D tex)
     {
-        bool showMaterialsAndMeshes = !hideMaterialAndMeshReferences.Contains(tex);
+        bool showMaterialsAndMeshes = showMaterialAndMeshReferences.Contains(tex);
         if (GUILayout.Button(showMaterialsAndMeshes ? "v" : ">", GUILayout.Width(20)))
         {
             showMaterialsAndMeshes = !showMaterialsAndMeshes;
             if (showMaterialsAndMeshes)
             {
-                hideMaterialAndMeshReferences.Remove(tex);
+                showMaterialAndMeshReferences.Add(tex);
             }
             else
             {
-                hideMaterialAndMeshReferences.Add(tex);
+                showMaterialAndMeshReferences.Remove(tex);
             }
         }
         return showMaterialsAndMeshes;
