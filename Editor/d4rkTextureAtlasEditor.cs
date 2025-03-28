@@ -11,14 +11,15 @@ using d4rkpl4y3r.AvatarOptimizer.Extensions;
 [CustomEditor(typeof(d4rkTextureAtlas))]
 public class d4rkTextureAtlasEditor : Editor
 {
-    private static d4rkTextureAtlas settings;
-    private static GameObject clone;
     private static string packageRootPath;
     private static readonly string textureAtlasFolder = "TextureAtlas";
     private static string TextureAtlasPath => $"{packageRootPath}/{textureAtlasFolder}";
-    private static int kernelSize = 5;
-    private static float ssimThreshold = 0.98f;
-    private static Material[] ssimDisplayMaterials;
+    private d4rkTextureAtlas settings;
+    private GameObject clone;
+    private int kernelSize = 5;
+    private float ssimThreshold = 0.99f;
+    private float qualityValue = 1.0f;
+    private Material[] ssimDisplayMaterials;
 
     private void ClearCaches()
     {
@@ -124,7 +125,18 @@ public class d4rkTextureAtlasEditor : Editor
             return;
         }
 
-        ssimThreshold = EditorGUILayout.Slider("SSIM Threshold", ssimThreshold, 0, 1);
+        using (var check = new EditorGUI.ChangeCheckScope())
+        {
+            qualityValue = EditorGUILayout.Slider("Quality Value", qualityValue, 0, 1);
+            if (check.changed)
+            {
+                ssimThreshold = Mathf.Lerp(0.75f, 0.99f, MathF.Pow(qualityValue, 0.333f));
+            }
+        }
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.Slider("SSIM Threshold", ssimThreshold, 0, 1);
+        }
         ssimDisplayMaterials ??= clone.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Distinct().Where(m => m != null &&  m.HasProperty("_MainTex")).ToArray();
         foreach (var material in ssimDisplayMaterials)
         {
