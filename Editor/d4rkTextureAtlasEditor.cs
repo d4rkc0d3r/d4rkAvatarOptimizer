@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
+using System;
+
+using d4rkpl4y3r.AvatarOptimizer.Extensions;
 
 [CustomEditor(typeof(d4rkTextureAtlas))]
 public class d4rkTextureAtlasEditor : Editor
@@ -14,7 +17,7 @@ public class d4rkTextureAtlasEditor : Editor
     private static readonly string textureAtlasFolder = "TextureAtlas";
     private static string TextureAtlasPath => $"{packageRootPath}/{textureAtlasFolder}";
     private static int kernelSize = 5;
-    private static float ssimThreshold = 0.99f;
+    private static float ssimThreshold = 0.98f;
     private static Material[] ssimDisplayMaterials;
 
     public override void OnInspectorGUI()
@@ -61,28 +64,164 @@ public class d4rkTextureAtlasEditor : Editor
             clone = null;
         }
 
+        var materials = settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null).Distinct().Where(m => m.HasProperty("_MainTex")).ToArray();
+        var textures = materials.Select(m => m.mainTexture as Texture2D).Where(t => t != null).Distinct().ToArray();
+
+        foreach (var tex in textures)
+        {
+            var error = IsTextureEligible(tex);
+            using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+            {
+                bool showMaterialsAndMeshes = true;
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    showMaterialsAndMeshes = ShowMaterialsAndMeshesFoldoutButton(tex);
+                    EditorGUILayout.ObjectField(tex, typeof(Texture2D), false);
+                }
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    if (showMaterialsAndMeshes)
+                    {
+                        EditorGUILayout.LabelField("Materials using this texture:");
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            foreach (var mat in materials.Where(m => m.mainTexture == tex))
+                            {
+                                EditorGUILayout.ObjectField(mat, typeof(Material), false);
+                            }
+                        }
+                        EditorGUILayout.LabelField("Meshes using this texture:");
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            foreach (var mesh in settings.GetComponentsInChildren<Renderer>(true)
+                                .Where(r => r.sharedMaterials.Any(m => m != null && m.mainTexture == tex))
+                                .Select(r => r.GetSharedMesh())
+                                .Where(m => m != null)
+                                .Distinct())
+                            {
+                                EditorGUILayout.ObjectField(mesh, typeof(Mesh), false);
+                            }
+                        }
+                    }
+                    if (error != null)
+                    {
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            EditorGUILayout.LabelField(error, new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.MiddleLeft });
+                        }
+                    }
+                }
+            }
+        }
+
         if (clone == null)
         {
             return;
         }
 
         ssimThreshold = EditorGUILayout.Slider("SSIM Threshold", ssimThreshold, 0, 1);
-        ssimDisplayMaterials ??= clone.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Distinct().Where(m => m.HasProperty("_MainTex")).ToArray();
+        ssimDisplayMaterials ??= clone.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Distinct().Where(m => m != null &&  m.HasProperty("_MainTex")).ToArray();
         foreach (var material in ssimDisplayMaterials)
         {
             material.SetFloat("_QualityThreshold", ssimThreshold);
         }
-
-        var materials = clone.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Distinct().Where(m => m.HasProperty("_MainTex")).ToArray();
-        var textures = materials.Select(m => m.mainTexture as Texture2D).Where(t => t != null).Distinct().ToArray();
-        foreach (var texture in textures)
-        {
-            EditorGUILayout.ObjectField(texture, typeof(Texture2D), false);
-        }
     }
+
+    private static HashSet<Texture2D> hideMaterialAndMeshReferences = new ();
+
+    private bool ShowMaterialsAndMeshesFoldoutButton(Texture2D tex)
+    {
+        bool showMaterialsAndMeshes = !hideMaterialAndMeshReferences.Contains(tex);
+        if (GUILayout.Button(showMaterialsAndMeshes ? "v" : ">", GUILayout.Width(20)))
+        {
+            showMaterialsAndMeshes = !showMaterialsAndMeshes;
+            if (showMaterialsAndMeshes)
+            {
+                hideMaterialAndMeshReferences.Remove(tex);
+            }
+            else
+            {
+                hideMaterialAndMeshReferences.Add(tex);
+            }
+        }
+        return showMaterialsAndMeshes;
+    }
+
+    private string IsTextureEligible(Texture2D tex)
+    {
+        if (tex == null)
+        {
+            return "Texture is null";
+        }
+        var eligibleTextureFormats = new HashSet<TextureFormat>()
+        {
+            TextureFormat.RGBA32,
+            TextureFormat.ARGB32,
+            TextureFormat.RGB24,
+            TextureFormat.BC7,
+            TextureFormat.DXT1,
+            TextureFormat.DXT1Crunched,
+            TextureFormat.DXT5,
+            TextureFormat.DXT5Crunched,
+        };
+        if (!eligibleTextureFormats.Contains(tex.format))
+        {
+            return $"Texture format {tex.format} is not eligible. Only {string.Join(", ", eligibleTextureFormats)} are eligible.";
+        }
+        var path = AssetDatabase.GetAssetPath(tex);
+        if (string.IsNullOrEmpty(path))
+        {
+            return "Texture path is null or empty";
+        }
+        var eligibleExtensions = new HashSet<string>()
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+        };
+        if (!eligibleExtensions.Any(ext => path.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"Texture path {path} is not eligible. Only {string.Join(", ", eligibleExtensions)} are eligible.";
+        }
+        return null;
+    }
+
+    private static Dictionary<string, Texture2D> rawTextures = new();
 
     private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel)
     {
+        var path = AssetDatabase.GetAssetPath(tex);
+        if (rawTextures.TryGetValue(path, out var updatedTex))
+        {
+            tex = updatedTex;
+        }
+        else
+        {
+            if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg"))
+            {
+                byte[] pngBytes = System.IO.File.ReadAllBytes(path);
+                var rawTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
+                if (ImageConversion.LoadImage(rawTex, pngBytes, false))
+                {
+                    int mipLevelToCopy = Mathf.RoundToInt(MathF.Log10(rawTex.width / tex.width) / MathF.Log10(2));
+                    Debug.Log($"Loaded {path} as raw texture from mip level {mipLevelToCopy}.");
+                    var texWithMips = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
+                    texWithMips.SetPixels32(rawTex.GetPixels32(mipLevelToCopy));
+                    texWithMips.Apply(true);
+                    texWithMips.name = $"{tex.name}_raw";
+                    tex = texWithMips;
+                    rawTextures[path] = texWithMips;
+                }
+                else
+                {
+                    rawTextures[path] = tex;
+                }
+            }
+            else
+            {
+                rawTextures[path] = tex;
+            }
+        }
         var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
         descriptor.useMipMap = false;
         descriptor.autoGenerateMips = false;
