@@ -4,6 +4,7 @@
     {
         _Mip1SSIM("Mip 1 SSIM", 2D) = "black" {}
         _Mip2SSIM("Mip 2 SSIM", 2D) = "black" {}
+        _CoverageMask("Coverage Mask", 2D) = "black" {}
         _QualityThreshold("Quality Threshold", Range(0, 1)) = 0.9
     }
     SubShader
@@ -28,7 +29,7 @@
             struct v2f
             {
                 float4 vertex : SV_POSITION;
-                float2 uv : TEXCOORD0;
+                centroid float2 uv : TEXCOORD0;
             };
 
             Texture2D<float> _Mip1SSIM;
@@ -37,6 +38,9 @@
             Texture2D<float> _Mip2SSIM;
             float4 _Mip2SSIM_TexelSize;
             float _QualityThreshold;
+            Texture2D<float> _CoverageMask;
+            float4 _CoverageMask_TexelSize;
+            SamplerState sampler_CoverageMask;
 
             v2f vert (appdata v)
             {
@@ -65,6 +69,8 @@
 
             float4 frag (v2f i) : SV_Target
             {
+                if (_CoverageMask.Sample(sampler_CoverageMask, i.uv).r == 0)
+                    return float4(0, 0, 0, 1);
                 float ssim1 = _Mip1SSIM.Sample(sampler_Mip1SSIM, i.uv).r;
                 float ssim2 = _Mip2SSIM.Sample(sampler_Mip1SSIM, i.uv).r;
                 if (_QualityThreshold == 0) {

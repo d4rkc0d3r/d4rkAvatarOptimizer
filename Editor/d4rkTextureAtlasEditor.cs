@@ -155,6 +155,18 @@ public class d4rkTextureAtlasEditor : Editor
         return cache_textureReferences;
     }
 
+    private Dictionary<Texture2D, HashSet<Renderer>> cache_textureRendererReferences = new ();
+    private HashSet<Renderer> GetReferencedRenderers(Texture2D tex)
+    {
+        if (cache_textureRendererReferences.TryGetValue(tex, out var renderers))
+        {
+            return renderers;
+        }
+        renderers = new (settings.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => m != null && m.mainTexture == tex)));
+        cache_textureRendererReferences[tex] = renderers;
+        return renderers;
+    }
+
     private Dictionary<Texture2D, HashSet<Material>> cache_textureMaterialReferences = new ();
     private HashSet<Material> GetReferencedMaterials(Texture2D tex)
     {
@@ -162,7 +174,7 @@ public class d4rkTextureAtlasEditor : Editor
         {
             return materials;
         }
-        materials = new (settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.mainTexture == tex));
+        materials = new (GetReferencedRenderers(tex).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.mainTexture == tex));
         cache_textureMaterialReferences[tex] = materials;
         return materials;
     }
@@ -174,8 +186,7 @@ public class d4rkTextureAtlasEditor : Editor
         {
             return meshes;
         }
-        var materials = GetReferencedMaterials(tex);
-        meshes = new (settings.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => materials.Contains(m))).Select(r => r.GetSharedMesh()).Where(m => m != null));
+        meshes = new (GetReferencedRenderers(tex).Select(r => r.GetSharedMesh()).Where(m => m != null));
         cache_textureMeshReferences[tex] = meshes;
         return meshes;
     }
@@ -308,7 +319,45 @@ public class d4rkTextureAtlasEditor : Editor
         
         //EditorUtility.CompressTexture(ssimTexture, TextureFormat.BC4, UnityEditor.TextureCompressionQuality.Best);
         AssetDatabase.CreateAsset(ssimTexture, $"{TextureAtlasPath}/{tex.name}_SSIM_mip{mipLevel}.asset");
+        ssimTexture.name = $"{tex.name}_SSIM_mip{mipLevel}";
         return ssimTexture;
+    }
+
+    private Texture2D CreateCoverageMaskTexture(Texture2D tex)
+    {
+        var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
+        descriptor.useMipMap = false;
+        descriptor.autoGenerateMips = false;
+        descriptor.sRGB = false;
+        var renderTexture = RenderTexture.GetTemporary(descriptor);
+        Graphics.SetRenderTarget(renderTexture);
+        GL.Clear(true, true, Color.clear);
+
+        var coverageMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/Write Coverage Mask"));
+        coverageMaterial.SetPass(0);
+        var referencedMaterials = GetReferencedMaterials(tex);
+        foreach (var renderer in GetReferencedRenderers(tex))
+        {
+            var subMeshIndices = renderer.sharedMaterials.Select((m, i) => (m, i)).Where(m => referencedMaterials.Contains(m.m)).Select(m => m.i).ToArray();
+            foreach (var index in subMeshIndices)
+            {
+                var mesh = renderer.GetSharedMesh();
+                var clampedIndex = Mathf.Clamp(index, 0, mesh.subMeshCount - 1);
+                Graphics.DrawMeshNow(mesh, renderer.transform.localToWorldMatrix, clampedIndex);
+            }
+        }
+
+        var coverageTexture = new Texture2D(tex.width, tex.height, TextureFormat.RFloat, false);
+        RenderTexture.active = renderTexture;
+        coverageTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+        coverageTexture.Apply();
+        RenderTexture.active = null;
+        RenderTexture.ReleaseTemporary(renderTexture);
+        coverageTexture.filterMode = FilterMode.Point;
+        coverageTexture.wrapMode = TextureWrapMode.Repeat;
+        AssetDatabase.CreateAsset(coverageTexture, $"{TextureAtlasPath}/{tex.name}_CoverageMask.asset");
+        coverageTexture.name = $"{tex.name}_CoverageMask";
+        return coverageTexture;
     }
 
     private void InitializeClone()
@@ -320,10 +369,12 @@ public class d4rkTextureAtlasEditor : Editor
             var tex = textures[i];
             var mip1 = CreateSSIMTexture(tex, 1);
             var mip2 = CreateSSIMTexture(tex, 2);
+            var coverage = CreateCoverageMaskTexture(tex);
 
             var ssimDisplayMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM Debug View"));
             ssimDisplayMaterial.SetTexture("_Mip1SSIM", mip1);
             ssimDisplayMaterial.SetTexture("_Mip2SSIM", mip2);
+            ssimDisplayMaterial.SetTexture("_CoverageMask", coverage);
             ssimDisplayMaterialMap[tex] = ssimDisplayMaterial;
             AssetDatabase.CreateAsset(ssimDisplayMaterial, $"{TextureAtlasPath}/{tex.name}_SSIM.mat");
             
