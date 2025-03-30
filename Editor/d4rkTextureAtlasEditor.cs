@@ -272,7 +272,7 @@ public class d4rkTextureAtlasEditor : Editor
     }
 
     private Dictionary<string, Texture2D> cache_rawTextures = new ();
-    private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel)
+    private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel, bool flip)
     {
         var path = AssetDatabase.GetAssetPath(tex);
         if (cache_rawTextures.TryGetValue(path, out var updatedTex))
@@ -319,6 +319,7 @@ public class d4rkTextureAtlasEditor : Editor
         ssimMaterial.SetFloat("_KernelSize", kernelSize);
         ssimMaterial.SetFloat("_TargetMipBias", mipLevel);
         ssimMaterial.SetFloat("_IgnoreAlpha", 1);
+        ssimMaterial.SetFloat("_FlipTarget", flip ? 1 : 0);
         Graphics.Blit(tex, ssimRenderTexture, ssimMaterial);
 
         // save render texture to texture2d
@@ -381,13 +382,15 @@ public class d4rkTextureAtlasEditor : Editor
         for (int i = 0; i < textures.Length; i++)
         {
             var tex = textures[i];
-            var mip1 = CreateSSIMTexture(tex, 1);
-            var mip2 = CreateSSIMTexture(tex, 2);
+            var mip1 = CreateSSIMTexture(tex, 1, flip: false);
+            var mip2 = CreateSSIMTexture(tex, 2, flip: false);
+            var flip = CreateSSIMTexture(tex, 0, flip: true);
             var coverage = CreateCoverageMaskTexture(tex);
 
             var ssimDisplayMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM Debug View"));
             ssimDisplayMaterial.SetTexture("_Mip1SSIM", mip1);
             ssimDisplayMaterial.SetTexture("_Mip2SSIM", mip2);
+            ssimDisplayMaterial.SetTexture("_FlipSSIM", flip);
             ssimDisplayMaterial.SetTexture("_CoverageMask", coverage);
             ssimDisplayMaterialMap[tex] = ssimDisplayMaterial;
             AssetDatabase.CreateAsset(ssimDisplayMaterial, $"{TextureAtlasPath}/{tex.name}_SSIM.mat");
@@ -396,7 +399,7 @@ public class d4rkTextureAtlasEditor : Editor
             quad.name = $"{tex.name} (SSIM Debug View)";
             quad.transform.SetParent(clone.transform);
             quad.transform.localPosition = Vector3.zero + Vector3.right * (i + 1);
-            quad.transform.localRotation = Quaternion.identity;
+            quad.transform.localRotation = Quaternion.Euler(0, 180, 0);
             quad.transform.localScale = Vector3.one;
             quad.GetComponent<Renderer>().sharedMaterial = ssimDisplayMaterial;
         }

@@ -4,6 +4,7 @@
     {
         _Mip1SSIM("Mip 1 SSIM", 2D) = "black" {}
         _Mip2SSIM("Mip 2 SSIM", 2D) = "black" {}
+        _FlipSSIM("Flip SSIM", 2D) = "black" {}
         _CoverageMask("Coverage Mask", 2D) = "black" {}
         _QualityThreshold("Quality Threshold", Range(0, 1)) = 0.9
     }
@@ -37,6 +38,8 @@
             SamplerState sampler_Mip1SSIM;
             Texture2D<float> _Mip2SSIM;
             float4 _Mip2SSIM_TexelSize;
+            Texture2D<float> _FlipSSIM;
+            float4 _FlipSSIM_TexelSize;
             float _QualityThreshold;
             Texture2D<float> _CoverageMask;
             float4 _CoverageMask_TexelSize;
@@ -76,12 +79,14 @@
                 if (_QualityThreshold == 0) {
                     return 1 - float4(ssim1.xxx, ssim2);
                 }
+                float ssimFlip = _FlipSSIM.Sample(sampler_Mip1SSIM, i.uv).r;
+                float blueChannel = ssimFlip >= _QualityThreshold && i.uv.x > 0.5 ? 1 : 0;
                 if (ssim2 >= _QualityThreshold)
-                    return float4(1, 0, 0, 1);
+                    return float4(1, 0, blueChannel, 1);
                 else if (ssim1 >= _QualityThreshold)
-                    return float4(1, 1, 0, 1);
+                    return float4(1, 1, blueChannel, 1);
                 else
-                    return float4(0, 1, 0, 1);
+                    return float4(0, 1, blueChannel, 1);
             }
             ENDCG
         }

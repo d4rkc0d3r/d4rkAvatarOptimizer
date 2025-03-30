@@ -9,6 +9,7 @@
         [IntRange] _KernelSize ("Kernel Size", Range(2, 11)) = 8
         [IntRange] _TargetMipBias ("Target Mip Bias", Range(0, 2)) = 0
         [ToggleUI] _IgnoreAlpha ("Ignore Alpha", Float) = 0
+        [ToggleUI] _FlipTarget ("Flip Target", Float) = 0
     }
     SubShader
     {
@@ -45,6 +46,7 @@
             float _KernelSize;
             float _TargetMipBias;
             bool _IgnoreAlpha;
+            bool _FlipTarget;
 
             v2f vert (appdata v)
             {
@@ -82,6 +84,12 @@
                 float2 uv = i.uv;
                 float2 dx = ddx(uv);
                 float2 dy = ddy(uv);
+                float2 dx_target = dx * exp2(_TargetMipBias);
+                float2 dy_target = dy * exp2(_TargetMipBias);
+                if (_FlipTarget)
+                {
+                    dx_target.x = -dx_target.x;
+                }
                 float2 pixelSize = 1 / _ScreenParams.xy;
                 float4 meanA = 0;
                 float4 meanB = 0;
@@ -91,7 +99,11 @@
                 {
                     float2 sampleUV = uv + (offset - floor(_KernelSize / 2)) * pixelSize;
                     meanA += SampleGrad(_Reference, sampleUV, dx, dy);
-                    meanB += SampleGrad(_Target, sampleUV, dx * exp2(_TargetMipBias), dy * exp2(_TargetMipBias));
+                    if (_FlipTarget)
+                    {
+                        sampleUV.x = 1 - sampleUV.x;
+                    }
+                    meanB += SampleGrad(_Target, sampleUV, dx_target, dy_target);
                 }
                 meanA /= _KernelSize * _KernelSize;
                 meanB /= _KernelSize * _KernelSize;
@@ -103,7 +115,11 @@
                 {
                     float2 sampleUV = uv + (offset - floor(_KernelSize / 2)) * pixelSize;
                     float4 a = SampleGrad(_Reference, sampleUV, dx, dy);
-                    float4 b = SampleGrad(_Target, sampleUV, dx * exp2(_TargetMipBias), dy * exp2(_TargetMipBias));
+                    if (_FlipTarget)
+                    {
+                        sampleUV.x = 1 - sampleUV.x;
+                    }
+                    float4 b = SampleGrad(_Target, sampleUV, dx_target, dy_target);
                     varA += (a - meanA) * (a - meanA);
                     varB += (b - meanB) * (b - meanB);
                     covAB += (a - meanA) * (b - meanB);
