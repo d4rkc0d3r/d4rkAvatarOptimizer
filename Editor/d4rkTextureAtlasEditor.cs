@@ -7,6 +7,7 @@ using UnityEditor;
 using System;
 
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
+using UnityEngine.Animations;
 
 [CustomEditor(typeof(d4rkTextureAtlas))]
 public class d4rkTextureAtlasEditor : Editor
@@ -144,6 +145,15 @@ public class d4rkTextureAtlasEditor : Editor
         }
     }
 
+    private HashSet<Renderer> GetUsedRenderers()
+    {
+        if (settings.TryGetComponent<d4rkAvatarOptimizer>(out var optimizer))
+        {
+            return optimizer.GetUsedComponentsInChildren<Renderer>().ToHashSet();
+        }
+        return new HashSet<Renderer>(settings.GetComponentsInChildren<Renderer>(true));
+    }
+
     private HashSet<Texture2D> cache_textureReferences = new ();
     private HashSet<Texture2D> GetReferencedTextures()
     {
@@ -151,7 +161,11 @@ public class d4rkTextureAtlasEditor : Editor
         {
             return cache_textureReferences;
         }
-        cache_textureReferences = new (settings.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.HasProperty("_MainTex")).Select(m => m.mainTexture as Texture2D).Where(t => t != null));
+        cache_textureReferences = new (GetUsedRenderers()
+            .SelectMany(r => r.sharedMaterials)
+            .Where(m => m != null && m.HasProperty("_MainTex"))
+            .Select(m => m.mainTexture as Texture2D)
+            .Where(t => t != null));
         return cache_textureReferences;
     }
 
@@ -162,7 +176,7 @@ public class d4rkTextureAtlasEditor : Editor
         {
             return renderers;
         }
-        renderers = new (settings.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => m != null && m.mainTexture == tex)));
+        renderers = new (GetUsedRenderers().Where(r => r.sharedMaterials.Any(m => m != null && m.mainTexture == tex)));
         cache_textureRendererReferences[tex] = renderers;
         return renderers;
     }
