@@ -271,11 +271,11 @@ public class d4rkTextureAtlasEditor : Editor
         return null;
     }
 
-    private Dictionary<string, Texture2D> cache_rawTextures = new ();
+    private Dictionary<string, Texture2D> cache_uncompressedTextures = new ();
     private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel, bool flip)
     {
         var path = AssetDatabase.GetAssetPath(tex);
-        if (cache_rawTextures.TryGetValue(path, out var updatedTex))
+        if (cache_uncompressedTextures.TryGetValue(path, out var updatedTex))
         {
             tex = updatedTex;
         }
@@ -283,27 +283,27 @@ public class d4rkTextureAtlasEditor : Editor
         {
             if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg"))
             {
-                byte[] pngBytes = System.IO.File.ReadAllBytes(path);
-                var rawTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
-                if (ImageConversion.LoadImage(rawTex, pngBytes, false))
+                byte[] rawData = System.IO.File.ReadAllBytes(path);
+                var uncompressedTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
+                if (ImageConversion.LoadImage(uncompressedTex, rawData, false))
                 {
-                    int mipLevelToCopy = Mathf.RoundToInt(MathF.Log10(rawTex.width / tex.width) / MathF.Log10(2));
+                    int mipLevelToCopy = Mathf.RoundToInt(MathF.Log10(uncompressedTex.width / tex.width) / MathF.Log10(2));
                     Debug.Log($"Loaded {path} as raw texture from mip level {mipLevelToCopy}.");
                     var texWithMips = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
-                    texWithMips.SetPixels32(rawTex.GetPixels32(mipLevelToCopy));
+                    texWithMips.SetPixels32(uncompressedTex.GetPixels32(mipLevelToCopy));
                     texWithMips.Apply(true);
                     texWithMips.name = $"{tex.name}_raw";
                     tex = texWithMips;
-                    cache_rawTextures[path] = texWithMips;
+                    cache_uncompressedTextures[path] = texWithMips;
                 }
                 else
                 {
-                    cache_rawTextures[path] = tex;
+                    cache_uncompressedTextures[path] = tex;
                 }
             }
             else
             {
-                cache_rawTextures[path] = tex;
+                cache_uncompressedTextures[path] = tex;
             }
         }
         var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
@@ -322,7 +322,6 @@ public class d4rkTextureAtlasEditor : Editor
         ssimMaterial.SetFloat("_FlipTarget", flip ? 1 : 0);
         Graphics.Blit(tex, ssimRenderTexture, ssimMaterial);
 
-        // save render texture to texture2d
         var ssimTexture = new Texture2D(tex.width, tex.height, TextureFormat.RHalf, false);
         RenderTexture.active = ssimRenderTexture;
         ssimTexture.ReadPixels(new Rect(0, 0, ssimRenderTexture.width, ssimRenderTexture.height), 0, 0);
@@ -332,7 +331,6 @@ public class d4rkTextureAtlasEditor : Editor
         ssimTexture.filterMode = FilterMode.Point;
         ssimTexture.wrapMode = TextureWrapMode.Repeat;
         
-        //EditorUtility.CompressTexture(ssimTexture, TextureFormat.BC4, UnityEditor.TextureCompressionQuality.Best);
         AssetDatabase.CreateAsset(ssimTexture, $"{TextureAtlasPath}/{tex.name}_SSIM_mip{mipLevel}.asset");
         ssimTexture.name = $"{tex.name}_SSIM_mip{mipLevel}";
         return ssimTexture;
@@ -370,9 +368,213 @@ public class d4rkTextureAtlasEditor : Editor
         RenderTexture.ReleaseTemporary(renderTexture);
         coverageTexture.filterMode = FilterMode.Point;
         coverageTexture.wrapMode = TextureWrapMode.Repeat;
-        AssetDatabase.CreateAsset(coverageTexture, $"{TextureAtlasPath}/{tex.name}_CoverageMask.asset");
         coverageTexture.name = $"{tex.name}_CoverageMask";
+        AssetDatabase.CreateAsset(coverageTexture, $"{TextureAtlasPath}/{tex.name}_CoverageMask.asset");
         return coverageTexture;
+    }
+
+    class UVIsland
+    {
+        public List<Vector2> uv = new ();
+        public List<int> triangles = new ();
+        private HashSet<Vector2> uvSet = new ();
+        public Bounds aabb = new ();
+        public void AddTriangle(Vector2 uv1, Vector2 uv2, Vector2 uv3)
+        {
+            if (uv.Count == 0)
+            {
+                aabb.center = uv1;
+                aabb.size = Vector3.zero;
+            }
+            if (uvSet.Add(uv1))
+            {
+                uv.Add(uv1);
+                triangles.Add(uv.Count - 1);
+                aabb.Encapsulate(uv1);
+            }
+            else
+            {
+                triangles.Add(uv.IndexOf(uv1));
+            }
+            if (uvSet.Add(uv2))
+            {
+                uv.Add(uv2);
+                triangles.Add(uv.Count - 1);
+                aabb.Encapsulate(uv2);
+            }
+            else
+            {
+                triangles.Add(uv.IndexOf(uv2));
+            }
+            if (uvSet.Add(uv3))
+            {
+                uv.Add(uv3);
+                triangles.Add(uv.Count - 1);
+                aabb.Encapsulate(uv3);
+            }
+            else
+            {
+                triangles.Add(uv.IndexOf(uv3));
+            }
+        }
+        public bool TryAddTriangle(Vector2 uv1, Vector2 uv2, Vector2 uv3)
+        {
+            if (uv.Count == 0 || uvSet.Contains(uv1) || uvSet.Contains(uv2) || uvSet.Contains(uv3))
+            {
+                AddTriangle(uv1, uv2, uv3);
+                return true;
+            }
+            return false;
+        }
+        public bool ShouldMergeWith(UVIsland other)
+        {
+            return uvSet.Intersect(other.uvSet).Any();
+        }
+        public void MergeWith(UVIsland other)
+        {
+            for (int i = 0; i < other.triangles.Count; i += 3)
+            {
+                AddTriangle(other.uv[other.triangles[i]], other.uv[other.triangles[i + 1]], other.uv[other.triangles[i + 2]]);
+            }
+            other.uv.Clear();
+            other.triangles.Clear();
+            other.uvSet.Clear();
+        }
+    }
+
+    private Texture2D CreateIslandIDMap(Texture2D tex)
+    {
+        List<UVIsland> islands = new ();
+        
+        var referencedMaterials = GetReferencedMaterials(tex);
+        foreach (var renderer in GetReferencedRenderers(tex))
+        {
+            var mesh = renderer.GetSharedMesh();
+            var subMeshIndices = renderer.sharedMaterials
+                .Select((m, i) => (m, i))
+                .Where(m => referencedMaterials.Contains(m.m))
+                .Select(m => Mathf.Clamp(m.i, 0, mesh.subMeshCount - 1))
+                .Distinct().ToArray();
+            foreach (var index in subMeshIndices)
+            {
+                var triangles = mesh.GetTriangles(index);
+                var uv = mesh.uv;
+                for (int i = 0; i < triangles.Length; i += 3)
+                {
+                    var uv1 = uv[triangles[i]];
+                    var uv2 = uv[triangles[i + 1]];
+                    var uv3 = uv[triangles[i + 2]];
+                    bool needsNewIsland = true;
+                    foreach (var island in islands)
+                    {
+                        if (island.TryAddTriangle(uv1, uv2, uv3))
+                        {
+                            needsNewIsland = false;
+                            break;
+                        }
+                    }
+                    if (needsNewIsland)
+                    {
+                        var newIsland = new UVIsland();
+                        newIsland.TryAddTriangle(uv1, uv2, uv3);
+                        islands.Add(newIsland);
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < islands.Count; i++)
+        {
+            for (int j = i + 1; j < islands.Count; j++)
+            {
+                if (islands[i].ShouldMergeWith(islands[j]))
+                {
+                    islands[i].MergeWith(islands[j]);
+                    islands.RemoveAt(j);
+                    j = i;
+                    continue;
+                }
+                float distanceThreshold = 8.2f / tex.width;
+                // calculate distance between island aabb rectangles
+                var aabb1 = islands[i].aabb;
+                var aabb2 = islands[j].aabb;
+                float dx = Mathf.Max(0, Mathf.Abs(aabb1.center.x - aabb2.center.x) - (aabb1.extents.x + aabb2.extents.x));
+                float dy = Mathf.Max(0, Mathf.Abs(aabb1.center.y - aabb2.center.y) - (aabb1.extents.y + aabb2.extents.y));
+                float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                // check if distance is less than pixel size in UV space
+                if (distance < distanceThreshold)
+                {
+                    // go through vertices of both islands and check if they are close enough to merge
+                    bool shouldMerge = false;
+                    foreach (var uv1 in islands[i].uv)
+                    {
+                        foreach (var uv2 in islands[j].uv)
+                        {
+                            if (Vector2.Distance(uv1, uv2) < distanceThreshold)
+                            {
+                                shouldMerge = true;
+                                break;
+                            }
+                        }
+                        if (shouldMerge)
+                        {
+                            break;
+                        }
+                    }
+                    if (shouldMerge)
+                    {
+                        islands[i].MergeWith(islands[j]);
+                        islands.RemoveAt(j);
+                        j = i;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        Mesh islandMesh = new ();
+        islandMesh.name = $"{tex.name}_IslandMesh";
+        List<Vector3> uvList = new ();
+        List<int> triList = new ();
+        int currentIslandID = 1;
+        foreach (var island in islands)
+        {
+            var islandVertices = new Vector3[island.uv.Count];
+            for (int i = 0; i < island.uv.Count; i++)
+            {
+                islandVertices[i] = new Vector3(island.uv[i].x, island.uv[i].y, currentIslandID);
+            }
+            triList.AddRange(island.triangles.Select(t => t + uvList.Count));
+            uvList.AddRange(islandVertices);
+            currentIslandID++;
+        }
+        islandMesh.vertices = uvList.ToArray();
+        islandMesh.triangles = triList.ToArray();
+        islandMesh.SetUVs(0, uvList.ToArray());
+
+        var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
+        descriptor.useMipMap = false;
+        descriptor.autoGenerateMips = false;
+        var renderTexture = RenderTexture.GetTemporary(descriptor);
+        Graphics.SetRenderTarget(renderTexture);
+        GL.Clear(true, true, Color.clear);
+
+        var islandIDMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/Write Coverage Mask"));
+        islandIDMaterial.SetFloat("_WriteIslandID", 1);
+        islandIDMaterial.SetPass(0);
+
+        Graphics.DrawMeshNow(islandMesh, Matrix4x4.identity, 0);
+        var islandIDTexture = new Texture2D(tex.width, tex.height, TextureFormat.RFloat, false);
+        RenderTexture.active = renderTexture;
+        islandIDTexture.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+        islandIDTexture.Apply();
+        RenderTexture.active = null;
+        RenderTexture.ReleaseTemporary(renderTexture);
+        islandIDTexture.filterMode = FilterMode.Point;
+        islandIDTexture.wrapMode = TextureWrapMode.Repeat;
+        islandIDTexture.name = $"{tex.name}_IslandID";
+        AssetDatabase.CreateAsset(islandIDTexture, $"{TextureAtlasPath}/{tex.name}_IslandID.asset");
+        return islandIDTexture; 
     }
 
     private void InitializeClone()
@@ -386,6 +588,7 @@ public class d4rkTextureAtlasEditor : Editor
             var mip2 = CreateSSIMTexture(tex, 2, flip: false);
             var flip = CreateSSIMTexture(tex, 0, flip: true);
             var coverage = CreateCoverageMaskTexture(tex);
+            var islandID = CreateIslandIDMap(tex);
 
             var ssimDisplayMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM Debug View"));
             ssimDisplayMaterial.SetTexture("_Mip1SSIM", mip1);
@@ -402,6 +605,18 @@ public class d4rkTextureAtlasEditor : Editor
             quad.transform.localRotation = Quaternion.Euler(0, 180, 0);
             quad.transform.localScale = Vector3.one;
             quad.GetComponent<Renderer>().sharedMaterial = ssimDisplayMaterial;
+
+            var islandDisplayMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM Debug View"));
+            islandDisplayMaterial.SetTexture("_CoverageMask", islandID);
+            islandDisplayMaterial.SetFloat("_ShowCoverageMaskAsColors", 1);
+            AssetDatabase.CreateAsset(islandDisplayMaterial, $"{TextureAtlasPath}/{tex.name}_IslandID.mat");
+            var islandQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            islandQuad.name = $"{tex.name} (Island ID Debug View)";
+            islandQuad.transform.SetParent(clone.transform);
+            islandQuad.transform.localPosition = Vector3.zero + Vector3.right * (i + 1) + Vector3.up;
+            islandQuad.transform.localRotation = Quaternion.Euler(0, 180, 0);
+            islandQuad.transform.localScale = Vector3.one;
+            islandQuad.GetComponent<Renderer>().sharedMaterial = islandDisplayMaterial;
         }
         foreach (var renderer in clone.GetComponentsInChildren<Renderer>(true))
         {

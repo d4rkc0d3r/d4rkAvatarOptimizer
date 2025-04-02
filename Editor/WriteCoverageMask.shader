@@ -2,6 +2,7 @@
 {
     Properties
     {
+        [ToggleUI] _WriteIslandID("Write Island ID", Float) = 0
     }
     SubShader
     {
@@ -19,32 +20,34 @@
 
             #include "UnityCG.cginc"
 
+            float _WriteIslandID;
+
             struct appdata
             {
                 float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
+                float4 uv : TEXCOORD0;
             };
 
             struct v2f
             {
                 float4 vertex : SV_POSITION;
-                float2 uv : TEXCOORD0;
+                nointerpolation float islandID : ISLAND_ID;
             };
 
             v2f vert (appdata v)
             {
                 v2f o;
-                o.vertex = float4(v.uv * 2 - 1, 1, 1);
+                o.vertex = float4(v.uv.xy * 2 - 1, 1, 1);
                 #if UNITY_UV_STARTS_AT_TOP
                     o.vertex.y *= -1;
                 #endif
-                o.uv = v.uv;
+                o.islandID = v.uv.z;
                 return o;
             }
 
             float4 frag (v2f i) : SV_Target
             {
-                return 1;
+                return _WriteIslandID > 0.5 ? i.islandID : 1;
             }
             ENDCG
         }
