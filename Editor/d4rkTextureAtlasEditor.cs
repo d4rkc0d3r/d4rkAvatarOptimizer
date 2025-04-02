@@ -489,6 +489,7 @@ public class d4rkTextureAtlasEditor : Editor
             }
         }
 
+        // merge islands that are close enough
         for (int i = 0; i < islands.Count; i++)
         {
             for (int j = i + 1; j < islands.Count; j++)
@@ -538,25 +539,97 @@ public class d4rkTextureAtlasEditor : Editor
             }
         }
 
+        islands.Sort((a, b) =>
+        {
+            if (a.aabb.center.x < b.aabb.center.x)
+            {
+                return 1;
+            }
+            else if (a.aabb.center.x > b.aabb.center.x)
+            {
+                return -1;
+            }
+            else
+            {
+                return 0;
+            }
+        });
+
         islandMesh = new ();
         islandMesh.name = $"{tex.name}_IslandMesh";
         List<Vector3> uvList = new ();
+        List<Vector3> uv2List = new ();
         List<int> triList = new ();
         int currentIslandID = 1;
-        foreach (var island in islands)
+        for (int i = 0; i < islands.Count; i++)
         {
+            var island = islands[i];
             var islandVertices = new Vector3[island.uv.Count];
-            for (int i = 0; i < island.uv.Count; i++)
+            for (int j = 0; j < island.uv.Count; j++)
             {
-                islandVertices[i] = new Vector3(island.uv[i].x, island.uv[i].y, currentIslandID);
+                islandVertices[j] = new Vector3(island.uv[j].x, island.uv[j].y, currentIslandID);
             }
             triList.AddRange(island.triangles.Select(t => t + uvList.Count));
             uvList.AddRange(islandVertices);
+            // find first island from back of the list that is either a copy of this island or a flip
+            // check bounds size && then check triangle & vertex count
+            // after those pass check if you can find matched vertices both un-flipped and flipped
+            // if match the offset & flip bit get written into uv2List
+            float distanceThreshold = 0.5f / tex.width;
+            for (int j = islands.Count - 1; j > i; j--)
+            {
+                var otherIsland = islands[j];
+                if (Mathf.Abs(island.aabb.size.x - otherIsland.aabb.size.x) > distanceThreshold || Mathf.Abs(island.aabb.size.y - otherIsland.aabb.size.y) > distanceThreshold)
+                {
+                    continue;
+                }
+                if (island.triangles.Count != otherIsland.triangles.Count || island.uv.Count != otherIsland.uv.Count)
+                {
+                    continue;
+                }
+                bool foundMatch = true;
+                var offset = new Vector2(island.aabb.center.x, island.aabb.center.y);
+                var otherOffset = new Vector2(otherIsland.aabb.center.x, otherIsland.aabb.center.y);
+                for (int k = 0; k < island.uv.Count; k++)
+                {
+                    if (!otherIsland.uv.Any(v => Vector2.Distance((island.uv[k] - offset) * new Vector2(-1, 1), v - otherOffset) < distanceThreshold))
+                    {
+                        foundMatch = false;
+                        break;
+                    }
+                }
+                if (foundMatch)
+                {
+                    Vector3 offsetVector = new Vector3(otherIsland.aabb.center.x + island.aabb.center.x, otherIsland.aabb.center.y - island.aabb.center.y, 1);
+                    uv2List.AddRange(Enumerable.Repeat(offsetVector, island.uv.Count));
+                    break;
+                }
+                foundMatch = true;
+                for (int k = 0; k < island.uv.Count; k++)
+                {
+                    if (!otherIsland.uv.Any(v => Vector2.Distance(island.uv[k] - offset, v - otherOffset) < distanceThreshold))
+                    {
+                        foundMatch = false;
+                        break;
+                    }
+                }
+                if (foundMatch)
+                {
+                    Vector3 offsetVector = new Vector3(otherIsland.aabb.center.x - island.aabb.center.x, otherIsland.aabb.center.y - island.aabb.center.y, 0);
+                    uv2List.AddRange(Enumerable.Repeat(offsetVector, island.uv.Count));
+                    break;
+                }
+            }
+            if (uv2List.Count != uvList.Count)
+            {
+                uv2List.AddRange(Enumerable.Repeat(new Vector3(island.aabb.center.x * 2, 0, -1), island.uv.Count));
+            }
             currentIslandID++;
         }
         islandMesh.vertices = uvList.ToArray();
         islandMesh.triangles = triList.ToArray();
         islandMesh.SetUVs(0, uvList.ToArray());
+        islandMesh.SetUVs(1, uv2List.ToArray());
         AssetDatabase.CreateAsset(islandMesh, $"{TextureAtlasPath}/{tex.name}_IslandMesh.asset");
         cache_islandMeshes[tex] = islandMesh;
         return islandMesh;

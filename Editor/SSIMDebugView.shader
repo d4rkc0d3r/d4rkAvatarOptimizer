@@ -104,7 +104,7 @@
                     return 1 - float4(ssim1.xxx, ssim2);
                 }
                 float ssimFlip = _FlipSSIM.Sample(sampler_Mip1SSIM, i.uv).r;
-                if (ssimFlip >= _QualityThreshold && i.uv.x > 0.5) {
+                if (ssimFlip >= _QualityThreshold) {
                     return float4(0, 0, 1, 1);
                 }
                 if (ssim2 >= _QualityThreshold)

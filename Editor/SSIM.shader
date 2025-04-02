@@ -31,12 +31,14 @@
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                float3 uv2 : TEXCOORD1;
             };
 
             struct v2f
             {
                 float4 vertex : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                nointerpolation float3 uv2 : TEXCOORD1;
             };
 
             Texture2D _Reference;
@@ -59,6 +61,9 @@
                     o.vertex.y *= -1;
                 #endif
                 o.uv = v.uv;
+                o.uv2 = v.uv2;
+                if (_FlipTarget && v.uv2.z == -1)
+                    return (v2f)0;
                 return o;
             }
 
@@ -89,7 +94,7 @@
                 float2 dy = ddy(uv);
                 float2 dx_target = dx * exp2(_TargetMipBias);
                 float2 dy_target = dy * exp2(_TargetMipBias);
-                if (_FlipTarget)
+                if (_FlipTarget && i.uv2.z == 1)
                 {
                     dx_target.x = -dx_target.x;
                 }
@@ -104,7 +109,8 @@
                     meanA += SampleGrad(_Reference, sampleUV, dx, dy);
                     if (_FlipTarget)
                     {
-                        sampleUV.x = 1 - sampleUV.x;
+                        sampleUV.x = i.uv2.z == 1 ? -sampleUV.x : sampleUV.x;
+                        sampleUV += i.uv2.xy;
                     }
                     meanB += SampleGrad(_Target, sampleUV, dx_target, dy_target);
                 }
@@ -120,7 +126,8 @@
                     float4 a = SampleGrad(_Reference, sampleUV, dx, dy);
                     if (_FlipTarget)
                     {
-                        sampleUV.x = 1 - sampleUV.x;
+                        sampleUV.x = i.uv2.z == 1 ? -sampleUV.x : sampleUV.x;
+                        sampleUV += i.uv2.xy;
                     }
                     float4 b = SampleGrad(_Target, sampleUV, dx_target, dy_target);
                     varA += (a - meanA) * (a - meanA);
