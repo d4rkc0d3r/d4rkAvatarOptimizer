@@ -15,6 +15,9 @@
     {
         Tags { "RenderType"="Opaque" }
         Cull Off
+        ZTest Always
+        ZWrite Off
+        Conservative True
 
         Pass
         {
@@ -53,7 +56,7 @@
                 v2f o;
                 o.vertex = float4(v.uv * 2 - 1, 1, 1);
                 #if UNITY_UV_STARTS_AT_TOP
-                o.vertex.y *= -1;
+                    o.vertex.y *= -1;
                 #endif
                 o.uv = v.uv;
                 return o;

@@ -271,48 +271,44 @@ public class d4rkTextureAtlasEditor : Editor
         return null;
     }
 
-    private Dictionary<string, Texture2D> cache_uncompressedTextures = new ();
-    private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel, bool flip)
+    private Dictionary<(string, int), Texture2D> cache_uncompressedTextures = new ();
+    private Texture2D GetUncompressedTexture(Texture2D tex, int mipLevel)
     {
         var path = AssetDatabase.GetAssetPath(tex);
-        if (cache_uncompressedTextures.TryGetValue(path, out var updatedTex))
+        if (cache_uncompressedTextures.TryGetValue((path, mipLevel), out var updatedTex))
         {
-            tex = updatedTex;
+            return updatedTex;
         }
-        else
+        if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg"))
         {
-            if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg"))
+            byte[] rawData = System.IO.File.ReadAllBytes(path);
+            var uncompressedTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
+            if (ImageConversion.LoadImage(uncompressedTex, rawData, false))
             {
-                byte[] rawData = System.IO.File.ReadAllBytes(path);
-                var uncompressedTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
-                if (ImageConversion.LoadImage(uncompressedTex, rawData, false))
-                {
-                    int mipLevelToCopy = Mathf.RoundToInt(MathF.Log10(uncompressedTex.width / tex.width) / MathF.Log10(2));
-                    Debug.Log($"Loaded {path} as raw texture from mip level {mipLevelToCopy}.");
-                    var texWithMips = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
-                    texWithMips.SetPixels32(uncompressedTex.GetPixels32(mipLevelToCopy));
-                    texWithMips.Apply(true);
-                    texWithMips.name = $"{tex.name}_raw";
-                    tex = texWithMips;
-                    cache_uncompressedTextures[path] = texWithMips;
-                }
-                else
-                {
-                    cache_uncompressedTextures[path] = tex;
-                }
-            }
-            else
-            {
-                cache_uncompressedTextures[path] = tex;
+                int mipLevelToCopy = Mathf.RoundToInt(MathF.Log10(uncompressedTex.width / tex.width) / MathF.Log10(2));
+                Debug.Log($"Loaded {path} as raw texture from mip level {mipLevelToCopy}.");
+                var texWithMips = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, true);
+                texWithMips.SetPixels32(uncompressedTex.GetPixels32(mipLevelToCopy));
+                texWithMips.Apply(true);
+                texWithMips.name = $"{tex.name}_raw";
+                cache_uncompressedTextures[(path, mipLevel)] = texWithMips;
+                return texWithMips;
             }
         }
-        var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
+        return cache_uncompressedTextures[(path, mipLevel)] = tex;
+    }
+    private Texture2D CreateSSIMTexture(Texture2D tex, int mipLevel, bool flip)
+    {
+        var uncompressedTex = GetUncompressedTexture(tex, mipLevel);
+        var descriptor = new RenderTextureDescriptor(uncompressedTex.width, uncompressedTex.height, RenderTextureFormat.RFloat, 0);
         descriptor.useMipMap = false;
         descriptor.autoGenerateMips = false;
         var ssimRenderTexture = RenderTexture.GetTemporary(descriptor);
+        Graphics.SetRenderTarget(ssimRenderTexture);
+        GL.Clear(true, true, Color.clear);
         var ssimMaterial = new Material(Shader.Find("d4rkpl4y3r/TextureAnalyzer/SSIM"));
-        ssimMaterial.SetTexture("_Reference", tex);
-        ssimMaterial.SetTexture("_Target", tex);
+        ssimMaterial.SetTexture("_Reference", uncompressedTex);
+        ssimMaterial.SetTexture("_Target", uncompressedTex);
         ssimMaterial.SetFloat("_sRGB", 1);
         ssimMaterial.SetFloat("_Derivative", 0);
         ssimMaterial.SetFloat("_NormalMap", 0);
@@ -320,9 +316,11 @@ public class d4rkTextureAtlasEditor : Editor
         ssimMaterial.SetFloat("_TargetMipBias", mipLevel);
         ssimMaterial.SetFloat("_IgnoreAlpha", 1);
         ssimMaterial.SetFloat("_FlipTarget", flip ? 1 : 0);
-        Graphics.Blit(tex, ssimRenderTexture, ssimMaterial);
+        ssimMaterial.SetPass(0);
+        var mesh = GetIslandMesh(tex);
+        Graphics.DrawMeshNow(mesh, Matrix4x4.identity, 0);
 
-        var ssimTexture = new Texture2D(tex.width, tex.height, TextureFormat.RHalf, false);
+        var ssimTexture = new Texture2D(uncompressedTex.width, uncompressedTex.height, TextureFormat.RFloat, false);
         RenderTexture.active = ssimRenderTexture;
         ssimTexture.ReadPixels(new Rect(0, 0, ssimRenderTexture.width, ssimRenderTexture.height), 0, 0);
         ssimTexture.Apply();
@@ -331,8 +329,8 @@ public class d4rkTextureAtlasEditor : Editor
         ssimTexture.filterMode = FilterMode.Point;
         ssimTexture.wrapMode = TextureWrapMode.Repeat;
         
-        AssetDatabase.CreateAsset(ssimTexture, $"{TextureAtlasPath}/{tex.name}_SSIM_mip{mipLevel}.asset");
-        ssimTexture.name = $"{tex.name}_SSIM_mip{mipLevel}";
+        AssetDatabase.CreateAsset(ssimTexture, $"{TextureAtlasPath}/{uncompressedTex.name}_SSIM_mip{mipLevel}.asset");
+        ssimTexture.name = $"{uncompressedTex.name}_SSIM_mip{mipLevel}";
         return ssimTexture;
     }
 
@@ -442,10 +440,18 @@ public class d4rkTextureAtlasEditor : Editor
         }
     }
 
-    private Texture2D CreateIslandIDMap(Texture2D tex)
+    private Dictionary<Texture2D, Mesh> cache_islandMeshes = new ();
+    private Mesh GetIslandMesh(Texture2D tex)
     {
+        if (cache_islandMeshes.TryGetValue(tex, out var islandMesh))
+        {
+            if (islandMesh != null)
+            {
+                return islandMesh;
+            }
+        }
+
         List<UVIsland> islands = new ();
-        
         var referencedMaterials = GetReferencedMaterials(tex);
         foreach (var renderer in GetReferencedRenderers(tex))
         {
@@ -532,7 +538,7 @@ public class d4rkTextureAtlasEditor : Editor
             }
         }
 
-        Mesh islandMesh = new ();
+        islandMesh = new ();
         islandMesh.name = $"{tex.name}_IslandMesh";
         List<Vector3> uvList = new ();
         List<int> triList = new ();
@@ -551,6 +557,14 @@ public class d4rkTextureAtlasEditor : Editor
         islandMesh.vertices = uvList.ToArray();
         islandMesh.triangles = triList.ToArray();
         islandMesh.SetUVs(0, uvList.ToArray());
+        AssetDatabase.CreateAsset(islandMesh, $"{TextureAtlasPath}/{tex.name}_IslandMesh.asset");
+        cache_islandMeshes[tex] = islandMesh;
+        return islandMesh;
+    }
+
+    private Texture2D CreateIslandIDMap(Texture2D tex)
+    {
+        var islandMesh = GetIslandMesh(tex);
 
         var descriptor = new RenderTextureDescriptor(tex.width, tex.height, RenderTextureFormat.RFloat, 0);
         descriptor.useMipMap = false;
@@ -594,7 +608,7 @@ public class d4rkTextureAtlasEditor : Editor
             ssimDisplayMaterial.SetTexture("_Mip1SSIM", mip1);
             ssimDisplayMaterial.SetTexture("_Mip2SSIM", mip2);
             ssimDisplayMaterial.SetTexture("_FlipSSIM", flip);
-            ssimDisplayMaterial.SetTexture("_CoverageMask", coverage);
+            //ssimDisplayMaterial.SetTexture("_CoverageMask", coverage);
             ssimDisplayMaterialMap[tex] = ssimDisplayMaterial;
             AssetDatabase.CreateAsset(ssimDisplayMaterial, $"{TextureAtlasPath}/{tex.name}_SSIM.mat");
             

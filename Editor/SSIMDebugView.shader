@@ -5,7 +5,7 @@
         _Mip1SSIM("Mip 1 SSIM", 2D) = "black" {}
         _Mip2SSIM("Mip 2 SSIM", 2D) = "black" {}
         _FlipSSIM("Flip SSIM", 2D) = "black" {}
-        _CoverageMask("Coverage Mask", 2D) = "black" {}
+        _CoverageMask("Coverage Mask", 2D) = "white" {}
         _QualityThreshold("Quality Threshold", Range(0, 1)) = 0.9
         [ToggleUI] _ShowCoverageMaskAsColors("Show Coverage Mask As Colors", Float) = 0
     }
@@ -111,8 +111,10 @@
                     return float4(1, 0, 0, 1);
                 else if (ssim1 >= _QualityThreshold)
                     return float4(1, 1, 0, 1);
-                else
+                else if (ssim1 > 0 && ssim2 > 0)
                     return float4(0, 1, 0, 1);
+                else
+                    return float4(0, 0, 0, 1);
             }
             ENDCG
         }
