@@ -1,3 +1,8 @@
+## v3.9.10
+### Bug Fixes
+* Fix issue when using empty vertex shader to eat some pass.
+  * This specifically was causing issues with Zekk's Hologram shader which should work properly now.
+
 ## v3.9.9
 ### Changes
 * Remove `#pragma enable_d3d11_debug_symbols` from the generated shaders.

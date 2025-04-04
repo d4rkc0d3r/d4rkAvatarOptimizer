@@ -1830,12 +1830,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var returnParam = func.parameters[0];
             var isVoidReturn = returnParam.type == "void";
             string nullReturn = isVoidReturn ? "return;" : "return (" + outParam.type + ")0;";
+            bool isEmptyPass = isVoidReturn && func.parameters.Count == 1;
             List<string> funcParams = null;
             List<string> originalVertexShader = null;
             bool needToPassOnMeshOrMaterialID =
                 arrayPropertyValues.Count > 0
                 || (currentPass.geometry != null && mergedMeshCount > 1)
                 || animatedPropertyValues.Count > 0;
+            needToPassOnMeshOrMaterialID = needToPassOnMeshOrMaterialID && !isEmptyPass;
             if (needToPassOnMeshOrMaterialID)
             {
                 int startLineIndex = sourceLineIndex;
@@ -1866,16 +1868,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     line = source[++sourceLineIndex];
                     output.Add(line);
                 }
-                if (mergedMeshCount > 1)
+                if (mergedMeshCount > 1 && !isEmptyPass)
                     output.Add($"d4rkAvatarOptimizer_MeshID = ((uint){inParam.name}.{vertexInUv0Member}.z >> 12) - {mergedMeshIndices.First()};");
-                if (arrayPropertyValues.Count > 0)
+                if (arrayPropertyValues.Count > 0 && !isEmptyPass)
                     output.Add($"d4rkAvatarOptimizer_MaterialID = 0xFFF & (uint){inParam.name}.{vertexInUv0Member}.z;");
             }
-            InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
-            InjectDummyCBufferUsage(nullReturn);
-            InjectIsActiveMeshCheck(nullReturn);
-            InjectArrayPropertyInitialization();
-            InjectAnimatedPropertyInitialization();
+            if (!isEmptyPass)
+            {
+                InitializeOutputParameter(funcParams, output, !needToPassOnMeshOrMaterialID);
+                InjectDummyCBufferUsage(nullReturn);
+                InjectIsActiveMeshCheck(nullReturn);
+                InjectArrayPropertyInitialization();
+                InjectAnimatedPropertyInitialization();
+            }
             curlyBraceDepth++;
             while (++sourceLineIndex < source.Count)
             {
