@@ -19,6 +19,12 @@ public class AvatarOptimizerSettings : EditorWindow
         private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", value);
     }
 
+    public static bool DoOptimizeInPlayMode
+    {
+        get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeInPlayMode", false);
+        private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeInPlayMode", value);
+    }
+
     public static int AutoRefreshPreviewTimeout
     {
         get => EditorPrefs.GetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", 500);
@@ -69,6 +75,9 @@ public class AvatarOptimizerSettings : EditorWindow
                 DoOptimizeWithDefaultSettingsWhenNoComponent = BoolFieldLeft(
                     new GUIContent("Always Optimize on Upload", "If an Avatar does not have a d4rkAvatarOptimizer component attached, it will be optimized with the default settings below when uploading it to VRChat."),
                     DoOptimizeWithDefaultSettingsWhenNoComponent);
+                DoOptimizeInPlayMode = BoolFieldLeft(
+                    new GUIContent("Optimize in Play Mode", "Allows optimizing to run in play mode. (Only relevant with tools that call build in play mode)"),
+                    DoOptimizeInPlayMode);
                 AutoRefreshPreviewTimeout = IntFieldLeft(
                     new GUIContent("Auto Refresh Preview Timeout", "In milliseconds. If the preview takes longer than this to refresh, the auto refresh will be disabled."),
                     AutoRefreshPreviewTimeout);
