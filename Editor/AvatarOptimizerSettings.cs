@@ -21,7 +21,7 @@ public class AvatarOptimizerSettings : EditorWindow
 
     public static bool DoOptimizeInPlayMode
     {
-        get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeInPlayMode", false);
+        get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeInPlayMode", true);
         private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeInPlayMode", value);
     }
 
