@@ -41,16 +41,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             try
             {
-                if (Application.isPlaying && AvatarOptimizerSettings.DoOptimizeInPlayMode)
+                if (Application.isPlaying)
                 {
-                    if (didRunInPlayMode)
+                    if (!AvatarOptimizerSettings.DoOptimizeInPlayMode)
+                    {
+                        return true;
+                    }
+                    else if (didRunInPlayMode)
                     {
                         Debug.LogWarning($"Only one avatar can be optimized per play mode session. Skipping optimization of {avatarGameObject.name}");
                         return true;
                     }
-                    didRunInPlayMode = Application.isPlaying;
-                    optimizer.Optimize();
                 }
+                didRunInPlayMode = Application.isPlaying;
+                optimizer.Optimize();
                 return true;
             }
             catch (Exception e)
