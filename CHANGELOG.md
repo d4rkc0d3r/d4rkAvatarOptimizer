@@ -1,4 +1,7 @@
-## v3.9.11
+## v3.10.0
+### Features
+* Add option to disable optimizer from running in play mode. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/149)
+
 ### Bug Fixes
 * Fix optimizer not copying over the disabled passes list from the source material to the generated material.
 * Fix optimizer not taking into account disabled passes when merging materials.
