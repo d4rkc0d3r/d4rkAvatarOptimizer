@@ -1,6 +1,7 @@
 ## v3.9.11
 ### Bug Fixes
 * Fix optimizer not copying over the disabled passes list from the source material to the generated material.
+* Fix optimizer not taking into account disabled passes when merging materials.
 
 ## v3.9.10
 ### Bug Fixes

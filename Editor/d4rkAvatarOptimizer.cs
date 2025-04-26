@@ -3893,6 +3893,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return allTheSameAsCandidate;
         if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
             return true;
+        for (int j = 0; j < firstMat.shader.passCount; j++)
+        {
+            var lightModeValue = firstMat.shader.FindPassTagValue(j, new ShaderTagId("LightMode"));
+            if (!string.IsNullOrEmpty(lightModeValue.name))
+            {
+                if (firstMat.GetShaderPassEnabled(lightModeValue.name) != candidateMat.GetShaderPassEnabled(lightModeValue.name))
+                {
+                    return false;
+                }
+            }
+        }
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
             return false;
