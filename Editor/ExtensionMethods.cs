@@ -220,6 +220,39 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
                 }
             }
         }
+
+        public static IEnumerable<(AnimatorState state, Motion motion)> EnumerateAllMotionOverrides(this AnimatorControllerLayer layer)
+        {
+            if (layer.syncedLayerIndex < 0)
+            {
+                yield break;
+            }
+            // use reflection to get the private StateMotionPair[] m_Motions; field from the layer
+            var field = typeof(AnimatorControllerLayer).GetField("m_Motions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var value = field.GetValue(layer);
+            if (value == null)
+            {
+                yield break;
+            }
+            var stateMotionPairs = value as System.Array;
+            if (stateMotionPairs == null)
+            {
+                yield break;
+            }
+            // StateMotionPair is an internal struct with 2 fields: public AnimatorState m_State; public Motion m_Motion;
+            // use reflection again to iterate over the motions and state pairs
+            foreach (var stateMotionPair in stateMotionPairs)
+            {
+                var stateField = stateMotionPair.GetType().GetField("m_State", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var state = stateField.GetValue(stateMotionPair) as AnimatorState;
+                var motionField = stateMotionPair.GetType().GetField("m_Motion", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var motionValue = motionField.GetValue(stateMotionPair) as Motion;
+                if (state != null)
+                {
+                    yield return (state, motionValue);
+                }
+            }
+        }
     }
 
     public static class Vector3Extensions

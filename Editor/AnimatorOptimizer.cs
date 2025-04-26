@@ -110,6 +110,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 target.AddParameter(blendTreeDummyWeight);
             }
 
+            var syncedLayers = new List<(int layerIndex, AnimatorControllerLayer old)>();
+            int layerIndex = 0;
             for (int i = 0; i < sourceLayers.Length; i++) {
                 if (layersToMerge.Contains(i) || layersToDestroy.Contains(i)) {
                     continue;
@@ -118,6 +120,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 newL.name = target.MakeUniqueLayerName(newL.name);
                 newL.stateMachine.name = newL.name;
                 target.AddLayer(newL);
+                if (newL.syncedLayerIndex >= 0)
+                    syncedLayers.Add((layerIndex, sourceLayers[i]));
+                layerIndex++;
+            }
+
+            if (syncedLayers.Count > 0)
+            {
+                var layers = target.layers;
+                for (int i = 0; i < syncedLayers.Count; i++)
+                {
+                    var layer = layers[syncedLayers[i].layerIndex];
+                    CloneOverrideMotions(layer, syncedLayers[i].old);
+                }
+                target.layers = layers;
             }
 
             MergeLayers();
@@ -399,6 +415,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
             };
             CloneTransitions(old.stateMachine, n.stateMachine);
             return n;
+        }
+
+        private void CloneOverrideMotions(AnimatorControllerLayer layer, AnimatorControllerLayer old)
+        {
+            foreach (var stateMotionPair in old.EnumerateAllMotionOverrides())
+            {
+                var state = stateMotionPair.state;
+                var motion = stateMotionPair.motion;
+                if (motion != null && stateMap.TryGetValue(state, out AnimatorState newState))
+                {
+                    layer.SetOverrideMotion(newState, motion);
+                }
+            }
         }
 
         private AnimatorStateMachine CloneStateMachine(AnimatorStateMachine old)

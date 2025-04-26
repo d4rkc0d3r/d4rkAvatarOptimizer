@@ -1642,20 +1642,35 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         
         for (int i = 0; i < optimizedControllers.Length; i++)
         {
-            var newLayer = optimizedControllers[i];
-            if (newLayer == null)
+            var newController = optimizedControllers[i];
+            if (newController == null)
                 continue;
 
-            foreach (var state in newLayer.EnumerateAllStates())
+            foreach (var state in newController.EnumerateAllStates())
             {
                 state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i]);
+            }
+
+            var layers = newController.layers;
+            var syncedLayerIndices = layers.Select((layer, index) => (layer, index)).Where(p => p.layer != null && p.layer.syncedLayerIndex >= 0).Select(p => p.index).ToArray();
+            foreach (var syncedLayerIndex in syncedLayerIndices)
+            {
+                var syncedLayer = layers[syncedLayerIndex];
+                foreach (var stateMotionPair in syncedLayer.EnumerateAllMotionOverrides())
+                {
+                    syncedLayer.SetOverrideMotion(stateMotionPair.state, FixMotion(stateMotionPair.motion, fixedMotions, layerCopyPaths[i]));
+                }
+            }
+            if (syncedLayerIndices.Length > 0)
+            {
+                newController.layers = layers;
             }
 
             if (DeleteUnusedGameObjects) {
                 var playAudioType = Type.GetType("VRC.SDKBase.VRC_AnimatorPlayAudio, VRCSDKBase");
                 if (playAudioType != null) {
                     var pathField = playAudioType.GetField("SourcePath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-                    foreach (var behaviour in newLayer.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours())) {
+                    foreach (var behaviour in newController.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours())) {
                         if (playAudioType.IsAssignableFrom(behaviour.GetType())) {
                             var path = (string)pathField.GetValue(behaviour) ?? "";
                             if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null) {
@@ -2182,6 +2197,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         var fxLayerLayers = GetFXLayerLayers();
         for (int i = 0; i < fxLayerLayers.Length; i++)
         {
+            usedClips.UnionWith(fxLayerLayers[i].EnumerateAllMotionOverrides().Select(p => p.motion as AnimationClip).Where(c => c != null));
             var stateMachine = fxLayerLayers[i].stateMachine;
             if (stateMachine == null || unusedLayers.Contains(i))
                 continue;
