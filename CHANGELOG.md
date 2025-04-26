@@ -1,3 +1,7 @@
+## v3.9.11
+### Bug Fixes
+* Fix optimizer not copying over the disabled passes list from the source material to the generated material.
+
 ## v3.9.10
 ### Bug Fixes
 * Fix issue when using empty vertex shader to eat some pass.

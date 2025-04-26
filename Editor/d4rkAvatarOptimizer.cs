@@ -3682,6 +3682,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             mat.shader = shader;
             mat.renderQueue = source.renderQueue;
             Profiler.StartNextSection("CopyMaterialProperties");
+            for (int j = 0; j < source.shader.passCount; j++)
+            {
+                var lightModeValue = source.shader.FindPassTagValue(j, new ShaderTagId("LightMode"));
+                if (!string.IsNullOrEmpty(lightModeValue.name))
+                {
+                    if (!source.GetShaderPassEnabled(lightModeValue.name))
+                    {
+                        mat.SetShaderPassEnabled(lightModeValue.name, false);
+                    }
+                }
+            }
             var texArrayProperties = new HashSet<string>();
             if (texArrayPropertiesToSet.TryGetValue(mat, out var texArrays))
             {
