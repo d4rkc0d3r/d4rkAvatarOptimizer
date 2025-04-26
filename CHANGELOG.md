@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Fix optimizer not copying over the disabled passes list from the source material to the generated material.
 * Fix optimizer not taking into account disabled passes when merging materials.
+* Fix only checking for same material object instead of if its a duplicate material when merging materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/136)
 
 ## v3.9.10
 ### Bug Fixes
