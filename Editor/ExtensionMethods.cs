@@ -84,6 +84,24 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             }
         }
 
+        public static bool IsDescendantOf(this Transform transform, Transform ancestor)
+        {
+            if (transform == null || ancestor == null)
+            {
+                return false;
+            }
+            var current = transform;
+            while (current != null)
+            {
+                if (current == ancestor)
+                {
+                    return true;
+                }
+                current = current.parent;
+            }
+            return false;
+        }
+
         public static Component[] GetNonNullComponents(this Transform transform)
         {
             var components = transform.GetComponents<Component>();

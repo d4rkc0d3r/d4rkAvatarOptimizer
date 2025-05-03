@@ -603,11 +603,13 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (optimizer.UseRingFingerAsFootCollider)
         {
-            if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null)
+            if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null
+                || !avDescriptor.collider_footL.transform.IsDescendantOf(avDescriptor.transform)
+                || !avDescriptor.collider_footR.transform.IsDescendantOf(avDescriptor.transform))
             {
                 EditorGUILayout.HelpBox(
-                    "Foot collider transform not set.\n" +
-                    "Open the collider foldout in the avatar descriptor.", MessageType.Error);
+                    "Foot collider transform not set to this avatar.\n" +
+                    "Open the collider foldout in the VRC Avatar Descriptor.", MessageType.Error);
             }
         }
 

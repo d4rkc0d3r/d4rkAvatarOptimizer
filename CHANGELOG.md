@@ -1,3 +1,7 @@
+## v3.10.1
+### Bug Fixes
+* Foot collider transform check now checks if the transform is a child of the avatar as well.
+
 ## v3.10.0
 ### Features
 * Add option to disable optimizer from running in play mode. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/149)
