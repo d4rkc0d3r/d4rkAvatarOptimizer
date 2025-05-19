@@ -3168,6 +3168,45 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             debugOutput?.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
         }
+        
+        static readonly HashSet<string> shaderPropertiesToKeep = new HashSet<string>()
+        {
+            // copied by vrchat shader fallback system
+            "_MainTex",
+            "_MetallicGlossMap",
+            "_SpecGlossMap",
+            "_BumpMap",
+            "_ParallaxMap",
+            "_OcclusionMap",
+            "_EmissionMap",
+            "_DetailMask",
+            "_DetailAlbedoMap",
+            "_DetailNormalMap",
+            "_Color",
+            "_EmissionColor",
+            "_SpecColor",
+            "_Cutoff",
+            "_Glossiness",
+            "_GlossMapScale",
+            "_SpecularHighlights",
+            "_GlossyReflections",
+            "_SmoothnessTextureChannel",
+            "_Metallic",
+            "_SpecularHighlights",
+            "_GlossyReflections",
+            "_BumpScale",
+            "_Parallax",
+            "_OcclusionStrength",
+            "_DetailNormalMapScale",
+            "_UVSec",
+            "_Mode",
+            "_SrcBlend",
+            "_DstBlend",
+            "_ZWrite",
+
+            // particle systems with skinned mesh renderer as source might inherit these
+            "_TintColor",
+        };
 
         private void Run()
         {
@@ -3179,7 +3218,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var lines = parsedShader.text[".shader"];
             var propertyBlock = new List<string>();
             int propertyBlockInsertionIndex = 0;
-            int propertyBlockStartParseIndex = 0; 
+            int propertyBlockStartParseIndex = 0;
             int lineIndex = 0;
             while (lineIndex < lines.Count)
             {
@@ -3207,30 +3246,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     propertyBlockInsertionIndex = output.Count;
                     var alreadyAdded = new HashSet<string>();
                     if (mergedMeshCount > 1)
-                    foreach (int i in mergedMeshIndices)
-                    {
-                        var name = $"_IsActiveMesh{i}";
-                        propertyBlock.Add($"{name}(\"{name} {mergedMeshNames[i]}\", Float) = 1");
-                        optimizedShader.AddProperty(name, "Float");
-                        alreadyAdded.Add(name);
-                    }
+                        foreach (int i in mergedMeshIndices)
+                        {
+                            var name = $"_IsActiveMesh{i}";
+                            propertyBlock.Add($"{name}(\"{name} {mergedMeshNames[i]}\", Float) = 1");
+                            optimizedShader.AddProperty(name, "Float");
+                            alreadyAdded.Add(name);
+                        }
                     foreach (var animatedProperty in animatedPropertyValues)
                     {
                         var prop = parsedShader.propertyTable[animatedProperty.Key];
                         string defaultValue = "0";
                         string type = "Float";
                         string tagString = tagString = prop.hasGammaTag ? "[gamma] " : "";
-                        if (prop.type == ParsedShader.Property.Type.Vector) {
+                        if (prop.type == ParsedShader.Property.Type.Vector)
+                        {
                             defaultValue = "(0,0,0,0)";
                             type = "Vector";
-                        } else if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.ColorHDR) {
+                        }
+                        else if (prop.type == ParsedShader.Property.Type.Color || prop.type == ParsedShader.Property.Type.ColorHDR)
+                        {
                             defaultValue = "(0,0,0,0)";
                             type = "Color";
-                        } 
-                        if (prop.type == ParsedShader.Property.Type.ColorHDR) {
+                        }
+                        if (prop.type == ParsedShader.Property.Type.ColorHDR)
+                        {
                             tagString += "[hdr] ";
                         }
-                        foreach (int i in mergedMeshIndices) {
+                        foreach (int i in mergedMeshIndices)
+                        {
                             var fullPropertyName = $"d4rkAvatarOptimizer{prop.name}_ArrayIndex{i}";
                             propertyBlock.Add($"{tagString}{fullPropertyName}(\"{prop.name} {i}\", {type}) = {defaultValue}");
                             optimizedShader.AddProperty(fullPropertyName, type);
@@ -3245,23 +3289,29 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         string type = defaultAnimatedProperty.isVector ? "Vector" : "Float";
                         string displayName = defaultAnimatedProperty.name;
                         string tagString = "";
-                        if (displayName.StartsWithSimple("_IsActiveMesh")) {
+                        if (displayName.StartsWithSimple("_IsActiveMesh"))
+                        {
                             int meshIndex = int.Parse(displayName.Substring("_IsActiveMesh".Length));
                             displayName = $"_IsActiveMesh{meshIndex} {mergedMeshNames[meshIndex]}";
                         }
-                        if (!parsedShader.propertyTable.TryGetValue(defaultAnimatedProperty.name, out var nativeProperty)) {
-                            var match = Regex.Match(defaultAnimatedProperty.name,  @"d4rkAvatarOptimizer(\w+)_ArrayIndex(\d+)");
-                            if (match.Success) {
+                        if (!parsedShader.propertyTable.TryGetValue(defaultAnimatedProperty.name, out var nativeProperty))
+                        {
+                            var match = Regex.Match(defaultAnimatedProperty.name, @"d4rkAvatarOptimizer(\w+)_ArrayIndex(\d+)");
+                            if (match.Success)
+                            {
                                 parsedShader.propertyTable.TryGetValue(match.Groups[1].Value, out nativeProperty);
                                 displayName = $"{match.Groups[1].Value} {match.Groups[2].Value}";
                             }
                         }
-                        if (nativeProperty != null) {
+                        if (nativeProperty != null)
+                        {
                             tagString = nativeProperty.hasGammaTag ? "[gamma] " : "";
-                            if (nativeProperty.type == ParsedShader.Property.Type.Color || nativeProperty.type == ParsedShader.Property.Type.ColorHDR) {
+                            if (nativeProperty.type == ParsedShader.Property.Type.Color || nativeProperty.type == ParsedShader.Property.Type.ColorHDR)
+                            {
                                 type = "Color";
                             }
-                            if (nativeProperty.type == ParsedShader.Property.Type.ColorHDR) {
+                            if (nativeProperty.type == ParsedShader.Property.Type.ColorHDR)
+                            {
                                 tagString += "[hdr] ";
                             }
                         }
@@ -3271,7 +3321,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             int passID = -1;
-            var lightModeToDefine = new  Dictionary<string, string>()
+            var lightModeToDefine = new Dictionary<string, string>()
             {
                 {"ForwardBase", "UNITY_PASS_FORWARDBASE"},
                 {"ForwardAdd", "UNITY_PASS_FORWARDADD"},
@@ -3363,10 +3413,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (defaultAnimatedProperties.Contains((prop.name, false)) || defaultAnimatedProperties.Contains((prop.name, true)))
                     continue;
-                if ((staticPropertyValues.ContainsKey(prop.name) || arrayPropertyValues.ContainsKey(prop.name)) 
+                if ((staticPropertyValues.ContainsKey(prop.name) || arrayPropertyValues.ContainsKey(prop.name))
                     && !animatedPropertyValues.ContainsKey(prop.name)
                     && parsedShader.propertyTable[prop.name].shaderLabParams.Count == 0
-                    && !(prop.name == "_Color" || prop.name == "_TintColor")) // particle systems with skinned mesh renderer as source might inherit these
+                    && !shaderPropertiesToKeep.Contains(prop.name))
                     continue;
                 if (texturesToMerge.Contains(prop.name))
                 {

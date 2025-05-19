@@ -1,3 +1,7 @@
+## v3.10.2
+### Bug Fixes
+* Fix shader optimizer throwing away properties that VRChat uses for the shader fallback system.
+
 ## v3.10.1
 ### Bug Fixes
 * Foot collider transform check now checks if the transform is a child of the avatar as well.
