@@ -920,6 +920,42 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
             return result;
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
+            if(typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.")) {
+                // ignore bindings for material properties that do not exist for any materials or material swaps on this renderer
+
+                Renderer renderer = GetTransformFromPath(binding.path)?.GetComponent<Renderer>();
+                if(renderer) {
+                    int materialSlotCount = renderer.sharedMaterials.Length;
+
+                    var swaps = FindAllMaterialSwapMaterials();
+                    string materialProperty = binding.propertyName.Substring("material.".Length);
+
+                    bool propertyExists = false;
+
+                    for(int i = 0; i < materialSlotCount && !propertyExists; ++i) {
+                        // check the default materials
+                        if(renderer.sharedMaterials[i].HasProperty(materialProperty)) {
+                            propertyExists = true;
+                            break;
+                        }
+
+                        // check the material swaps
+                        if(swaps.TryGetValue((binding.path, i), out var mats)) {
+                            foreach(Material mat in mats) {
+                                if(mat.HasProperty(materialProperty)) {
+                                    propertyExists = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // if the property does not exist, this binding is not relevent
+                    if(!propertyExists)
+                        return false;
+                }
+            }
+            
             if (withNaNimation && CanUseNaNimationOnMesh(binding.path)) {
                 if (typeof(Renderer).IsAssignableFrom(binding.type))
                     return !binding.propertyName.StartsWithSimple("blendShape.") && binding.propertyName != "m_Enabled";
