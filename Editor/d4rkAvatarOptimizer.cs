@@ -928,7 +928,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     int materialSlotCount = renderer.sharedMaterials.Length;
 
                     var swaps = FindAllMaterialSwapMaterials();
-                    string materialProperty = binding.propertyName.Substring("material.".Length);
+                    string materialProperty = binding.propertyName.Substring("material.".Length).Split('.', 2)[0];
 
                     bool propertyExists = false;
 
