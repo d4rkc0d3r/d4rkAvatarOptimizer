@@ -934,7 +934,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                     for(int i = 0; i < materialSlotCount && !propertyExists; ++i) {
                         // check the default materials
-                        if(renderer.sharedMaterials[i]?.HasProperty(materialProperty) ?? false) {
+                        if(renderer.sharedMaterials[i] != null && renderer.sharedMaterials[i].HasProperty(materialProperty)) {
                             propertyExists = true;
                             break;
                         }
@@ -942,7 +942,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         // check the material swaps
                         if(swaps.TryGetValue((binding.path, i), out var mats)) {
                             foreach(Material mat in mats) {
-                                if(mat?.HasProperty(materialProperty) ?? false) {
+                                if(mat != null && mat.HasProperty(materialProperty)) {
                                     propertyExists = true;
                                     break;
                                 }
