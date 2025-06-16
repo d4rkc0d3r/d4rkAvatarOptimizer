@@ -5254,6 +5254,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             used.UnionWith(FindReferencedTransforms(c));
         }
 
+        // the vrc finger colliders depend on their relative position to their parent, so we need to keep their parents around too
+        var avDescriptor = GetComponent<VRCAvatarDescriptor>();
+        var fingerColliders = new List<VRCAvatarDescriptor.ColliderConfig>() {
+            avDescriptor.collider_fingerIndexL,
+            avDescriptor.collider_fingerIndexR,
+            avDescriptor.collider_fingerMiddleL,
+            avDescriptor.collider_fingerMiddleR,
+            avDescriptor.collider_fingerRingL,
+            avDescriptor.collider_fingerRingR,
+            avDescriptor.collider_fingerLittleL,
+            avDescriptor.collider_fingerLittleR,
+        }.Select(c => c.transform).Where(t => t != null);
+        used.UnionWith(fingerColliders.Select(c => c.parent).Where(t => t != null));
+
         used.UnionWith(FindAllGameObjectTogglePaths().Select(p => GetTransformFromPath(p)).Where(t => t != null));
 
         foreach (var exclusion in GetAllExcludedTransforms())
