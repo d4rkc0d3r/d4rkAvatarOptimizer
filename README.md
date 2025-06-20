@@ -197,7 +197,7 @@ Here you can see an example of this which will be referenced in this section:
 
 ![Mesh & Material Merge Preview](Documentation~/img/exampleMeshMaterialMergePreview.png)
 
-In this detailed view the resulting meshes are separated by spaces. Materials that get merged together are indented. In the example you can see 3 resulting meshes. You can also see that `Body/FaceSkin` and `Body/Eyes` get merged into one material while `Body/FaceAlpha` is still its own material.
+In this detailed view the resulting meshes are separated by spaces. Materials that get merged together are indented. The button with the name "S" next to each group will select all the materials in that group. In the example you can see 3 resulting meshes. You can also see that `Body/FaceSkin` and `Body/Eyes` get merged into one material while `Body/FaceAlpha` is still its own material.
 ## Show FX Layer Merge Result
 In this section you can see which layers in the FXLayer could get merged or deleted. The VRChat performance rank icon is used to indicate if a layer could be optimized:
   * Excellent - Layer is useless and can be deleted.

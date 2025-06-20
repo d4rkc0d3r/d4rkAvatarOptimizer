@@ -249,10 +249,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 for (int i = 0; i < matched.Count; i++)
                 {
-                    for (int j = 0; j < matched[i].Count; j++)
+                    using var horizontalScope = new EditorGUILayout.HorizontalScope();
+                    using (new EditorGUILayout.VerticalScope())
                     {
-                        int indent = j == 0 ? 0 : 1;
-                        DrawMatchedMaterialSlot(matched[i][j], indent);
+                        for (int j = 0; j < matched[i].Count; j++)
+                        {
+                            int indent = j == 0 ? 0 : 1;
+                            DrawMatchedMaterialSlot(matched[i][j], indent);
+                        }
+                    }
+                    var materials = matched[i].Select(slot => slot.material).Distinct().ToArray();
+                    var buttonContent = new GUIContent("S", $"Selects this group of {materials.Length} materials");
+                    if (GUILayout.Button(buttonContent, GUILayout.Width(20)))
+                    {
+                        Selection.objects = materials;
                     }
                 }
                 EditorGUILayout.Space(8);
