@@ -2,6 +2,9 @@
 ### Features
 * Add button to select group of materials that will get merged from the merge preview.
 
+### Bug Fixes
+* Fix absolute Assets & Packages paths in shader include files not being able to be referenced from the other root folder.
+
 ## v3.10.2
 ### Bug Fixes
 * No longer prevent meshes from getting merged if none existing material properties are animated. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/151)

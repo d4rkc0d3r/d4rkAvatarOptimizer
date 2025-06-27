@@ -950,7 +950,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         }
                     }
 
-                    // if the property does not exist, this binding is not relevent
+                    // if the property does not exist, this binding is not relevant
                     if(!propertyExists)
                         return false;
                 }

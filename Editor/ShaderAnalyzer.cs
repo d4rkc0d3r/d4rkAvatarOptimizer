@@ -389,14 +389,30 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (currentFilePath.StartsWithSimple("/Assets/") || currentFilePath.StartsWithSimple("Assets/"))
                 {
                     var path = Path.GetDirectoryName(callerPath);
-                    var assetFolderPath = path.IndexOf("Assets") != -1 ? path.Substring(0, path.IndexOf("Assets") - 1) : path;
-                    currentFilePath = Path.Combine(assetFolderPath, currentFilePath.TrimStart('/'));
+                    var rootPath = path;
+                    if (path.IndexOf("Assets") != -1)
+                    {
+                        rootPath = path.Substring(0, path.IndexOf("Assets") - 1);
+                    }
+                    else if (path.IndexOf("Packages") != -1)
+                    {
+                        rootPath = path.Substring(0, path.IndexOf("Packages") - 1);
+                    }
+                    currentFilePath = Path.Combine(rootPath, currentFilePath.TrimStart('/'));
                 }
                 else if (currentFilePath.StartsWithSimple("/Packages/") || currentFilePath.StartsWithSimple("Packages/"))
                 {
                     var path = Path.GetDirectoryName(callerPath);
-                    var packageFolderPath = path.IndexOf("Packages") != -1 ? path.Substring(0, path.IndexOf("Packages") - 1) : path;
-                    currentFilePath = Path.Combine(packageFolderPath, currentFilePath.TrimStart('/'));
+                    var rootPath = path;
+                    if (path.IndexOf("Packages") != -1)
+                    {
+                        rootPath = path.Substring(0, path.IndexOf("Packages") - 1);
+                    }
+                    else if (path.IndexOf("Assets") != -1)
+                    {
+                        rootPath = path.Substring(0, path.IndexOf("Assets") - 1);
+                    }
+                    currentFilePath = Path.Combine(rootPath, currentFilePath.TrimStart('/'));
                 }
                 else if (!isTopLevelFile)
                 {
