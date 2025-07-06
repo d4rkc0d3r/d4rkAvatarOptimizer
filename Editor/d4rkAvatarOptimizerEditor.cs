@@ -189,10 +189,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.StartSection("Show Perf Rank Change");
         var exclusions = optimizer.GetAllExcludedTransforms();
         var particleSystemCount = optimizer.GetNonEditorOnlyComponentsInChildren<ParticleSystem>().Count;
+        var trailRendererCount = optimizer.GetNonEditorOnlyComponentsInChildren<TrailRenderer>().Count;
         var skinnedMeshes = optimizer.GetNonEditorOnlyComponentsInChildren<SkinnedMeshRenderer>();
         int meshCount = optimizer.GetNonEditorOnlyComponentsInChildren<MeshRenderer>().Count;
         int totalMaterialCount = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
-            .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount;
+            .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount + trailRendererCount;
         var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
             if (r.sharedMesh == null)
                 return new string[0];
@@ -219,7 +220,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var mesh = renderers[0].GetSharedMesh();
                 optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
             }
-            else // ParticleSystemRenderer
+            else // ParticleSystemRenderer & TrailRenderer
             {
                 optimizedTotalMaterialCount += 1;
             }
