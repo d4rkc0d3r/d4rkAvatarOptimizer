@@ -383,6 +383,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     throw new ParserException("lilToon shaders are not supported.");
                 }
+                if (parsedShader.name.StartsWithSimple("VRChat/Mobile/Toon Standard"))
+                {
+                    throw new ParserException("VRChat/Mobile/Toon Standard shaders are not supported.");
+                }
             }
             if (rawLines == null)
             {

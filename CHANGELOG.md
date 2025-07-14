@@ -5,6 +5,7 @@
 ### Bug Fixes
 * Fix absolute Assets & Packages paths in shader include files not being able to be referenced from the other root folder.
 * Fix trail renderers not getting counted in the pre optimization material count.
+* Explicitly mark `VRChat/Mobile/Toon Standard` shaders as unsupported.
 
 ## v3.10.2
 ### Bug Fixes
