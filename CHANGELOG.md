@@ -5,7 +5,8 @@
 ### Bug Fixes
 * Fix absolute Assets & Packages paths in shader include files not being able to be referenced from the other root folder.
 * Fix trail renderers not getting counted in the pre optimization material count.
-* Explicitly mark `VRChat/Mobile/Toon Standard` shaders as unsupported.
+* Explicitly mark `VRChat/Mobile/Toon Standard` shaders as unsupported. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/155)
+* Fix `FindUselessFXLayers()` not checking if the binding type is a base type of the existing component types. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/156)
 
 ## v3.10.2
 ### Bug Fixes
@@ -38,7 +39,7 @@
 * Refactored the settings GUI to use GUI scopes.
 
 ### Bug Fixes
-* Fixed modular avatar and VRCFury warning to still use the old name of the `Apply on Upload` option.
+* Fix modular avatar and VRCFury warning to still use the old name of the `Apply on Upload` option.
 * Fix geometry shader input parameter semantic not getting copied.
 * Fix GameObject toggle animations not getting deleted from the GO that had stuff merged into it but had itself no children or components on it when shader toggles got enabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/145)
 * Fix deletion of meta pass when its the only pass in the shader. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/146)

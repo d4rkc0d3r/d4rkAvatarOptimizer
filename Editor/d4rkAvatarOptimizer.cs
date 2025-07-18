@@ -2149,23 +2149,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
         var uselessLayers = new HashSet<int>();
 
-        var possibleBindingTypes = new Dictionary<string, HashSet<string>>();
+        var possibleBindingTypes = new Dictionary<string, Type[]>();
         bool IsPossibleBinding(EditorCurveBinding binding)
         {
-            if (!possibleBindingTypes.TryGetValue(binding.path, out var possibleTypeNames))
+            if (!possibleBindingTypes.TryGetValue(binding.path, out var possibleTypes))
             {
-                possibleTypeNames = new HashSet<string>();
+                var uniquePossibleTypes = new HashSet<Type>();
                 var transform = GetTransformFromPath(binding.path);
                 if (transform != null)
                 {
                     // AnimationUtility.GetAnimatableBindings(transform.gameObject, gameObject)
                     // is too slow, so we just check if the components mentioned in the bindings exist at that path
-                    possibleTypeNames.UnionWith(transform.GetNonNullComponents().Select(c => c.GetType().FullName));
-                    possibleTypeNames.Add(typeof(GameObject).FullName);
+                    uniquePossibleTypes.UnionWith(transform.GetNonNullComponents().Select(c => c.GetType()));
+                    uniquePossibleTypes.Add(typeof(GameObject));
                 }
-                possibleBindingTypes[binding.path] = possibleTypeNames;
+                possibleTypes = possibleBindingTypes[binding.path] = uniquePossibleTypes.ToArray();
             }
-            return possibleTypeNames.Contains(binding.type.FullName);
+            return possibleTypes.Any(t => binding.type.IsAssignableFrom(t));
         }
 
         var fxLayerLayers = GetFXLayerLayers();
