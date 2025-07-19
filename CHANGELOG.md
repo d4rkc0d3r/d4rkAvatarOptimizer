@@ -1,6 +1,7 @@
 ## v3.11.0
 ### Features
 * Add button to select group of materials that will get merged from the merge preview.
+* Add support for toggles using any state transitions instead of state transitions.
 
 ### Bug Fixes
 * Fix absolute Assets & Packages paths in shader include files not being able to be referenced from the other root folder.

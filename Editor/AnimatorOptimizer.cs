@@ -297,36 +297,45 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var sourceLayers = source.layers;
             foreach (var i in layersToMerge) {
                 var layer = sourceLayers[i].stateMachine;
+                var layerStates = layer.states;
                 Motion layerMotion = null;
-                if (layer.states.Length == 2) {
-                    var layerMotions = layer.states.Select(x => ConvertStateToMotion(x.state)).ToArray();
+                if (layerStates.Length == 2) {
+                    var layerMotions = layerStates.Select(x => ConvertStateToMotion(x.state)).ToArray();
                     if (IsNullOrEmpty(layerMotions[0]))
                         layerMotions[0] = CloneAndFlipCurves(layerMotions[1] as AnimationClip);
                     if (IsNullOrEmpty(layerMotions[1]))
                         layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
 
-                    int singleIndex = layer.states[0].state.transitions.Length == 1 ? 0 : 1;
-                    var andMotion = layerMotions[1 - singleIndex];
-                    var orMotion = layerMotions[singleIndex];
-                    foreach (var condition in layer.states[singleIndex].state.transitions[0].conditions) {
+                    var transitions = layer.anyStateTransitions.Concat(layerStates.SelectMany(x => x.state.transitions)).ToArray();
+                    var singleIndex = transitions.Count(x => x.destinationState == layerStates[0].state) == 1 ? 1 : 0;
+                    var andMotion = layerMotions[singleIndex];
+                    var orMotion = layerMotions[1 - singleIndex];
+                    foreach (var condition in transitions.First(c => c.destinationState == layerStates[singleIndex].state).conditions)
+                    {
                         var innerTreeMotions = new ChildMotion[2] {
                             new ChildMotion() { motion = orMotion },
                             new ChildMotion() { motion = andMotion },
                         };
                         var param = source.parameters.FirstOrDefault(x => x.name == condition.parameter);
-                        if (condition.mode == AnimatorConditionMode.IfNot) {
+                        if (condition.mode == AnimatorConditionMode.IfNot)
+                        {
                             innerTreeMotions = innerTreeMotions.Reverse().ToArray();
                         }
-                        if (param.type == AnimatorControllerParameterType.Float) {
+                        if (param.type == AnimatorControllerParameterType.Float)
+                        {
                             innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold;
-                            if (condition.mode == AnimatorConditionMode.Less) {
+                            if (condition.mode == AnimatorConditionMode.Less)
+                            {
                                 innerTreeMotions = innerTreeMotions.Reverse().ToArray();
                             }
                             innerTreeMotions[0].threshold -= 0.001f;
                             innerTreeMotions[1].threshold += 0.001f;
-                        } else if (param.type == AnimatorControllerParameterType.Int) {
+                        }
+                        else if (param.type == AnimatorControllerParameterType.Int)
+                        {
                             innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold + 0.5f;
-                            if (condition.mode == AnimatorConditionMode.Less) {
+                            if (condition.mode == AnimatorConditionMode.Less)
+                            {
                                 innerTreeMotions[0].threshold = innerTreeMotions[1].threshold = condition.threshold - 0.5f;
                                 innerTreeMotions = innerTreeMotions.Reverse().ToArray();
                             }
@@ -336,8 +345,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         andMotion = CreateBlendTree(condition.parameter, innerTreeMotions);
                     }
                     layerMotion = andMotion;
-                } else if (layer.states.Length == 1) {
-                    layerMotion = ConvertStateToMotion(layer.states[0].state);
+                } else if (layerStates.Length == 1) {
+                    layerMotion = ConvertStateToMotion(layerStates[0].state);
                 } else {
                     var transitions = layer.anyStateTransitions.OrderBy(x => x.conditions[0].threshold).ToArray();
                     var layerMotions = transitions.Select(x => ConvertStateToMotion(x.destinationState)).ToArray();

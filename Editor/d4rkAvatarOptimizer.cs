@@ -1920,27 +1920,63 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             }
 
             if (states.Length == 2) {
-                int singleTransitionStateIndex = System.Array.FindIndex(states, s => s.state.transitions.Length == 1);
-                if (singleTransitionStateIndex == -1) {
-                    errorMessages[i].Add($"no single transition state");
+                int singleTransitionStateIndex = Array.FindIndex(states, s => s.state.transitions.Length == 1);
+                bool usesAnyStateTransitions = false;
+                if (singleTransitionStateIndex == -1)
+                {
+                    if (states.Sum(s => s.state.transitions.Length) > 0)
+                    {
+                        errorMessages[i].Add($"no single transition state");
+                        continue;
+                    }
+                    var anyStateTransitionDestinationIndices = stateMachine.anyStateTransitions.Select(t => Array.FindIndex(states, s => s.state == t.destinationState)).ToList();
+                    if (anyStateTransitionDestinationIndices.Any(i => i < 0 || i >= states.Length))
+                    {
+                        errorMessages[i].Add($"any state transition destination state is not in the states array");
+                        continue;
+                    }
+                    var state0transitions = anyStateTransitionDestinationIndices.Count(i => i == 0);
+                    var state1transitions = anyStateTransitionDestinationIndices.Count(i => i == 1);
+                    if (state0transitions != 1 && state1transitions != 1)
+                    {
+                        errorMessages[i].Add($"no single transition state");
+                        continue;
+                    }
+                    singleTransitionStateIndex = state0transitions == 1 ? 1 : 0;
+                    usesAnyStateTransitions = true;
+                }
+                else if (stateMachine.anyStateTransitions.Length != 0)
+                {
+                    errorMessages[i].Add($"has any state transitions");
                     continue;
                 }
                 var orState = states[singleTransitionStateIndex].state;
                 var andState = states[1 - singleTransitionStateIndex].state;
-                if (orState.transitions[0].conditions.Length != andState.transitions.Length) {
-                    errorMessages[i].Add($"or state has {orState.transitions[0].conditions.Length} conditions but and state has {andState.transitions.Length} transitions");
+                AnimatorStateTransition[] orStateTransitions = orState.transitions;
+                AnimatorStateTransition[] andStateTransitions = andState.transitions;
+                if (usesAnyStateTransitions)
+                {
+                    orStateTransitions = stateMachine.anyStateTransitions.Where(t => t.destinationState == andState).ToArray();
+                    andStateTransitions = stateMachine.anyStateTransitions.Where(t => t.destinationState == orState).ToArray();
+                }
+                var stateTransitions = singleTransitionStateIndex == 0
+                    ? new AnimatorStateTransition[][] { orStateTransitions, andStateTransitions }
+                    : new AnimatorStateTransition[][] { andStateTransitions, orStateTransitions };
+                if (orStateTransitions[0].conditions.Length != andStateTransitions.Length)
+                {
+                    errorMessages[i].Add($"or state has {orStateTransitions[0].conditions.Length} conditions but and state has {andStateTransitions.Length} transitions");
                     continue;
                 }
-                if (andState.transitions.Length == 0) {
+                if (andStateTransitions.Length == 0) {
                     errorMessages[i].Add($"and state has no transitions");
                     continue;
                 }
-                if (andState.transitions.Any(t => t.conditions.Length != 1)) {
+                if (andStateTransitions.Any(t => t.conditions.Length != 1)) {
                     errorMessages[i].Add($"a and state transition has multiple conditions");
                     continue;
                 }
                 bool conditionError = false;
-                foreach (var condition in orState.transitions[0].conditions) {
+                foreach (var condition in orStateTransitions[0].conditions) {
                     if (condition.mode == AnimatorConditionMode.Equals || condition.mode == AnimatorConditionMode.NotEqual) {
                         errorMessages[i].Add($"a transition condition mode is {condition.mode}");
                         conditionError = true;
@@ -1957,7 +1993,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     if (condition.mode == AnimatorConditionMode.Less)
                         inverseConditionMode = AnimatorConditionMode.Greater;
                     if ((condition.mode == AnimatorConditionMode.If || condition.mode == AnimatorConditionMode.IfNot)
-                        && !andState.transitions.Any(t => t.conditions.Any(c => c.parameter == condition.parameter && c.mode == inverseConditionMode))) {
+                        && !andStateTransitions.Any(t => t.conditions.Any(c => c.parameter == condition.parameter && c.mode == inverseConditionMode))) {
                         errorMessages[i].Add($"condition with parameter {condition.parameter} has no inverse transition");
                         conditionError = true;
                         break;
@@ -1970,7 +2006,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     bool isInt = paramLookup[condition.parameter].type == AnimatorControllerParameterType.Int;
                     float inverseThreshold = condition.threshold + (isInt ? (condition.mode == AnimatorConditionMode.Greater ? 1 : -1) : 0);
                     if ((condition.mode == AnimatorConditionMode.Greater || condition.mode == AnimatorConditionMode.Less)
-                        && !andState.transitions.Any(t => t.conditions.Any(c => c.parameter == condition.parameter && c.mode == inverseConditionMode && c.threshold == inverseThreshold))) {
+                        && !andStateTransitions.Any(t => t.conditions.Any(c => c.parameter == condition.parameter && c.mode == inverseConditionMode && c.threshold == inverseThreshold))) {
                         errorMessages[i].Add($"condition with parameter {condition.parameter} has no inverse transition");
                         conditionError = true;
                         break;
@@ -1984,11 +2020,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 for (int j = 0; j < 2; j++) {
                     var state = states[j].state;
                     var otherState = states[1 - j].state;
-                    if (state.transitions.Any(t => t.destinationState != otherState)) {
+                    if (stateTransitions[j].Any(t => t.destinationState != otherState)) {
                         errorMessages[i].Add($"{state} transition destination state is not the other state");
                         break;
                     }
-                    if (state.transitions.Any(t => t.hasExitTime && t.exitTime != 0.0f)) {
+                    if (stateTransitions[j].Any(t => t.hasExitTime && t.exitTime != 0.0f)) {
                         errorMessages[i].Add($"{state} transition has exit time");
                         break;
                     }
@@ -2029,7 +2065,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 if (reliesOnWriteDefaults && !onlyBoolBindings) {
                     errorMessages[i].Add($"relies on write defaults and animates something other than m_Enabled/m_IsActive");
                 }
-                if (states.Any(s => s.state.transitions.Any(t => t.duration != 0.0f)) && !onlyBoolBindings) {
+                if (stateTransitions.Any(s => s.Any(t => t.duration != 0.0f)) && !onlyBoolBindings) {
                     errorMessages[i].Add($"transition has non 0 duration and animates something other than m_Enabled/m_IsActive");
                 }
                 errorMessages[i].Add($"toggle");
