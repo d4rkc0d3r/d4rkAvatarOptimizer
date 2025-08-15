@@ -3199,12 +3199,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (t.GetComponentsInChildren<Light>(true).Count(IsDPSPenetratorTipLight) != 1)
             return false;
-        if (t.GetComponentsInChildren<MeshRenderer>(true).Count() != 1)
+        var renderers = t.GetComponentsInChildren<MeshRenderer>(true);
+        if (renderers.Length != 1)
             return false;
-        var meshRenderer = t.GetComponentsInChildren<MeshRenderer>(true).First();
-        if (meshRenderer.sharedMaterials.Length == 0)
+        if (renderers[0].sharedMaterials.Length == 0)
             return false;
-        var material = meshRenderer.sharedMaterials[0];
+        var material = renderers[0].sharedMaterials[0];
         if (material == null)
             return false;
         return material.HasProperty("_Length");
@@ -3214,12 +3214,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     {
         if (t == null)
             return false;
-        if (t.GetComponentsInChildren<Renderer>(true).Count() != 1)
+        var renderers = t.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length != 1)
             return false;
-        var meshRenderer = t.GetComponentsInChildren<Renderer>(true).First();
-        if (meshRenderer.sharedMaterials.Length == 0)
+        if (renderers[0].sharedMaterials.Length == 0)
             return false;
-        var material = meshRenderer.sharedMaterials[0];
+        var material = renderers[0].sharedMaterials[0];
         if (material == null)
             return false;
         return material.HasProperty("_TPSPenetratorEnabled") && material.GetFloat("_TPSPenetratorEnabled") > 0.5f;
@@ -3228,12 +3228,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     private bool IsSPSPenetratorRoot(Transform t) {
 		if(t == null)
 			return false;
-		if(t.GetComponentsInChildren<Renderer>(true).Count() != 1)
+        var renderers = t.GetComponentsInChildren<Renderer>(true);
+		if (renderers.Length != 1)
+            return false;
+		if(renderers[0].sharedMaterials.Length == 0)
 			return false;
-		var meshRenderer = t.GetComponentsInChildren<Renderer>(true).First();
-		if(meshRenderer.sharedMaterials.Length == 0)
-			return false;
-		var material = meshRenderer.sharedMaterials[0];
+		var material = renderers[0].sharedMaterials[0];
 		if(material == null)
 			return false;
 		return material.HasProperty("_SPS_Length");
