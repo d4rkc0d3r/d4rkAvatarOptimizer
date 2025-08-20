@@ -1,4 +1,7 @@
 ## v3.11.1
+### Changes
+* Add support for `isAnimated` && `isNotAnimated` ifex conditions. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/161)
+
 ### Bug Fixes
 * Fix material instancing flag not being preserved when creating optimized materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/162)
 
