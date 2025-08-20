@@ -1,3 +1,7 @@
+## v3.11.1
+### Bug Fixes
+* Fix material instancing flag not being preserved when creating optimized materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/162)
+
 ## v3.11.0
 ### Features
 * Add button to select group of materials that will get merged from the merge preview.

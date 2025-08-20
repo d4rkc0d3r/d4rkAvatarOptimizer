@@ -3771,6 +3771,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             Profiler.StartNextSection("mat.shader = shader");
             mat.shader = shader;
             mat.renderQueue = source.renderQueue;
+            mat.enableInstancing = source.enableInstancing;
             Profiler.StartNextSection("CopyMaterialProperties");
             for (int j = 0; j < source.shader.passCount; j++)
             {
@@ -3979,7 +3980,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         var listMaterials = list.Select(slot => slot.material).ToArray();
         var materialComparer = new MaterialAssetComparer();
-        bool allTheSameAsCandidate = listMaterials.All(mat => mat == candidateMat) || (listMaterials.All(mat => materialComparer.Equals(mat, candidateMat)));
+        bool allTheSameAsCandidate = listMaterials.All(mat => materialComparer.Equals(mat, candidateMat));
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate;
         if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
@@ -3999,6 +4000,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (parsedShader.parsedCorrectly == false)
             return false;
         if (firstMat.renderQueue != candidateMat.renderQueue)
+            return false;
+        if (firstMat.enableInstancing != candidateMat.enableInstancing)
             return false;
         #if UNITY_2022_1_OR_NEWER
             bool hasAnyMaterialVariant = listMaterials.Any(m => m.isVariant) || candidateMat.isVariant;
