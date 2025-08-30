@@ -1567,6 +1567,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private int curlyBraceDepth = 0;
         private string sanitizedMaterialName;
         private bool stripShadowVariants = false;
+        private bool inlineReplaceConstants = false;
+        private Dictionary<string, string> constantPropertyValues = new Dictionary<string, string>();
         private OptimizedShader optimizedShader = new OptimizedShader();
 
         private ShaderOptimizer() {}
@@ -1623,6 +1625,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
             optimizer.optimizedShader.originalShader = source;
+            optimizer.inlineReplaceConstants = source.ifexParameters.Count > 0;
+            foreach (var staticValues in optimizer.staticPropertyValues)
+            {
+                if (optimizer.animatedPropertyValues.ContainsKey(staticValues.Key))
+                    continue;
+                if (optimizer.arrayPropertyValues.ContainsKey(staticValues.Key))
+                    continue;
+                optimizer.constantPropertyValues[staticValues.Key] = $"({staticValues.Value})";
+            }
             try
             {
                 optimizer.Run();
@@ -1638,6 +1649,41 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
             return optimizer.optimizedShader;
+        }
+
+        private string ReplaceConstants(string line)
+        {
+            if (!inlineReplaceConstants || line.Length == 0 || line[0] == '#')
+            {
+                return line;
+            }
+            bool IsIdentifierChar(char c)
+            {
+                return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+            }
+            var sb = new StringBuilder();
+            bool inIdentifier = IsIdentifierChar(line[0]);
+            bool didReplaceSomething = false;
+            int currentChunkStart = 0;
+            for (int i = 1; i <= line.Length; i++)
+            {
+                if (i == line.Length || IsIdentifierChar(line[i]) != inIdentifier)
+                {
+                    var chunk = line.Substring(currentChunkStart, i - currentChunkStart);
+                    if (inIdentifier && constantPropertyValues.TryGetValue(chunk, out var replacement))
+                    {
+                        sb.Append(replacement);
+                        didReplaceSomething = true;
+                    }
+                    else
+                    {
+                        sb.Append(chunk);
+                    }
+                    currentChunkStart = i;
+                    inIdentifier = !inIdentifier;
+                }
+            }
+            return didReplaceSomething ? sb.ToString() : line;
         }
 
         private void InjectArrayPropertyInitialization()
@@ -1931,6 +1977,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     line = Regex.Replace(line, $"({inParam.name}\\s*\\.\\s*{vertexInUv0Member})([^0-9a-zA-Z])", $"$1{vertexInUv0EndSwizzle}$2");
                 }
+                line = ReplaceConstants(line);
                 originalVertexShader?.Add(line);
                 if (line == "}")
                 {
@@ -2046,6 +2093,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 line = source[sourceLineIndex];
+                line = ReplaceConstants(line);
                 if (line == "}")
                 {
                     output.Add(line);
@@ -2216,6 +2264,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 string line = source[sourceLineIndex];
+                line = ReplaceConstants(line);
                 if (line[0] == '#')
                 {
                     line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
@@ -3115,7 +3164,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else
                     {
-                        output.Add(line);
+                        output.Add(ReplaceConstants(line));
                     }
                 }
             }
@@ -3165,10 +3214,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     case ShaderAnalyzer.IfexConditionType.IsNotAnimated:
                         bool isAnimatedCheck = condition.conditionType == ShaderAnalyzer.IfexConditionType.IsAnimated;
                         outputString += $"{(isAnimatedCheck ? "isAnimated" : "isNotAnimated")}({propertyName})({isStaticValue},{isAnimated},{isArrayProperty})";
-                        if (isValueConstant == isAnimatedCheck || propertyName == "_AlphaToCoverage")
+                        if (isValueConstant == isAnimatedCheck)
                         {
                             lineIndex++;
-                            debugOutput?.Add(outputString + ", FALSE" + (propertyName == "_AlphaToCoverage" ? " (special case)" : ""));
+                            debugOutput?.Add(outputString + ", FALSE");
                             ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                             return;
                         }
