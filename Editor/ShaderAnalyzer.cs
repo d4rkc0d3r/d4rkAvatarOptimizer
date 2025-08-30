@@ -503,9 +503,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd(trimWhiteSpaceChars) + " " + rawLines[++lineIndex].Trim(trimWhiteSpaceChars);
                 }
-                if (trimmedLine.Length >= 6 && trimmedLine[0] == '/' && trimmedLine[1] == '/')
+                if (trimmedLine.StartsWithSimple("//"))
                 {
-                    if (trimmedLine[2] == 'i' && trimmedLine[3] == 'f' && trimmedLine[4] == 'e' && trimmedLine[5] == 'x')
+                    if (trimmedLine.StartsWithSimple("ifex", 2))
                     {
                         string ifexLine = $"#{trimmedLine.Substring(2)}";
                         processedLines.Add(ifexLine);
@@ -516,9 +516,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             parsedShader.unableToParseIfexStatements.Add(trimmedLine);
                         }
                     }
-                    else if (trimmedLine.Length > 6 && trimmedLine[2] == 'e' && trimmedLine[3] == 'n' && trimmedLine[4] == 'd' && trimmedLine[5] == 'e' && trimmedLine[6] == 'x')
+                    else if (trimmedLine.StartsWithSimple("endex", 2))
                     {
                         processedLines.Add("#endex");
+                    }
+                    else if (trimmedLine.StartsWithSimple("d4rkAO:incompatible_shader", 2))
+                    {
+                        throw new ParserException("Shader is explicitly marked as incompatible.");
                     }
                     continue;
                 }
@@ -1657,17 +1661,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 return line;
             }
-            bool IsIdentifierChar(char c)
-            {
-                return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
-            }
             var sb = new StringBuilder();
-            bool inIdentifier = IsIdentifierChar(line[0]);
+            bool inIdentifier = ShaderAnalyzer.IsIdentifierLetter(line[0]);
             bool didReplaceSomething = false;
             int currentChunkStart = 0;
             for (int i = 1; i <= line.Length; i++)
             {
-                if (i == line.Length || IsIdentifierChar(line[i]) != inIdentifier)
+                if (i == line.Length || ShaderAnalyzer.IsIdentifierLetter(line[i]) != inIdentifier)
                 {
                     var chunk = line.Substring(currentChunkStart, i - currentChunkStart);
                     if (inIdentifier && constantPropertyValues.TryGetValue(chunk, out var replacement))

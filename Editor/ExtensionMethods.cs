@@ -292,8 +292,26 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             {
                 return false;
             }
-            for (int i = 0; i < value.Length; i++) {
-                if (str[i] != value[i]) {
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (str[i] != value[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        public static bool StartsWithSimple(this string str, string value, int startIndex)
+        {
+            if (str.Length - startIndex < value.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (str[startIndex + i] != value[i])
+                {
                     return false;
                 }
             }
