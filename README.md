@@ -53,6 +53,8 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 * Use the "Basic" preset which causes the optimizer to not touch the shaders at all.
 * Use the "Exclusions" foldout to manually only exclude meshes from optimization that are broken.
 
+If you are a shader author you can read the [Guidelines for Shader Authors](./Documentation~/ForShaderAuthors.md) document to make your shaders compatible with the optimizer.
+
 It is also nice to make a bug report with the broken shaders so I can fix it for the future.  
 To do that you need to bundle up the optimized `.mat`, `.shader` & `.cginc` files. You can do that by right clicking on `d4rkAvatarOptimizer/TrashBin` in the project view under `Packages` and selecting `Show in Explorer`. A window with the folder selected should open. Go inside the folder and put the files into a `.zip` file. You don't need to include the `.asset` files as they can be very large and don't help when debugging the shaders.  
 Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.zip` file.
