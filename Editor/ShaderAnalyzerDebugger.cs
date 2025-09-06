@@ -243,7 +243,11 @@ public class ShaderAnalyzerDebugger : EditorWindow
             return;
 
         scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
-        GUILayout.Label(parsedShader.mismatchedCurlyBraces ? "Mismatched curly braces" : "No mismatched curly braces");
+        if (!parsedShader.parsedCorrectly)
+        {
+            GUILayout.Label("Shader did not parse correctly:");
+            EditorGUILayout.HelpBox(parsedShader.errorMessage, MessageType.Error);
+        }
 
         GUILayout.Space(5);
 
@@ -283,6 +287,30 @@ public class ShaderAnalyzerDebugger : EditorWindow
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
                 EditorGUILayout.ToggleLeft(keyword, material.IsKeywordEnabled(keyword));
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        if (parsedShader.unknownOptimizerComments.Count > 0)
+        {
+            GUILayout.Space(15);
+            GUILayout.Label($"Has {parsedShader.unknownOptimizerComments.Count} unknown optimizer comments:");
+            EditorGUI.indentLevel++;
+            foreach (var comment in parsedShader.unknownOptimizerComments)
+            {
+                EditorGUILayout.LabelField(comment);
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        if (parsedShader.requiredConstantProperties.Count > 0)
+        {
+            GUILayout.Space(15);
+            GUILayout.Label($"Has {parsedShader.requiredConstantProperties.Count} require_constant properties:");
+            EditorGUI.indentLevel++;
+            foreach (var requiredConstantProperty in parsedShader.requiredConstantProperties)
+            {
+                EditorGUILayout.LabelField(requiredConstantProperty);
             }
             EditorGUI.indentLevel--;
         }

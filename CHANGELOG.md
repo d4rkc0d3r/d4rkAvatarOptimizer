@@ -1,8 +1,9 @@
 ## v3.12.0
 ### Features
 * Add option for shaders to explicitly mark themselves as incompatible by adding the comment `//d4rkAO:incompatible_shader`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/159)
+* Add option for shaders to mark properties as required constant by adding the comment `//d4rkAO:require_constant(_PropertyName)`.
 * Add support for `isAnimated` && `isNotAnimated` ifex conditions. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/161)
-  * Inline replace constant values in shader code when using any `//ifex` statement.
+* Inline replace constant values in shader code when using any `//ifex` or `//d4rkAO:require_constant(_PropertyName)` comments.
 
 ### Bug Fixes
 * Fix material instancing flag not being preserved when creating optimized materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/162)

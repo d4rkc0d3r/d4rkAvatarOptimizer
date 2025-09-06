@@ -118,6 +118,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public HashSet<string> shaderFeatureKeyWords = new HashSet<string>();
         public HashSet<string> ifexParameters = new HashSet<string>();
         public HashSet<string> unableToParseIfexStatements = new HashSet<string>();
+        public List<string> unknownOptimizerComments = new List<string>();
+        public HashSet<string> requiredConstantProperties = new HashSet<string>();
 
         public bool CanMerge()
         {
@@ -490,21 +492,28 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return false; 
                 }
             }
+            var trimWhiteSpaceChars = new char[] { ' ', '\t', '\r', '\n' };
             void ParseOptimizerComment(string commentLine)
             {
                 var commands = commentLine.Split(':');
                 foreach (var command in commands)
                 {
-                    var cmd = command.Trim();
+                    var cmd = command.Trim(trimWhiteSpaceChars);
                     if (cmd == "incompatible_shader")
                     {
                         throw new ParserException("Shader is explicitly marked as incompatible.");
                     }
+                    if (cmd.StartsWithSimple("require_constant(") && cmd.EndsWith(")"))
+                    {
+                        var paramName = cmd.Substring("require_constant(".Length, cmd.Length - "require_constant(".Length - 1).Trim(trimWhiteSpaceChars);
+                        parsedShader.requiredConstantProperties.Add(paramName);
+                        continue;
+                    }
+                    parsedShader.unknownOptimizerComments.Add(cmd);
                 }
             }
             parsedShader.text[fileID] = processedLines;
             alreadyIncludedThisPass.Add(fileID);
-            var trimWhiteSpaceChars = new char[] { ' ', '\t', '\r', '\n' };
             for (int lineIndex = 0; lineIndex < rawLines.Length; lineIndex++)
             {
                 string trimmedLine = rawLines[lineIndex].Trim(trimWhiteSpaceChars);
@@ -1462,11 +1471,21 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     pass.startLineIndex += 3;
                 }
             }
-            foreach (var ifexPropName in parsedShader.ifexParameters)
+            if (parsedShader.requiredConstantProperties.Count == 0)
             {
-                if (parsedShader.propertyTable.TryGetValue(ifexPropName, out var prop))
+                foreach (var ifexPropName in parsedShader.ifexParameters)
                 {
-                    prop.shaderLabParams.Add("ifex");
+                    if (parsedShader.propertyTable.TryGetValue(ifexPropName, out var prop))
+                    {
+                        prop.shaderLabParams.Add("ifex");
+                    }
+                }
+            }
+            foreach (var requiredConstantProperty in parsedShader.requiredConstantProperties)
+            {
+                if (parsedShader.propertyTable.TryGetValue(requiredConstantProperty, out var prop))
+                {
+                    prop.shaderLabParams.Add("require_constant");
                 }
             }
             foreach (var prop in parsedShader.properties)
@@ -1645,7 +1664,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizer.texturesToReplaceCalls = new HashSet<string>(
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
             optimizer.optimizedShader.originalShader = source;
-            optimizer.inlineReplaceConstants = source.ifexParameters.Count > 0;
+            optimizer.inlineReplaceConstants = source.ifexParameters.Count > 0 || source.requiredConstantProperties.Count > 0;
             foreach (var staticValues in optimizer.staticPropertyValues)
             {
                 if (optimizer.animatedPropertyValues.ContainsKey(staticValues.Key))
