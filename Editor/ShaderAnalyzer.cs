@@ -490,6 +490,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return false; 
                 }
             }
+            void ParseOptimizerComment(string commentLine)
+            {
+                var commands = commentLine.Split(':');
+                foreach (var command in commands)
+                {
+                    var cmd = command.Trim();
+                    if (cmd == "incompatible_shader")
+                    {
+                        throw new ParserException("Shader is explicitly marked as incompatible.");
+                    }
+                }
+            }
             parsedShader.text[fileID] = processedLines;
             alreadyIncludedThisPass.Add(fileID);
             var trimWhiteSpaceChars = new char[] { ' ', '\t', '\r', '\n' };
@@ -520,9 +532,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         processedLines.Add("#endex");
                     }
-                    else if (trimmedLine.StartsWithSimple("d4rkAO:incompatible_shader", 2))
+                    else if (trimmedLine.StartsWithSimple("d4rkAO:", 2))
                     {
-                        throw new ParserException("Shader is explicitly marked as incompatible.");
+                        ParseOptimizerComment(trimmedLine.Substring("//d4rkAO:".Length));
                     }
                     continue;
                 }
@@ -561,6 +573,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     if (trimmedLine[i + 1] == '/')
                     {
+                        if (trimmedLine.StartsWithSimple("d4rkAO:", i + 2))
+                        {
+                            ParseOptimizerComment(trimmedLine.Substring(i + 2 + "d4rkAO:".Length));
+                        }
                         trimmedLine = trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars);
                         break;
                     }

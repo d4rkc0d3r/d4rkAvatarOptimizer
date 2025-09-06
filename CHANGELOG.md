@@ -1,6 +1,6 @@
 ## v3.12.0
 ### Features
-* Add option for shaders to explicitly mark themselves as incompatible by adding the comment `//d4rkAO:incompatible_shader` in a separate line. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/159)
+* Add option for shaders to explicitly mark themselves as incompatible by adding the comment `//d4rkAO:incompatible_shader`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/159)
 * Add support for `isAnimated` && `isNotAnimated` ifex conditions. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/161)
   * Inline replace constant values in shader code when using any `//ifex` statement.
 
