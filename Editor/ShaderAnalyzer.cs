@@ -2408,6 +2408,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             target.Add($"#pragma warning (disable : 4008) // A floating point division by zero occurred.");
         }
 
+        private void InjectOptimizerDefines()
+        {
+            if (parsedShader.requiredConstantProperties.Count == 0)
+                return;
+            var currentKnownDefines = knownDefines.Peek();
+            output.Add("#define OPTIMIZER_ENABLED 1");
+            currentKnownDefines["OPTIMIZER_ENABLED"] = (true, 1);
+            foreach (var prop in poiUsedPropertyDefines)
+            {
+                if (!prop.Value)
+                    continue;
+                output.Add($"#define {prop.Key} 1");
+                currentKnownDefines[prop.Key] = (true, 1);
+            }
+        }
+
         private void InjectPropertyArrays()
         {
             pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", SkippedShaderVariants)}");
@@ -2510,7 +2526,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     varName = "_MainTexButNotQuiteSoThatUnityDoesntCry_ST";
                 output.Add("static " + type + " " + varName + " = " + value + ";");
             }
-            foreach(var keyword in setKeywords.Where(k => currentPass.shaderFeatureKeyWords.Contains(k)))
+            foreach (var keyword in setKeywords.Where(k => currentPass.shaderFeatureKeyWords.Contains(k)))
             {
                 output.Add($"#define {keyword} 1");
             }
@@ -2545,7 +2561,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var texName in texturesToReplaceCalls)
             {
                 string nullCheck = null;
-                if (texturesToNullCheck.TryGetValue(texName, out string textureDefaultValue)) {
+                if (texturesToNullCheck.TryGetValue(texName, out string textureDefaultValue))
+                {
                     nullCheck = $"if (!shouldSample{texName}) return {textureDefaultValue};";
                 }
 
@@ -3506,6 +3523,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     texturesToCallSoTheSamplerDoesntDisappear.Clear();
                     pragmaOutput = output;
                     output = new List<string>();
+                    InjectOptimizerDefines();
                     InjectPropertyArrays();
                     foreach (var keyword in currentPass.shaderFeatureKeyWords)
                     {
