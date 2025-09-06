@@ -6,6 +6,8 @@
 
 ### Bug Fixes
 * Fix material instancing flag not being preserved when creating optimized materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/162)
+* Fix multi condition toggles not working properly when using `Optimize FX Layer`.
+  * This was a regression bug from v3.11.0 when adding more toggle support.
 
 ## v3.11.0
 ### Features

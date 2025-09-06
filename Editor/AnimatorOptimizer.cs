@@ -307,7 +307,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
 
                     var transitions = layer.anyStateTransitions.Concat(layerStates.SelectMany(x => x.state.transitions)).ToArray();
-                    var singleIndex = transitions.Count(x => x.destinationState == layerStates[0].state) == 1 ? 1 : 0;
+                    var singleIndex = transitions.Count(x => x.destinationState == layerStates[0].state) == 1 ? 0 : 1;
                     var andMotion = layerMotions[singleIndex];
                     var orMotion = layerMotions[1 - singleIndex];
                     foreach (var condition in transitions.First(c => c.destinationState == layerStates[singleIndex].state).conditions)
