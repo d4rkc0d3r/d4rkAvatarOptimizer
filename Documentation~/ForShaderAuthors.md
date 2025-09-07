@@ -13,7 +13,8 @@ These features are unsupported but are detected by the analyzer marking the shad
 ## Things that can break the optimizer silently
 Things in here might not get caught by the shader analyzer resulting in the optimizer trying to optimize the shader but failing to do so correctly.
 
-Generally try to avoid using preprocessor macros as much as possible. They can hide critical code structure from the parser.  
+Generally try to avoid using preprocessor macros as much as possible. They can hide critical code structure from the parser.
+### Property Declarations  
 Especially avoid hiding property declarations behind macros as that *will* break when writing properties as static values.
 For example, do NOT do this:
 ```c
@@ -43,8 +44,10 @@ Do this:
     float4 _MyTexture_ST;
 #endif
 ```
+Besides the direct hlsl declarations you can also use the unity macros `UNITY_DECLARE_TEX2D` and `UNITY_DECLARE_TEX2D_NOSAMPLER` as the have hardcoded support in the optimizer.
 
-Other critical places are the structs for vertex data and the vertex / fragment function signatures. I need to pass along a combine mesh/material id from uv0.z to the later shader stages. This requires me to modify those structs and function signatures which can easily break when the optimizer isn't able to see the full structure.
+### Vertex Data and Function Signatures
+Other critical places are the structs for vertex data and the vertex, geometry & fragment function signatures. I need to pass along a combine mesh/material id from uv0.z to the later shader stages. This requires me to modify those structs and function signatures which can easily break when the optimizer isn't able to see the full structure.
 
 As with the property declarations, don't hide vertex data struct member declarations behind macros. Also don't hide vertex or fragment function parameters behind macros.  Using `#ifdef` blocks inside the struct/parameter list is fine.  
 For example, do NOT do this:
