@@ -11,6 +11,8 @@
 * Fix material instancing flag not being preserved when creating optimized materials. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/162)
 * Fix multi condition toggles not working properly when using `Optimize FX Layer`.
   * This was a regression bug from v3.11.0 when adding more toggle support.
+* Fix mesh baking sometimes altering the looks of meshes when pose didn't match model bind pose. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/158)
+  * This comes at the cost of not re-parenting non moving bones to the first moving parent when using `Delete Unused GameObjects`.
 
 ## v3.11.0
 ### Features

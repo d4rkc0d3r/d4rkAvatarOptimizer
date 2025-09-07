@@ -1127,26 +1127,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return cache_FindSameAnimatedMaterialProperties[(aPath, bPath)] = new HashSet<string>(result.Select(p => p.Substring("material.".Length)));
     }
 
-    private HashSet<Transform> cache_FindAllTransformsWithScaleAnimation = null;
-    private HashSet<Transform> FindAllTransformsWithScaleAnimation()
-    {
-        if (cache_FindAllTransformsWithScaleAnimation == null)
-        {
-            cache_FindAllTransformsWithScaleAnimation = new HashSet<Transform>();
-            foreach (var clip in GetAllUsedAnimationClips())
-            {
-                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
-                {
-                    if (binding.type == typeof(Transform) && binding.propertyName == "m_LocalScale.x" && GetTransformFromPath(binding.path) != null)
-                    {
-                        cache_FindAllTransformsWithScaleAnimation.Add(GetTransformFromPath(binding.path));
-                    }
-                }
-            }
-        }
-        return cache_FindAllTransformsWithScaleAnimation;
-    }
-
     private void AddAnimationPathChange((string path, string name, Type type) source, (string path, string name, Type type) target)
     {
         if (source == target)
@@ -3342,16 +3322,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return texArray;
     }
 
-    private void AddWeighted(ref Matrix4x4 a, Matrix4x4 b, float weight)
-    {
-        if (weight == 0)
-            return;
-        a.m00 += b.m00 * weight; a.m01 += b.m01 * weight; a.m02 += b.m02 * weight; a.m03 += b.m03 * weight;
-        a.m10 += b.m10 * weight; a.m11 += b.m11 * weight; a.m12 += b.m12 * weight; a.m13 += b.m13 * weight;
-        a.m20 += b.m20 * weight; a.m21 += b.m21 * weight; a.m22 += b.m22 * weight; a.m23 += b.m23 * weight;
-        a.m30 += b.m30 * weight; a.m31 += b.m31 * weight; a.m32 += b.m32 * weight; a.m33 += b.m33 * weight;
-    }
-
     private void SearchForTextureArrayCreation(List<List<Material>> sources)
     {
         foreach (var source in sources)
@@ -4421,28 +4391,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         }
         return result;
     }
-    
-    private int GetNewBoneIDFromTransform(List<Transform> bones, Dictionary<Transform, int> boneMap, List<Matrix4x4> bindPoses, Transform toMatch)
-    {
-        if (boneMap.TryGetValue(toMatch, out int index))
-            return index;
-        if (DeleteUnusedGameObjects)
-            toMatch = movingParentMap[toMatch];
-        foreach (var bone in transform.GetAllDescendants())
-        {
-            if (bone == toMatch)
-            {
-                bones.Add(bone);
-                bindPoses.Add(bone.worldToLocalMatrix);
-                boneMap[bone] = bones.Count - 1;
-                return bones.Count - 1;
-            }
-        }
-        bones.Add(transform);
-        bindPoses.Add(transform.localToWorldMatrix);
-        boneMap[transform] = bones.Count - 1;
-        return bones.Count - 1;
-    }
 
     private Dictionary<string, HashSet<string>> cache_SameAnimatedPropertiesOnMergedMesh = null;
     private HashSet<string> GetSameAnimatedPropertiesOnMergedMesh(string path)
@@ -4468,6 +4416,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         oldPathToMergedPaths.Clear();
         oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
+        // TODO: this map is currently unused.
+        // It should be used to reparent bones that are non moving to the first parent that does when using "Delete Unused GameObjects"
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
@@ -4478,11 +4428,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             .Where(l => l[0].sharedMesh != null)
             .Where(l => l.All(m => !exclusions.Contains(m.transform)))
             .ToArray();
-        List<(Transform bone, Vector3 scale)> allBonesAndParentsWithOriginalScale = combinableSkinnedMeshList
-            .SelectMany(l => l).SelectMany(smr => smr.bones).Where(b => b != null).Distinct()
-            .Intersect(FindAllTransformsWithScaleAnimation())
-            .Select(bone => (bone, bone.localScale)).ToList();
-        allBonesAndParentsWithOriginalScale.ForEach(pair => pair.bone.localScale = Vector3.one);
         var originalRootPosition = transform.position;
         var originalRootRotation = transform.rotation;
         transform.position = Vector3.zero;
@@ -4517,7 +4462,39 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             int totalVertexCount = combinableSkinnedMeshes.Sum(m => m.sharedMesh.vertexCount);
 
             var targetBones = new List<Transform>();
-            var targetBoneMap = new Dictionary<Transform, int>();
+            var targetBindPoses = new List<Matrix4x4>();
+            var targetBoneIndexMap = new Dictionary<(int meshID, int boneID), int>();
+            var transformToTargetIndices = new Dictionary<Transform, HashSet<int>>();
+
+            int AddNewBone(Transform boneTransform, Matrix4x4 bindPose)
+            {
+                targetBones.Add(boneTransform);
+                targetBindPoses.Add(bindPose);
+                if (!transformToTargetIndices.TryGetValue(boneTransform, out var existingTransformIndices))
+                {
+                    transformToTargetIndices[boneTransform] = existingTransformIndices = new HashSet<int>();
+                }
+                existingTransformIndices.Add(targetBones.Count - 1);
+                return targetBones.Count - 1;
+            }
+            int GetNewBoneIndex(int boneID, int meshID, Transform boneTransform, Matrix4x4 bindPose)
+            {
+                if (targetBoneIndexMap.TryGetValue((meshID, boneID), out int index))
+                    return index;
+                if (!transformToTargetIndices.TryGetValue(boneTransform, out var existingTransformIndices))
+                {
+                    transformToTargetIndices[boneTransform] = existingTransformIndices = new HashSet<int>();
+                }
+                foreach (var i in existingTransformIndices)
+                {
+                    if (targetBones[i] == boneTransform && targetBindPoses[i] == bindPose)
+                    {
+                        return targetBoneIndexMap[(meshID, boneID)] = i;
+                    }
+                }
+                return targetBoneIndexMap[(meshID, boneID)] = AddNewBone(boneTransform, bindPose);
+            }
+
             var hasUvSet = new bool[8] {
                 true,
                 combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord1)),
@@ -4539,8 +4516,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             var targetNormals = new List<Vector3>(totalVertexCount);
             var targetTangents = new List<Vector4>(totalVertexCount);
             var targetWeights = new List<BoneWeight>(totalVertexCount);
-            var targetBindPoses = new List<Matrix4x4>();
-            var sourceToWorld = new List<Matrix4x4>(totalVertexCount);
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
             var targetRootBone = combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone;
 
@@ -4566,9 +4541,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
             var toLocal = targetRootBone.worldToLocalMatrix;
 
-            targetBones.Add(combinableSkinnedMeshes[0].transform);
-            targetBoneMap[combinableSkinnedMeshes[0].transform] = targetBones.Count - 1;
-            targetBindPoses.Add(combinableSkinnedMeshes[0].transform.worldToLocalMatrix);
+            AddNewBone(combinableSkinnedMeshes[0].transform, combinableSkinnedMeshes[0].transform.worldToLocalMatrix);
 
             string newMeshName = combinableSkinnedMeshes[0].name;
             string newPath = GetPathToRoot(combinableSkinnedMeshes[0]);
@@ -4581,10 +4554,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             // this caches the results for later use when optimizing the materials
             basicMergedMeshesList.ForEach(r => GetFirstMaterialOnPath(GetPathToRoot(r)));
 
+            int bindPoseMeshID = -1;
+
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
                 DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
 
+                bindPoseMeshID++;
                 var blobMeshID = basicMergedMeshes.FindIndex(blob => blob.Contains(skinnedMesh));
                 var currentMeshPath = GetPathToRoot(skinnedMesh);
                 var mesh = skinnedMesh.sharedMesh;
@@ -4609,9 +4585,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
                     bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
                 }
-                var toWorldArray = Enumerable.Range(0, bindPoseCount).Select(i =>
-                    sourceBones[i].localToWorldMatrix * sourceBindPoses[i]
-                    ).ToArray();
                 var aabb = skinnedMesh.localBounds;
                 var m = toLocal * rootBone.localToWorldMatrix;
                 targetBounds.Encapsulate(m.MultiplyPoint3x4(aabb.extents.Multiply(1, 1, 1) + aabb.center));
@@ -4626,13 +4599,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 int NaNimationBoneIndex = -1;
                 if (MergeSkinnedMeshesWithNaNimation && basicMergedMeshes.Count > 1
                         && FindAllRendererTogglePaths().Contains(currentMeshPath)
-                        && CanUseNaNimationOnMesh(currentMeshPath)) {
+                        && CanUseNaNimationOnMesh(currentMeshPath))
+                {
                     NaNimationBone = new GameObject("NaNimationBone").transform;
                     var pathToRoot = currentMeshPath.Replace('/', '_');
                     var siblingNames = new HashSet<string>(transform.Cast<Transform>().Select(t => t.name));
                     var nameCandidate = "NaNimation " + pathToRoot;
                     int i = 1;
-                    while (siblingNames.Contains(nameCandidate)) {
+                    while (siblingNames.Contains(nameCandidate))
+                    {
                         nameCandidate = "NaNimation " + pathToRoot + " " + i++;
                     }
                     NaNimationBone.name = nameCandidate;
@@ -4640,11 +4615,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     NaNimationBone.localPosition = Vector3.zero;
                     NaNimationBone.localRotation = Quaternion.identity;
                     NaNimationBone.localScale = Vector3.one;
-                    targetBones.Add(NaNimationBone);
-                    NaNimationBoneIndex = targetBoneMap[NaNimationBone] = targetBones.Count - 1;
-                    targetBindPoses.Add(NaNimationBone.worldToLocalMatrix);
+                    NaNimationBoneIndex = AddNewBone(NaNimationBone, NaNimationBone.worldToLocalMatrix);
                     string key = "NaNimation";
-                    if (MergeSkinnedMeshesWithShaderToggle) {
+                    if (MergeSkinnedMeshesWithShaderToggle)
+                    {
                         key += $";{blobMeshID};{newPath}";
                     }
                     AddAnimationPathChange((currentMeshPath, "m_IsActive", typeof(GameObject)),
@@ -4657,13 +4631,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.up * 0.2f));
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f + Vector3.right * 0.2f));
                     targetBounds.Encapsulate(toLocal.MultiplyPoint3x4(avDescriptor.ViewPosition + Vector3.forward * 0.3f - Vector3.right * 0.2f));
-                } else if (basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle) {
+                }
+                else if (basicMergedMeshes.Count > 1 && MergeSkinnedMeshesWithShaderToggle)
+                {
                     AddAnimationPathChange((currentMeshPath, "m_IsActive", typeof(GameObject)),
                             (newPath, "material._IsActiveMesh" + blobMeshID, typeof(SkinnedMeshRenderer)));
                     AddAnimationPathChange((currentMeshPath, "m_Enabled", typeof(SkinnedMeshRenderer)),
                             (newPath, "material._IsActiveMesh" + blobMeshID, typeof(SkinnedMeshRenderer)));
                 }
-                
+
                 if (sourceWeights.Length != sourceVertices.Length || bindPoseCount == 0)
                 {
                     var defaultWeight = new BoneWeight
@@ -4679,7 +4655,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                     };
                     sourceWeights = Enumerable.Repeat(defaultWeight, sourceVertices.Length).ToArray();
                     sourceBones = new Transform[1] { rootBone.transform };
-                    toWorldArray = new Matrix4x4[1] { rootBone.transform.localToWorldMatrix };
+                    sourceBindPoses = new Matrix4x4[1] { Matrix4x4.identity };
                     keepTransforms.Add(rootBone.transform);
                     bindPoseCount = 1;
                 }
@@ -4695,17 +4671,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                 if (mesh.HasVertexAttribute(VertexAttribute.Color))
                 {
-                    if (useColor32) {
+                    if (useColor32)
+                    {
                         targetColor32.AddRange(mesh.colors32);
-                    } else {
+                    }
+                    else
+                    {
                         targetColor.AddRange(mesh.colors);
                     }
                 }
                 else
                 {
-                    if (useColor32) {
+                    if (useColor32)
+                    {
                         targetColor32.AddRange(Enumerable.Repeat(new Color32(255, 255, 255, 255), sourceVertices.Length));
-                    } else {
+                    }
+                    else
+                    {
                         targetColor.AddRange(Enumerable.Repeat(Color.white, sourceVertices.Length));
                     }
                 }
@@ -4736,62 +4718,52 @@ public class d4rkAvatarOptimizer : MonoBehaviour
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
                 {
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
-                    var boneWeight = sourceWeights[vertIndex];
-                    boneWeight.boneIndex0 = boneWeight.boneIndex0 >= bindPoseCount ? 0 : boneWeight.boneIndex0;
-                    boneWeight.boneIndex1 = boneWeight.boneIndex1 >= bindPoseCount ? 0 : boneWeight.boneIndex1;
-                    boneWeight.boneIndex2 = boneWeight.boneIndex2 >= bindPoseCount ? 0 : boneWeight.boneIndex2;
-                    boneWeight.boneIndex3 = boneWeight.boneIndex3 >= bindPoseCount ? 0 : boneWeight.boneIndex3;
-                    Matrix4x4 toWorld = toWorldArray[boneWeight.boneIndex0];
-                    if (boneWeight.weight0 != 1)
+                    int GetNewBoneIndexForCurrentMesh(int oldIndex)
                     {
-                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex0], boneWeight.weight0 - 1);
-                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex1], boneWeight.weight1);
-                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex2], boneWeight.weight2);
-                        AddWeighted(ref toWorld, toWorldArray[boneWeight.boneIndex3], boneWeight.weight3);
-                    }
-                    sourceToWorld.Add(toWorld);
-                    var vertex = sourceVertices[vertIndex];
-                    var normal = sourceNormals[vertIndex];
-                    var tangent = (Vector3)sourceTangents[vertIndex];
-                    targetVertices.Add(toWorld.MultiplyPoint3x4(vertex));
-                    targetNormals.Add(toWorld.MultiplyVector(normal));
-                    var t = toWorld.MultiplyVector(tangent);
-                    targetTangents.Add(new Vector4(t.x, t.y, t.z, sourceTangents[vertIndex].w));
-                    int GetNewBoneIndex(int oldIndex)
-                    {
+                        oldIndex = oldIndex >= bindPoseCount ? 0 : Math.Max(0, oldIndex);
                         if (!bindPoseIDMap.TryGetValue(oldIndex, out int newIndex))
                         {
-                            newIndex = GetNewBoneIDFromTransform(targetBones, targetBoneMap, targetBindPoses, sourceBones[oldIndex]);
+                            newIndex = GetNewBoneIndex(oldIndex, bindPoseMeshID, sourceBones[oldIndex], sourceBindPoses[oldIndex]);
                             bindPoseIDMap[oldIndex] = newIndex;
                         }
                         return newIndex;
                     }
-                    boneWeight.boneIndex0 = GetNewBoneIndex(boneWeight.boneIndex0);
-                    boneWeight.boneIndex1 = GetNewBoneIndex(boneWeight.boneIndex1);
-                    boneWeight.boneIndex2 = GetNewBoneIndex(boneWeight.boneIndex2);
-                    boneWeight.boneIndex3 = GetNewBoneIndex(boneWeight.boneIndex3);
-                    if (NaNimationBoneIndex != -1) {
+                    var boneWeight = sourceWeights[vertIndex];
+                    boneWeight.boneIndex0 = GetNewBoneIndexForCurrentMesh(boneWeight.boneIndex0);
+                    boneWeight.boneIndex1 = GetNewBoneIndexForCurrentMesh(boneWeight.boneIndex1);
+                    boneWeight.boneIndex2 = GetNewBoneIndexForCurrentMesh(boneWeight.boneIndex2);
+                    boneWeight.boneIndex3 = GetNewBoneIndexForCurrentMesh(boneWeight.boneIndex3);
+                    if (NaNimationBoneIndex != -1)
+                    {
                         var sum = boneWeight.weight0 + boneWeight.weight1 + boneWeight.weight2;
                         sum = sum == 0 ? 1 : sum;
                         boneWeight.weight0 /= sum;
                         boneWeight.weight1 /= sum;
                         boneWeight.weight2 /= sum;
                         boneWeight.weight3 = 0;
-                        if (boneWeight.weight1 == 0) {
+                        if (boneWeight.weight1 == 0)
+                        {
                             boneWeight.boneIndex1 = NaNimationBoneIndex;
                             boneWeight.weight1 = 1e-35f;
-                        } else if (boneWeight.weight2 == 0) {
+                        }
+                        else if (boneWeight.weight2 == 0)
+                        {
                             boneWeight.boneIndex2 = NaNimationBoneIndex;
                             boneWeight.weight2 = 1e-35f;
-                        } else {
+                        }
+                        else
+                        {
                             boneWeight.boneIndex3 = NaNimationBoneIndex;
                             boneWeight.weight3 = 1e-35f;
                         }
                     }
                     targetWeights.Add(boneWeight);
+                    targetVertices.Add(sourceVertices[vertIndex]);
+                    targetNormals.Add(sourceNormals[vertIndex]);
+                    targetTangents.Add(sourceTangents[vertIndex]);
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
                 }
-                
+
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
                 {
                     int clampedSubMeshID = Math.Min(matID, mesh.subMeshCount - 1);
@@ -4897,10 +4869,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         for (int k = 0; k < meshVertexCount; k++)
                         {
                             int vertIndex = k + vertexOffset[meshID];
-                            var toWorld = sourceToWorld[vertIndex];
-                            targetDeltaVertices[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaVertices[k]));
-                            targetDeltaNormals[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaNormals[k]));
-                            targetDeltaTangents[vertIndex] = CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaTangents[k]));
+                            targetDeltaVertices[vertIndex] = sourceDeltaVertices[k];
+                            targetDeltaNormals[vertIndex] = sourceDeltaNormals[k];
+                            targetDeltaTangents[vertIndex] = sourceDeltaTangents[k];
                         }
                         var weight = mesh.GetBlendShapeFrameWeight(blendShapeID, j);
                         combinedMesh.AddBlendShapeFrame(name, weight, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
@@ -4941,10 +4912,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                         for (int k = 0; k < meshVertexCount; k++)
                         {
                             int vertIndex = k + vertexOffset[meshID];
-                            var toWorld = sourceToWorld[vertIndex];
-                            targetDeltaVertices[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaVertices[k]) * toMerge.weight);
-                            targetDeltaNormals[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaNormals[k]) * toMerge.weight);
-                            targetDeltaTangents[vertIndex] += CleanUpSmallValues(toWorld.MultiplyVector(sourceDeltaTangents[k]) * toMerge.weight);
+                            targetDeltaVertices[vertIndex] += sourceDeltaVertices[k] * toMerge.weight;
+                            targetDeltaNormals[vertIndex] += sourceDeltaNormals[k] * toMerge.weight;
+                            targetDeltaTangents[vertIndex] += sourceDeltaTangents[k] * toMerge.weight;
                         }
                     }
                     combinedMesh.AddBlendShapeFrame(name, 100, targetDeltaVertices, targetDeltaNormals, targetDeltaTangents);
@@ -5135,7 +5105,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
         }
-        allBonesAndParentsWithOriginalScale.ForEach(pair => pair.bone.localScale = pair.scale);
         transform.position = originalRootPosition;
         transform.rotation = originalRootRotation;
 
