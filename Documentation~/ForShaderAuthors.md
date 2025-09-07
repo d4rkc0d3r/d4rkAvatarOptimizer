@@ -104,7 +104,7 @@ This is useful in cases where inline replacement of the value is necessary like 
 #else
     [instance(32)]
 #endif
-void geom(triangle VS_OUT input[3], inout TriangleStream<PS_IN> triStream, uint instanceID : SV_InstanceID)
+void geom(triangle VS_OUT input[3], inout TriangleStream<PS_IN> triStream, uint instanceID : SV_GSInstanceID)
 {
     #if !defined(OPTIMIZER_ENABLED)
         if (instanceID >= _GSInstanceCount) return;
