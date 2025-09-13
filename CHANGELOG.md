@@ -1,3 +1,8 @@
+## v3.12.1
+### Bug Fixes
+* Add support for `[DoNotLock]` tag in shaders to prevent them from being inline replaced as constants.
+  * This fixes shader pink with the newest poi shader versions.
+
 ## v3.12.0
 ### Features
 * Several upgrades to the shader optimizer:

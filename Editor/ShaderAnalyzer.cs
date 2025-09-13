@@ -40,6 +40,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public HashSet<string> shaderLabParams = new HashSet<string>();
             public string defaultValue;
             public bool hasGammaTag = false;
+            public bool doNotLock = false;
         }
         public class Function
         {
@@ -677,8 +678,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             endInsideTagIndex = charIndex + 1;
                         charIndex++;
                     }
-                    if (endInsideTagIndex - startInsideTagIndex <= 5) {
-                        // currently we only care about [hdr] and [gamma] tags
+                    if (endInsideTagIndex - startInsideTagIndex <= 10) {
+                        // currently we only care about [hdr], [gamma] & [donotlock] tags
                         tags.Add(line.Substring(startInsideTagIndex, endInsideTagIndex - startInsideTagIndex));
                     }
                     charIndex++;
@@ -740,12 +741,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
             output.hasGammaTag = false;
             bool hasHdrTag = false;
             for (int i = 0; i < tags.Count; i++) {
-                switch (tags[i].ToLowerInvariant()) {
+                switch (tags[i].ToLowerInvariant())
+                {
                     case "gamma":
                         output.hasGammaTag = true;
                         break;
                     case "hdr":
                         hasHdrTag = true;
+                        break;
+                    case "donotlock":
+                        output.doNotLock = true;
                         break;
                 }
             }
@@ -1671,6 +1676,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (optimizer.arrayPropertyValues.ContainsKey(staticValues.Key))
                     continue;
+                if (source.propertyTable.TryGetValue(staticValues.Key, out var prop))
+                {
+                    if (prop.doNotLock)
+                        continue;
+                }
                 optimizer.constantPropertyValues[staticValues.Key] = $"({staticValues.Value})";
             }
             try
