@@ -44,7 +44,7 @@ Do this:
     float4 _MyTexture_ST;
 #endif
 ```
-Besides the direct hlsl declarations you can also use the unity macros `UNITY_DECLARE_TEX2D` and `UNITY_DECLARE_TEX2D_NOSAMPLER` as the have hardcoded support in the optimizer.
+Besides the direct hlsl declarations you can also use the unity macros `UNITY_DECLARE_TEX2D` and `UNITY_DECLARE_TEX2D_NOSAMPLER` as they have hardcoded support in the optimizer.
 
 ### Vertex Data and Function Signatures
 Other critical places are the structs for vertex data and the vertex, geometry & fragment function signatures. I need to pass along a combine mesh/material id from uv0.z to the later shader stages. This requires me to modify those structs and function signatures which can easily break when the optimizer isn't able to see the full structure.
@@ -55,7 +55,7 @@ For example, do NOT do this:
 // VERY BAD, DO NOT DO THIS
 #ifdef SOME_PLATFORM_DEFINE
     #define FACING_PARAM(facing) , uint facing : SV_IsFrontFace
-    #define UV_PARAM(uvIndex) , float2 uv##uvIndex : TEXCOORD##uvIndex
+    #define UV_PARAM(uvIndex) float2 uv##uvIndex : TEXCOORD##uvIndex;
 #else
     #define FACING_PARAM(facing)
     #define UV_PARAM(uv)
