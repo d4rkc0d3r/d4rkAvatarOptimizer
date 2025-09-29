@@ -1,3 +1,7 @@
+## v3.12.2
+### Bug Fixes
+* Fix shader error when a material has an apostrophe (`'`) in its name.
+
 ## v3.12.1
 ### Bug Fixes
 * Add support for `[DoNotLock]` tag in shaders to prevent them from being inline replaced as constants.
