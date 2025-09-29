@@ -1,6 +1,7 @@
 ## v3.12.2
 ### Bug Fixes
 * Fix shader error when a material has an apostrophe (`'`) in its name.
+* Fix optimizer stripping shadow variants from materials with render queue 2500.
 
 ## v3.12.1
 ### Bug Fixes

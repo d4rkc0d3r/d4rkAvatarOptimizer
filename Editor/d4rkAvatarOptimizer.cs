@@ -3486,6 +3486,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             char[] invalidChars = Path.GetInvalidFileNameChars()
                 .Append('\'') // imagine fxc being able to handle all legal filenames smh
                 .ToArray();
+            stripShadowVariants[i] = source[0].renderQueue > 2500;
             sanitizedMaterialNames[i] = "s_" + Path.GetFileNameWithoutExtension(parsedShader[i].filePath)
                 + " " + string.Join("_", source[0].name.Split(invalidChars, System.StringSplitOptions.RemoveEmptyEntries));
             texturesToMerge[i] = new HashSet<string>();
