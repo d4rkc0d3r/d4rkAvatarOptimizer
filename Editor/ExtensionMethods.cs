@@ -26,6 +26,19 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
             }
         }
 
+        public static Transform GetRootBone(this Renderer renderer)
+        {
+            if (renderer is SkinnedMeshRenderer skinnedMeshRenderer)
+            {
+                var bone = skinnedMeshRenderer.rootBone;
+                if (bone != null)
+                {
+                    return bone;
+                }
+            }
+            return renderer.transform;
+        }
+
         // using mesh.boneWeights = boneWeights; causes the mesh to always use 4 bone weights per vertex
         // this method allows to also use 2 or 1 bone weights per vertex if none of the vertices need more
         public static void SetBoneWeights(this Mesh mesh, BoneWeight[] boneWeights)

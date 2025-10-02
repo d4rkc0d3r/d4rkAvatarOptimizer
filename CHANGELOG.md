@@ -2,6 +2,8 @@
 ### Bug Fixes
 * Fix shader error when a material has an apostrophe (`'`) in its name.
 * Fix optimizer stripping shadow variants from materials with render queue 2500.
+* Fix meshes with negative scale getting merged with meshes with positive scale.
+  * This caused the shader property `SV_IsFrontFace` to get flipped for parts of the merged mesh.
 
 ## v3.12.1
 ### Bug Fixes

@@ -756,6 +756,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         return false;
     }
 
+    private bool RenderersHaveSameRootBoneScaleSign(Renderer a, Renderer b)
+    {
+        if (a == null || b == null)
+            return true;
+        var scaleA = a.GetRootBone().lossyScale;
+        var scaleB = b.GetRootBone().lossyScale;
+        return Mathf.Sign(scaleA.x) == Mathf.Sign(scaleB.x) && Mathf.Sign(scaleA.y) == Mathf.Sign(scaleB.y) && Mathf.Sign(scaleA.z) == Mathf.Sign(scaleB.z);
+    }
+
     private bool CanCombineRendererWith(List<Renderer> list, Renderer candidate)
     {
         if (!MergeSkinnedMeshes)
@@ -765,6 +774,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         if (list[0].shadowCastingMode != candidate.shadowCastingMode)
             return false;
         if (list[0].receiveShadows != candidate.receiveShadows)
+            return false;
+        if (!RenderersHaveSameRootBoneScaleSign(list[0], candidate))
             return false;
         bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
         {
