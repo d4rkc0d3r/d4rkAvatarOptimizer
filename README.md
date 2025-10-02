@@ -39,7 +39,6 @@ Expect the following behavior changes (reduced due to NaNimation toggles):
   * Some examples of this are wire frame shaders and screen space ambient occlusion
 * With blocked shaders all merged meshes that now rely on shader toggles are always visible
   * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually
-### Full
 This preset uses all optimizations I use for my own avatars.  
 Some of the settings used here compromise quality of the avatar heavily when animations/shaders are blocked.  
 It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.
