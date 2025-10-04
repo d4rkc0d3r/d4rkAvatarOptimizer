@@ -1681,7 +1681,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (prop.doNotLock)
                         continue;
                 }
-                optimizer.constantPropertyValues[staticValues.Key] = $"({staticValues.Value})";
+                string value = staticValues.Value;
+                if (int.TryParse(value, out var intValue))
+                {
+                    value = intValue + ".0";
+                }
+                optimizer.constantPropertyValues[staticValues.Key] = $"({value})";
             }
             try
             {

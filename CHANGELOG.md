@@ -1,3 +1,7 @@
+## v3.12.3
+### Bug Fixes
+* Fix errors in constant folding if value is an exact integer.
+
 ## v3.12.2
 ### Bug Fixes
 * Fix shader error when a material has an apostrophe (`'`) in its name.
