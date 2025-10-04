@@ -2421,6 +2421,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             target.Add($"#pragma warning (disable : 3557) // loop only executes for 1 iteration(s), forcing loop to unroll");
             target.Add($"#pragma warning (disable : 4008) // A floating point division by zero occurred.");
+            target.Add($"#pragma warning (disable : 3554) // The attribute is unknown or invalid for the specified statement.");
         }
 
         private void InjectOptimizerDefines()

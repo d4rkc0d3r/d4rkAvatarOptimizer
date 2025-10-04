@@ -1,4 +1,8 @@
 ## v3.12.3
+### Changes
+* Add ignore warning 3554 to generated shaders (The attribute is unknown or invalid for the specified statement).
+  * These were caused by `[branch]` attributes on if statements that get constant folded.
+
 ### Bug Fixes
 * Fix errors in constant folding if value is an exact integer.
 
