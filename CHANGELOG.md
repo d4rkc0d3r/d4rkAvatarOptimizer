@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Strip material swap bindings that point to slots that don't exist on the renderer.
   * Merging meshes could result in those slots now existing and getting overwritten by the material swap animation.
+* Fix incompatibility with ndmf for detecting unused physbones.
 
 ## v3.12.3
 ### Changes

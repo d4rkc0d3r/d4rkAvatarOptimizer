@@ -2465,6 +2465,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour
         {
             AddDependency(contact.GetRootTransform(), contact);
         }
+
+        var componentTypesToIgnore = new HashSet<string>() {
+            "UnityEngine.Transform",
+            "nadena.dev.ndmf.multiplatform.components.PortableDynamicBone",
+            "nadena.dev.ndmf.multiplatform.components.PortableDynamicBoneCollider",
+        };
+
         foreach (var physBone in physBones)
         {
             var root = physBone.GetRootTransform();
@@ -2474,7 +2481,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 {
                     result[physBone].UnionWith(dependencies);
                 }
-                result[physBone].UnionWith(current.GetNonNullComponents().Where(c => c != physBone && !(c is Transform)));
+                result[physBone].UnionWith(current.GetNonNullComponents()
+                    .Where(c => c != physBone && !componentTypesToIgnore.Contains(c.GetType().FullName)));
             }
         }
 
