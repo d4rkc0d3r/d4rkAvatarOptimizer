@@ -1613,6 +1613,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool stripShadowVariants = false;
         private bool inlineReplaceConstants = false;
         private Dictionary<string, string> constantPropertyValues = new Dictionary<string, string>();
+        private Dictionary<string, string> variableTypesThisPass = new Dictionary<string, string>();
         private OptimizedShader optimizedShader = new OptimizedShader();
 
         private ShaderOptimizer() {}
@@ -1681,12 +1682,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (prop.doNotLock)
                         continue;
                 }
-                string value = staticValues.Value;
-                if (int.TryParse(value, out var intValue))
-                {
-                    value = intValue + ".0";
-                }
-                optimizer.constantPropertyValues[staticValues.Key] = $"({value})";
+                optimizer.constantPropertyValues[staticValues.Key] = staticValues.Value;
             }
             try
             {
@@ -1722,7 +1718,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var chunk = line.Substring(currentChunkStart, i - currentChunkStart);
                     if (inIdentifier && constantPropertyValues.TryGetValue(chunk, out var replacement))
                     {
-                        sb.Append(replacement);
+                        if (variableTypesThisPass.TryGetValue(chunk, out var type))
+                        {
+                            replacement = $"({type}){replacement}";
+                        }
+                        sb.Append($"({replacement})");
                         didReplaceSomething = true;
                     }
                     else
@@ -3189,6 +3189,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var type = match.type;
                         foreach (var name in match.names)
                         {
+                            variableTypesThisPass[name] = type;
                             bool isTextureSamplerState = (type == "SamplerState" || type == "sampler") && name.StartsWithSimple("sampler");
                             string referencedTexture = isTextureSamplerState ? name.Substring(7) : null;
                             if (isTextureSamplerState && !texturesToReplaceCalls.Contains(referencedTexture))
@@ -3512,6 +3513,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     passID = int.Parse(line.Substring(6));
                     currentPass = parsedShader.passes[passID];
+                    variableTypesThisPass.Clear();
                     alreadyIncludedFiles.Clear();
                     alreadyIncludedFiles.Push(new HashSet<string>());
                     knownDefines.Clear();

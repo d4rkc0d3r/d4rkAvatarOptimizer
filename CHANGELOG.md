@@ -1,3 +1,7 @@
+## v3.12.5
+### Bug Fixes
+* Fix inline replacement of constant property values not preserving their declared variable type. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/165)
+
 ## v3.12.4
 ### Bug Fixes
 * Strip material swap bindings that point to slots that don't exist on the renderer.
