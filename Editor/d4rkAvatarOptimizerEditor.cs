@@ -606,12 +606,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         }
 
-        #if !HAS_IEDITOR_ONLY
-        EditorGUILayout.HelpBox("Your VRChat Avatar SDK is outdated.\n" +
-            "The version you are using does not support the \"Optimize on Upload\" feature.\n" +
-            "Please update your SDK to the latest version.", MessageType.Error);
-        #endif
-
         if (optimizer.UseRingFingerAsFootCollider)
         {
             if (avDescriptor.collider_footL.transform == null || avDescriptor.collider_footR.transform == null
@@ -830,14 +824,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         var avDescriptor = optimizer.GetComponent<VRCAvatarDescriptor>();
         if (avDescriptor == null)
             return;
-        var pm = optimizer.GetComponent<VRC.Core.PipelineManager>();
-        if (pm == null)
+        if (!optimizer.TryGetComponent<VRC.Core.PipelineManager>(out var pm))
         {
             pm = optimizer.gameObject.AddComponent<VRC.Core.PipelineManager>();
         }
         if (!string.IsNullOrEmpty(pm.blueprintId))
             return;
-        pm.AssignId();
+        pm.AssignId(VRC.Core.PipelineManager.ContentType.avatar);
     }
 
     private d4rkAvatarOptimizer lastSelected = null;

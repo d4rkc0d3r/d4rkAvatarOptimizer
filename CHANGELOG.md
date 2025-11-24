@@ -1,3 +1,11 @@
+## v4.0.0
+### Changes
+* Minimum required VRChat Avatar SDK version is now 3.9.0
+* Minimum supported Unity version is now 2022.3
+
+### Bug Fixes
+* The component now gets properly shown as `d4rk Avatar Optimizer` in the inspector instead of `D 4rk Avatar Optimizer`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/166)
+
 ## v3.12.5
 ### Bug Fixes
 * Fix inline replacement of constant property values not preserving their declared variable type. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/165)

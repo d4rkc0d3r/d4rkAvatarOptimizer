@@ -29,10 +29,7 @@ using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 
 [HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
 [AddComponentMenu("d4rk Avatar Optimizer")]
-public class d4rkAvatarOptimizer : MonoBehaviour
-#if HAS_IEDITOR_ONLY
-, VRC.SDKBase.IEditorOnly
-#endif
+public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 {
     #region Settings
     [System.Serializable]
@@ -202,12 +199,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
     }
 
     public static bool HasCustomShaderSupport { get => EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64; }
-
-    #if HAS_IEDITOR_ONLY
     public bool ApplyOnUpload { get { return settings.ApplyOnUpload; } set { settings.ApplyOnUpload = value; } }
-    #else
-    public bool ApplyOnUpload { get { return false; } set { settings.ApplyOnUpload = false; } }
-    #endif
     public bool WritePropertiesAsStaticValues {
         get { return HasCustomShaderSupport && (settings.WritePropertiesAsStaticValues || MergeSkinnedMeshesWithShaderToggle || settings.MergeDifferentPropertyMaterials); }
         set { settings.WritePropertiesAsStaticValues = value; } }
@@ -267,10 +259,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 return MergeSameDimensionTextures;
             case nameof(CombineApproximateMotionTimeAnimations):
                 return settings.OptimizeFXLayer;
-            #if !HAS_IEDITOR_ONLY
-            case nameof(ApplyOnUpload):
-                return false;
-            #endif
             default:
                 return true;
         }
@@ -1700,16 +1688,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 newController.layers = layers;
             }
 
-            if (DeleteUnusedGameObjects) {
-                var playAudioType = Type.GetType("VRC.SDKBase.VRC_AnimatorPlayAudio, VRCSDKBase");
-                if (playAudioType != null) {
-                    var pathField = playAudioType.GetField("SourcePath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-                    foreach (var behaviour in newController.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours())) {
-                        if (playAudioType.IsAssignableFrom(behaviour.GetType())) {
-                            var path = (string)pathField.GetValue(behaviour) ?? "";
-                            if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null) {
-                                pathField.SetValue(behaviour, GetPathToRoot(transform));
-                            }
+            if (DeleteUnusedGameObjects)
+            {
+                foreach (var behavior in newController.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours()))
+                {
+                    if (behavior is VRC.SDKBase.VRC_AnimatorPlayAudio playAudio)
+                    {
+                        var path = playAudio.SourcePath ?? "";
+                        if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null)
+                        {
+                            playAudio.SourcePath = GetPathToRoot(transform);
                         }
                     }
                 }
@@ -4040,11 +4028,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour
             return false;
         if (firstMat.enableInstancing != candidateMat.enableInstancing)
             return false;
-        #if UNITY_2022_1_OR_NEWER
-            bool hasAnyMaterialVariant = listMaterials.Any(m => m.isVariant) || candidateMat.isVariant;
-        #else
-            bool hasAnyMaterialVariant = false;
-        #endif
+        bool hasAnyMaterialVariant = listMaterials.Any(m => m.isVariant) || candidateMat.isVariant;
         if (!hasAnyMaterialVariant && firstMat.GetTag("VRCFallback", false, "None") != candidateMat.GetTag("VRCFallback", false, "None"))
             return false;
         foreach (var pass in parsedShader.passes)
@@ -5230,14 +5214,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour
                 }
                 else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
                 {
-                    #if UNITY_2022_1_OR_NEWER
-                        if (!visitedIds.Add(iterator.managedReferenceId))
-                        {
-                            enterChildren = false;
-                        }
-                    #else
+                    if (!visitedIds.Add(iterator.managedReferenceId))
+                    {
                         enterChildren = false;
-                    #endif
+                    }
                 }
             }
             return referencedTransforms;
