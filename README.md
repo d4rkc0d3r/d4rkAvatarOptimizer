@@ -17,6 +17,19 @@ To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.git
 
 After that you can add and update the optimizer like any other packages in your VCC projects.
 
+## Settings Recommendation
+* Your avatar is over 150k triangles or a lot of materials
+  * Use the "Basic" preset
+  * Shader and NaNimation toggles should be avoided as merging too many meshes could cause performance regressions
+* Your avatar is under 150k triangles and a moderate amount of materials
+  * Use the "Shader Toggles" preset
+  * If your shaders are supported shaders like Poiyomi
+    * Disable NaNimation toggles
+    * Check if your avatar doesn't show anything unwanted with shaders blocked  
+In game open the action menu (the round one) -> Options -> Avatar -> Fallback Shaders
+  * If anything in game looks off, fall back to the "Basic" preset
+
+
 ## Presets
 ### Basic
 This preset only uses optimizations that don't affect the behavior of the avatar.
@@ -31,7 +44,7 @@ This preset uses all the above & some new optimizations.
 For this mode you should keep shaders unlocked as it can allow for more merging.  
 * Merges meshes even if they are animated/toggled differently by injecting logic into the shaders
 * Merged materials with the same shader even if their properties differ
-* Applies a generalized version of "lock in" to the new shaders
+* Applies a generalized version of "lock in" to the new shaders  
 Due to the added shader logic this preset will slightly increase the GPU cost of the avatar as a trade off for less draw calls.
 
 Expect the following behavior changes (reduced due to NaNimation toggles):
@@ -40,7 +53,6 @@ Expect the following behavior changes (reduced due to NaNimation toggles):
 * With blocked shaders all merged meshes that now rely on shader toggles are always visible
   * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually
 ### Full
-This preset uses all optimizations I use for my own avatars.  
 Some of the settings used here compromise quality of the avatar heavily when animations/shaders are blocked.  
 It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.
 
