@@ -26,7 +26,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public bool OnPreprocessAvatar(GameObject avatarGameObject)
         {
-            var optimizers = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(true);
+            var optimizers = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(includeInactive: false);
             if (optimizers.Length > 1)
             {
                 Debug.LogError($"Multiple d4rkAvatarOptimizer components found on avatar {avatarGameObject.name}. Remove duplicates before uploading.");
