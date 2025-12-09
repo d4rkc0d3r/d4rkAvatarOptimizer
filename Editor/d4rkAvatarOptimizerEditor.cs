@@ -154,17 +154,18 @@ public class d4rkAvatarOptimizerEditor : Editor
             Profiler.Reset();
             Profiler.StartSection("Assign New Avatar ID");
             AssignNewAvatarIDIfEmpty();
-            Profiler.StartNextSection("Instantiate(optimizer.gameObject)");
-            var copy = Instantiate(optimizer.gameObject);
+            var avDescriptor = optimizer.GetAvatarDescriptor();
+            Profiler.StartNextSection("Instantiate(avDescriptor.gameObject)");
+            var copy = Instantiate(avDescriptor.gameObject);
             Profiler.StartNextSection("Move Copy to Scene");
-            SceneManager.MoveGameObjectToScene(copy, optimizer.gameObject.scene);
+            SceneManager.MoveGameObjectToScene(copy, avDescriptor.gameObject.scene);
             Profiler.StartNextSection("Optimize Copy");
-            copy.name = optimizer.gameObject.name + "(BrokenCopy)";
+            copy.name = avDescriptor.gameObject.name + "(BrokenCopy)";
             copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
-            copy.name = optimizer.gameObject.name + "(OptimizedCopy)";
+            copy.name = avDescriptor.gameObject.name + "(OptimizedCopy)";
             Profiler.StartNextSection("Select Copy");
             copy.SetActive(true);
-            optimizer.gameObject.SetActive(false);
+            avDescriptor.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
             Profiler.EndSection();
             Profiler.PrintTimeUsed();
@@ -576,11 +577,21 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Validate()
     {
-        var avDescriptor = optimizer.GetComponent<VRCAvatarDescriptor>();
+        var avDescriptor = optimizer.GetAvatarDescriptor();
 
         if (avDescriptor == null)
         {
-            EditorGUILayout.HelpBox("No VRCAvatarDescriptor found on the root object.", MessageType.Error);
+            EditorGUILayout.HelpBox("No VRCAvatarDescriptor found.", MessageType.Error);
+            return false;
+        }
+
+        var allOptimizerComponents = avDescriptor.GetComponentsInChildren<d4rkAvatarOptimizer>(true);
+        if (allOptimizerComponents.Length > 1)
+        {
+            EditorGUILayout.HelpBox("Multiple d4rkAvatarOptimizer components found on the avatar.\n" +
+                "Remove the duplicates. Components are at paths:\n - " +
+                string.Join("\n - ", allOptimizerComponents.Select(c => avDescriptor.name + (c.transform == avDescriptor.transform ? "" : "/" + c.GetPathToRoot(c)))),
+                MessageType.Error);
             return false;
         }
 
@@ -600,7 +611,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         }
 
-        if (optimizer.name.EndsWith("(OptimizedCopy)"))
+        if (avDescriptor.name.EndsWith("(OptimizedCopy)"))
         {
             EditorGUILayout.HelpBox("Put the optimizer on the original avatar, not the optimized copy.", MessageType.Error);
             return false;
@@ -622,7 +633,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             && avDescriptor.VisemeSkinnedMesh != null)
         {
             var meshRenderer = avDescriptor.VisemeSkinnedMesh;
-            if (optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+            if (avDescriptor.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
             {
                 EditorGUILayout.HelpBox("Viseme SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
@@ -632,20 +643,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)
         {
             var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-            if (optimizer.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
+            if (avDescriptor.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
             {
                 EditorGUILayout.HelpBox("Eyelid SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
         }
 
-        if (Object.FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
+        if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
         {
             EditorGUILayout.HelpBox(
                 "Optimized copy of some avatar is present in the scene.\n" +
                 "Its assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
-        if (Object.FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
+        if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
         {
             EditorGUILayout.HelpBox(
                 "Seems like the last optimization attempt failed.\n" +
@@ -657,8 +668,8 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var exclusions = optimizer.GetAllExcludedTransforms();
 
-        var animatorsExcludingRoot = optimizer.GetComponentsInChildren<Animator>(true)
-            .Where(a => a.gameObject != optimizer.gameObject)
+        var animatorsExcludingRoot = avDescriptor.GetComponentsInChildren<Animator>(true)
+            .Where(a => a.gameObject != avDescriptor.gameObject)
             .Where(a => !exclusions.Contains(a.transform))
             .Where(a => a.runtimeAnimatorController != null)
             .ToArray();
@@ -795,7 +806,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         var furyType = Type.GetType("VF.Model.VRCFury, VRCFury");
-        if (furyType != null && optimizer.GetComponentsInChildren(furyType, true).Any())
+        if (furyType != null && avDescriptor.GetComponentsInChildren(furyType, true).Any())
         {
             EditorGUILayout.HelpBox(
                 "VRCFury is used on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +
@@ -805,7 +816,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         #if MODULAR_AVATAR_EXISTS
-        if (optimizer.GetComponentsInChildren<nadena.dev.modular_avatar.core.AvatarTagComponent>(true).Any())
+        if (avDescriptor.GetComponentsInChildren<nadena.dev.modular_avatar.core.AvatarTagComponent>(true).Any())
         {
             EditorGUILayout.HelpBox(
                 "Modular Avatar is used on the avatar. This means the perf rank change and merge result previews " + 
@@ -821,12 +832,12 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private static void AssignNewAvatarIDIfEmpty()
     {
-        var avDescriptor = optimizer.GetComponent<VRCAvatarDescriptor>();
+        var avDescriptor = optimizer.GetAvatarDescriptor();
         if (avDescriptor == null)
             return;
-        if (!optimizer.TryGetComponent<VRC.Core.PipelineManager>(out var pm))
+        if (!avDescriptor.TryGetComponent<VRC.Core.PipelineManager>(out var pm))
         {
-            pm = optimizer.gameObject.AddComponent<VRC.Core.PipelineManager>();
+            pm = avDescriptor.gameObject.AddComponent<VRC.Core.PipelineManager>();
         }
         if (!string.IsNullOrEmpty(pm.blueprintId))
             return;

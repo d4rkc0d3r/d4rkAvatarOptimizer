@@ -26,7 +26,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public bool OnPreprocessAvatar(GameObject avatarGameObject)
         {
-            var optimizer = avatarGameObject.GetComponent<d4rkAvatarOptimizer>();
+            var optimizers = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(true);
+            if (optimizers.Length > 1)
+            {
+                Debug.LogError($"Multiple d4rkAvatarOptimizer components found on avatar {avatarGameObject.name}. Remove duplicates before uploading.");
+                return false;
+            }
+            var optimizer = optimizers.Length == 1 ? optimizers[0] : null;
             if (optimizer == null && AvatarOptimizerSettings.DoOptimizeWithDefaultSettingsWhenNoComponent)
             {
                 optimizer = avatarGameObject.AddComponent<d4rkAvatarOptimizer>();
@@ -58,7 +64,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             catch (Exception e)
             {
-                Debug.LogError(e);
+                Debug.LogException(e);
                 return false;
             }
         }
