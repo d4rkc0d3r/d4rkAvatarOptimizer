@@ -47,12 +47,12 @@ Do this:
 Besides the direct hlsl declarations you can also use the unity macros `UNITY_DECLARE_TEX2D` and `UNITY_DECLARE_TEX2D_NOSAMPLER` as they have hardcoded support in the optimizer.
 
 ### Geometry shader streams
-Don't pass the geometry output streams to other functions. The optimizer needs to see the `.Append()` calls directly in the geometry shader function to be able to inject its wrapper struct properly.
+Don't pass the geometry output streams to other functions. The optimizer needs to see the `.Append()` calls directly in the geometry shader function to be able to inject its wrapper struct properly. This means you should also not hide the `.Append()` calls behind macros.
 
 ### Vertex Data and Function Signatures
 Other critical places are the structs for vertex data and the vertex, geometry & fragment function signatures. I need to pass along a combine mesh/material id from uv0.z to the later shader stages. This requires me to modify those structs and function signatures which can easily break when the optimizer isn't able to see the full structure.
 
-As with the property declarations, don't hide vertex data struct member declarations behind macros. Also don't hide vertex or fragment function parameters behind macros.  Using `#ifdef` blocks inside the struct/parameter list is fine.  
+As with the property declarations, don't hide vertex data struct member declarations behind macros. Also don't hide vertex or fragment function parameters behind macros. Using `#ifdef` blocks inside the struct/parameter list is fine.  
 For example, do NOT do this:
 ```c
 // VERY BAD, DO NOT DO THIS
