@@ -187,7 +187,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             DisplayProgressBar("Done", 1.0f);
             MoveRingFingerColliderToFeet();
             Profiler.StartNextSection("DestroyImmediate(this)");
+            var t = transform;
             DestroyImmediate(this);
+            if (t.childCount == 0 && t.GetComponents<Component>().Length == 1)
+                DestroyImmediate(t.gameObject);
             Profiler.EndSection();
         }
         finally
