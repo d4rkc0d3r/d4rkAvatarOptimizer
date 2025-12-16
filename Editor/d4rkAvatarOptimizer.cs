@@ -517,6 +517,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     private void DisplayProgressBar(string text)
     {
+        var name = GetRootTransform().name;
         var titleName = name.EndsWith("(BrokenCopy)") ? name.Substring(0, name.Length - "(BrokenCopy)".Length) : name;
         EditorUtility.DisplayProgressBar("Optimizing " + titleName, text, progressBar);
     }
@@ -525,29 +526,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         progressBar = progress;
         DisplayProgressBar(text);
-    }
-
-    public static string GetTrashBinPath()
-    {
-        var path = AssetDatabase.GUIDToAssetPath(AssetDatabase.FindAssets("d4rkAvatarOptimizer")[0]);
-        packageRootPath = path.Substring(0, path.LastIndexOf('/'));
-        packageRootPath = packageRootPath.Substring(0, packageRootPath.LastIndexOf('/'));
-        var trashBinRoot = packageRootPath;
-        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
-        if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
-        {
-            trashBinRoot = "Assets/d4rkAvatarOptimizer";
-            if (!AssetDatabase.IsValidFolder("Assets/d4rkAvatarOptimizer"))
-            {
-                AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
-            }
-        }
-        trashBinPath = trashBinRoot + "/TrashBin/";
-        if (!AssetDatabase.IsValidFolder(trashBinRoot + "/TrashBin"))
-        {
-            AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
-        }
-        return trashBinPath;
     }
 
     private void ClearTrashBin()
