@@ -3605,10 +3605,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             output.InsertRange(propertyBlockInsertionIndex, propertyBlock);
             var shaderHash = GetMD5Hash(output);
-            optimizedShader.files = new List<(string name, List<string> lines)>();
-            optimizedShader.files.Add(("Shader", output));
+            // add the first 4 characters of the overall shader hash to the include filenames so that the includes get sorted right below their respective shaders
+            outputIncludes = outputIncludes.Select(oi => {
+                var underscoreIndex = oi.name.LastIndexOf('_');
+                var newName = $"{oi.name[..underscoreIndex]}_{shaderHash[..4]}{oi.name[underscoreIndex..]}";
+                output = output.Select(line => line.Replace(oi.name, newName)).ToList();
+                return (newName, oi.lines);
+            }).ToList();
+            optimizedShader.files = new() { ("Shader", output) };
             optimizedShader.files.AddRange(outputIncludes);
-            optimizedShader.SetName($"{sanitizedShaderName} {shaderHash[..12]}");
+            optimizedShader.SetName($"{sanitizedShaderName}_{shaderHash[..4]} {shaderHash[4..12]}");
         }
     }
 }
