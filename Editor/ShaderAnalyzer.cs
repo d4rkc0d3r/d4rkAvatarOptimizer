@@ -1609,7 +1609,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<string> texturesToCallSoTheSamplerDoesntDisappear;
         private List<string> setKeywords;
         private int curlyBraceDepth = 0;
-        private string sanitizedMaterialName;
+        private string sanitizedShaderName;
         private bool stripShadowVariants = false;
         private bool inlineReplaceConstants = false;
         private Dictionary<string, string> constantPropertyValues = new Dictionary<string, string>();
@@ -1630,7 +1630,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             Dictionary<string, string> animatedPropertyValues = null,
             List<string> setKeywords = null,
             Dictionary<string, bool> poiUsedPropertyDefines = null,
-            string sanitizedMaterialName = null,
             bool stripShadowVariants = false,
             Dictionary<string, bool[]> animatedPropertyOnMeshID = null
             )
@@ -1663,7 +1662,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>(),
-                sanitizedMaterialName = sanitizedMaterialName ?? Path.GetFileNameWithoutExtension(source.filePath),
+                sanitizedShaderName = $"s_{Path.GetFileNameWithoutExtension(source.filePath)}",
                 stripShadowVariants = stripShadowVariants,
                 animatedPropertyOnMeshID = animatedPropertyOnMeshID ?? new Dictionary<string, bool[]>()
             };
@@ -3559,7 +3558,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         throw new ShaderAnalyzer.ParserException($"Unbalanced curly braces in {parsedShader.name} pass {passID}");
                     }
-                    var includeName = $"{sanitizedMaterialName}_{GetMD5Hash(output).Substring(0, 8)}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
+                    var includeName = $"{sanitizedShaderName}_{GetMD5Hash(output)[..12]}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
                     output.Add($"#include \"{includeName}\"");
@@ -3609,7 +3608,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizedShader.files = new List<(string name, List<string> lines)>();
             optimizedShader.files.Add(("Shader", output));
             optimizedShader.files.AddRange(outputIncludes);
-            optimizedShader.SetName($"{sanitizedMaterialName} {shaderHash.Substring(0, 8)}");
+            optimizedShader.SetName($"{sanitizedShaderName} {shaderHash[..12]}");
         }
     }
 }

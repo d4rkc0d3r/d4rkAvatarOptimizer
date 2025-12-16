@@ -1,4 +1,8 @@
 ## v4.0.0
+### Features
+* Deduplicate generated shaders if two materials create the exact same optimized shader.
+  * Also stopped baking `_TexelSize` into the shader to allow materials that only differ by textures to share the same optimized shader.
+
 ### Changes
 * Minimum required VRChat Avatar SDK version is now 3.9.0
 * Minimum supported Unity version is now 2022.3

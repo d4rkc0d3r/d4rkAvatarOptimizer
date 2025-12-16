@@ -5,6 +5,8 @@ using VRC.SDK3.Dynamics.Contact.Components;
 using VRC.SDK3.Dynamics.PhysBone.Components;
 using System.Text.RegularExpressions;
 using Array = System.Array;
+using System.IO;
+
 
 #if UNITY_EDITOR
 using System.Threading;
@@ -3522,7 +3524,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             animatedPropertyOnMeshID = null;
         var materials = new Material[sources.Count];
         var parsedShader = new ParsedShader[sources.Count];
-        var sanitizedMaterialNames = new string[sources.Count];
         var setShaderKeywords = new List<string>[sources.Count];
         var replace = new Dictionary<string, string>[sources.Count];
         var texturesToMerge = new HashSet<string>[sources.Count];
@@ -3546,8 +3547,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 .Append('\'') // imagine fxc being able to handle all legal filenames smh
                 .ToArray();
             stripShadowVariants[i] = source[0].renderQueue > 2500;
-            sanitizedMaterialNames[i] = "s_" + Path.GetFileNameWithoutExtension(parsedShader[i].filePath)
-                + " " + string.Join("_", source[0].name.Split(invalidChars, System.StringSplitOptions.RemoveEmptyEntries));
             texturesToMerge[i] = new HashSet<string>();
             propertyTextureArrayIndex[i] = new Dictionary<string, int>();
             arrayPropertyValues[i] = new Dictionary<string, (string type, List<string> values)>();
@@ -3615,14 +3614,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                             }
                             arrayPropertyValues[i]["arrayIndex" + prop.name].values.Add("" + index);
                             arrayPropertyValues[i]["shouldSample" + prop.name].values.Add((tex != null).ToString().ToLowerInvariant());
-                            if (!arrayPropertyValues[i].TryGetValue(prop.name + "_TexelSize", out propertyArray))
-                            {
-                                propertyArray.type = "float4";
-                                propertyArray.values = new List<string>();
-                                arrayPropertyValues[i][prop.name + "_TexelSize"] = propertyArray;
-                            }
-                            var texelSize = new Vector2(tex?.width ?? 4, tex?.height ?? 4);
-                            propertyArray.values.Add($"float4(1.0 / {texelSize.x}, 1.0 / {texelSize.y}, {texelSize.x}, {texelSize.y})");
                             break;
                     }
                 }
@@ -3728,7 +3719,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     animatedPropertyValues[i],
                     setShaderKeywords[i],
                     poiUsedPropertyDefines[i],
-                    sanitizedMaterialNames[i],
                     stripShadowVariants[i],
                     animatedPropertyOnMeshID
                 );
@@ -3744,22 +3734,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
             DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
             var shaderName = optimizedShader[i].name;
-            var shaderFilePath = AssetDatabase.GenerateUniqueAssetPath(trashBinPath + shaderName + ".shader");
-            var name = Path.GetFileNameWithoutExtension(shaderFilePath);
-            optimizedShader[i].SetName(name);
-            foreach (var opt in optimizedShader[i].files)
+            var shaderFilePath = $"{trashBinPath}{shaderName}.shader";
+            if (!File.Exists(shaderFilePath))
             {
-                var filePath = shaderFilePath;
-                if (opt.name != "Shader")
+                foreach (var opt in optimizedShader[i].files)
                 {
-                    filePath = trashBinPath + opt.name;
+                    var filePath = shaderFilePath;
+                    if (opt.name != "Shader")
+                    {
+                        filePath = $"{trashBinPath}{opt.name}";
+                    }
+                    File.WriteAllLines(filePath, opt.lines);
+                    optimizedMaterialImportPaths.Add(filePath);
                 }
-                System.IO.File.WriteAllLines(filePath, opt.lines);
-                optimizedMaterialImportPaths.Add(filePath);
             }
             var optimizedMaterial = new Material(Shader.Find("Unlit/Texture"));
             optimizedMaterial.shader = null;
-            optimizedMaterial.name = "m_" + name.Substring(2);
+            optimizedMaterial.name = $"m_{source[0].name}_{shaderName[2..]}";
             materials[i] = optimizedMaterial;
             optimizedMaterials.Add((optimizedMaterial, source, optimizedShader[i]));
             var arrayList = new List<(string name, Texture2DArray array)>();
@@ -3865,7 +3856,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 if (!source.HasProperty(prop))
                     continue;
-                mat.SetInteger(prop, source.GetInt(prop));
+                mat.SetInteger(prop, source.GetInteger(prop));
             }
             var vrcFallback = source.GetTag("VRCFallback", false, "not_set");
             if (vrcFallback != "not_set")
