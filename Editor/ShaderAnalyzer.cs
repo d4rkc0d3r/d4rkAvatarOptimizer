@@ -3596,7 +3596,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (texturesToMerge.Contains(prop.name))
                 {
                     int index = prop.type.LastIndexOf("2D");
-                    prop.type = prop.type.Substring(0, index) + "2DArray" + prop.type.Substring(index + 2);
+                    prop.type = prop.type.Insert(index + 2, "Array");
                     if (prop.name == "_MainTex")
                         prop.name = "_MainTexButNotQuiteSoThatUnityDoesntCry";
                 }
@@ -3608,7 +3608,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             // add the first 4 characters of the overall shader hash to the include filenames so that the includes get sorted right below their respective shaders
             outputIncludes = outputIncludes.Select(oi => {
                 var underscoreIndex = oi.name.LastIndexOf('_');
-                var newName = $"{oi.name[..underscoreIndex]}_{shaderHash[..4]}{oi.name[underscoreIndex..]}";
+                var newName = oi.name.Insert(underscoreIndex, $"_{shaderHash[..4]}");
                 output = output.Select(line => line.Replace(oi.name, newName)).ToList();
                 return (newName, oi.lines);
             }).ToList();
