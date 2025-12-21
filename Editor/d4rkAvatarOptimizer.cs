@@ -440,6 +440,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
     private Dictionary<EditorCurveBinding, float> constantAnimatedValuesToAdd = new Dictionary<EditorCurveBinding, float>();
+    private Dictionary<string, List<MaterialSlot>> materialSlotsToDisableWhenOriginalPathMeshIsDisabled = new();
     // blendshape names come from https://www.deviantart.com/xoriu/art/MMD-Facial-Expressions-Chart-341504917
     private static HashSet<string> MMDBlendShapes = new HashSet<string>()
     {
@@ -1424,6 +1425,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         return false;
     }
+
+    private Material cache_DisabledMaterial = null;
+    private Material GetDisabledMaterial()
+    {
+        if (cache_DisabledMaterial == null)
+        {
+            cache_DisabledMaterial = new Material(Shader.Find(
+                HasCustomShaderSupport ? "d4rkpl4y3r/Optimizer/DisabledMaterial" : "VRChat/Mobile/Particles/Additive"));
+            cache_DisabledMaterial.name = "d4rkAvatarOptimizer_DisabledMaterial";
+            cache_DisabledMaterial.SetShaderPassEnabled("Always", false);
+            CreateUniqueAsset(cache_DisabledMaterial, "d4rkAvatarOptimizer_DisabledMaterial.mat");
+        }
+        return cache_DisabledMaterial;
+    }
     
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
@@ -1458,6 +1473,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
+            if (((typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
+                           || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive"))
+                && materialSlotsToDisableWhenOriginalPathMeshIsDisabled.TryGetValue(binding.path, out var slotsToDisable))
+            {
+                foreach (var slot in slotsToDisable)
+                {
+                    var matSwapBinding = EditorCurveBinding.PPtrCurve(GetPathToRoot(slot.renderer), typeof(SkinnedMeshRenderer), $"m_Materials.Array.data[{slot.index}]");
+                    var keyframes = curve.keys.Select((key, i) => new ObjectReferenceKeyframe {
+                        time = key.time,
+                        value = key.value == 0 ? GetDisabledMaterial() : slot.material
+                    }).ToArray();
+                    SetObjectReferenceCurve(newClip, matSwapBinding, keyframes);
+                }
+            }
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive" && !pathsToDeleteGameObjectTogglesOn.Contains(binding.path))
             {
                 SetFloatCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
@@ -4391,18 +4420,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             ).ToList()).ToList();
             var optimizedMaterials = CreateOptimizedMaterials(uniqueMatchedMaterials, meshCount > 1 ? meshCount : 0, meshPath, mergedMeshIndices);
 
+            bool swapMaterialsOnMeshDisable = (MergeSkinnedMeshesWithShaderToggle || MergeSkinnedMeshesWithNaNimation)
+                && mergedMeshIndices.SelectMany(l => l).Distinct().Count() > 1;
+
             for (int i = 0; i < uniqueMatchedMaterials.Count; i++)
             {
-                if (uniqueMatchedMaterials[i].Count != 1 || uniqueMatchedMaterials[i][0].material == null)
+                if (uniqueMatchedMaterials[i][0].material == null)
                     continue;
                 var originalSlot = GetOriginalSlot((meshPath, matchedSlots[i][0].index));
-                AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
-                    (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
-                if (!optimizedSlotSwapMaterials.TryGetValue(originalSlot, out var optimizedSwapMaterials))
+                if (uniqueMatchedMaterials[i].Count == 1)
                 {
-                    optimizedSlotSwapMaterials[originalSlot] = optimizedSwapMaterials = new Dictionary<Material, Material>();
+                    AddAnimationPathChange((originalSlot.path, $"m_Materials.Array.data[{originalSlot.index}]", typeof(SkinnedMeshRenderer)),
+                        (meshPath, $"m_Materials.Array.data[{i}]", typeof(SkinnedMeshRenderer)));
+                    if (!optimizedSlotSwapMaterials.TryGetValue(originalSlot, out var optimizedSwapMaterials))
+                    {
+                        optimizedSlotSwapMaterials[originalSlot] = optimizedSwapMaterials = new Dictionary<Material, Material>();
+                    }
+                    optimizedSwapMaterials[uniqueMatchedMaterials[i][0].material] = optimizedMaterials[i];
                 }
-                optimizedSwapMaterials[uniqueMatchedMaterials[i][0].material] = optimizedMaterials[i];
+                if (swapMaterialsOnMeshDisable && !slotSwapMaterials.ContainsKey(originalSlot) && mergedMeshIndices[i].Count == 1)
+                {
+                    if (!materialSlotsToDisableWhenOriginalPathMeshIsDisabled.TryGetValue(originalSlot.path, out var slotList))
+                    {
+                        materialSlotsToDisableWhenOriginalPathMeshIsDisabled[originalSlot.path] = slotList = new List<MaterialSlot>();
+                    }
+                    slotList.Add(new MaterialSlot(meshRenderer, i));
+                }
             }
 
             meshRenderer.sharedMaterials = optimizedMaterials;

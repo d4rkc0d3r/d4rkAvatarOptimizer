@@ -1,5 +1,9 @@
 ## v4.0.0
 ### Features
+* Reduce draw calls when using shader or NaNimation toggles and merging skinned meshes:
+  * For each resulting material slot if it has only one source mesh, it will now add a material swap animation to the animations that disables / enables that source mesh.
+  * This will skip the draw call entirely instead of having to discard the vertices in the shader.
+  * It also has the `"IgnoreProjector"="True"` tag to prevent projector components from trying to render the disabled parts.
 * Deduplicate generated shaders if two materials create the exact same optimized shader.
   * Also stopped baking `_TexelSize` into the shader to allow materials that only differ by textures to share the same optimized shader.
 
