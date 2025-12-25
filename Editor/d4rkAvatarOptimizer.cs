@@ -3674,9 +3674,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 continue;
             }
             
-            char[] invalidChars = Path.GetInvalidFileNameChars()
-                .Append('\'') // imagine fxc being able to handle all legal filenames smh
-                .ToArray();
             stripShadowVariants[i] = source[0].renderQueue > 2500;
             texturesToMerge[i] = new HashSet<string>();
             propertyTextureArrayIndex[i] = new Dictionary<string, int>();

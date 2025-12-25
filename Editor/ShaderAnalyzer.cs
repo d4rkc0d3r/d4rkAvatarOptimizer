@@ -1662,7 +1662,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>(),
-                sanitizedShaderName = $"s_{Path.GetFileNameWithoutExtension(source.filePath)}",
+                sanitizedShaderName = $"s_{Path.GetFileNameWithoutExtension(source.filePath)}".Replace('\'', '_'),
                 stripShadowVariants = stripShadowVariants,
                 animatedPropertyOnMeshID = animatedPropertyOnMeshID ?? new Dictionary<string, bool[]>()
             };
