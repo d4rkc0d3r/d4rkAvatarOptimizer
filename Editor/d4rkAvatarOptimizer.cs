@@ -3506,6 +3506,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         Profiler.EndSection();
         texArray.name = $"{texArray.width}x{texArray.height}_{texArray.format}_{(isLinear ? "linear" : "sRGB")}_{texArray.wrapMode}_{texArray.filterMode}_2DArray";
         CreateUniqueAsset(texArray, $"{texArray.name}.asset");
+        LogToFile($" - '{texArray.name}' from {textures.Count} textures:");
+        foreach (var tex in textures)
+        {
+            LogToFile($"    - '{tex.name}' at path '{AssetDatabase.GetAssetPath(tex)}'");
+        }
         return texArray;
     }
 
@@ -4307,6 +4312,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             SearchForTextureArrayCreation(uniqueMatchedMaterials);
         }
 
+        if (textureArrayLists.Count == 0)
+            return;
+        LogToFile($"Creating {textureArrayLists.Count} texture arrays:");
         foreach (var textureList in textureArrayLists)
         {
             textureArrays.Add(CombineTextures(textureList));
