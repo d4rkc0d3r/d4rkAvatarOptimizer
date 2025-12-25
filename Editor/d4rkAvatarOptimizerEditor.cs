@@ -150,25 +150,16 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (GUILayout.Button("<size=18>Create Optimized Copy</size>", new GUIStyle(GUI.skin.button) { richText = true }))
         {
-            Profiler.enabled = optimizer.ProfileTimeUsed;
-            Profiler.Reset();
-            Profiler.StartSection("Assign New Avatar ID");
             AssignNewAvatarIDIfEmpty();
             var avDescriptor = optimizer.GetAvatarDescriptor();
-            Profiler.StartNextSection("Instantiate(avDescriptor.gameObject)");
             var copy = Instantiate(avDescriptor.gameObject);
-            Profiler.StartNextSection("Move Copy to Scene");
             SceneManager.MoveGameObjectToScene(copy, avDescriptor.gameObject.scene);
-            Profiler.StartNextSection("Optimize Copy");
             copy.name = avDescriptor.gameObject.name + "(BrokenCopy)";
             copy.GetComponent<d4rkAvatarOptimizer>().Optimize();
             copy.name = avDescriptor.gameObject.name + "(OptimizedCopy)";
-            Profiler.StartNextSection("Select Copy");
             copy.SetActive(true);
             avDescriptor.gameObject.SetActive(false);
             Selection.objects = new Object[] { copy };
-            Profiler.EndSection();
-            Profiler.PrintTimeUsed();
             Profiler.Reset();
             return;
         }

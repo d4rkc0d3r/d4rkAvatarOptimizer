@@ -8,6 +8,26 @@ using UnityEngine;
 
 namespace d4rkpl4y3r.AvatarOptimizer.Extensions
 {
+    public class InvariantCultureScope : System.IDisposable
+    {
+        private System.Globalization.CultureInfo previousCulture;
+        private System.Globalization.CultureInfo previousUICulture;
+
+        public InvariantCultureScope()
+        {
+            previousCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+            previousUICulture = System.Threading.Thread.CurrentThread.CurrentUICulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        }
+
+        public void Dispose()
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = previousCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = previousUICulture;
+        }
+    }
+
     public static class RendererExtensions
     {
         public static Mesh GetSharedMesh(this Renderer renderer)

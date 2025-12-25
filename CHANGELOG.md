@@ -6,6 +6,7 @@
   * It also has the `"IgnoreProjector"="True"` tag to prevent projector components from trying to render the disabled parts.
 * Deduplicate generated shaders if two materials create the exact same optimized shader.
   * Also stopped baking `_TexelSize` into the shader to allow materials that only differ by textures to share the same optimized shader.
+* Optimizer writes a log file `TrashBin/_log.txt` with information about what it did.
 
 ### Changes
 * Minimum required VRChat Avatar SDK version is now 3.9.0

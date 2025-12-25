@@ -12,6 +12,12 @@ namespace d4rkpl4y3r.AvatarOptimizer.Util
         private static Stack<(string name, long start)> stack = new Stack<(string name, long start)>();
         public static bool enabled = true;
 
+        public class Section : IDisposable
+        {
+            public Section(string name) => StartSection(name);
+            public void Dispose() => EndSection();
+        }
+
         public static void Reset()
         {
             timeUsed.Clear();
@@ -61,15 +67,15 @@ namespace d4rkpl4y3r.AvatarOptimizer.Util
                 return new List<string>();
             long totalTime = DateTime.Now.Ticks - lastReset;
             var result = new List<string>();
-            result.Add(string.Format("Total Time: {0:N3}s", new TimeSpan(totalTime).TotalSeconds));
+            result.Add(string.Format("d4rkAvatarOptimizer Total Time: {0:N3}s", new TimeSpan(totalTime).TotalSeconds));
             long unknownTime = totalTime - timeUsed.Values.Sum();
             timeUsed["unknown"] = unknownTime;
-            double sum = (double)timeUsed.Values.Sum();
-            int maxSectionNameLength = timeUsed.Keys.Select(n => n.Length).Max();
+            double sum = timeUsed.Values.Sum();
+            int maxSectionNameLength = timeUsed.Keys.Max(n => n.Length);
             foreach (var pair in timeUsed.OrderByDescending(p => p.Value))
             {
                 double p = Math.Round(pair.Value / sum * 10000) / 100;
-                result.Add(string.Format("Section {0} took {1:N2}% of time", pair.Key, p));
+                result.Add(string.Format("Section {0} took {1:N2}% of time ({2:N1}ms)", pair.Key, p, new TimeSpan(pair.Value).TotalMilliseconds));
             }
             return result;
         }

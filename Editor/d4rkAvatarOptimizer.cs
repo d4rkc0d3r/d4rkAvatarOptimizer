@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using Array = System.Array;
 using System.IO;
 
-
 #if UNITY_EDITOR
 using System.Threading;
 using System.Threading.Tasks;
@@ -86,6 +85,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DebugShowAnimatedMaterialPropertyPaths = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
+    private bool isOptimizing = false;
     #endregion
 
     public struct MaterialSlot
@@ -122,12 +122,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public void Optimize()
     {
-        var oldCulture = Thread.CurrentThread.CurrentCulture;
-        var oldUICulture = Thread.CurrentThread.CurrentUICulture;
+        using var _ = new InvariantCultureScope();
         try
         {
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            isOptimizing = true;
+            Profiler.enabled = true;
+            Profiler.Reset();
             DisplayProgressBar("Clear TrashBin Folder", 0.01f);
             ClearTrashBin();
             Profiler.StartSection("ClearCaches()");
@@ -194,12 +194,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (t.childCount == 0 && t.GetComponents<Component>().Length == 1)
                 DestroyImmediate(t.gameObject);
             Profiler.EndSection();
+            if (settings.ProfileTimeUsed)
+                Profiler.PrintTimeUsed();
+            LogToFile(string.Join("\n - ", Profiler.FormatTimeUsed()));
+        }
+        catch (System.Exception e)
+        {
+            LogToFile("An error occurred during optimization:\n" + e.ToString());
+            throw;
         }
         finally
         {
-            Thread.CurrentThread.CurrentCulture = oldCulture;
-            Thread.CurrentThread.CurrentUICulture = oldUICulture;
             EditorUtility.ClearProgressBar();
+            ImportLogFile();
         }
     }
 
@@ -531,6 +538,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         DisplayProgressBar(text);
     }
 
+    private string logFilePath = null;
+
     private void ClearTrashBin()
     {
         Profiler.StartSection("ClearTrashBin()");
@@ -552,6 +561,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
         binaryAssetBundlePath = null;
         materialAssetBundlePath = null;
+        logFilePath = Path.Combine(trashBinPath, "_log.txt");
+        LogToFile($"d4rk Avatar Optimizer v{packageInfo.version}");
+        LogToFile("Settings:");
+        foreach (var field in typeof(Settings).GetFields())
+        {
+            LogToFile($" - {GetDisplayName(field.Name)}: {field.GetValue(settings)}");
+        }
         Profiler.EndSection();
     }
 
@@ -584,6 +600,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             AssetDatabase.AddObjectToAsset(asset, binaryAssetBundlePath);
         }
         Profiler.EndSection();
+    }
+
+    private readonly List<string> logFileBuffer = new();
+
+    private void LogToFile(string message)
+    {
+        if (!isOptimizing || logFilePath == null)
+            return;
+        using var _ = new Profiler.Section("LogToFile()");
+        logFileBuffer.Add(message);
+        if (logFileBuffer.Count < 64)
+            return;
+        File.AppendAllText(logFilePath, string.Join("\n", logFileBuffer) + "\n");
+        logFileBuffer.Clear();
+    }
+
+    private void ImportLogFile()
+    {
+        if (logFilePath == null)
+            return;
+        if (logFileBuffer.Count > 0)
+        {
+            using var _ = new Profiler.Section("LogToFile()");
+            File.AppendAllText(logFilePath, string.Join("\n", logFileBuffer) + "\n");
+            logFileBuffer.Clear();
+        }
+        AssetDatabase.ImportAsset(logFilePath);
     }
 
     private VRCAvatarDescriptor cache_avatarDescriptor = null;
@@ -1449,32 +1492,38 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         newClip.ClearCurves();
         newClip.name = clip.name;
         bool changed = false;
+        var removedBindings = new List<EditorCurveBinding>();
+        var addedBindings = new List<EditorCurveBinding>();
+        var changedBindings = new List<(EditorCurveBinding from, EditorCurveBinding to)>();
         float lastUsedKeyframeTime = -1;
         float lastUnusedKeyframeTime = -1;
         void SetFloatCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, AnimationCurve curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
-                lastUsedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[curveToSet.length - 1].time : 0, lastUsedKeyframeTime);
+                lastUsedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUsedKeyframeTime);
                 AnimationUtility.SetEditorCurve(clipToSet, bindingToSet, curveToSet);
             } else {
-                lastUnusedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[curveToSet.length - 1].time : 0, lastUnusedKeyframeTime);
+                lastUnusedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
+                removedBindings.Add(bindingToSet);
             }
         }
         void SetObjectReferenceCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, ObjectReferenceKeyframe[] curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
-                lastUsedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[curveToSet.Length - 1].time : 0, lastUsedKeyframeTime);
+                lastUsedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUsedKeyframeTime);
                 AnimationUtility.SetObjectReferenceCurve(clipToSet, bindingToSet, curveToSet);
             } else {
-                lastUnusedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[curveToSet.Length - 1].time : 0, lastUnusedKeyframeTime);
+                lastUnusedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
+                removedBindings.Add(bindingToSet);
             }
         }
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             var fixedBinding = FixAnimationBinding(binding, ref changed);
-            if (((typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
-                           || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive"))
+            bool isRendererToggleBinding = (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
+                || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
+            if (isRendererToggleBinding
                 && materialSlotsToDisableWhenOriginalPathMeshIsDisabled.TryGetValue(binding.path, out var slotsToDisable))
             {
                 foreach (var slot in slotsToDisable)
@@ -1485,6 +1534,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         value = key.value == 0 ? GetDisabledMaterial() : slot.material
                     }).ToArray();
                     SetObjectReferenceCurve(newClip, matSwapBinding, keyframes);
+                    changed = true;
+                    addedBindings.Add(matSwapBinding);
                 }
             }
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive" && !pathsToDeleteGameObjectTogglesOn.Contains(binding.path))
@@ -1498,6 +1549,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 for (int i = 0; i < propertyNames.Length; i++) {
                     fixedBinding.propertyName = propertyNames[i];
                     SetFloatCurve(newClip, fixedBinding, NaNCurve);
+                    addedBindings.Add(fixedBinding);
                 }
                 if (shaderToggleInfo.Length > 0) {
                     shaderToggleInfo = shaderToggleInfo.Substring(1);
@@ -1505,20 +1557,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     fixedBinding.path = shaderToggleInfo.Substring(semicolonIndex + 1);
                     fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
-                    SetFloatCurve(newClip, FixAnimationBindingPath(fixedBinding, ref changed), curve);
+                    var b = FixAnimationBindingPath(fixedBinding, ref changed);
+                    SetFloatCurve(newClip, b, curve);
+                    addedBindings.Add(b);
                 }
             } else {
+                if (fixedBinding != binding)
+                    changedBindings.Add((binding, fixedBinding));
                 SetFloatCurve(newClip, fixedBinding, curve);
                 if (fixedBinding.propertyName.StartsWithSimple($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
                     var otherBinding = fixedBinding;
                     var match = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+(\.[a-z])?");
                     otherBinding.propertyName = $"material.{match.Groups[1].Value}{match.Groups[2].Value}";
                     SetFloatCurve(newClip, otherBinding, curve);
+                    addedBindings.Add(otherBinding);
                 }
             }
-            bool addPhysBoneCurves = (binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName == "m_Enabled")
-                || (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive");
-            if (addPhysBoneCurves && physBonesToDisable.TryGetValue(binding.path, out var physBonePaths))
+            if (isRendererToggleBinding && physBonesToDisable.TryGetValue(binding.path, out var physBonePaths))
             {
                 var physBoneBinding = binding;
                 physBoneBinding.propertyName = "m_Enabled";
@@ -1526,7 +1581,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 foreach (var physBonePath in physBonePaths)
                 {
                     physBoneBinding.path = physBonePath;
-                    SetFloatCurve(newClip, FixAnimationBindingPath(physBoneBinding, ref changed), curve);
+                    var b = FixAnimationBindingPath(physBoneBinding, ref changed);
+                    SetFloatCurve(newClip, b, curve);
+                    addedBindings.Add(b);
                     changed = true;
                 }
             }
@@ -1538,6 +1595,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 lastUnusedKeyframeTime = Mathf.Max(curve.Length > 0 ? curve[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
+                removedBindings.Add(binding);
                 continue;
             }
             for (int i = 0; i < curve.Length; i++)
@@ -1569,6 +1627,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 if (cache_DummyAnimationClipOfLength == null) {
                     cache_DummyAnimationClipOfLength = new Dictionary<float, AnimationClip>();
                 }
+                LogToFile($" - clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip");
                 if (!cache_DummyAnimationClipOfLength.TryGetValue(lastUnusedKeyframeTime, out var dummyClip)) {
                     newClip.name = $"DummyClip_{lastUnusedKeyframeTime}";
                     CreateUniqueAsset(newClip, newClip.name + ".anim");
@@ -1579,6 +1638,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         if (changed)
         {
+            LogToFile($" - clip '{clip.name}' got modified");
+            foreach (var (from, to) in changedBindings)
+            {
+                if (from.type == to.type)
+                {
+                    LogToFile($"   * {from.path}.{from.propertyName} => {to.path}.{to.propertyName} ({from.type})");
+                }
+                else
+                {
+                    LogToFile($"   * {from.path}.{from.propertyName} ({from.type})  =>  {to.path}.{to.propertyName} ({to.type})");
+                }
+            }
+            foreach (var binding in removedBindings)
+            {
+                LogToFile($"   - {binding.path}.{binding.propertyName} ({binding.type})");
+            }
+            foreach (var binding in addedBindings)
+            {
+                LogToFile($"   + {binding.path}.{binding.propertyName} ({binding.type})");
+            }
             CreateUniqueAsset(newClip, newClip.name + ".anim");
             return newClip;
         }
@@ -1657,6 +1736,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 fxLayersToMerge.Clear();
                 fxLayerMap.Clear();
             }
+            LogToFile($"Optimizing FX Layer with {GetFXLayerLayers().Length} original layers");
+            if (fxLayersToMerge.Count > 0)
+            {
+                LogToFile($" - Merging {fxLayersToMerge.Count} layers:");
+                for (int i = 0; i < fxLayersToMerge.Count; i++)
+                {
+                    LogToFile($"   - ({fxLayersToMerge[i]}) {GetFXLayerLayers()[fxLayersToMerge[i]].name}");
+                }
+            }
+            if (fxLayersToDestroy.Count > 0)
+            {
+                LogToFile($" - Removing {fxLayersToDestroy.Count} layers:");
+                for (int i = 0; i < fxLayersToDestroy.Count; i++)
+                {
+                    LogToFile($"   - ({fxLayersToDestroy[i]}) {GetFXLayerLayers()[fxLayersToDestroy[i]].name}");
+                }
+            }
         }
 
         Profiler.StartSection("AnimatorOptimizer.Run()");
@@ -1693,6 +1789,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             animations.UnionWith(optimizedControllers[i].animationClips);
         }
 
+        LogToFile($"Fixing animation paths in {animations.Count} animation clips");
         var fixedMotions = new Dictionary<Motion, Motion>();
         foreach (var clip in animations)
         {
@@ -3755,11 +3852,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         });
         Profiler.EndSection();
 
+        LogToFile($"Optimizing shaders for {sources.Count} material blobs");
         for (int i = 0; i < sources.Count; i++)
         {
             var source = sources[i].Select(t => t.mat).ToList();
             if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
+            {
+                LogToFile($" - Skipped optimization for material {(source[0] == null ? "null" : source[0].name)} due to parse failure.");
                 continue;
+            }
 
             DisplayProgressBar($"Optimizing shader {source[0].shader.name} ({i + 1}/{sources.Count})");
             var shaderName = optimizedShader[i].name;
@@ -3790,6 +3891,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (arrayList.Count > 0)
             {
                 texArrayPropertiesToSet[optimizedMaterial] = arrayList;
+            }
+
+            LogToFile($" - {(source.Count > 1 ? $"{source.Count} source materials for " : "")}{optimizedMaterial.name} with shader {shaderName}");
+            for (int j = 0; j < source.Count && source.Count > 1; j++)
+            {
+                LogToFile($"   - {source[j].name}");
             }
         }
         return materials;
@@ -4227,6 +4334,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var uniqueMatchedSlots = matchedSlots.Select(list => list.Select(slot => list.First(slot2 => slot.material == slot2.material)).Distinct().ToList()).ToList();
             var mergedMeshIndices = new List<List<int>>();
 
+            LogToFile($"Combining material slots on {meshPath} ({meshRenderer.sharedMaterials.Length} => {matchedSlots.Count})");
+            foreach (var slotGroup in matchedSlots)
+            {
+                for (int k = 0; k < slotGroup.Count; k++)
+                {
+                    var slot = slotGroup[k];
+                    string indent = k == 0 ? "" : "  ";
+                    LogToFile($" {indent}- {slot.index,2} {(slot.material == null ? "null" : slot.material.name)}");
+                }
+            }
+
             var sourceVertices = mesh.vertices;
             var hasUvSet = new bool[8] {
                 true,
@@ -4648,6 +4766,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
             int bindPoseMeshID = -1;
 
+            LogToFile($"CombineSkinnedMeshes() on {newPath}");
+            if (combinableSkinnedMeshes.Count > 1)
+            {
+                LogToFile($" - Merging {combinableSkinnedMeshes.Count} skinned meshes:");
+                foreach (var blob in basicMergedMeshes)
+                {
+                    for (int i = 0; i < blob.Count; i++)
+                    {
+                        LogToFile($"   {(i == 0 ? "" : "  ")}- {GetPathToRoot(blob[i])}");
+                    }
+                }
+            }
+            LogToFile($" - Basic mesh info:");
+            LogToFile($"   - Total vertices: {totalVertexCount}");
+            LogToFile($"   - Total submeshes: {basicMergedMeshesList.Sum(m => m.sharedMesh.subMeshCount)}");
+            LogToFile($"   - Target root bone: {GetPathToRoot(targetRootBone)}");
+            LogToFile($"   - Use color32: {useColor32}");
+            LogToFile($"   - Used UV sets: {string.Join(", ", hasUvSet.Select((b, i) => (b, i)).Where(t => t.b).Select(t => $"uv{t.i}"))}");
+
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
                 DisplayProgressBar($"Combining mesh ({++currentMeshCount}/{totalMeshCount}) {skinnedMesh.name}");
@@ -4674,7 +4811,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var bindPoseCount = sourceBindPoses.Length;
                 if (sourceBones.Length != bindPoseCount)
                 {
-                    Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {skinnedMesh.name}");
+                    Debug.LogWarning($"Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {currentMeshPath}");
+                    LogToFile($" - Warning: Bone count ({sourceBones.Length}) does not match bind pose count ({bindPoseCount}) on {currentMeshPath}");
                     bindPoseCount = Math.Min(sourceBones.Length, bindPoseCount);
                 }
                 var aabb = skinnedMesh.localBounds;
@@ -4792,6 +4930,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     blendShapeIDs = new List<int>();
                 }
 
+                if (blendShapeIDs.Count > 0)
+                {
+                    LogToFile($" - Baking {blendShapeIDs.Count} blendshapes from {currentMeshPath}:");
+                }
                 foreach (int blendShapeID in blendShapeIDs)
                 {
                     var weight = Mathf.Clamp(skinnedMesh.GetBlendShapeWeight(blendShapeID) / 100f, 0, 1);
@@ -4805,6 +4947,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         sourceNormals[i] += deltaNormals[i] * weight;
                         sourceTangents[i] += (Vector4)(deltaTangents[i] * weight);
                     }
+                    LogToFile($"   - {mesh.GetBlendShapeName(blendShapeID)} ({weight * 100f:F1}%)");
                 }
 
                 for (int vertIndex = 0; vertIndex < sourceVertices.Length; vertIndex++)
@@ -4979,13 +5122,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     var targetDeltaVertices = new Vector3[combinedMeshVertexCount];
                     var targetDeltaNormals = new Vector3[combinedMeshVertexCount];
                     var targetDeltaTangents = new Vector3[combinedMeshVertexCount];
+                    LogToFile($" - Merging {mergedBlendShapes.Count} blendshapes into {name}");
                     bool first = true;
                     foreach (var toMerge in mergedBlendShapes)
                     {
-                        var path = toMerge.blendshape.Substring(0, toMerge.blendshape.IndexOf("/blendShape."));
+                        var path = toMerge.blendshape[..toMerge.blendshape.IndexOf("/blendShape.")];
+                        var blendShapeName = toMerge.blendshape[(path.Length + 12)..];
+                        LogToFile($"   - {path}.{blendShapeName} with weight {toMerge.weight * 100:F2}%");
                         var skinnedMesh = GetTransformFromPath(path).GetComponent<SkinnedMeshRenderer>();
                         var mesh = skinnedMesh.sharedMesh;
-                        var blendShapeID = mesh.GetBlendShapeIndex(toMerge.blendshape.Substring(path.Length + 12));
+                        var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
                         if (blendShapeID == -1)
                             continue;
                         var meshID = meshPathToID[path];
@@ -5217,6 +5363,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
             .Where(t => t != null));
         hardCodedExclusions.AddRange(FindAllPenetrators().Select(p => p.transform));
+        hardCodedExclusions = hardCodedExclusions.Where(t => t != null).ToList();
+        if (hardCodedExclusions.Count > 0) {
+            LogToFile($"Automatically excluding {hardCodedExclusions.Count} transforms from optimization:");
+            foreach (var t in hardCodedExclusions) {
+                LogToFile($" - {GetPathToRoot(t)}");
+            }
+        }
         foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
             if (excludedTransform == null)
                 continue;
@@ -5272,6 +5425,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var current = stack.Pop();
             if (current.gameObject.CompareTag("EditorOnly"))
             {
+                LogToFile($"Deleted EditorOnly GameObject: {GetPathToRoot(current)}");
                 DestroyImmediate(current.gameObject);
                 continue;
             }
@@ -5286,11 +5440,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (!DeleteUnusedComponents)
             return;
-        var list = FindAllUnusedComponents();
+        var list = FindAllUnusedComponents().Where(c => c != null).ToList();
+        if (list.Count == 0)
+            return;
+        LogToFile($"Deleting {list.Count} unused components:");
         foreach (var component in list)
         {
             if (component == null)
                 continue;
+            LogToFile($" - {component.GetType().Name} on {GetPathToRoot(component.transform)}");
             if (component is AudioSource audio)
             {
                 var vrcAudioSource = audio.GetComponent<VRCSpatialAudioSource>();
@@ -5380,6 +5538,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var queue = new Queue<Transform>();
         queue.Enqueue(root);
 
+        var deletedPaths = new List<string>();
+
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
@@ -5389,12 +5549,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
             if (!used.Contains(current))
             {
+                deletedPaths.Add(GetPathToRoot(current));
                 foreach (var child in current.Cast<Transform>().ToArray())
                 {
                     child.parent = current.parent;
                     child.name = $"{current.name}_{child.name}";
                 }
                 DestroyImmediate(current.gameObject);
+            }
+        }
+
+        if (deletedPaths.Count > 0)
+        {
+            LogToFile($"Deleted {deletedPaths.Count} unused GameObjects:");
+            foreach (var path in deletedPaths)
+            {
+                LogToFile($" - {path}");
             }
         }
     }
@@ -5420,6 +5590,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         leaf.transform.localScale = Vector3.one;
         collider.transform = leaf.transform;
         avDescriptor.collider_fingerRingL = collider;
+        LogToFile($"Moved left ring finger collider to {GetPathToRoot(collider.transform)}");
 
         collider = avDescriptor.collider_footR;
         collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
@@ -5436,6 +5607,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         leaf.transform.localScale = Vector3.one;
         collider.transform = leaf.transform;
         avDescriptor.collider_fingerRingR = collider;
+        LogToFile($"Moved right ring finger collider to {GetPathToRoot(collider.transform)}");
 
         // disable collider foldout in the inspector because it resets the collider transform
         EditorPrefs.SetBool("VRCSDK3_AvatarDescriptorEditor3_CollidersFoldout", false);
@@ -5450,11 +5622,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Where(f => f.gameObject.layer != 12)
             .Select(f => f.gameObject).Distinct().ToList();
         var meshesThatGetCombinedWithOtherMeshes = new HashSet<Renderer>(FindPossibleSkinnedMeshMerges().Where(l => l.Count > 1).SelectMany(l => l));
+        var meshesToConvert = staticMeshes.Where(obj => meshesThatGetCombinedWithOtherMeshes.Contains(obj.GetComponent<Renderer>())).ToList();
+        if (meshesToConvert.Count > 0)
+            LogToFile($"Converting {meshesToConvert.Count} static meshes to skinned meshes for merging:");
 
-        foreach (var obj in staticMeshes)
+        foreach (var obj in meshesToConvert)
         {
-            if (!meshesThatGetCombinedWithOtherMeshes.Contains(obj.GetComponent<Renderer>()))
-                continue;
             bool isActive = obj.GetComponent<MeshRenderer>().enabled;
             var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
             var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
@@ -5466,6 +5639,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
             convertedMeshRendererPaths.Add(GetPathToRoot(obj));
+            LogToFile($" - {GetPathToRoot(obj)}");
         }
     }
 
