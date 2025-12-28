@@ -254,6 +254,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 parsedShader.errorMessage = "ORLShader Generator 6.2 is not installed.";
                 #endif
             }
+            else if (shaderPath.StartsWithSimple("Resources/unity_builtin"))
+            {
+                parsedShader.parsedCorrectly = false;
+                doneParsing = true;
+                parsedShader.errorMessage = "Built-in Unity shaders are not supported.";
+            }
             else if (!shaderPath.EndsWith(".shader"))
             {
                 parsedShader.parsedCorrectly = false;
@@ -266,10 +272,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (doneParsing)
                 return parsedShader;
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            using var _ = new InvariantCultureScope();
             try
             {
                 RecursiveParseFile(filePath, true, filePath);
@@ -296,11 +299,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 parsedShader.parsedCorrectly = false;
                 parsedShader.errorMessage = e.Message;
                 Debug.LogWarning(e);
-            }
-            finally
-            {
-                Thread.CurrentThread.CurrentCulture = oldCulture;
-                Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
             doneParsing = true;
             return parsedShader;
