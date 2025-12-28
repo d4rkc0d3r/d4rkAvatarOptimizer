@@ -2706,6 +2706,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     private void OptimizeMaterialSwapMaterials()
     {
+        bool didLogInitialMessage = false;
         var exclusions = GetAllExcludedTransforms();
         foreach (var entry in slotSwapMaterials)
         {
@@ -2729,6 +2730,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 if (!optimizedMaterials.TryGetValue(material, out var optimizedMaterial))
                 {
+                    if (!didLogInitialMessage)
+                    {
+                        LogToFile("Optimizing material swap materials:");
+                        didLogInitialMessage = true;
+                    }
                     DisplayProgressBar("Optimizing swap material: " + material.name);
                     var matWrapper = new List<List<(Material, List<string>)>>() { new List<(Material, List<string>)>() { (material, new List<string> { entry.Key.path } ) } };
                     var mergedMeshIndexWrapper = new List<List<int>>() { new List<int>() { meshIndex } };
@@ -3854,13 +3860,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         });
         Profiler.EndSection();
 
-        LogToFile($"Optimizing shaders for {sources.Count} material blobs");
+        LogToFile($" - Optimizing shaders for {sources.Count} material blobs on '{path}':");
         for (int i = 0; i < sources.Count; i++)
         {
             var source = sources[i].Select(t => t.mat).ToList();
             if (parsedShader[i] == null || !parsedShader[i].parsedCorrectly)
             {
-                LogToFile($" - Skipped optimization for material {(source[0] == null ? "null" : source[0].name)} due to parse failure.");
+                var reason = parsedShader[i] == null ? "parsedShader is null" : parsedShader[i].errorMessage;
+                LogToFile($"   - Skipped optimization for material {(source[0] == null ? "null" : source[0].name)}: '{reason}'");
                 continue;
             }
 
@@ -3895,10 +3902,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 texArrayPropertiesToSet[optimizedMaterial] = arrayList;
             }
 
-            LogToFile($" - {(source.Count > 1 ? $"{source.Count} source materials for " : "")}{optimizedMaterial.name} with shader {shaderName}");
+            LogToFile($"   - {(source.Count > 1 ? $"{source.Count} source materials for " : "")}{optimizedMaterial.name} with shader {shaderName}");
             for (int j = 0; j < source.Count && source.Count > 1; j++)
             {
-                LogToFile($"   - {source[j].name}");
+                LogToFile($"     - {source[j].name}");
             }
         }
         return materials;
@@ -4222,10 +4229,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         var meshRenderers = GetRootTransform().GetComponentsInChildren<MeshRenderer>(true);
         var exclusions = GetAllExcludedTransforms();
+        meshRenderers = meshRenderers.Where(mr => !exclusions.Contains(mr.transform) && mr.GetSharedMesh() != null).ToArray();
+        if (meshRenderers.Length == 0)
+            return;
+        LogToFile($"Optimizing materials on {meshRenderers.Length} MeshRenderers:");
         foreach (var meshRenderer in meshRenderers)
         {
-            if (exclusions.Contains(meshRenderer.transform) || meshRenderer.GetSharedMesh() == null)
-                continue;
             DisplayProgressBar($"Optimizing materials on {meshRenderer.name}");
             var path = GetPathToRoot(meshRenderer);
             var mats = meshRenderer.sharedMaterials.Select((material, index) => (material, index)).Where(m => m.material != null).ToList();
