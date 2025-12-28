@@ -238,7 +238,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Profiler.StartSection("ORL.ShaderGenerator");
                 try
                 {
-                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: true)
+                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: false)
                         .Split(new string[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.RemoveEmptyEntries);
                 }
                 catch (IOException e)

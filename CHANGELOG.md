@@ -7,9 +7,11 @@
 * Deduplicate generated shaders if two materials create the exact same optimized shader.
   * Also stopped baking `_TexelSize` into the shader to allow materials that only differ by textures to share the same optimized shader.
 * Optimizer writes a log file `TrashBin/_log.txt` with information about what it did.
+* New debug tool `Why No Material Merge` that shows why selected material slots can't be merged together. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/164)
+  * You can open it under `Tools/d4rkpl4y3r/Why No Material Merge`.
 
 ### Changes
-* Minimum required VRChat Avatar SDK version is now 3.9.0
+* Minimum supported VRChat Avatar SDK version is now 3.9.0
 * Minimum supported Unity version is now 2022.3
 * Minimum supported ORLShader Generator version is now 7.0.0
 * The `d4rkAvatarOptimizer` component can now be put anywhere in the avatar hierarchy instead of only on the root.

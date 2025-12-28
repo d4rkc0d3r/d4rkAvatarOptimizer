@@ -92,9 +92,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         public Renderer renderer;
         public int index;
-        public Material material
+        public readonly Material material
         {
-            get { return renderer.sharedMaterials[index]; }
+            get
+            {
+                if (renderer == null || index < 0)
+                    return null;
+                var materials = renderer.sharedMaterials;
+                if (index >= materials.Length)
+                    return null;
+                return materials[index];
+            }
         }
         public MaterialSlot(Renderer renderer, int index)
         {
@@ -116,6 +124,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return renderer.GetSharedMesh()?.GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1)) ?? MeshTopology.Triangles;
         }
 #endif
+        // equals operators
+        public override bool Equals(object obj)
+        {
+            if (obj is MaterialSlot other)
+            {
+                return renderer == other.renderer && index == other.index;
+            }
+            return false;
+        }
+        public override int GetHashCode()
+        {
+            return (renderer == null ? 0 : renderer.GetHashCode()) ^ index.GetHashCode();
+        }
+        public static bool operator ==(MaterialSlot a, MaterialSlot b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(MaterialSlot a, MaterialSlot b)
+        {
+            return !a.Equals(b);
+        }
     }
 
 #if UNITY_EDITOR
@@ -708,6 +737,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 field.SetValue(this, null);
             }
         }
+        MaterialAssetComparer.ClearCache();
     }
 
     public long GetPolyCount()
@@ -4130,30 +4160,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return true;
     }
 
-    private bool CanCombineMaterialsWith(List<MaterialSlot> list, MaterialSlot candidate)
+    public string CanCombineMaterialsError(List<MaterialSlot> list, MaterialSlot candidate)
     {
         var candidateMat = candidate.material;
         var firstMat = list[0].material;
         if (candidateMat == null || firstMat == null)
-            return false;
+            return "One of the materials is null";
         if (firstMat.shader != candidateMat.shader)
-            return false;
+            return "Shaders do not match";
         if (list.Any(slot => slot.GetTopology() != candidate.GetTopology()))
-            return false;
+            return "Topologies do not match";
         bool IsAffectedByMaterialSwap(MaterialSlot slot) =>
             slotSwapMaterials.ContainsKey((GetPathToRoot(slot.renderer), slot.index))
             || (materialSlotRemap.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var remap) && slotSwapMaterials.ContainsKey(remap));
         if (IsAffectedByMaterialSwap(list[0]) || IsAffectedByMaterialSwap(candidate))
-            return false;
+            return "Affected by material swap";
         if (GetParticleSystemsUsingRenderer(candidate.renderer).Any(ps => ps.shape.useMeshMaterialIndex && ps.shape.meshMaterialIndex == candidate.index))
-            return false;
+            return "Affected by particle system using mesh material index";
+        if (GetParticleSystemsUsingRenderer(list[0].renderer).Any(ps => ps.shape.useMeshMaterialIndex && ps.shape.meshMaterialIndex == list[0].index))
+            return "Affected by particle system using mesh material index";
         var listMaterials = list.Select(slot => slot.material).ToArray();
         var materialComparer = new MaterialAssetComparer();
         bool allTheSameAsCandidate = listMaterials.All(mat => materialComparer.Equals(mat, candidateMat));
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
-            return allTheSameAsCandidate;
+            return allTheSameAsCandidate ? null : "Not the same materials and merging different property materials is disabled";
         if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
-            return true;
+            return null;
         for (int j = 0; j < firstMat.shader.passCount; j++)
         {
             var lightModeValue = firstMat.shader.FindPassTagValue(j, new ShaderTagId("LightMode"));
@@ -4161,35 +4193,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 if (firstMat.GetShaderPassEnabled(lightModeValue.name) != candidateMat.GetShaderPassEnabled(lightModeValue.name))
                 {
-                    return false;
+                    return $"Shader pass enabled states for '{lightModeValue.name}' do not match";
                 }
             }
         }
         var parsedShader = ShaderAnalyzer.Parse(candidateMat.shader);
         if (parsedShader.parsedCorrectly == false)
-            return false;
+            return "Failed to parse shader correctly";
         if (firstMat.renderQueue != candidateMat.renderQueue)
-            return false;
+            return "Render queues do not match";
         if (firstMat.enableInstancing != candidateMat.enableInstancing)
-            return false;
+            return "Instancing settings do not match";
         bool hasAnyMaterialVariant = listMaterials.Any(m => m.isVariant) || candidateMat.isVariant;
         if (!hasAnyMaterialVariant && firstMat.GetTag("VRCFallback", false, "None") != candidateMat.GetTag("VRCFallback", false, "None"))
-            return false;
+            return "VRCFallback tags do not match";
         foreach (var pass in parsedShader.passes)
         {
             if (pass.vertex == null)
-                return false;
-            if (pass.hull != null)
-                return false;
-            if (pass.domain != null)
-                return false;
+                return "Vertex shader is missing";
+            if (pass.hull != null || pass.domain != null)
+                return "Tessellation is unsupported for merging with different properties";
             if (pass.fragment == null)
-                return false;
+                return "Fragment shader is missing";
         }
         foreach (var keyword in parsedShader.shaderFeatureKeyWords)
         {
             if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
-                return false;
+                return $"Shader keyword '{keyword}' does not match";
         }
         listMaterials = new HashSet<Material>(listMaterials).ToArray();
         bool mergeTextures = MergeSameDimensionTextures && parsedShader.CanMergeTextures();
@@ -4200,12 +4230,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 case ParsedShader.Property.Type.Float:
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)
-                        return false;
+                        return $"Float property '{prop.name}' does not match";
                     break;
                 case ParsedShader.Property.Type.Integer:
                     var candidateIntValue = candidateMat.GetInteger(prop.name);
                     if (listMaterials[0].GetInteger(prop.name) != candidateIntValue)
-                        return false;
+                        return $"Integer property '{prop.name}' does not match";
                     break;
                 case ParsedShader.Property.Type.Texture2D:
                 case ParsedShader.Property.Type.Texture2DArray:
@@ -4216,13 +4246,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     int propertyID = Shader.PropertyToID(prop.name);
                     var cTex = candidateMat.GetTexture(propertyID);
                     if (!mergeTexture && cTex != firstMat.GetTexture(propertyID))
-                        return false;
+                        return $"Texture property '{prop.name}' does not match";
                     if (mergeTexture && listMaterials.Any(mat => !CanCombineTextures(cTex, mat.GetTexture(propertyID))))
-                        return false;
+                        return $"Texture property '{prop.name}' cannot be combined because of texture {cTex.name}";
                     break;
             }
         }
-        return true;
+        return null;
     }
 
     private void OptimizeMaterialsOnNonSkinnedMeshes()
@@ -4273,6 +4303,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public List<List<MaterialSlot>> FindAllMergeAbleMaterials(IEnumerable<Renderer> renderers)
     {
+        using var _ = new Profiler.Section("FindAllMergeAbleMaterials()");
         var matched = new List<List<MaterialSlot>>();
         foreach (var renderer in renderers)
         {
@@ -4281,7 +4312,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 bool foundMatch = false;
                 for (int i = 0; i < matched.Count; i++)
                 {
-                    if (CanCombineMaterialsWith(matched[i], candidate))
+                    if (CanCombineMaterialsError(matched[i], candidate) == null)
                     {
                         matched[i].Add(candidate);
                         foundMatch = true;
@@ -5658,6 +5689,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     public class MaterialAssetComparer : IEqualityComparer<Material> {
+        private static Dictionary<(Material a, Material b), bool> comparisonCache = new ();
+        public static void ClearCache() => comparisonCache.Clear();
         public bool Equals(Material a, Material b) {
             if (a == b)
                 return true;
@@ -5665,6 +5698,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return false;
             if (a.shader != b.shader)
                 return false;
+            if (comparisonCache.TryGetValue((a, b), out bool cachedResult))
+                return cachedResult;
+            
+            try {
             if (a.renderQueue != b.renderQueue)
                 return false;
             if (a.doubleSidedGI != b.doubleSidedGI)
@@ -5726,8 +5763,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return false;
             if (!aMatrices.Select(x => a.GetMatrix(x)).SequenceEqual(bMatrices.Select(x => b.GetMatrix(x))))
                 return false;
+            } finally {
+                comparisonCache[(a, b)] = comparisonCache[(b, a)] = false;
+            }
 
-            return true;
+            return comparisonCache[(a, b)] = comparisonCache[(b, a)] = true;
         }
 
         public int GetHashCode(Material m) {
