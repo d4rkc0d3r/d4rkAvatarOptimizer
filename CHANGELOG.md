@@ -11,6 +11,7 @@
 ### Changes
 * Minimum required VRChat Avatar SDK version is now 3.9.0
 * Minimum supported Unity version is now 2022.3
+* Minimum supported ORLShader Generator version is now 7.0.0
 * The `d4rkAvatarOptimizer` component can now be put anywhere in the avatar hierarchy instead of only on the root.
 
 ### Bug Fixes

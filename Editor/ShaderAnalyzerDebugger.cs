@@ -57,26 +57,27 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
     public void OnGUI()
     {
-        if (ObjectField<Material>(ref material, "Material"))
+        if (ObjectField(ref material, "Material"))
         {
             shader = null;
             folder = null;
             lastTime = 0;
         }
-        if (ObjectField<Shader>(ref shader, "Shader"))
+        if (ObjectField(ref shader, "Shader"))
         {
             material = null;
             folder = null;
             lastTime = 0;
         }
-        if (ObjectField<DefaultAsset>(ref folder, "Folder"))
+        if (ObjectField(ref folder, "Folder"))
         {
             material = null;
             shader = null;
             if (folder != null)
             {
                 var longPath = Path.GetFullPath(AssetDatabase.GetAssetPath(folder));
-                var files = Directory.GetFiles(longPath, "*.shader", SearchOption.AllDirectories);
+                var files = Directory.GetFiles(longPath, "*.shader", SearchOption.AllDirectories)
+                    .Concat(Directory.GetFiles(longPath, "*.orlshader", SearchOption.AllDirectories)).ToArray();
                 int prefixLength = Application.dataPath.Length - "Assets".Length;
                 shaders = new List<Shader>();
                 foreach (var file in files.Select(s => s.Substring(prefixLength)))

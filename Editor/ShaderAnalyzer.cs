@@ -238,7 +238,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Profiler.StartSection("ORL.ShaderGenerator");
                 try
                 {
-                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, false)
+                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: true)
                         .Split(new string[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.RemoveEmptyEntries);
                 }
                 catch (IOException e)
@@ -251,7 +251,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 #else
                 parsedShader.parsedCorrectly = false;
                 doneParsing = true;
-                parsedShader.errorMessage = "ORLShader Generator 6.2 is not installed.";
+                parsedShader.errorMessage = "ORLShader Generator 7.0+ is not installed.";
                 #endif
             }
             else if (shaderPath.StartsWithSimple("Resources/unity_builtin"))
