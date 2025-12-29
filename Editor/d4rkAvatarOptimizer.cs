@@ -677,6 +677,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_avatarDescriptor;
     }
 
+    public HashSet<string> GetNonDestructiveToolsUsedOnAvatar()
+    {
+        var tools = new HashSet<string>();
+        var descriptor = GetAvatarDescriptor();
+        if (descriptor == null)
+            return tools;
+        #if MODULAR_AVATAR_EXISTS
+        if (descriptor.GetComponentsInChildren<nadena.dev.modular_avatar.core.AvatarTagComponent>(true).Any())
+        {
+            tools.Add("Modular Avatar");
+        }
+        #endif
+        var furyType = Type.GetType("VF.Model.VRCFury, VRCFury");
+        if (furyType != null && descriptor.GetComponentsInChildren(furyType, true).Any())
+        {
+            tools.Add("VRCFury");
+        }
+        return tools;
+    }
+
     public Transform GetRootTransform()
     {
         var descriptor = GetAvatarDescriptor();

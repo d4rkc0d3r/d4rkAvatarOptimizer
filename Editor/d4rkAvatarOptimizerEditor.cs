@@ -235,7 +235,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         EditorGUILayout.Separator();
 
-        if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview))
+        if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview, showNonDestructiveToolingWarning: true))
         {
             Profiler.StartSection("Show Merge Preview");
             foreach (var matched in MergedMaterialPreview)
@@ -267,7 +267,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (optimizer.OptimizeFXLayer && optimizer.GetFXLayer() != null)
         {
-            if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults))
+            if (Foldout("Show FX Layer Merge Result", ref optimizer.ShowFXLayerMergeResults, showNonDestructiveToolingWarning: true))
             {
                 Profiler.StartSection("Show FX Layer Merge Errors");
                 ToggleOptimizerProperty(nameof(optimizer.ShowFXLayerMergeErrors));
@@ -308,7 +308,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         EditorGUILayout.Separator();
 
-        if (Foldout("Debug Info", ref optimizer.ShowDebugInfo))
+        if (Foldout("Debug Info", ref optimizer.ShowDebugInfo, showNonDestructiveToolingWarning: true))
         {
             ToggleOptimizerProperty(nameof(optimizer.ProfileTimeUsed));
             EditorGUI.indentLevel++;
@@ -796,8 +796,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "You should expect your poly count to increase, this is working as intended!", MessageType.Info);
         }
 
-        var furyType = Type.GetType("VF.Model.VRCFury, VRCFury");
-        if (furyType != null && avDescriptor.GetComponentsInChildren(furyType, true).Any())
+        var tools = optimizer.GetNonDestructiveToolsUsedOnAvatar();
+        if (tools.Contains("VRCFury"))
         {
             EditorGUILayout.HelpBox(
                 "VRCFury is used on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +
@@ -806,8 +806,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return false;
         }
 
-        #if MODULAR_AVATAR_EXISTS
-        if (avDescriptor.GetComponentsInChildren<nadena.dev.modular_avatar.core.AvatarTagComponent>(true).Any())
+        if (tools.Contains("Modular Avatar"))
         {
             EditorGUILayout.HelpBox(
                 "Modular Avatar is used on the avatar. This means the perf rank change and merge result previews " + 
@@ -816,9 +815,18 @@ public class d4rkAvatarOptimizerEditor : Editor
                 $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures Modular Avatar and the optimizer get used in the correct order.", MessageType.Warning);
             return false;
         }
-        #endif
 
         return true;
+    }
+
+    private string GetNonDestructiveToolingWarning(string sectionName)
+    {
+        var tools = optimizer.GetNonDestructiveToolsUsedOnAvatar();
+        if (tools.Count == 0)
+            return null;
+        return $"The following non-destructive tool{(tools.Count == 1 ? " is" : "s are")} found on the avatar:\n" +
+               string.Join(", ", tools) +
+               $"\nThis means the {sectionName} can be wrong as {(tools.Count == 1 ? "this tool" : "these tools")} can change the avatar at build time which the optimizer can't see before it happens.";
     }
 
     private static void AssignNewAvatarIDIfEmpty()
@@ -1224,7 +1232,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         return output;
     }
 
-    private bool Foldout(string label, ref bool value)
+    private void DrawWarningIconWithTooltip(string tooltip, Rect rect)
+    {
+        var tooltipContent = new GUIContent("", tooltip);
+        GUI.Label(rect, tooltipContent);
+        GUI.DrawTexture(rect, EditorGUIUtility.IconContent("console.warnicon.sml").image);
+    }
+
+    private bool Foldout(string label, ref bool value, bool showNonDestructiveToolingWarning = false)
     {
         var content = GetLabelWithTooltip(label);
         bool output = EditorGUILayout.Foldout(value, content, true);
@@ -1234,6 +1249,15 @@ public class d4rkAvatarOptimizerEditor : Editor
             rect.x += rect.width - 20;
             rect.width = 20;
             GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
+            if (showNonDestructiveToolingWarning)
+            {
+                var warning = GetNonDestructiveToolingWarning(label);
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    rect.x -= 24;
+                    DrawWarningIconWithTooltip(warning, rect);
+                }
+            }
         }
         if (value != output)
         {
@@ -1454,6 +1478,19 @@ public class d4rkAvatarOptimizerEditor : Editor
             EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(20));
             EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
             EditorGUILayout.LabelField(label);
+        }
+
+        // Hacky way to only show the warning icon for the first perf rank change label
+        if (label == "Skinned Mesh Renderers")
+        {
+            var warning = GetNonDestructiveToolingWarning("Performance Rank Change Preview");
+            if (!string.IsNullOrEmpty(warning))
+            {
+                var rect = GUILayoutUtility.GetLastRect();
+                rect.x += rect.width - 20;
+                rect.width = 20;
+                DrawWarningIconWithTooltip(warning, rect);
+            }
         }
     }
 }

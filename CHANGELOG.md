@@ -15,6 +15,7 @@
 * Minimum supported Unity version is now 2022.3
 * Minimum supported ORLShader Generator version is now 7.0.0
 * The `d4rkAvatarOptimizer` component can now be put anywhere in the avatar hierarchy instead of only on the root.
+* The different preview foldouts now show a warning icon with tooltip if any non destructive tooling is detected on the avatar.
 
 ### Bug Fixes
 * The component now gets properly shown as `d4rk Avatar Optimizer` in the inspector instead of `D 4rk Avatar Optimizer`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/166)
