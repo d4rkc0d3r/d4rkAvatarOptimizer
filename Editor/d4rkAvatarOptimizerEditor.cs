@@ -1234,8 +1234,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private void DrawWarningIconWithTooltip(string tooltip, Rect rect)
     {
-        var tooltipContent = new GUIContent("", tooltip);
-        GUI.Label(rect, tooltipContent);
+        GUI.Label(rect, new GUIContent("", tooltip));
         GUI.DrawTexture(rect, EditorGUIUtility.IconContent("console.warnicon.sml").image);
     }
 
@@ -1243,20 +1242,22 @@ public class d4rkAvatarOptimizerEditor : Editor
     {
         var content = GetLabelWithTooltip(label);
         bool output = EditorGUILayout.Foldout(value, content, true);
+        var rect = GUILayoutUtility.GetLastRect();
+        rect.x += rect.width + 4;
+        rect.width = 20;
         if (!string.IsNullOrEmpty(content.tooltip))
         {
-            var rect = GUILayoutUtility.GetLastRect();
-            rect.x += rect.width - 20;
-            rect.width = 20;
+            rect.x -= 24;
+            GUI.Label(rect, new GUIContent("", content.tooltip));
             GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
-            if (showNonDestructiveToolingWarning)
+        }
+        if (showNonDestructiveToolingWarning)
+        {
+            var warning = GetNonDestructiveToolingWarning(label);
+            if (!string.IsNullOrEmpty(warning))
             {
-                var warning = GetNonDestructiveToolingWarning(label);
-                if (!string.IsNullOrEmpty(warning))
-                {
-                    rect.x -= 24;
-                    DrawWarningIconWithTooltip(warning, rect);
-                }
+                rect.x -= 24;
+                DrawWarningIconWithTooltip(warning, rect);
             }
         }
         if (value != output)

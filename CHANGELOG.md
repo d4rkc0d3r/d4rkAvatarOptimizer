@@ -19,6 +19,7 @@
 
 ### Bug Fixes
 * The component now gets properly shown as `d4rk Avatar Optimizer` in the inspector instead of `D 4rk Avatar Optimizer`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/166)
+* Fix tooltips on foldouts not showing up when hovering over the tooltip icon specifically.
 
 ## v3.12.5
 ### Bug Fixes
