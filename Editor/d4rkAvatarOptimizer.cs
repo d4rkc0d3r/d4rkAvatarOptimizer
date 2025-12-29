@@ -2698,16 +2698,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             dependencies.RemoveWhere(o => o == null);
         }
-        foreach (var entry in physBoneDependencies)
+        foreach ((var physBone, var dependencies) in physBoneDependencies)
         {
-            if (entry.Key != null && entry.Value.Count(o => !(o is AnimatorController)) == 1 && entry.Value.First(o => !(o is AnimatorController)) is SkinnedMeshRenderer target)
+            if (physBone != null && dependencies.Count(o => !(o is AnimatorController)) == 1 && dependencies.First(o => !(o is AnimatorController)) is SkinnedMeshRenderer target)
             {
                 var targetPath = GetPathToRoot(target);
-                if (!result.TryGetValue(targetPath, out var physBones))
+                if (!result.TryGetValue(targetPath, out var physBonePaths))
                 {
-                    result[targetPath] = physBones = new List<string>();
+                    result[targetPath] = physBonePaths = new List<string>();
                 }
-                physBones.Add(GetPathToRoot(entry.Key));
+                physBonePaths.Add(GetPathToRoot(physBone));
+            }
+        }
+        if (result.Count > 0)
+        {
+            LogToFile($"Found {result.Count} meshes with exclusive physbone dependencies:");
+            foreach ((var meshPath, var physBonePaths) in result)
+            {
+                LogToFile($" - {physBonePaths.Count} physbones owned by '{meshPath}':");
+                foreach (var physBonePath in physBonePaths)
+                {
+                    LogToFile($"   - {physBonePath}");
+                }
             }
         }
         return result;
