@@ -5455,26 +5455,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
         var allExcludedTransforms = new HashSet<Transform>();
-        var hardCodedExclusions = new List<string>() {
+        var automaticExclusions = new List<string>() {
             "_VirtualLens_Root",
         }.Select(s => GetTransformFromPath(s)).ToList();
-        hardCodedExclusions.AddRange(GetRootTransform().GetComponentsInChildren<VRCContactSender>(true)
+        automaticExclusions.AddRange(GetRootTransform().GetComponentsInChildren<VRCContactSender>(true)
             .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
             .Select(c => c.transform.parent)
             .Where(t => t != null)
             .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
             .Where(t => t != null));
-        hardCodedExclusions.AddRange(FindAllPenetrators().Select(p => p.transform));
-        hardCodedExclusions = hardCodedExclusions.Where(t => t != null).ToList();
-        if (hardCodedExclusions.Count > 0) {
-            LogToFile($"Automatically excluding {hardCodedExclusions.Count} transforms from optimization:");
-            foreach (var t in hardCodedExclusions) {
+        automaticExclusions.AddRange(FindAllPenetrators().Select(p => p.transform));
+        automaticExclusions = automaticExclusions.Where(t => t != null).ToList();
+        if (automaticExclusions.Count > 0) {
+            LogToFile($"Automatically excluding {automaticExclusions.Count} transforms from optimization:");
+            foreach (var t in automaticExclusions) {
                 LogToFile($" - {GetPathToRoot(t)}");
             }
         }
-        foreach (var excludedTransform in ExcludeTransforms.Concat(hardCodedExclusions)) {
-            if (excludedTransform == null)
-                continue;
+        var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
+        if (manualExclusions.Count > 0) {
+            LogToFile($"Excluding {manualExclusions.Count} user-specified transforms from optimization:");
+            foreach (var t in manualExclusions) {
+                LogToFile($" - {GetPathToRoot(t)}");
+            }
+        }
+        foreach (var excludedTransform in manualExclusions.Concat(automaticExclusions)) {
             allExcludedTransforms.Add(excludedTransform);
             allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
         }
