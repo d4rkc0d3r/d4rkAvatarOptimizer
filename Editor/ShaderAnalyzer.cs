@@ -231,7 +231,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             filePath = Path.GetFullPath(shaderPath);
             parsedShader.filePath = filePath;
             maxIncludes = 1000;
-            doneParsing = false;
             if (shaderPath.EndsWith(".orlshader"))
             {
                 #if ORLSHADER_EXISTS
@@ -243,29 +242,23 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 catch (IOException e)
                 {
-                    parsedShader.parsedCorrectly = false;
-                    doneParsing = true;
                     parsedShader.errorMessage = e.Message;
                 }
                 Profiler.EndSection();
                 #else
-                parsedShader.parsedCorrectly = false;
-                doneParsing = true;
                 parsedShader.errorMessage = "ORLShader Generator 7.0+ is not installed.";
                 #endif
             }
-            else if (shaderPath.StartsWithSimple("Resources/unity_builtin"))
+            else if (shaderPath.StartsWithSimple("Resources/unity_builtin") || shaderName == "Hidden/InternalErrorShader")
             {
-                parsedShader.parsedCorrectly = false;
-                doneParsing = true;
                 parsedShader.errorMessage = "Built-in Unity shaders are not supported.";
             }
             else if (!shaderPath.EndsWith(".shader"))
             {
-                parsedShader.parsedCorrectly = false;
-                doneParsing = true;
                 parsedShader.errorMessage = $"Unsupported shader file type: {Path.GetExtension(shaderPath)}";
             }
+            parsedShader.parsedCorrectly = string.IsNullOrEmpty(parsedShader.errorMessage);
+            doneParsing = !parsedShader.parsedCorrectly;
         }
 
         private ParsedShader Parse()

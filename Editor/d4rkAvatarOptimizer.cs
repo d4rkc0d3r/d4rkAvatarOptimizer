@@ -124,7 +124,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return renderer.GetSharedMesh()?.GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1)) ?? MeshTopology.Triangles;
         }
 #endif
-        // equals operators
         public override bool Equals(object obj)
         {
             if (obj is MaterialSlot other)
@@ -137,14 +136,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             return (renderer == null ? 0 : renderer.GetHashCode()) ^ index.GetHashCode();
         }
-        public static bool operator ==(MaterialSlot a, MaterialSlot b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(MaterialSlot a, MaterialSlot b)
-        {
-            return !a.Equals(b);
-        }
+        public static bool operator ==(MaterialSlot a, MaterialSlot b) => a.Equals(b);
+        public static bool operator !=(MaterialSlot a, MaterialSlot b) => !a.Equals(b);
     }
 
 #if UNITY_EDITOR
@@ -183,8 +176,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 DisplayProgressBar("Parsing Shaders", 0.05f);
                 Profiler.StartNextSection("ParseAndCacheAllShaders()");
-                ShaderAnalyzer.ParseAndCacheAllShaders(FindAllUsedMaterials().Select(m => m.shader), true,
+                var shaders = ShaderAnalyzer.ParseAndCacheAllShaders(FindAllUsedMaterials().Select(m => m.shader), true,
                     (done, total) => DisplayProgressBar($"Parsing Shaders ({done}/{total})", 0.05f + 0.15f * done / total));
+                LogShaderParseResult(shaders);
             }
             physBonesToDisable = FindAllPhysBonesToDisable();
             Profiler.StartNextSection("ConvertStaticMeshesToSkinnedMeshes()");
@@ -656,6 +650,37 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             logFileBuffer.Clear();
         }
         AssetDatabase.ImportAsset(logFilePath);
+    }
+
+    private void LogShaderParseResult(List<ParsedShader> shaders)
+    {
+        if (shaders.Count == 0)
+            return;
+        var filtered = shaders.Distinct().OrderBy(s => s.name).ToList();
+        var unmergeable = filtered.Where(s => !s.CanMerge()).ToList();
+        var mergeable = filtered.Where(s => s.CanMerge()).ToList();
+        LogToFile($"Parsed {filtered.Count} shaders:");
+        if (mergeable.Count > 0)
+        {
+            LogToFile($" - {mergeable.Count} mergeable shaders:");
+            foreach (var shader in mergeable)
+            {
+                LogToFile($"    - {shader.name}");
+            }
+        }
+        if (unmergeable.Count > 0)
+        {
+            LogToFile($" - {unmergeable.Count} unmergeable shaders:");
+            var groupedByMessage = unmergeable.GroupBy(s => s.CantMergeReason()).OrderBy(g => g.Count()).ToList();
+            foreach (var group in groupedByMessage)
+            {
+                LogToFile($"    - {group.Key}");
+                foreach (var shader in group)
+                {
+                    LogToFile($"      - {shader.name}");
+                }
+            }
+        }
     }
 
     private VRCAvatarDescriptor cache_avatarDescriptor = null;

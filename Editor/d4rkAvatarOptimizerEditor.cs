@@ -1243,11 +1243,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         var content = GetLabelWithTooltip(label);
         bool output = EditorGUILayout.Foldout(value, content, true);
         var rect = GUILayoutUtility.GetLastRect();
-        rect.x += rect.width + 4;
+        rect.x += rect.width;
         rect.width = 20;
         if (!string.IsNullOrEmpty(content.tooltip))
         {
-            rect.x -= 24;
+            rect.x -= 20;
             GUI.Label(rect, new GUIContent("", content.tooltip));
             GUI.DrawTexture(rect, EditorGUIUtility.IconContent("_Help").image);
         }
@@ -1256,7 +1256,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var warning = GetNonDestructiveToolingWarning(label);
             if (!string.IsNullOrEmpty(warning))
             {
-                rect.x -= 24;
+                rect.x -= 20;
                 DrawWarningIconWithTooltip(warning, rect);
             }
         }
