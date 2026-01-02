@@ -164,6 +164,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             constantAnimatedValuesToAdd.Clear();
             animatedMaterialPropertyDefaultValues.Clear();
             ClearCaches();
+            LogAvatarStats($"Avatar stats for '{GetAvatarDescriptor().name}' before optimization:");
             DisplayProgressBar("Destroying unused components", 0.2f);
             Profiler.StartNextSection("DestroyEditorOnlyGameObjects()");
             DestroyEditorOnlyGameObjects();
@@ -211,6 +212,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.StartNextSection("MoveRingFingerColliderToFeet()");
             DisplayProgressBar("Done", 1.0f);
             MoveRingFingerColliderToFeet();
+            LogAvatarStats("Avatar stats after optimization:");
             Profiler.StartNextSection("DestroyImmediate(this)");
             var t = transform;
             DestroyImmediate(this);
@@ -683,6 +685,30 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
+    private void LogAvatarStats(string header)
+    {
+        using var _ = new Profiler.Section("LogAvatarStats()");
+        LogToFile(header);
+        var av = GetAvatarDescriptor();
+        var components = av.GetComponentsInChildren<Component>(true).GroupBy(c => c.GetType()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key.FullName).ToArray();
+        LogToFile($" - Total Component Types: {components.Length}");
+        foreach (var group in components)
+        {
+            LogToFile($"   - {group.Key}: {group.Count()}");
+        }
+        var renderers = components.Where(g => g.Key == typeof(MeshRenderer) || g.Key == typeof(SkinnedMeshRenderer)).SelectMany(g => g).Cast<Renderer>().ToArray();
+        var skinnedMeshRenderers = components.Where(g => g.Key == typeof(SkinnedMeshRenderer)).SelectMany(g => g).Cast<SkinnedMeshRenderer>().ToArray();
+        LogToFile($" - Total Poly Count: {renderers.Sum(r => GetRendererPolyCount(r))}");
+        LogToFile($" - Total BlendShapes: {skinnedMeshRenderers.Sum(r => r.sharedMesh == null ? 0 : r.sharedMesh.blendShapeCount)}");
+        LogToFile($" - Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
+
+        var animatorControllers = av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
+        var totalAnimatorLayerCount = animatorControllers.Sum(c => c.layers.Length);
+        LogToFile($" - Animator Layers: {totalAnimatorLayerCount}");
+        var animationClipCount = animatorControllers.SelectMany(c => c.animationClips).Distinct().Count();
+        LogToFile($" - Animation Clip Count: {animationClipCount}");
+    }
+
     private VRCAvatarDescriptor cache_avatarDescriptor = null;
     public VRCAvatarDescriptor GetAvatarDescriptor()
     {
@@ -785,19 +811,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         MaterialAssetComparer.ClearCache();
     }
 
+    public long GetRendererPolyCount(Renderer renderer)
+    {
+        if (renderer == null || !(renderer is SkinnedMeshRenderer || renderer is MeshRenderer))
+            return 0;
+        var mesh = renderer.GetSharedMesh();
+        if (mesh == null)
+            return 0;
+        return Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / (mesh.GetTopology(i) == MeshTopology.Quads ? 2 : 3));
+    }
+
     public long GetPolyCount()
     {
-        long polyCount = 0;
-        foreach (var renderer in GetUsedComponentsInChildren<Renderer>())
-        {
-            if (!(renderer is SkinnedMeshRenderer || renderer is MeshRenderer))
-                continue;
-            var mesh = renderer.GetSharedMesh();
-            if (mesh == null)
-                continue;
-            polyCount += Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / 3);
-        }
-        return polyCount;
+        return GetUsedComponentsInChildren<Renderer>().Sum(r => GetRendererPolyCount(r));
     }
 
     private Dictionary<Renderer, List<ParticleSystem>> cache_ParticleSystemsUsingRenderer = null;
