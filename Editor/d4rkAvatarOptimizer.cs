@@ -5527,18 +5527,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         var stack = new Stack<Transform>();
         stack.Push(GetRootTransform());
+        var deletedPaths = new List<string>();
         while (stack.Count > 0)
         {
             var current = stack.Pop();
             if (current.gameObject.CompareTag("EditorOnly"))
             {
-                LogToFile($"Deleted EditorOnly GameObject: {GetPathToRoot(current)}");
+                deletedPaths.Add(GetPathToRoot(current));
                 DestroyImmediate(current.gameObject);
                 continue;
             }
             foreach (Transform child in current)
             {
                 stack.Push(child);
+            }
+        }
+        if (deletedPaths.Count > 0)
+        {
+            LogToFile($"Deleted {deletedPaths.Count} EditorOnly GameObjects:");
+            foreach (var path in deletedPaths)
+            {
+                LogToFile($" - {path}");
             }
         }
     }
