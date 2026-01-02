@@ -588,6 +588,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         materialAssetBundlePath = null;
         logFilePath = Path.Combine(trashBinPath, "_log.txt");
         LogToFile($"d4rk Avatar Optimizer v{packageInfo.version}");
+        LogToFile($"Unity Version: {Application.unityVersion}");
+        LogToFile($"Application.isPlaying: {Application.isPlaying}");
+        LogToFile($"Build Target: {EditorUserBuildSettings.activeBuildTarget}");
+        LogToFile("Global Settings:");
+        LogToFile($" - Always Optimize on Upload: {AvatarOptimizerSettings.DoOptimizeWithDefaultSettingsWhenNoComponent}");
+        LogToFile($" - Optimize in Play Mode: {AvatarOptimizerSettings.DoOptimizeInPlayMode}");
+        LogToFile($" - Auto Refresh Preview Timeout: {AvatarOptimizerSettings.AutoRefreshPreviewTimeout} ms");
+        LogToFile($" - Motion Time Approximation Sample Count: {AvatarOptimizerSettings.MotionTimeApproximationSampleCount}");
         LogToFile("Settings:");
         foreach (var field in typeof(Settings).GetFields())
         {
