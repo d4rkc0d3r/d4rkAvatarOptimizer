@@ -675,7 +675,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             LogToFile($" - {mergeable.Count} mergeable shaders:");
             foreach (var shader in mergeable)
             {
-                LogToFile($"    - {shader.name}");
+                LogToFile($"   - {shader.name}");
             }
         }
         if (unmergeable.Count > 0)
@@ -684,10 +684,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var groupedByMessage = unmergeable.GroupBy(s => s.CantMergeReason()).OrderBy(g => g.Count()).ToList();
             foreach (var group in groupedByMessage)
             {
-                LogToFile($"    - {group.Key}");
+                LogToFile($"   - {group.Key}");
                 foreach (var shader in group)
                 {
-                    LogToFile($"      - {shader.name}");
+                    LogToFile($"     - {shader.name}");
                 }
             }
         }
