@@ -16,6 +16,7 @@ using VRC.SDKBase.Validation.Performance;
 using Type = System.Type;
 using MaterialSlot = d4rkAvatarOptimizer.MaterialSlot;
 using Settings = d4rkAvatarOptimizer.Settings;
+using d4rkpl4y3r.d4rkavataroptimizer;
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
 public class d4rkAvatarOptimizerEditor : Editor
@@ -234,6 +235,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
 
         EditorGUILayout.Separator();
+        DrawWhyNoMaterialMergeButton();
+        EditorGUILayout.Separator();
 
         if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview, showNonDestructiveToolingWarning: true))
         {
@@ -304,9 +307,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 Profiler.EndSection();
             }
+            EditorGUILayout.Separator();
         }
-
-        EditorGUILayout.Separator();
 
         if (Foldout("Debug Info", ref optimizer.ShowDebugInfo, showNonDestructiveToolingWarning: true))
         {
@@ -817,6 +819,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         return true;
+    }
+
+    private void DrawWhyNoMaterialMergeButton()
+    {
+        if (!optimizer.MergeDifferentPropertyMaterials)
+            return;
+        using var _ = new EditorGUILayout.HorizontalScope();
+        GUILayout.Space(15 * EditorGUI.indentLevel);
+        if (GUILayout.Button(new GUIContent("Material Merge Analyzer", "Open the \"Why No Material Merge\" window to analyze why some materials can't be merged.")))
+        {
+            EditorWindow.GetWindow<WhyNoMaterialMerge>().Show();
+        }
     }
 
     private string GetNonDestructiveToolingWarning(string sectionName)

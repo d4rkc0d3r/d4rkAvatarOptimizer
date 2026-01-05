@@ -46,6 +46,8 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
 
         private void AvatarSelectionChanged()
         {
+            if (optimizer != null)
+                optimizer.ClearCaches();
             mergedMaterialPreviewCache = null;
             slotA = new MaterialSlot();
             slotB = new MaterialSlot();
