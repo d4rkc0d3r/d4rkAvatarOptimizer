@@ -4324,12 +4324,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 case ParsedShader.Property.Type.Float:
                     var candidateValue = candidateMat.GetFloat(prop.name);
                     if (listMaterials[0].GetFloat(prop.name) != candidateValue)
-                        return $"Float property '{prop.name}' does not match";
+                        return $"Float property '{prop.name}' with display name '{prop.displayName}' does not match";
                     break;
                 case ParsedShader.Property.Type.Integer:
                     var candidateIntValue = candidateMat.GetInteger(prop.name);
                     if (listMaterials[0].GetInteger(prop.name) != candidateIntValue)
-                        return $"Integer property '{prop.name}' does not match";
+                        return $"Integer property '{prop.name}' with display name '{prop.displayName}' does not match";
                     break;
                 case ParsedShader.Property.Type.Texture2D:
                 case ParsedShader.Property.Type.Texture2DArray:
@@ -4340,9 +4340,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     int propertyID = Shader.PropertyToID(prop.name);
                     var cTex = candidateMat.GetTexture(propertyID);
                     if (!mergeTexture && cTex != firstMat.GetTexture(propertyID))
-                        return $"Texture property '{prop.name}' does not match";
+                        return $"Texture property '{prop.name}' with display name '{prop.displayName}' does not match";
                     if (mergeTexture && listMaterials.Any(mat => !CanCombineTextures(cTex, mat.GetTexture(propertyID))))
-                        return $"Texture property '{prop.name}' cannot be combined because of texture {cTex.name}";
+                        return $"Texture property '{prop.name}' with display name '{prop.displayName}' cannot be combined because of texture {cTex.name}";
                     break;
             }
         }
