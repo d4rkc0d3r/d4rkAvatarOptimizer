@@ -110,10 +110,17 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
                 EditorGUILayout.HelpBox("Select an avatar with d4rkAvatarOptimizer to see why material merging is not possible.", MessageType.Warning);
                 return;
             }
-            if (showInfoBoxes = EditorGUILayout.Foldout(showInfoBoxes, "Show Info", toggleOnLabelClick: true))
+            using (new EditorGUILayout.VerticalScope(GUI.skin.box))
             {
-                using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+                if (showInfoBoxes = EditorGUILayout.Foldout(showInfoBoxes, "Show Info", toggleOnLabelClick: true))
                 {
+                    EditorGUILayout.HelpBox(
+                        "This tool allows you to analyze why certain material slots on your avatar cannot be merged by the d4rkAvatarOptimizer.\n\n" +
+                        "1. Assign two material slots (Slot A and Slot B) from the avatar's renderers.\n" +
+                        "2. The tool will analyze if these material slots can be merged based on the optimizer's settings.\n\n" +
+                        "You can select material slots directly from the merge preview below by clicking on the A or B buttons respectively. \n" +
+                        "This tool does not check if the renderers using these slots can be merged in the first place, only if the material slots themselves can.",
+                        MessageType.Info);
                     var tools = optimizer.GetNonDestructiveToolsUsedOnAvatar();
                     if (tools.Count > 0)
                     {
