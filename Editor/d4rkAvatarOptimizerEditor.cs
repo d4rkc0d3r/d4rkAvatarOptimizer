@@ -235,7 +235,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         Profiler.EndSection();
 
         EditorGUILayout.Separator();
+        
         DrawWhyNoMaterialMergeButton();
+
         EditorGUILayout.Separator();
 
         if (Foldout("Show Mesh & Material Merge Preview", ref optimizer.ShowMeshAndMaterialMergePreview, showNonDestructiveToolingWarning: true))

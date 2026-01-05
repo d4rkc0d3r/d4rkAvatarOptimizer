@@ -147,7 +147,19 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
             scrollPos = scrollView.scrollPosition;
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
             {
-                selectSlotsFromMergePreview = EditorGUILayout.ToggleLeft("Select Slots From Optimizer Merge Preview", selectSlotsFromMergePreview);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    selectSlotsFromMergePreview = EditorGUILayout.ToggleLeft("Select Slots From Optimizer Merge Preview", selectSlotsFromMergePreview, GUILayout.MinWidth(260));
+                    using var _ = new EditorGUI.DisabledScope(!selectSlotsFromMergePreview);
+                    var buttonRect = EditorGUILayout.GetControlRect(GUILayout.Width(24));
+                    buttonRect.height = 24;
+                    if (GUI.Button(buttonRect, EditorGUIUtility.IconContent("Refresh")))
+                    {
+                        mergedMaterialPreviewCache = null;
+                        optimizer.ClearCaches();
+                    }
+                    GUI.Label(buttonRect, new GUIContent("", "Clears merge preview cache.\nClick this if you changed any material properties."));
+                }
                 EditorGUILayout.Space(8);
                 if (selectSlotsFromMergePreview)
                 {
