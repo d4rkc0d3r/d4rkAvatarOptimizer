@@ -62,8 +62,11 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
             {
                 EditorGUI.indentLevel = 0;
                 slot.renderer = EditorGUILayout.ObjectField(slot.renderer, typeof(Renderer), true, GUILayout.MinWidth(120)) as Renderer;
+                GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent("", "The renderer of material slot " + label[^1]));
                 slot.index = EditorGUILayout.IntField(slot.index, GUILayout.Width(32));
+                GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent("", "The material index of material slot " + label[^1]));
                 EditorGUILayout.ObjectField(slot.material, typeof(Material), false, GUILayout.MinWidth(100));
+                GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent("", "The material of material slot " + label[^1] + "\nThis is only for showing which material is assigned to this slot."));
             }
             finally
             {
@@ -208,12 +211,12 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
                 EditorGUI.indentLevel = originalIndent;
                 using (new EditorGUI.DisabledScope(slot == slotA))
                 {
-                    if (GUILayout.Button("A", GUILayout.Width(20)))
+                    if (GUILayout.Button(new GUIContent("A", $"Select ({slot.renderer.name}, {slot.index}) as Slot A"), GUILayout.Width(20)))
                         slotA = slot;
                 }
                 using (new EditorGUI.DisabledScope(slot == slotB))
                 {
-                    if (GUILayout.Button("B", GUILayout.Width(20)))
+                    if (GUILayout.Button(new GUIContent("B", $"Select ({slot.renderer.name}, {slot.index}) as Slot B"), GUILayout.Width(20)))
                         slotB = slot;
                 }
             }
