@@ -336,7 +336,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             EditorGUI.indentLevel++;
             int shownProperties = 0;
-            propertyFilter = EditorGUILayout.TextField("Property Filter", propertyFilter);
+            propertyFilter = EditorGUILayout.TextField(new GUIContent("Property Filter", "Filter properties by name, 'ifex' for ifex parameters, or 'keyword' for properties with shader keywords"), propertyFilter);
             for (int i = 0; shownProperties < maxProperties && i < parsedShader.properties.Count; i++)
             {
                 var prop = parsedShader.properties[i];
