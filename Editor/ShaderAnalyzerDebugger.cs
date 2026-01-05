@@ -13,7 +13,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private Material material = null;
     private Shader shader = null;
     private ParsedShader parsedShader;
-    private int maxLines = 20;
+    private int maxLines = 0;
     private int maxProperties = 50;
     private int maxKeywords = 10;
     private bool showShaderLabParamsOnly = false;
@@ -287,7 +287,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
             EditorGUI.indentLevel++;
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
-                EditorGUILayout.ToggleLeft(keyword, material.IsKeywordEnabled(keyword));
+                var tooltip = parsedShader.keywordToProperty.TryGetValue(keyword, out var prop)
+                    ? $"tied to property '{prop.name}'" : "";
+                EditorGUILayout.ToggleLeft(new GUIContent(keyword, tooltip), material.IsKeywordEnabled(keyword));
             }
             EditorGUI.indentLevel--;
         }
@@ -322,7 +324,10 @@ public class ShaderAnalyzerDebugger : EditorWindow
         {
             if (showShaderLabParamsOnly && prop.shaderLabParams.Count == 0)
                 return false;
-            if (!string.IsNullOrEmpty(propertyFilter) && !prop.name.Contains(propertyFilter) && !(propertyFilter == "ifex" && parsedShader.ifexParameters.Contains(prop.name)))
+            if (!string.IsNullOrEmpty(propertyFilter)
+                    && !prop.name.Contains(propertyFilter)
+                    && !(propertyFilter == "ifex" && parsedShader.ifexParameters.Contains(prop.name))
+                    && !(propertyFilter == "keyword" && prop.shaderKeywords.Count > 0))
                 return false;
             return true;
         }
@@ -338,9 +343,24 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 if (!IsShownProperty(prop))
                     continue;
                 shownProperties++;
-                EditorGUILayout.LabelField(prop.name, (prop.hasGammaTag ? "[gamma] " : "") + prop.type
+                using var _ = new EditorGUILayout.HorizontalScope();
+                GUILayout.Space(15 * EditorGUI.indentLevel);
+                var rect = EditorGUILayout.GetControlRect(GUILayout.MinWidth(100));
+                GUI.Label(rect, new GUIContent(prop.name, prop.displayName));
+                rect = EditorGUILayout.GetControlRect(GUILayout.MinWidth(80));
+                var typeAndDefault = (prop.hasGammaTag ? "[gamma] " : "") + prop.type
                     + (prop.shaderLabParams.Count > 0 ? " {" + string.Join(",", prop.shaderLabParams) + "}" : "")
-                    + " = " + prop.defaultValue);
+                    + " = " + prop.defaultValue;
+                GUI.Label(rect, new GUIContent(typeAndDefault, typeAndDefault));
+                rect = EditorGUILayout.GetControlRect(GUILayout.MinWidth(80));
+                var keywordLabel = "";
+                var keywordTooltip = "";
+                if (prop.shaderKeywords.Count > 0)
+                {
+                    keywordLabel = prop.shaderKeywords.Count == 1 ? prop.shaderKeywords.First() : prop.shaderKeywords.Count + " Keywords";
+                    keywordTooltip = string.Join("\n", prop.shaderKeywords);
+                }
+                GUI.Label(rect, new GUIContent(keywordLabel, keywordTooltip));
             }
             EditorGUI.indentLevel--;
         }

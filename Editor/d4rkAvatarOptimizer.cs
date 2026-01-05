@@ -4309,8 +4309,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         foreach (var keyword in parsedShader.shaderFeatureKeyWords)
         {
-            if (firstMat.IsKeywordEnabled(keyword) ^ candidateMat.IsKeywordEnabled(keyword))
-                return $"Shader keyword '{keyword}' does not match";
+            if (firstMat.IsKeywordEnabled(keyword) == candidateMat.IsKeywordEnabled(keyword))
+                continue;
+            if (parsedShader.keywordToProperty.TryGetValue(keyword, out var prop))
+                return $"Shader keyword '{keyword}' does not match\nKeyword is tied to property '{prop.name}' with display name '{prop.displayName}'";
+            return $"Shader keyword '{keyword}' does not match";
         }
         listMaterials = new HashSet<Material>(listMaterials).ToArray();
         bool mergeTextures = MergeSameDimensionTextures && parsedShader.CanMergeTextures();
