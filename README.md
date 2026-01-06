@@ -37,6 +37,7 @@ This preset only uses optimizations that don't affect the behavior of the avatar
 * Bakes non animated blend shapes into the mesh
 * Merges all skinned meshes that are always animated in the same way
 * Merges material slots that use the same material
+  * Slots affected by material swap animations are not merged
 * Merges toggles in the FXLayer into a direct blend tree
 * Merges blend shapes that are always animated in the same ratio to each other
 ### Shader Toggles
@@ -203,6 +204,7 @@ In addition to the selected optimizations there are some optimizations that are 
 * Bake unused shape keys with non-zero weight into the mesh data. (only if the blend shape has a single frame)
 * Remove animation curves which reference a binding that doesn't exist on the avatar.
 * Merge identical material slots on skinned meshes.
+  * Slots affected by material swap animations are not merged.
 * Only reference bones if they have a non-zero weight on any vertex.
 * Remove everything with the EditorOnly tag.
 ## Show Mesh & Material Merge Preview
