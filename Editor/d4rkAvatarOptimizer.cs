@@ -736,8 +736,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_avatarDescriptor;
     }
 
+    private HashSet<string> cache_toolsUsedOnAvatar = null;
+    private long lastToolsCheckTime = 0;
     public HashSet<string> GetNonDestructiveToolsUsedOnAvatar()
     {
+        if (System.DateTime.Now.Ticks - lastToolsCheckTime > System.TimeSpan.TicksPerMinute * 2)
+        {
+            cache_toolsUsedOnAvatar = null;
+            lastToolsCheckTime = System.DateTime.Now.Ticks;
+        }
+        if (cache_toolsUsedOnAvatar != null)
+            return cache_toolsUsedOnAvatar;
         var tools = new HashSet<string>();
         var descriptor = GetAvatarDescriptor();
         if (descriptor == null)
@@ -753,7 +762,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             tools.Add("VRCFury");
         }
-        return tools;
+        return cache_toolsUsedOnAvatar = tools;
     }
 
     public Transform GetRootTransform()
