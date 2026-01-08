@@ -64,25 +64,24 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         settingsRect.width = 24;
         settingsRect.height = 24;
-        bool pressedSettingsButton = GUI.Button(settingsRect, new GUIContent("", "Settings"));
-        GUI.DrawTexture(settingsRect, EditorGUIUtility.IconContent("Settings@2x").image);
-        if (pressedSettingsButton)
+        if (GUI.Button(settingsRect, new GUIContent("", "Global settings and defaults for new optimizer components can be changed here.")))
         {
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
         }
+        GUI.DrawTexture(settingsRect, EditorGUIUtility.IconContent("Settings@2x").image);
+
         var koFiRect = settingsRect;
         koFiRect.x += settingsRect.width + 2;
-        bool pressedKoFiButton = GUI.Button(koFiRect, new GUIContent("", "Support me on Ko-fi!"));
+        if (GUI.Button(koFiRect, new GUIContent("", "Support me on Ko-fi!")))
+        {
+            Application.OpenURL("https://ko-fi.com/d4rkpl4y3r");
+        }
         const float pad = 2;
         koFiRect.x += pad;
         koFiRect.y += pad;
         koFiRect.width -= pad * 2;
         koFiRect.height -= pad * 2;
         GUI.DrawTexture(koFiRect, KoFiIcon);
-        if (pressedKoFiButton)
-        {
-            Application.OpenURL("https://ko-fi.com/d4rkpl4y3r");
-        }
 
         if (Application.isPlaying)
         {
