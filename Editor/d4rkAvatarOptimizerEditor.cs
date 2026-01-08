@@ -293,7 +293,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(perfRating)), GUILayout.Width(20));
+                        EditorGUILayout.LabelField(GetPerformanceIconForRating(perfRating), GUILayout.Width(20));
                         EditorGUILayout.LabelField(new GUIContent($"{i}{fxLayerLayers[i].name}", string.Join("\n", errorMessages[i])));
                     }
                     if (optimizer.ShowFXLayerMergeErrors)
@@ -1405,38 +1405,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    static Texture _perfIcon_Excellent;
-    static Texture _perfIcon_Good;
-    static Texture _perfIcon_Medium;
-    static Texture _perfIcon_Poor;
-    static Texture _perfIcon_VeryPoor;
+    static GUIContent _perfIcon_Excellent;
+    static GUIContent _perfIcon_Good;
+    static GUIContent _perfIcon_Medium;
+    static GUIContent _perfIcon_Poor;
+    static GUIContent _perfIcon_VeryPoor;
 
-    private Texture GetPerformanceIconForRating(PerformanceRating value)
+    private GUIContent GetPerformanceIconForRating(PerformanceRating rating)
     {
         if (_perfIcon_Excellent == null)
-            _perfIcon_Excellent = Resources.Load<Texture>("PerformanceIcons/Perf_Great_32");
-        if (_perfIcon_Good == null)
-            _perfIcon_Good = Resources.Load<Texture>("PerformanceIcons/Perf_Good_32");
-        if (_perfIcon_Medium == null)
-            _perfIcon_Medium = Resources.Load<Texture>("PerformanceIcons/Perf_Medium_32");
-        if (_perfIcon_Poor == null)
-            _perfIcon_Poor = Resources.Load<Texture>("PerformanceIcons/Perf_Poor_32");
-        if (_perfIcon_VeryPoor == null)
-            _perfIcon_VeryPoor = Resources.Load<Texture>("PerformanceIcons/Perf_Horrible_32");
-
-        switch (value)
         {
-            case PerformanceRating.Excellent:
-                return _perfIcon_Excellent;
-            case PerformanceRating.Good:
-                return _perfIcon_Good;
-            case PerformanceRating.Medium:
-                return _perfIcon_Medium;
-            case PerformanceRating.Poor:
-                return _perfIcon_Poor;
-            default:
-                return _perfIcon_VeryPoor;
+            _perfIcon_Excellent = new GUIContent(Resources.Load<Texture>("PerformanceIcons/Perf_Great_32"));
+            _perfIcon_Good = new GUIContent(Resources.Load<Texture>("PerformanceIcons/Perf_Good_32"));
+            _perfIcon_Medium = new GUIContent(Resources.Load<Texture>("PerformanceIcons/Perf_Medium_32"));
+            _perfIcon_Poor = new GUIContent(Resources.Load<Texture>("PerformanceIcons/Perf_Poor_32"));
+            _perfIcon_VeryPoor = new GUIContent(Resources.Load<Texture>("PerformanceIcons/Perf_Horrible_32"));
         }
+
+        return rating switch
+        {
+            PerformanceRating.Excellent => _perfIcon_Excellent,
+            PerformanceRating.Good => _perfIcon_Good,
+            PerformanceRating.Medium => _perfIcon_Medium,
+            PerformanceRating.Poor => _perfIcon_Poor,
+            _ => _perfIcon_VeryPoor,
+        };
     }
 
     PerformanceRating GetPerfRank(int count, int[] perfLevels)
@@ -1489,10 +1482,10 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(oldRating)), GUILayout.Width(20));
+            EditorGUILayout.LabelField(GetPerformanceIconForRating(oldRating), GUILayout.Width(20));
             EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
             EditorGUILayout.LabelField($"->", GUILayout.Width(20));
-            EditorGUILayout.LabelField(new GUIContent(GetPerformanceIconForRating(newRating)), GUILayout.Width(20));
+            EditorGUILayout.LabelField(GetPerformanceIconForRating(newRating), GUILayout.Width(20));
             EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
             EditorGUILayout.LabelField(label);
         }
