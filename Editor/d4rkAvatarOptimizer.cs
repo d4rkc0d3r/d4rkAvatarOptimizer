@@ -4944,7 +4944,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
                 var sourceVertices = mesh.vertices;
-                var sourceUv = mesh.uv;
+				var sourceUvList = new List<Vector4>();
+				mesh.GetUVs(0, sourceUvList);
+                var sourceUv = sourceUvList.ToArray();
                 var sourceNormals = mesh.normals;
                 var sourceTangents = mesh.tangents;
                 var sourceWeights = mesh.boneWeights;
@@ -5069,7 +5071,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     }
                 }
 
-                sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
+                sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
                 sourceTangents = sourceTangents.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceTangents;
 
@@ -5143,7 +5145,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     targetVertices.Add(sourceVertices[vertIndex]);
                     targetNormals.Add(sourceNormals[vertIndex]);
                     targetTangents.Add(sourceTangents[vertIndex]);
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, sourceUv[vertIndex].z + (blobMeshID << 12), 0));
                 }
 
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
