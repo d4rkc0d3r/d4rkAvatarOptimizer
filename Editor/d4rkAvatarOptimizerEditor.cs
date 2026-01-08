@@ -52,8 +52,13 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         using (new EditorGUI.IndentLevelScope())
         {
-            EditorGUILayout.LabelField($"<size=20>d4rk{(currentViewWidth > 350 ? "pl4y3r's" : "")} Avatar Optimizer</size>", new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
-            settingsRect = GUILayoutUtility.GetLastRect();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                settingsRect = GUILayoutUtility.GetRect(32, 1, GUILayout.ExpandWidth(false));
+                EditorGUILayout.LabelField(
+                    $"<size=20>d4rk{(currentViewWidth > 370 ? "pl4y3r's" : "")} Avatar Optimizer</size>",
+                    new GUIStyle(EditorStyles.label) { richText = true, alignment = TextAnchor.LowerCenter });
+            }
             EditorGUILayout.LabelField($"v{packageInfo.version}", EditorStyles.centeredGreyMiniLabel);
         }
 
@@ -64,6 +69,19 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (pressedSettingsButton)
         {
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
+        }
+        var koFiRect = settingsRect;
+        koFiRect.x += settingsRect.width + 2;
+        bool pressedKoFiButton = GUI.Button(koFiRect, new GUIContent("", "Support me on Ko-fi!"));
+        const float pad = 2;
+        koFiRect.x += pad;
+        koFiRect.y += pad;
+        koFiRect.width -= pad * 2;
+        koFiRect.height -= pad * 2;
+        GUI.DrawTexture(koFiRect, KoFiIcon);
+        if (pressedKoFiButton)
+        {
+            Application.OpenURL("https://ko-fi.com/d4rkpl4y3r");
         }
 
         if (Application.isPlaying)
@@ -1404,6 +1422,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             serializedObject.ApplyModifiedProperties();
         }
     }
+
+    static Texture _kofiIcon = null;
+    static Texture KoFiIcon { get => _kofiIcon == null ? _kofiIcon = Resources.Load<Texture>("d4rkAO_ko-fi_64") : _kofiIcon; }
 
     static GUIContent _perfIcon_Excellent;
     static GUIContent _perfIcon_Good;
