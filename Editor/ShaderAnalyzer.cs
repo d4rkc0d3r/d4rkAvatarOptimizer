@@ -736,7 +736,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             output.hasGammaTag = false;
             bool hasHdrTag = false;
             for (int i = 0; i < tags.Count; i++) {
-                var tag = tags[i];
+                var tag = tags[i].Trim();
                 switch (tag.ToLowerInvariant())
                 {
                     case "gamma":
@@ -749,7 +749,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         output.doNotLock = true;
                         break;
                     case "texturekeyword":
-                        output.shaderKeywords.Add("PROP_" + output.name.ToUpperInvariant().TrimStart('_'));
+                        output.shaderKeywords.Add("PROP_" + (output.name[0] == '_' ? output.name[1..] : output.name).ToUpperInvariant());
+                        break;
+                    case "toggle":
+                    case "thrytoggle":
+                        output.shaderKeywords.Add(output.name.ToUpperInvariant() + "_ON");
+                        break;
+                    case "toggleoff":
+                        output.shaderKeywords.Add(output.name.ToUpperInvariant() + "_OFF");
                         break;
                 }
                 if (tag.StartsWithSimple("ThryToggle("))
@@ -758,6 +765,24 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (string.IsNullOrEmpty(param))
                         param = output.name.ToUpperInvariant() + "_ON";
                     output.shaderKeywords.Add(param);
+                }
+                else if (tag.StartsWithSimple("Toggle("))
+                {
+                    var param = tag["Toggle(".Length..^1].Trim();
+                    if (string.IsNullOrEmpty(param))
+                        param = output.name.ToUpperInvariant() + "_ON";
+                    output.shaderKeywords.Add(param);
+                }
+                else if (tag.StartsWithSimple("ToggleOff("))
+                {
+                    var param = tag["ToggleOff(".Length..^1].Trim();
+                    if (string.IsNullOrEmpty(param))
+                        param = output.name.ToUpperInvariant() + "_OFF";
+                    output.shaderKeywords.Add(param);
+                }
+                else if (tag.StartsWithSimple("KeywordEnum("))
+                {
+                    output.shaderKeywords.UnionWith(tag["KeywordEnum(".Length..^1].Split(',').Select(s => $"{output.name}_{s.Trim()}".ToUpperInvariant().Replace(' ', '_')));
                 }
             }
             switch (typeDefinition) {

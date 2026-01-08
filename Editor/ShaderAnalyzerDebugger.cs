@@ -288,7 +288,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
             foreach (var keyword in parsedShader.shaderFeatureKeyWords.OrderBy(s => s))
             {
                 var tooltip = parsedShader.keywordToProperty.TryGetValue(keyword, out var prop)
-                    ? $"tied to property '{prop.name}'" : "";
+                    ? $"tied to property '{prop.name}' with display name '{prop.displayName}'" : "";
                 EditorGUILayout.ToggleLeft(new GUIContent(keyword, tooltip), material.IsKeywordEnabled(keyword));
             }
             EditorGUI.indentLevel--;
