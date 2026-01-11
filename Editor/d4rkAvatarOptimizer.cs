@@ -5145,7 +5145,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     targetVertices.Add(sourceVertices[vertIndex]);
                     targetNormals.Add(sourceNormals[vertIndex]);
                     targetTangents.Add(sourceTangents[vertIndex]);
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, sourceUv[vertIndex].z + (blobMeshID << 12), 0));
+					
+                    if (WritePropertiesAsStaticValues)
+                    {
+                        targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
+                    }
+                    else
+                    {
+                        targetUv[0].Add(sourceUv[vertIndex]);
+                    }
                 }
 
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
