@@ -4930,20 +4930,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             LogToFile($"   - Total vertices: {totalVertexCount}");
             LogToFile($"   - Total submeshes: {basicMergedMeshesList.Sum(m => m.sharedMesh.subMeshCount)}");
             LogToFile($"   - Target root bone: {GetPathToRoot(targetRootBone)}");
-            LogToFile($"   - Vertex attributes used:");
-            var usedAttributes = new HashSet<string>();
+            var usedAttributes = new Dictionary<string, int>();
             foreach (var skinnedMesh in basicMergedMeshesList)
             {
                 var mesh = skinnedMesh.sharedMesh;
                 for (int i = 0; i < mesh.vertexAttributeCount; i++)
                 {
-                    var attr = mesh.GetVertexAttribute(i);
-                    usedAttributes.Add($"     - {attr.attribute,-12}  {attr.dimension}x{attr.format}");
+                    var a = mesh.GetVertexAttribute(i);
+                    var s = $"     - {a.attribute,-12}  {a.dimension}x{a.format,-8}";
+                    if (!usedAttributes.TryGetValue(s, out int count))
+                        count = 0;
+                    usedAttributes[s] = count + 1;
                 }
             }
-            foreach (var attr in usedAttributes.OrderBy(s => s))
+            LogToFile($"   - Vertex attributes used:");
+            foreach ((var attr, var count) in usedAttributes.OrderBy(s => s.Key))
             {
-                LogToFile(attr);
+                LogToFile($"{attr} {count,3}");
             }
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
