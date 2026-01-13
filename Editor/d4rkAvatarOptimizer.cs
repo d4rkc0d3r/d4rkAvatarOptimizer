@@ -4930,8 +4930,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             LogToFile($"   - Total vertices: {totalVertexCount}");
             LogToFile($"   - Total submeshes: {basicMergedMeshesList.Sum(m => m.sharedMesh.subMeshCount)}");
             LogToFile($"   - Target root bone: {GetPathToRoot(targetRootBone)}");
-            LogToFile($"   - Use color32: {useColor32}");
-            LogToFile($"   - Used UV sets: {string.Join(", ", hasUvSet.Select((b, i) => (b, i)).Where(t => t.b).Select(t => $"uv{t.i}"))}");
+            LogToFile($"   - Vertex attributes used:");
+            var usedAttributes = new HashSet<string>();
+            foreach (var skinnedMesh in basicMergedMeshesList)
+            {
+                var mesh = skinnedMesh.sharedMesh;
+                for (int i = 0; i < mesh.vertexAttributeCount; i++)
+                {
+                    var attr = mesh.GetVertexAttribute(i);
+                    usedAttributes.Add($"     - {attr.attribute,-12}  {attr.dimension}x{attr.format}");
+                }
+            }
+            foreach (var attr in usedAttributes.OrderBy(s => s))
+            {
+                LogToFile(attr);
+            }
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
             {
