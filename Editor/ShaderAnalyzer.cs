@@ -240,7 +240,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Profiler.StartSection("ORL.ShaderGenerator");
                 try
                 {
-                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: false)
+                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: true)
                         .Split(new string[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.RemoveEmptyEntries);
                 }
                 catch (IOException e)
@@ -249,7 +249,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 Profiler.EndSection();
                 #else
-                parsedShader.errorMessage = "ORLShader Generator 7.0+ is not installed.";
+                parsedShader.errorMessage = "ORLShader Generator 7.1+ is not installed.";
                 #endif
             }
             else if (shaderPath.StartsWithSimple("Resources/unity_builtin") || shaderName == "Hidden/InternalErrorShader")
@@ -1100,16 +1100,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                 }
                 line = source[++sourceLineIndex];
-            }
-            foreach (var declaration in output)
-            {
-                if (declaration.StartsWithSimple("#"))
-                    continue;
-                var match = Regex.Match(declaration, @"^((in|out|inout)\s)?\s*(\w+)\s+(\w+)(\s*:\s*\w+)?");
-                if (!match.Success)
-                {
-                    throw new ParserException("Unknown function parameter declaration: " + declaration);
-                }
             }
             return output;
         }
@@ -2316,8 +2306,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 lineIndex = sourceLineIndex;
                 functionDefinition = ShaderAnalyzer.ParseFunctionParametersWithPreprocessorStatements(source, ref lineIndex);
                 sourceLineIndex = lineIndex;
-            } catch (ShaderAnalyzer.ParserException) {
-                Debug.LogWarning($"Failed to parse function parameters for function {func.name}. Skipping duplication.");
+            } catch (ShaderAnalyzer.ParserException e) {
+                Debug.LogWarning($"Failed to parse function parameters for function {func.name}. Skipping duplication.\n{e.Message}");
                 output.Add(source[sourceLineIndex]);
                 return;
             }

@@ -13,7 +13,8 @@
 ### Changes
 * Minimum supported VRChat Avatar SDK version is now 3.9.0
 * Minimum supported Unity version is now 2022.3
-* Minimum supported ORLShader Generator version is now 7.0.0
+* Minimum supported ORLShader Generator version is now 7.1.0
+  * This allows the use of `Merge Same Dimension Textures` with `.orlshader` files.
 * The `d4rkAvatarOptimizer` component can now be put anywhere in the avatar hierarchy instead of only on the root.
 * The different preview foldouts now show a warning icon with tooltip if any non destructive tooling is detected on the avatar.
 * Added Ko-fi button to the optimizer window next to the settings button.
