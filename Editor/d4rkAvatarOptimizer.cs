@@ -3684,7 +3684,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 List<Texture2D> list = null;
                 foreach (var subList in textureArrayLists)
                 {
-                    if (CanCombineTextures(subList[0], texArray[0]))
+                    if (CanCombineTexturesError(subList[0], texArray[0]) == null)
                     {
                         list = subList;
                         break;
@@ -4230,33 +4230,35 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return importer.sRGBTexture == false;
     }
 
-    private bool CanCombineTextures(Texture a, Texture b)
+    private string CanCombineTexturesError(Texture a, Texture b)
     {
         if (a == b)
-            return true;
+            return null;
         if (a == null && b is Texture2D)
-            return true;
+            return null;
         if (a is Texture2D && b == null)
-            return true;
+            return null;
         if (!(a is Texture2D) || !(b is Texture2D))
-            return false;
+            return a is Texture2D ? $"{b.name} is not a Texture2D" : $"{a.name} is not a Texture2D";
         if (a.texelSize != b.texelSize)
-            return false;
+            return $"{a.name} and {b.name} have different texel sizes";
         var a2D = a as Texture2D;
         var b2D = b as Texture2D;
         if (a2D.format != b2D.format)
-            return false;
+            return $"{a.name} and {b.name} have different texture formats";
         if (a2D.format == TextureFormat.DXT1Crunched || a2D.format == TextureFormat.DXT5Crunched)
-            return false;
+            return $"{a.name} is using a crunched texture format which is not supported";
+        if (b2D.format == TextureFormat.DXT1Crunched || b2D.format == TextureFormat.DXT5Crunched)
+            return $"{b.name} is using a crunched texture format which is not supported";
         if (a2D.mipmapCount != b2D.mipmapCount)
-            return false;
+            return $"{a.name} and {b.name} have different mipmap counts";
         if (a2D.filterMode != b2D.filterMode)
-            return false;
+            return $"{a.name} and {b.name} have different filter modes";
         if (a2D.wrapMode != b2D.wrapMode)
-            return false;
+            return $"{a.name} and {b.name} have different wrap modes";
         if (IsTextureLinear(a2D) != IsTextureLinear(b2D))
-            return false;
-        return true;
+            return $"{a.name} and {b.name} have different color spaces";
+        return null;
     }
 
     public string CanCombineMaterialsError(List<MaterialSlot> list, MaterialSlot candidate)
@@ -4349,8 +4351,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     var cTex = candidateMat.GetTexture(propertyID);
                     if (!mergeTexture && cTex != firstMat.GetTexture(propertyID))
                         return $"Texture property '{prop.name}' with display name '{prop.displayName}' does not match";
-                    if (mergeTexture && listMaterials.Any(mat => !CanCombineTextures(cTex, mat.GetTexture(propertyID))))
-                        return $"Texture property '{prop.name}' with display name '{prop.displayName}' cannot be combined because of texture {cTex.name}";
+                    if (mergeTexture)
+                    {
+                        var error = listMaterials.Select(mat => CanCombineTexturesError(cTex, mat.GetTexture(propertyID))).FirstOrDefault(err => err != null);
+                        if (error != null)
+                            return $"Texture property '{prop.name}' with display name '{prop.displayName}' cannot be combined: {error}";
+                    }
                     break;
             }
         }
