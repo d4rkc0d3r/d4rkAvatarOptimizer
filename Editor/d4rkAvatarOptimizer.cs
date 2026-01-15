@@ -3456,17 +3456,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             transforms.UnionWith(FindReferencedTransforms(finalIKScript));
         }
 
-        var headChopType = Type.GetType("VRC.SDK3.Avatars.Components.VRCHeadChop, VRCSDK3A");
-        if (headChopType != null) {
-            foreach (var headChop in avDescriptor.GetComponentsInChildren(headChopType, true)) {
-                using (var so = new SerializedObject(headChop)) {
-                    var targetBonesProperty = so.FindProperty("targetBones");
-                    for (int i = 0; i < targetBonesProperty.arraySize; i++) {
-                        var targetBone = targetBonesProperty.GetArrayElementAtIndex(i).FindPropertyRelative("transform").objectReferenceValue as Transform;
-                        if (targetBone != null) {
-                            transforms.Add(targetBone);
-                        }
-                    }
+        foreach (var headChop in avDescriptor.GetComponentsInChildren<VRCHeadChop>(true))
+        {
+            foreach (var targetBone in headChop.targetBones)
+            {
+                if (targetBone.transform != null)
+                {
+                    transforms.Add(targetBone.transform);
                 }
             }
         }
