@@ -1697,7 +1697,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 poiUsedPropertyDefines = poiUsedPropertyDefines ?? new Dictionary<string, bool>(),
                 animatedPropertyValues = animatedPropertyValues ?? new Dictionary<string, string>(),
                 setKeywords = setKeywords ?? new List<string>(),
-                sanitizedShaderName = $"s_{Path.GetFileNameWithoutExtension(source.filePath)}".Replace('\'', '_'),
+                sanitizedShaderName = $"s_{Path.GetFileNameWithoutExtension(source.filePath)}".Replace('\'', '_').Replace(' ', '_'),
                 stripShadowVariants = stripShadowVariants,
                 animatedPropertyOnMeshID = animatedPropertyOnMeshID ?? new Dictionary<string, bool[]>()
             };
@@ -3593,7 +3593,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         throw new ShaderAnalyzer.ParserException($"Unbalanced curly braces in {parsedShader.name} pass {passID}");
                     }
-                    var includeName = $"{sanitizedShaderName}_{GetMD5Hash(output)[..12]}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
+                    var includeName = $"{sanitizedShaderName}-{GetMD5Hash(output)[..12]}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
                     output.Add($"#include \"{includeName}\"");
@@ -3642,14 +3642,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var shaderHash = GetMD5Hash(output);
             // add the first 4 characters of the overall shader hash to the include filenames so that the includes get sorted right below their respective shaders
             outputIncludes = outputIncludes.Select(oi => {
-                var underscoreIndex = oi.name.LastIndexOf('_');
-                var newName = oi.name.Insert(underscoreIndex, $"_{shaderHash[..4]}");
+                var newName = oi.name.Insert(oi.name.LastIndexOf('-'), $"_{shaderHash[..4]}");
                 output = output.Select(line => line.Replace(oi.name, newName)).ToList();
                 return (newName, oi.lines);
             }).ToList();
             optimizedShader.files = new() { ("Shader", output) };
             optimizedShader.files.AddRange(outputIncludes);
-            optimizedShader.SetName($"{sanitizedShaderName}_{shaderHash[..4]} {shaderHash[4..12]}");
+            optimizedShader.SetName($"{sanitizedShaderName}_{shaderHash[..4]}_{shaderHash[4..12]}");
         }
     }
 }
