@@ -5621,20 +5621,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var list = FindAllUnusedComponents().Where(c => c != null).ToList();
         if (list.Count == 0)
             return;
+        var typesToDeleteInSecondPass = new HashSet<Type>() {
+            typeof(Rigidbody),
+            typeof(AudioSource),
+        };
         LogToFile($"Deleting {list.Count} unused components:");
-        foreach (var component in list)
+        foreach (var component in list.Where(c => c != null && !typesToDeleteInSecondPass.Contains(c.GetType()))
+                            .Concat(list.Where(c => c != null && typesToDeleteInSecondPass.Contains(c.GetType()))))
         {
             if (component == null)
                 continue;
             LogToFile($" - {component.GetType().Name} on {GetPathToRoot(component.transform)}");
-            if (component is AudioSource audio)
-            {
-                var vrcAudioSource = audio.GetComponent<VRCSpatialAudioSource>();
-                if (vrcAudioSource != null)
-                {
-                    DestroyImmediate(vrcAudioSource);
-                }
-            }
             DestroyImmediate(component);
         }
     }
