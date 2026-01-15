@@ -3469,6 +3469,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         transforms.UnionWith(avDescriptor.transform.GetAllDescendants().Where(t => t.localScale != Vector3.one));
 
+        transforms.UnionWith(avDescriptor.GetComponentsInChildren<Rigidbody>(true)
+            .Where(rb => !alwaysDisabledComponents.Contains(rb)).Select(rb => rb.transform));
+
         return cache_FindAllMovingTransforms = transforms;
     }
 
