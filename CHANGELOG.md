@@ -24,6 +24,7 @@
 * Fix tooltips on foldouts not showing up when hovering over the tooltip icon specifically.
 * Fix `Delete Unused Components` trying to delete rigidbody components before joint components that depend on them.
 * Mark all transforms with a `Rigidbody` component as moving transforms.
+* Fix optimizer overwriting existing data in uv0.zw. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/173)
 
 ## v3.12.5
 ### Bug Fixes

@@ -885,9 +885,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return true;
     }
 
+    private Dictionary<Renderer, bool> cache_UsesUV0ZW = null;
+    private bool UsesUV0ZW(Renderer renderer)
+    {
+        if (renderer == null)
+            return false;
+        cache_UsesUV0ZW ??= new Dictionary<Renderer, bool>();
+        if (cache_UsesUV0ZW.TryGetValue(renderer, out var cachedResult))
+            return cachedResult;
+        var mesh = renderer.GetSharedMesh();
+        if (mesh == null)
+            return cache_UsesUV0ZW[renderer] = false;
+        for (int i = 0; i < mesh.vertexAttributeCount; i++)
+        {
+            var attr = mesh.GetVertexAttribute(i);
+            if (attr.attribute == VertexAttribute.TexCoord0 && (attr.dimension == 3 || attr.dimension == 4))
+                return cache_UsesUV0ZW[renderer] = true;
+        }
+        return cache_UsesUV0ZW[renderer] = false;
+    }
+
     private bool IsShaderToggleCombinableRenderer(Renderer candidate)
     {
         if (!IsBasicCombinableRenderer(candidate))
+            return false;
+        if (UsesUV0ZW(candidate))
             return false;
         foreach (var slot in MaterialSlot.GetAllSlotsFrom(candidate))
         {
@@ -956,6 +978,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (list.Any(r => GetRendererDefaultEnabledState(r) != candidateDefaultEnabledState))
                 return false;
         }
+        if (!list.All(r => UsesUV0ZW(r) == UsesUV0ZW(candidate)))
+            return false;
         if (CanCombineRendererWithBasicMerge(list, candidate, true))
             return true;
         if (!MergeSkinnedMeshesWithShaderToggle)
@@ -4285,6 +4309,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         bool allTheSameAsCandidate = listMaterials.All(mat => materialComparer.Equals(mat, candidateMat));
         if (allTheSameAsCandidate || !MergeDifferentPropertyMaterials)
             return allTheSameAsCandidate ? null : "Not the same materials and merging different property materials is disabled";
+        if (UsesUV0ZW(candidate.renderer) || list.Any(slot => UsesUV0ZW(slot.renderer)))
+            return $"Renderer {GetPathToRoot(list.Concat(new[] { candidate }).First(slot => UsesUV0ZW(slot.renderer)).renderer)} uses uv0.zw";
         if (list.Count > 1 && listMaterials.Any(mat => mat == candidateMat))
             return null;
         for (int j = 0; j < firstMat.shader.passCount; j++)
@@ -4571,7 +4597,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                             newIndex = targetVertices.Count;
                             indexList.Add(newIndex);
                             indexMap[oldIndex] = newIndex;
-                            targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z + internalMaterialID, 0));
+                            targetUv[0].Add(new Vector4(sourceUv[0][oldIndex].x, sourceUv[0][oldIndex].y, sourceUv[0][oldIndex].z + internalMaterialID, sourceUv[0][oldIndex].w));
                             for (int a = 1; a <= highestUsedUvSet; a++)
                             {
                                 targetUv[a]?.Add(sourceUv[a][oldIndex]);
@@ -4965,7 +4991,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var bindPoseIDMap = new Dictionary<int, int>();
                 var indexOffset = targetVertices.Count;
                 var sourceVertices = mesh.vertices;
-                var sourceUv = mesh.uv;
                 var sourceNormals = mesh.normals;
                 var sourceTangents = mesh.tangents;
                 var sourceWeights = mesh.boneWeights;
@@ -5067,6 +5092,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     targetUv[i].AddRange(uvs.Count == sourceVertices.Length ? uvs : Enumerable.Repeat(Vector4.zero, sourceVertices.Length));
                 }
 
+                var sourceUv = new List<Vector4>();
+                mesh.GetUVs(0, sourceUv);
+                if (sourceUv.Count != sourceVertices.Length)
+                {
+                    sourceUv = Enumerable.Repeat(Vector4.zero, sourceVertices.Length).ToList();
+                }
+
                 if (mesh.HasVertexAttribute(VertexAttribute.Color))
                 {
                     if (useColor32)
@@ -5090,7 +5122,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     }
                 }
 
-                sourceUv = sourceUv.Length != sourceVertices.Length ? new Vector2[sourceVertices.Length] : sourceUv;
                 sourceNormals = sourceNormals.Length != sourceVertices.Length ? new Vector3[sourceVertices.Length] : sourceNormals;
                 sourceTangents = sourceTangents.Length != sourceVertices.Length ? new Vector4[sourceVertices.Length] : sourceTangents;
 
@@ -5164,7 +5195,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     targetVertices.Add(sourceVertices[vertIndex]);
                     targetNormals.Add(sourceNormals[vertIndex]);
                     targetTangents.Add(sourceTangents[vertIndex]);
-                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, blobMeshID << 12, 0));
+                    targetUv[0].Add(new Vector4(sourceUv[vertIndex].x, sourceUv[vertIndex].y, sourceUv[vertIndex].z + (blobMeshID << 12), sourceUv[vertIndex].w));
                 }
 
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
@@ -5185,9 +5216,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var blendShapeWeights = new Dictionary<string, float>();
 
             var combinedMesh = new Mesh();
-            combinedMesh.indexFormat = targetVertices.Count >= 65536
-                ? UnityEngine.Rendering.IndexFormat.UInt32
-                : UnityEngine.Rendering.IndexFormat.UInt16;
+            combinedMesh.indexFormat = targetVertices.Count >= 65536 ? IndexFormat.UInt32 : IndexFormat.UInt16;
             combinedMesh.SetVertices(targetVertices);
             combinedMesh.bindposes = targetBindPoses.ToArray();
             combinedMesh.SetBoneWeights(targetWeights.ToArray());
