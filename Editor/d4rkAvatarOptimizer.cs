@@ -751,16 +751,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var descriptor = GetAvatarDescriptor();
         if (descriptor == null)
             return tools;
-        #if MODULAR_AVATAR_EXISTS
-        if (descriptor.GetComponentsInChildren<nadena.dev.modular_avatar.core.AvatarTagComponent>(true).Any())
+        var allComponentTypes = new HashSet<Type>(descriptor.GetComponentsInChildren<Component>(true).Where(c => c != null).Select(c => c.GetType()));
+        if (allComponentTypes.Any(t => t.FullName.StartsWithSimple("nadena.dev.modular_avatar.core.")))
         {
             tools.Add("Modular Avatar");
         }
-        #endif
-        var furyType = Type.GetType("VF.Model.VRCFury, VRCFury");
-        if (furyType != null && descriptor.GetComponentsInChildren(furyType, true).Any())
+        if (allComponentTypes.Any(t => t.FullName == "VF.Model.VRCFury" || t.FullName.StartsWithSimple("VF.Component.")))
         {
             tools.Add("VRCFury");
+        }
+        if (allComponentTypes.Any(t => t.FullName.StartsWithSimple("Prefabulous.Universal.Common.Runtime.")))
+        {
+            tools.Add("Prefabulous Avatar");
         }
         return cache_toolsUsedOnAvatar = tools;
     }
