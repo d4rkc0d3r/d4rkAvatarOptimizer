@@ -25,6 +25,8 @@
 * Fix `Delete Unused Components` trying to delete rigidbody components before joint components that depend on them.
 * Mark all transforms with a `Rigidbody` component as moving transforms.
 * Fix optimizer overwriting existing data in uv0.zw. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/173)
+* Fix optimizer deleting FinalIK components that are always disabled.
+  * FinalIK still work even when the component is disabled? so we keep them. Fixes issues with the GrabFullBody gimmick.
 
 ## v3.12.5
 ### Bug Fixes

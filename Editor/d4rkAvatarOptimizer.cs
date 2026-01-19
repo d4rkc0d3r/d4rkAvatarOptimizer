@@ -3347,14 +3347,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
             .Where(b => b != null && !b.enabled)
             .Where(b => !(b is VRCPhysBoneColliderBase))
-            .Where(b => !behaviourToggles.Contains(GetPathToRoot(b))));
+            .Where(b => !behaviourToggles.Contains(GetPathToRoot(b)))
+            .Where(b => !b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
 
         alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<Renderer>(true)
             .Where(r => r != null && !r.enabled && !(r is ParticleSystemRenderer))
             .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
-            .SelectMany(t => t.GetNonNullComponents().Where(c => !(c is Transform))));
+            .SelectMany(t => t.GetNonNullComponents()
+                .Where(c => !(c is Transform)))
+                .Where(c => !c.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
         
         var exclusions = GetAllExcludedTransforms();
 
