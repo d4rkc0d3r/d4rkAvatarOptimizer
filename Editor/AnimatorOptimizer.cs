@@ -1,6 +1,5 @@
 ﻿#if UNITY_EDITOR
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using UnityEditor;
@@ -9,6 +8,7 @@ using UnityEngine;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
+using d4rkpl4y3r.AvatarOptimizer.Util;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
