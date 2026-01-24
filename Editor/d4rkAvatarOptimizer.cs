@@ -8,11 +8,8 @@ using Array = System.Array;
 using System.IO;
 
 #if UNITY_EDITOR
-using System.Threading;
 using System.Threading.Tasks;
-using System.Globalization;
 using UnityEngine.Rendering;
-using UnityEngine.Animations;
 using UnityEditor;
 using UnityEditor.Animations;
 using d4rkpl4y3r.AvatarOptimizer;
@@ -85,7 +82,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DebugShowAnimatedMaterialPropertyPaths = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
-    private bool isOptimizing = false;
     #endregion
 
     public struct MaterialSlot
@@ -141,6 +137,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
 #if UNITY_EDITOR
+    private bool isOptimizing = false;
 
     public void Optimize()
     {
