@@ -591,6 +591,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"Unity Version: {Application.unityVersion}");
         LogToFile($"Application.isPlaying: {Application.isPlaying}");
         LogToFile($"Build Target: {EditorUserBuildSettings.activeBuildTarget}");
+        LogToFile($"SystemInfo.graphicsDeviceType: {SystemInfo.graphicsDeviceType}");
         LogToFile("Global Settings:");
         using (log.IndentScope())
         {

@@ -1,3 +1,7 @@
+## v4.0.1
+### Bug Fixes
+* Fix `Use Shader Toggles` not working properly in editor when using glcore graphics API. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/174)
+
 ## v4.0.0
 ### Features
 * Reduce draw calls when using shader or NaNimation toggles and merging skinned meshes:

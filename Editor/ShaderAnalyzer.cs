@@ -1835,27 +1835,43 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var animatedProperty in animatedPropertyValues)
             {
                 string name = animatedProperty.Key;
+                string isAnimatedCheck = localMeshCount > 32
+                    ? $"d4rkAvatarOptimizer{name}_IsAnimated[d4rkAvatarOptimizer_MeshID]"
+                    : $"((1u << d4rkAvatarOptimizer_MeshID) & d4rkAvatarOptimizer{name}_IsAnimatedMask) != 0";
+                bool foundAnimatedPropertyOnMeshID = animatedPropertyOnMeshID.TryGetValue(name, out var onMeshID);
+                bool skipAnimatedCheck = foundAnimatedPropertyOnMeshID && mergedMeshIndices.All(i => onMeshID[i]);
+                if (localMeshCount > 1)
+                {
+                    output.Add($"#if !defined(SHADER_API_D3D11)");
+                    output.Add("{");
+                    foreach (int i in mergedMeshIndices)
+                    {
+                        string currentIndex = $"d4rkAvatarOptimizer{name}_ArrayIndex{i}";
+                        if (!foundAnimatedPropertyOnMeshID)
+                        {
+                            currentIndex = $"(isnan(asfloat(asuint({currentIndex}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {currentIndex})";
+                        }
+                        output.Add($"{name} = {i - mergedMeshIndices.First()} == d4rkAvatarOptimizer_MeshID ? "
+                            + (skipAnimatedCheck || !foundAnimatedPropertyOnMeshID ? $"{currentIndex}" : $"({isAnimatedCheck} ? {currentIndex} : {name})")
+                            + $" : {name};");
+                    }
+                    output.Add("}");
+                    output.Add($"#else");
+                }
                 string animatedValue = localMeshCount > 1
                     ? $"{CBufferAliasArray[name].name}[{CBufferAliasArray[name].offset} + d4rkAvatarOptimizer_MeshID]"
                     : $"d4rkAvatarOptimizer{name}_ArrayIndex{mergedMeshIndices.First()}";
-                if (animatedPropertyOnMeshID.TryGetValue(name, out var onMeshID))
+                if (foundAnimatedPropertyOnMeshID)
                 {
-                    if (mergedMeshIndices.All(i => onMeshID[i]))
-                    {
-                        output.Add($"{name} = {animatedValue};");
-                    }
-                    else if (localMeshCount > 32)
-                    {
-                        output.Add($"{name} = d4rkAvatarOptimizer{name}_IsAnimated[d4rkAvatarOptimizer_MeshID] ? {animatedValue} : {name};");
-                    }
-                    else
-                    {
-                        output.Add($"{name} = ((1u << d4rkAvatarOptimizer_MeshID) & d4rkAvatarOptimizer{name}_IsAnimatedMask) != 0 ? {animatedValue} : {name};");
-                    }
+                    output.Add($"{name} = {(skipAnimatedCheck ? animatedValue : $"{isAnimatedCheck} ? {animatedValue} : {name}")};");
                 }
                 else
                 {
                     output.Add($"{name} = isnan(asfloat(asuint({animatedValue}.x) ^ asuint(d4rkAvatarOptimizer_Zero))) ? {name} : {animatedValue};");
+                }
+                if (localMeshCount > 1)
+                {
+                    output.Add($"#endif");
                 }
             }
         }
@@ -2392,6 +2408,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
 
+            output.Add("#if defined(SHADER_API_D3D11)");
             output.Add("if (d4rkAvatarOptimizer_Zero)");
             output.Add("{");
             output.Add($"float d4rkAvatarOptimizer_val = {valuesToDummyUse.Pop()};");
@@ -2405,6 +2422,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             output.Add("if (d4rkAvatarOptimizer_val) " + nullReturn);
             output.Add("}");
+            output.Add("#endif");
         }
 
         private void InjectIsActiveMeshCheck(string nullReturn)
@@ -2412,7 +2430,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (mergedMeshCount <= 1)
                 return;
             if (localMeshCount > 1)
+            {
+                output.Add("#if defined(SHADER_API_D3D11)");
                 output.Add($"if (0.5 > d4rkAvatarOptimizerAnimatedScalars[d4rkAvatarOptimizer_MeshID]) {nullReturn}");
+                output.Add("#else");
+                output.Add("{");
+                output.Add($"bool isActive = true;");
+                foreach (int i in mergedMeshIndices)
+                {
+                    output.Add($"isActive = {i - mergedMeshIndices.First()} == d4rkAvatarOptimizer_MeshID ? _IsActiveMesh{i} > 0.5 : isActive;");
+                }
+                output.Add($"if (!isActive) {nullReturn}");
+                output.Add("}");
+                output.Add("#endif");
+            }
             else
                 output.Add($"if (0.5 > _IsActiveMesh{mergedMeshIndices.First()}) {nullReturn}");
         }
@@ -2476,10 +2507,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var usedScalarRegisters = new HashSet<int>();
                 var usedVectorRegisters = new HashSet<int>();
                 var scalarOutput = new List<string>();
+                var glOutput = new List<string>();
                 var vectorOutput = new List<string>();
                 foreach (int i in mergedMeshIndices)
                 {
                     scalarOutput.Add($"float _IsActiveMesh{i} : packoffset(c{i - mergedMeshIndices.First()});");
+                    glOutput.Add($"float _IsActiveMesh{i};");
                 }
                 CBufferAliasArray.Add("_IsActiveMesh", ("d4rkAvatarOptimizerAnimatedScalars", 0));
                 int currentScalarPackOffset = AllocateCBufferRegisters(0, usedScalarRegisters);
@@ -2507,8 +2540,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     foreach (int i in mergedMeshIndices)
                     {
                         currentOutput.Add($"{type} d4rkAvatarOptimizer{name}_ArrayIndex{i} : packoffset(c{currentPackOffset + i - mergedMeshIndices.First()});");
+                        glOutput.Add($"{type} d4rkAvatarOptimizer{name}_ArrayIndex{i};");
                     }
                 }
+                output.Add("#if defined(SHADER_API_D3D11)");
                 output.Add("cbuffer d4rkAvatarOptimizerAnimatedScalars");
                 output.Add("{");
                 if (localMeshCount > 1)
@@ -2524,6 +2559,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.AddRange(vectorOutput);
                     output.Add("};");
                 }
+                output.Add("#else");
+                output.AddRange(glOutput);
+                output.Add("#endif");
                 foreach (var animatedPropertyMask in animatedPropertyOnMeshID)
                 {
                     string name = animatedPropertyMask.Key;
