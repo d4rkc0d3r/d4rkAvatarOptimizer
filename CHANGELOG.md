@@ -1,6 +1,7 @@
 ## v4.0.1
 ### Bug Fixes
 * Fix `Use Shader Toggles` not working properly in editor when using glcore graphics API. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/174)
+* Perf rank change preview didn't count ParticleSystemRenderer as two material slots when they have trails enabled.
 
 ## v4.0.0
 ### Features

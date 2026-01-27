@@ -197,12 +197,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
 
         Profiler.StartSection("Show Perf Rank Change");
-        var exclusions = optimizer.GetAllExcludedTransforms();
-        var particleSystemCount = optimizer.GetNonEditorOnlyComponentsInChildren<ParticleSystem>().Count;
-        var trailRendererCount = optimizer.GetNonEditorOnlyComponentsInChildren<TrailRenderer>().Count;
-        var skinnedMeshes = optimizer.GetNonEditorOnlyComponentsInChildren<SkinnedMeshRenderer>();
-        int meshCount = optimizer.GetNonEditorOnlyComponentsInChildren<MeshRenderer>().Count;
-        int totalMaterialCount = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>()
+        static int ParticleSystemMaterialCount(ParticleSystemRenderer psr) => psr.trailMaterial != null ? 2 : 1;
+        var allRenderers = optimizer.GetNonEditorOnlyComponentsInChildren<Renderer>();
+        var particleSystemCount = allRenderers.OfType<ParticleSystemRenderer>().Sum(ParticleSystemMaterialCount);
+        var trailRendererCount = allRenderers.OfType<TrailRenderer>().Count();
+        var skinnedMeshes = allRenderers.OfType<SkinnedMeshRenderer>().ToList();
+        var meshRenderers = allRenderers.OfType<MeshRenderer>().ToList();
+        int totalMaterialCount = skinnedMeshes.Cast<Renderer>().Concat(meshRenderers)
             .Sum(r => r.GetSharedMesh() == null ? 0 : r.GetSharedMesh().subMeshCount) + particleSystemCount + trailRendererCount;
         var totalBlendShapePaths = new HashSet<string>(skinnedMeshes.SelectMany(r => {
             if (r.sharedMesh == null)
@@ -213,6 +214,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         int optimizedSkinnedMeshCount = 0;
         int optimizedMeshCount = 0;
         int optimizedTotalMaterialCount = 0;
+        var exclusions = optimizer.GetAllExcludedTransforms();
         foreach (var matched in MergedMaterialPreview)
         {
             var renderers = matched.SelectMany(m => m).Select(slot => slot.renderer).Distinct().ToArray();
@@ -230,13 +232,17 @@ public class d4rkAvatarOptimizerEditor : Editor
                 var mesh = renderers[0].GetSharedMesh();
                 optimizedTotalMaterialCount += mesh == null ? 0 : mesh.subMeshCount;
             }
-            else // ParticleSystemRenderer & TrailRenderer
+            else if (renderers[0] is ParticleSystemRenderer psr)
+            {
+                optimizedTotalMaterialCount += ParticleSystemMaterialCount(psr);
+            }
+            else // TrailRenderer
             {
                 optimizedTotalMaterialCount += 1;
             }
         }
         PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
-        PerfRankChangeLabel("Mesh Renderers", meshCount, optimizedMeshCount, PerformanceCategory.MeshCount);
+        PerfRankChangeLabel("Mesh Renderers", meshRenderers.Count, optimizedMeshCount, PerformanceCategory.MeshCount);
         PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
         if (optimizer.GetFXLayer() != null)
         {
