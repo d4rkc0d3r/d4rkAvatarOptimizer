@@ -216,16 +216,10 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
                 EditorGUI.indentLevel = 0;
                 EditorGUILayout.ObjectField(slot.material, typeof(Material), false);
                 EditorGUI.indentLevel = originalIndent;
-                using (new EditorGUI.DisabledScope(slot == slotA))
-                {
-                    if (GUILayout.Button(new GUIContent("A", $"Select ({slot.renderer.name}, {slot.index}) as Slot A"), GUILayout.Width(20)))
-                        slotA = slot;
-                }
-                using (new EditorGUI.DisabledScope(slot == slotB))
-                {
-                    if (GUILayout.Button(new GUIContent("B", $"Select ({slot.renderer.name}, {slot.index}) as Slot B"), GUILayout.Width(20)))
-                        slotB = slot;
-                }
+                if (GUILayout.Toggle(slot == slotA, new GUIContent("A", $"Select ({slot.renderer.name}, {slot.index}) as Slot A"), GUI.skin.button, GUILayout.Width(20)))
+                    slotA = slot;
+                if (GUILayout.Toggle(slot == slotB, new GUIContent("B", $"Select ({slot.renderer.name}, {slot.index}) as Slot B"), GUI.skin.button, GUILayout.Width(20)))
+                    slotB = slot;
             }
         }
 

@@ -97,14 +97,14 @@ public class d4rkAvatarOptimizerEditor : Editor
                 EditorGUILayout.LabelField(GetLabelWithTooltip("Presets"), EditorStyles.boldLabel, GUILayout.Width(50));
                 foreach (var preset in presets)
                 {
-                    GUI.enabled = !optimizer.IsPresetActive(preset);
-                    if (GUILayout.Button(GetLabelWithTooltip(preset)))
+                    using var cc = new EditorGUI.ChangeCheckScope();
+                    bool clicked = GUILayout.Toggle(optimizer.IsPresetActive(preset), GetLabelWithTooltip(preset), GUI.skin.button);
+                    if (cc.changed && clicked)
                     {
                         optimizer.SetPreset(preset);
                         ClearUICaches();
                         EditorUtility.SetDirty(optimizer);
                     }
-                    GUI.enabled = true;
                 }
             }
         }
