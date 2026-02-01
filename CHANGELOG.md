@@ -1,6 +1,7 @@
 ## v4.0.1
 ### Changes
 * Preset buttons and slot selection buttons in `Why No Material Merge` window are now toggle buttons to better highlight the current selection.
+* Optimizer build hook now logs information about skipping or running optimization on avatars.
 
 ### Bug Fixes
 * Fix `Use Shader Toggles` not working properly in editor when using glcore graphics API. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/174)

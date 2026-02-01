@@ -29,7 +29,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var optimizers = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(includeInactive: false);
             if (optimizers.Length > 1)
             {
-                Debug.LogError($"Multiple d4rkAvatarOptimizer components found on avatar {avatarGameObject.name}. Remove duplicates before uploading.");
+                Debug.LogError($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because multiple optimizer components found on avatar. Remove duplicates before uploading.");
                 return false;
             }
             var optimizer = optimizers.Length == 1 ? optimizers[0] : null;
@@ -39,9 +39,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 AvatarOptimizerSettings.ApplyDefaults(optimizer);
                 optimizer.ApplyAutoSettings();
                 optimizer.ApplyOnUpload = true;
+                Debug.Log($"d4rkAvatarOptimizer added default optimizer component to avatar {avatarGameObject.name} because \"Always Optimize on Upload\" is enabled.");
             }
-            if (optimizer == null || !optimizer.ApplyOnUpload)
+            if (optimizer == null)
             {
+                Debug.Log($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because no optimizer component found.");
+                return true;
+            }
+            if (!optimizer.ApplyOnUpload)
+            {
+                Debug.Log($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because \"Apply On Upload\" is disabled on the optimizer component.");
                 return true;
             }
             try
@@ -50,15 +57,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (!AvatarOptimizerSettings.DoOptimizeInPlayMode)
                     {
+                        Debug.Log($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because \"Optimize in Play Mode\" is disabled.");
                         return true;
                     }
                     else if (didRunInPlayMode)
                     {
-                        Debug.LogWarning($"Only one avatar can be optimized per play mode session. Skipping optimization of {avatarGameObject.name}");
+                        Debug.LogWarning($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because it has already optimized an avatar in this play session.");
                         return true;
                     }
                 }
                 didRunInPlayMode = Application.isPlaying;
+                Debug.Log($"d4rkAvatarOptimizer optimizing avatar {avatarGameObject.name}.");
                 optimizer.Optimize();
                 return true;
             }
