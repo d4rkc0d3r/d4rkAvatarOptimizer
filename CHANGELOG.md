@@ -1,3 +1,7 @@
+## v4.0.2
+### Bug Fixes
+* Fix crash when the avatar has a missing script on it.
+
 ## v4.0.1
 ### Changes
 * Preset buttons and slot selection buttons in `Why No Material Merge` window are now toggle buttons to better highlight the current selection.

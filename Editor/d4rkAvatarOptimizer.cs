@@ -694,7 +694,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile(header);
         using var __ = log.IndentScope();
         var av = GetAvatarDescriptor();
-        var components = av.GetComponentsInChildren<Component>(true).GroupBy(c => c.GetType()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key.FullName).ToArray();
+        var components = av.GetComponentsInChildren<Component>(true).Where(c => c != null).GroupBy(c => c.GetType()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key.FullName).ToArray();
         LogToFile($"- Total Component Types: {components.Length}");
         foreach (var group in components)
         {
