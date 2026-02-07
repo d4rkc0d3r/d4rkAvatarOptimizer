@@ -80,7 +80,22 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
             {
                 var lockLabel = new GUIContent("Lock Avatar Auto Selection", "When enabled, the avatar and optimizer will not auto select based on your selection in the hierarchy.");
-                lockAvatarSelection = EditorGUILayout.ToggleLeft(lockLabel, lockAvatarSelection);
+                var descLabel = new GUIContent("", "The avatar descriptor to analyze.\nThis will auto select based on your selection in the hierarchy.");
+                var optLabel = new GUIContent("", "The d4rkAvatarOptimizer component on the avatar to analyze.\nThis will auto select based on the selected avatar.");
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(15 * EditorGUI.indentLevel);
+                    lockAvatarSelection = GUILayout.Toggle(lockAvatarSelection, lockLabel, GUI.skin.button, GUILayout.ExpandWidth(false));
+                    var prevIndent = EditorGUI.indentLevel;
+                    EditorGUI.indentLevel = 0;
+                    avatar = EditorGUILayout.ObjectField(avatar, typeof(VRCAvatarDescriptor), true) as VRCAvatarDescriptor;
+                    GUI.Label(GUILayoutUtility.GetLastRect(), descLabel);
+                    optimizer = EditorGUILayout.ObjectField(optimizer, typeof(d4rkAvatarOptimizer), true) as d4rkAvatarOptimizer;
+                    GUI.Label(GUILayoutUtility.GetLastRect(), optLabel);
+                    EditorGUI.indentLevel = prevIndent;
+                }
+
                 if (!lockAvatarSelection && Selection.activeGameObject != null)
                 {
                     var currentTransform = Selection.activeGameObject.transform;
@@ -100,10 +115,6 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
                         optimizer = avatar.GetComponentInChildren<d4rkAvatarOptimizer>(includeInactive: false);
                     }
                 }
-                var descLabel = new GUIContent("Avatar", "The avatar descriptor to analyze.\nThis will auto select based on your selection in the hierarchy.");
-                avatar = EditorGUILayout.ObjectField(descLabel, avatar, typeof(VRCAvatarDescriptor), true) as VRCAvatarDescriptor;
-                var optLabel = new GUIContent("Optimizer", "The d4rkAvatarOptimizer component on the avatar to analyze.\nThis will auto select based on the selected avatar.");
-                optimizer = EditorGUILayout.ObjectField(optLabel, optimizer, typeof(d4rkAvatarOptimizer), true) as d4rkAvatarOptimizer;
             }
             if (optimizer == null || avatar == null)
             {

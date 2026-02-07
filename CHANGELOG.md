@@ -1,3 +1,8 @@
+## v4.0.3
+### Changes
+* Why No Material Merge window got some minor changes:
+  * The avatar auto selection toggle is now a toggle button and the object fields for the avatar descriptor and the optimizer are now inline.
+
 ## v4.0.2
 ### Bug Fixes
 * Fix crash when the avatar has a missing script on it.
