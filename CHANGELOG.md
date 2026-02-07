@@ -2,6 +2,7 @@
 ### Changes
 * Why No Material Merge window got some minor changes:
   * The avatar auto selection toggle is now a toggle button and the object fields for the avatar descriptor and the optimizer are now inline.
+  * Increased the font size of the help boxes slightly to make them more readable.
 
 ## v4.0.2
 ### Bug Fixes
