@@ -1231,7 +1231,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         && lines[lineIndex + 1][0] != '{'
                         && lines[lineIndex + 1][0] != '}'
                         && lines[lineIndex + 1][0] != '#'
-                        && !lines[lineIndex + 1].StartsWithSimple("return"))
+                        && !lines[lineIndex + 1].StartsWithSimple("return")
+                        && !lines[lineIndex].StartsWithSimple("SPS_TEX_DEFINE"))
                     {
                         lineIndex++;
                     }
