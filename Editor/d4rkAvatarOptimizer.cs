@@ -583,7 +583,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
         binaryAssetBundlePath = null;
         materialAssetBundlePath = null;
-        log = new (Path.Combine(trashBinPath, "_log.txt"));
+        log = new (Path.Combine(trashBinPath, "_d4rkAvatarOptimizer.log"));
         LogToFile($"d4rk Avatar Optimizer v{packageInfo.version}");
         LogToFile($"Unity Version: {Application.unityVersion}");
         LogToFile($"Application.isPlaying: {Application.isPlaying}");
