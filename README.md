@@ -68,7 +68,7 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
 If you are a shader author you can read the [Guidelines for Shader Authors](./Documentation~/ForShaderAuthors.md) document to make your shaders compatible with the optimizer.
 
 It is also nice to make a bug report with the broken shaders so I can fix it for the future.  
-To do that you need to bundle up the optimized `.mat`, `.shader` & `.cginc` files. You can do that by right clicking on `d4rkAvatarOptimizer/TrashBin` in the project view under `Packages` and selecting `Show in Explorer`. A window with the folder selected should open. Go inside the folder and put the files into a `.zip` file. You don't need to include the `.asset` files as they can be very large and don't help when debugging the shaders.  
+To do that you need to bundle up the optimized `.mat`, `.shader`, `.cginc` & `.log` files. You can do that by right clicking on `d4rkAvatarOptimizer/TrashBin` in the project view under `Packages` and selecting `Show in Explorer`. A window with the folder selected should open. Go inside the folder and put the files into a `.zip` file. You don't need to include the `.asset` files as they can be very large and don't help when debugging the shaders.  
 Once you have done that make a bug report on the [issue tracker](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues) where you can attach the `.zip` file.
 
 ![Show TrashBin in Explorer](./Documentation~/img/openTrashBinInExplorer.png)
@@ -122,7 +122,7 @@ This is useful to not look weird with blocked animations in case of NaNimation t
 Automatically converts static meshes to skinned meshes so that they can be merged with other meshes and have their materials merged as well. This only happens if the static mesh has materials that can be merged with materials from the skinned mesh it tries to get merged into.  
 Does not convert meshes on the UIMenu layer since they are mostly used for computation.
 ## Merge Different Property Materials
-Merges materials with the same shader where properties can have different values. If they do have different values the values will get written to a constant buffer. Material IDs get written to uv.w and used to access the correct value from that cbuffer.
+Merges materials with the same shader where properties can have different values. If they do have different values the values will get written to a constant buffer. Material IDs get written to uv.z and used to access the correct value from that cbuffer.
 
 If your shader has a "lock in" or "bake" feature, make sure to not use it with this optimizer if you have "Write Properties as Static Values" enabled. Locked in shaders will have different actual shaders for each material, so they can't be combined. "Write Properties as Static Values" will take over the job of locking in the shaders.
 
