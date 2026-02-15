@@ -3,7 +3,8 @@
 * Why No Material Merge window got some minor changes:
   * The avatar auto selection toggle is now a toggle button and the object fields for the avatar descriptor and the optimizer are now inline.
   * Increased the font size of the help boxes slightly to make them more readable.
-* Log file renamed from `_log.txt` to `_d4rkAvatarOptimizer.log`
+* Log file renamed from `_log.txt` to `_d4rkAvatarOptimizer.log`.
+* Simplified state machine behavior cloning to rely on `EditorUtility.CopySerialized` to work with newer versions of the vrc sdk where new properties got added.
 
 ## v4.0.2
 ### Bug Fixes
