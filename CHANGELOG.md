@@ -1,3 +1,7 @@
+## v4.0.4
+### Bug Fixes
+* Fix issue when merging meshes with different uv sets.
+
 ## v4.0.3
 ### Changes
 * Why No Material Merge window got some minor changes:

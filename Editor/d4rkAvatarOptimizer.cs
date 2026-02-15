@@ -4989,7 +4989,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return targetBoneIndexMap[(meshID, boneID)] = AddNewBone(boneTransform, bindPose);
             }
 
-            var hasUvSet = new bool[8] {
+            var anyHasUvSet = new bool[8] {
                 true,
                 combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord1)),
                 combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord2)),
@@ -4999,7 +4999,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord6)),
                 combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.TexCoord7)),
             };
-            var targetUv = Enumerable.Range(0, 8).Select(i => hasUvSet[i] ? new List<Vector4>(totalVertexCount) : null).ToArray();
+            var targetUv = Enumerable.Range(0, 8).Select(i => anyHasUvSet[i] ? new List<Vector4>(totalVertexCount) : null).ToArray();
             bool useColor32 = !combinableSkinnedMeshes.Any(m => m.sharedMesh.HasVertexAttribute(VertexAttribute.Color)
                 && m.sharedMesh.GetVertexAttributeFormat(VertexAttribute.Color) != VertexAttributeFormat.UNorm8);
             var targetColor = new List<Color>(useColor32 ? 0 : totalVertexCount);
@@ -5221,12 +5221,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     bindPoseCount = 1;
                 }
 
+                var currentHasUvSet = new bool[8] {
+                    true,
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord1),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord2),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord3),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord4),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord5),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord6),
+                    mesh.HasVertexAttribute(VertexAttribute.TexCoord7),
+                };
+
                 for (int i = 1; i < 8; i++)
                 {
-                    if (!hasUvSet[i])
+                    if (!anyHasUvSet[i])
                         continue;
                     var uvs = new List<Vector4>();
-                    mesh.GetUVs(i, uvs);
+                    var j = i;
+                    while (!currentHasUvSet[j] && j > 0)
+                    {
+                        j--;
+                    }
+                    mesh.GetUVs(j, uvs);
                     targetUv[i].AddRange(uvs.Count == sourceVertices.Length ? uvs : Enumerable.Repeat(Vector4.zero, sourceVertices.Length));
                 }
 
@@ -5369,7 +5385,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
             for (int i = 0; i < 8; i++)
             {
-                if (hasUvSet[i] && targetUv[i].Any(uv => !uv.Equals(Vector4.zero)))
+                if (anyHasUvSet[i] && targetUv[i].Any(uv => !uv.Equals(Vector4.zero)))
                 {
                     combinedMesh.SetUVs(i, targetUv[i]);
                 }
