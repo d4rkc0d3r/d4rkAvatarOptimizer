@@ -3,8 +3,15 @@
 * Why No Material Merge window got some minor changes:
   * The avatar auto selection toggle is now a toggle button and the object fields for the avatar descriptor and the optimizer are now inline.
   * Increased the font size of the help boxes slightly to make them more readable.
-* Log file renamed from `_log.txt` to `_d4rkAvatarOptimizer.log`.
+* Log file changes:
+  * File renamed from `_log.txt` to `_d4rkAvatarOptimizer.log`
+  * Log all paths where a component == null
+  * Log all paths where a game object has a slash in its name
+  * Log all ambiguous paths where multiple game objects have the same path in the hierarchy
 * Simplified state machine behavior cloning to rely on `EditorUtility.CopySerialized` to work with newer versions of the vrc sdk where new properties got added.
+
+### Bug Fixes
+* Fix optimizer not working correctly when game objects have slashes in their names.
 
 ## v4.0.2
 ### Bug Fixes

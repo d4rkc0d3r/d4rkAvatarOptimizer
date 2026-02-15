@@ -749,6 +749,48 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"- Animator Complexity Score: {animatorLayers.Length * 8 + blendTreeRank}");
         var animationClipCount = animatorControllers.SelectMany(c => c.animationClips).Distinct().Count();
         LogToFile($"- Animation Clip Count: {animationClipCount}");
+
+        var stack = new Stack<Transform>();
+        stack.Push(GetRootTransform());
+        var missingComponentPaths = new List<string>();
+        var gameObjectsWithSlashesInName = new List<string>();
+        var ambiguousPaths = new List<string>();
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            var currentPath = GetPathToRoot(current);
+            if (current.GetComponents<Component>().Any(c => c == null))
+            {
+                missingComponentPaths.Add($"- '{currentPath}'");
+            }
+            if (current != GetTransformFromPath(currentPath))
+            {
+                ambiguousPaths.Add($"- '{currentPath}'");
+                continue;
+            }
+            foreach (Transform child in current)
+            {
+                if (child.name.Contains('/'))
+                {
+                    gameObjectsWithSlashesInName.Add($"- '{currentPath}' => '{child.name}'");
+                }
+                stack.Push(child);
+            }
+        }
+        void LogPathList(string header, List<string> paths)
+        {
+            if (paths.Count == 0)
+                return;
+            paths = paths.Distinct().ToList();
+            LogToFile($"{header}: {paths.Count}");
+            foreach (var path in paths)
+            {
+                LogToFile(path, 1);
+            }
+        }
+        LogPathList("- GameObjects with missing components", missingComponentPaths);
+        LogPathList("- GameObjects with '/' in name", gameObjectsWithSlashesInName);
+        LogPathList("- Ambiguous Paths", ambiguousPaths);
     }
 
     private VRCAvatarDescriptor cache_avatarDescriptor = null;
@@ -826,19 +868,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return GetTransformPathTo(t, GetRootTransform());
     }
 
-    public Transform GetTransformFromPath(string path)
+    public Transform GetTransformFromPath(string path, Transform current = null, int index = 0)
     {
-        if (path == "")
+        if (string.IsNullOrEmpty(path))
             return GetRootTransform();
-        string[] pathParts = path.Split('/');
-        Transform t = GetRootTransform();
-        for (int i = 0; i < pathParts.Length; i++)
+        if (current == null)
+            current = GetRootTransform();
+        foreach (Transform t in current)
         {
-            t = t.Find(pathParts[i]);
-            if (t == null)
-                return null;
+            if (path.StartsWithSimple(t.name, index))
+            {
+                int nextIndex = index + t.name.Length;
+                if (path.Length == nextIndex)
+                    return t;
+                if (path[nextIndex] != '/')
+                    continue;
+                var result = GetTransformFromPath(path, t, nextIndex + 1);
+                if (result != null)
+                    return result;
+            }
         }
-        return t;
+        return null;
     }
 
     public string GetPathToRoot(GameObject obj)
