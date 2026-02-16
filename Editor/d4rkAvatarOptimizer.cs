@@ -6075,13 +6075,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return false;
             if (!aTextures.Select(x => a.GetTexture(x)).SequenceEqual(bTextures.Select(x => b.GetTexture(x))))
                 return false;
-
-            string[] aMatrices = a.GetPropertyNames(MaterialPropertyType.Matrix);
-            string[] bMatrices = b.GetPropertyNames(MaterialPropertyType.Matrix);
-            if (!aMatrices.SequenceEqual(bMatrices))
-                return false;
-            if (!aMatrices.Select(x => a.GetMatrix(x)).SequenceEqual(bMatrices.Select(x => b.GetMatrix(x))))
-                return false;
             } finally {
                 comparisonCache[(a, b)] = comparisonCache[(b, a)] = false;
             }
