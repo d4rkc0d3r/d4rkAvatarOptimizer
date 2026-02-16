@@ -1,4 +1,7 @@
 ## v4.0.4
+### Changes
+* Show a validation warning when unlocked materials with rename animated properties are detected and `Write Properties as Static Values` is enabled.
+
 ### Bug Fixes
 * Fix issue when merging meshes with different uv sets.
 

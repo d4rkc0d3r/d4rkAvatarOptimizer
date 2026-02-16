@@ -409,16 +409,28 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(CantMergeNaNimationBecauseOfWDONAnimations);
                 Profiler.EndSection();
             }
-            if (optimizer.WritePropertiesAsStaticValues && Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
+            if (optimizer.WritePropertiesAsStaticValues)
             {
-                Profiler.StartSection("Locked in Materials");
-                var list = optimizer.GetUsedComponentsInChildren<Renderer>()
-                    .SelectMany(r => r.sharedMaterials).Distinct()
-                    .Where(mat => IsLockedIn(mat)).ToArray();
-                DrawDebugList(list);
-                Profiler.EndSection();
+                if (Foldout("Locked in Materials", ref optimizer.DebugShowLockedInMaterials))
+                {
+                    Profiler.StartSection("Locked in Materials");
+                    var list = optimizer.GetUsedComponentsInChildren<Renderer>()
+                        .SelectMany(r => r.sharedMaterials).Distinct()
+                        .Where(mat => IsLockedIn(mat) && !HasPropertyMarkedAsRenameAnimated(mat)).ToArray();
+                    DrawDebugList(list);
+                    Profiler.EndSection();
+                }
+                if (Foldout("Unlocked Materials with Rename Animated", ref optimizer.DebugShowUnlockedMaterialsWithRenameAnimated))
+                {
+                    Profiler.StartSection("Unlocked Materials with Rename Animated");
+                    var list = optimizer.GetUsedComponentsInChildren<Renderer>()
+                        .SelectMany(r => r.sharedMaterials).Distinct()
+                        .Where(mat => CanLockIn(mat) && !IsLockedIn(mat) && HasPropertyMarkedAsRenameAnimated(mat)).ToArray();
+                    DrawDebugList(list);
+                    Profiler.EndSection();
+                }
             }
-            if (!optimizer.WritePropertiesAsStaticValues && Foldout("Unlocked Materials", ref optimizer.DebugShowUnlockedMaterials))
+            else if (Foldout("Unlocked Materials", ref optimizer.DebugShowUnlockedMaterials))
             {
                 Profiler.StartSection("Unlocked Materials");
                 var list = optimizer.GetUsedComponentsInChildren<Renderer>()
@@ -732,7 +744,16 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             var correctlyParsedMaterials = allMaterials
                 .Select(m => ShaderAnalyzer.Parse(m?.shader))
-                .Where(p => (p?.parsedCorrectly ?? false)).ToArray();
+                .Where(p => p?.parsedCorrectly ?? false).ToArray();
+
+            if (allMaterials.Any(m => !IsLockedIn(m) && HasPropertyMarkedAsRenameAnimated(m)))
+            {
+                EditorGUILayout.HelpBox(
+                    "Some materials have properties marked as Rename Animated without being locked in.\n" +
+                    "Write Properties as Static Values does not support this option.\n" +
+                    "If you rely on Rename Animated, lock in these materials with their native method.\n" +
+                    "Check the Debug Info foldout for a list of these materials.", MessageType.Warning);
+            }
 
             var mergeInfoList = new List<string>();
 
@@ -759,12 +780,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                     "Check the Debug Info foldout for more info.", MessageType.Info);
             }
 
-            if (optimizer.MergeDifferentPropertyMaterials && allMaterials.Any(m => IsLockedIn(m)))
+            if (optimizer.MergeDifferentPropertyMaterials && allMaterials.Any(m => IsLockedIn(m) && !HasPropertyMarkedAsRenameAnimated(m)))
             {
                 EditorGUILayout.HelpBox(
                     "Some materials are locked in.\n" +
                     "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
-                    "If you use \"Rename Animated\" on some locked in shaders keep them locked as the animations will break otherwise.\n" + 
                     "Check the Debug Info foldout for a full list.", MessageType.Info);
             }
 
@@ -893,6 +913,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private HashSet<string> keptBlendShapePathsCache = null;
     private List<List<(string blendshape, float value)>> mergeableBlendShapesCache = null;
     private Dictionary<Mesh, (int count, float maxValue, float medianValue)[]> meshBoneWeightStatsCache = null;
+    private Dictionary<Material, bool> hasPropertiesMarkedAsRenameAnimatedCache = null;
 
     private void ClearUICaches()
     {
@@ -907,6 +928,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
         mergeableBlendShapesCache = null;
+        hasPropertiesMarkedAsRenameAnimatedCache = null;
         optimizer.ClearCaches();
     }
 
@@ -1189,6 +1211,83 @@ public class d4rkAvatarOptimizerEditor : Editor
         if (material.HasProperty("__Baked") && material.GetInt("__Baked") == 1)
             return true;
         return false;
+    }
+
+    public bool HasPropertyMarkedAsRenameAnimated(Material material)
+    {
+        if (material == null)
+            return false;
+        hasPropertiesMarkedAsRenameAnimatedCache ??= new();
+        if (!CanLockIn(material))
+            return false;
+        if (hasPropertiesMarkedAsRenameAnimatedCache.TryGetValue(material, out var cached))
+            return cached;
+
+        string CleanStringForPropertyNames(string s)
+        {
+            s = s.Trim().Replace(" ", "");
+            var utf8Source = System.Text.Encoding.UTF8.GetBytes(s);
+            string cleaned = "";
+            for (var i = 0; i < utf8Source.Length; i++)
+            {
+                if ((utf8Source[i] >= 'a' && utf8Source[i] <= 'z') ||
+                    (utf8Source[i] >= 'A' && utf8Source[i] <= 'Z') ||
+                    (utf8Source[i] >= '0' && utf8Source[i] <= '9') || utf8Source[i] == '_')
+                {
+                    cleaned += (char)utf8Source[i];
+                }
+                else
+                {
+                    cleaned += utf8Source[i].ToString("X2");
+                }
+            }
+            return cleaned;
+        }
+        var raSuffix = CleanStringForPropertyNames(material.GetTag("thry_rename_suffix", false, material.name));
+
+        bool EntryHasRenameAnimatedTag(SerializedProperty entry)
+        {
+            if (entry == null)
+                return false;
+            var keyProp = entry.FindPropertyRelative("first");
+            var valueProp = entry.FindPropertyRelative("second");
+            if (keyProp == null || valueProp == null
+                || keyProp.propertyType != SerializedPropertyType.String
+                || valueProp.propertyType != SerializedPropertyType.String)
+            {
+                return false;
+            }
+            var tag = keyProp.stringValue;
+            if (string.IsNullOrEmpty(tag))
+                return false;
+            if (!tag.EndsWith("Animated", System.StringComparison.Ordinal))
+                return false;
+            if (valueProp.stringValue != "2")
+                return false;
+            var propName = tag[..^"Animated".Length];
+            return material.HasProperty(propName) || material.HasProperty($"{propName}_{raSuffix}");
+        }
+
+        bool result = false;
+        using (var serializedMaterial = new SerializedObject(material))
+        {
+            var tagMap = serializedMaterial.FindProperty("stringTagMap");
+
+            if (tagMap != null && tagMap.isArray)
+            {
+                for (int i = 0; i < tagMap.arraySize; i++)
+                {
+                    if (EntryHasRenameAnimatedTag(tagMap.GetArrayElementAtIndex(i)))
+                    {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        hasPropertiesMarkedAsRenameAnimatedCache[material] = result;
+        return result;
     }
 
     private static Dictionary<string, List<string>> tooltipCache = null;

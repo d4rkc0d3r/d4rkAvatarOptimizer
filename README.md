@@ -80,7 +80,8 @@ There are also some settings to tweak the optimization. You can read about their
 ## Apply on Upload
 Automatically applies the optimizer to the avatar before uploading it to VRChat. This is non destructive, the avatar in your scene will stay as it is.
 ## Write Properties as Static Values
-This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader.
+This is very similar to what some shaders call locking in or baking. If you use this option you should disable the locking in or baking feature of your shader.  
+One exception to this is for materials that use the "Rename Animated" feature. These materials should stay locked in.
 
 When enabled the optimizer will replace the uniform parameter definitions with a static value on all materials.  
 For example `uniform float4 _Color;` will get changed to `static float4 _Color = float4(1, 0, 1, 1);`  
@@ -246,8 +247,12 @@ Shows all textures that are used as normal maps but don't use the BC5 compressio
 Shows all meshes that can't be merged with NaNimation toggles because they are missing either the on or off animation in a layer.  
 This usually happens when using a WD ON workflow. In that case switching to a WD OFF workflow is recommended as it allows for more optimizations.
 ### Locked in Materials
-Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
+Shows all materials that have a "lock in" or "bake" feature enabled which the optimizer detected. Materials which have a property marked as "Rename Animated" will not show up in this list as they should stay locked in to work correctly.
+
+If you want to merge these materials you need to disable the "lock in" or "bake" feature.  
 The optimizer might not detect all forms of "lock in" or "bake" so you might need to check some materials manually.
+### Unlocked Materials with Rename Animated
+Shows all materials that have a "lock in" or "bake" feature disabled which the optimizer detected and also have at least one property marked as "Rename Animated". The optimizer doesn't support rename animated as a feature so make sure to lock in these materials or animations relying on rename animated properties won't work.
 ### Unlocked Materials
 Shows all materials that have a "lock in" or "bake" feature disabled which the optimizer detected.  
 With the `Write Properties as Static Values` option disabled you need to make sure to lock in or bake your materials in this list before optimization.

@@ -72,6 +72,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DebugShowMeshesThatCantMergeNaNimationCausedByAnimations = true;
     public bool DebugShowLockedInMaterials = true;
     public bool DebugShowUnlockedMaterials = true;
+    public bool DebugShowUnlockedMaterialsWithRenameAnimated = true;
     public bool DebugShowPenetrators = true;
     public bool DebugShowMergeableBlendShapes = true;
     public bool DebugShowBoneWeightStats = true;
