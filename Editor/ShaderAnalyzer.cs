@@ -1734,20 +1734,42 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var sb = new StringBuilder();
             bool inIdentifier = ShaderAnalyzer.IsIdentifierLetter(line[0]);
             bool didReplaceSomething = false;
+            bool isIfStatementWithBranchAttribute = line.StartsWithSimple("UNITY_BRANCH");
             int currentChunkStart = 0;
+            int identifierId = 0;
             for (int i = 1; i <= line.Length; i++)
             {
                 if (i == line.Length || ShaderAnalyzer.IsIdentifierLetter(line[i]) != inIdentifier)
                 {
-                    var chunk = line.Substring(currentChunkStart, i - currentChunkStart);
-                    if (inIdentifier && constantPropertyValues.TryGetValue(chunk, out var replacement))
+                    var chunk = line[currentChunkStart..i];
+                    if (inIdentifier)
                     {
-                        if (variableTypesThisPass.TryGetValue(chunk, out var type))
+                        bool isNumber = char.IsDigit(chunk[0]);
+                        if (!isNumber && isIfStatementWithBranchAttribute && identifierId == 1 && chunk != "if")
                         {
-                            replacement = $"({type}){replacement}";
+                            isIfStatementWithBranchAttribute = false;
                         }
-                        sb.Append($"({replacement})");
-                        didReplaceSomething = true;
+                        if (constantPropertyValues.TryGetValue(chunk, out var replacement))
+                        {
+                            if (variableTypesThisPass.TryGetValue(chunk, out var type))
+                            {
+                                replacement = $"({type}){replacement}";
+                            }
+                            sb.Append($"({replacement})");
+                            didReplaceSomething = true;
+                        }
+                        else
+                        {
+                            sb.Append(chunk);
+                            if (identifierId > 1 && !isNumber)
+                            {
+                                isIfStatementWithBranchAttribute = false;
+                            }
+                        }
+                        if (!isNumber)
+                        {
+                            identifierId++;
+                        }
                     }
                     else
                     {
@@ -1757,7 +1779,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     inIdentifier = !inIdentifier;
                 }
             }
-            return didReplaceSomething ? sb.ToString() : line;
+            var result = didReplaceSomething ? sb.ToString() : line;
+            return isIfStatementWithBranchAttribute ? result["UNITY_BRANCH".Length..].TrimStart() + " // removed UNITY_BRANCH" : result;
         }
 
         private void InjectArrayPropertyInitialization()

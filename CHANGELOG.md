@@ -1,3 +1,7 @@
+## v4.0.5
+### Bug Fixes
+* Remove `UNITY_BRANCH` from if statements that have all their variables replaced by constants. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/178)
+
 ## v4.0.4
 ### Changes
 * Show a validation warning when unlocked materials with rename animated properties are detected and `Write Properties as Static Values` is enabled.
