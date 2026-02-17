@@ -1,4 +1,7 @@
 ## v4.0.5
+### Changes
+* Generated shader code is now indented with 4 spaces per `{` and `}`.
+
 ### Bug Fixes
 * Remove `UNITY_BRANCH` from if statements that have all their variables replaced by constants. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/178)
 

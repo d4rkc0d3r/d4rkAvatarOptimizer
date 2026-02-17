@@ -2687,7 +2687,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 output.Add($"{textureType} {newTexName};");
                 output.Add($"SamplerState sampler{newTexName};");
 
-                output.Add($"class {texName}_Wrapper {{");
+                output.Add($"class {texName}_Wrapper");
+                output.Add("{");
                 output.Add($"float memberToDifferentiateWrapperClasses[{++textureWrapperCount}];");
 
                 output.Add($"{type} Sample(SamplerState sampl, float2 uv) {{");
@@ -3700,6 +3701,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizedShader.files = new() { ("Shader", output) };
             optimizedShader.files.AddRange(outputIncludes);
             optimizedShader.SetName($"{sanitizedShaderName}_{shaderHash[..4]}_{shaderHash[4..12]}");
+            static List<string> IndentContent(List<string> content)
+            {
+                int indentLevel = 0;
+                for (int i = 0; i < content.Count; i++)
+                {
+                    var line = content[i];
+                    if (line.StartsWithSimple("}"))
+                        indentLevel--;
+                    indentLevel = System.Math.Max(indentLevel, 0);
+                    content[i] = new string(' ', indentLevel * 4) + line;
+                    if (line.StartsWithSimple("{"))
+                        indentLevel++;
+                }
+                return content;
+            }
+            optimizedShader.files = optimizedShader.files.Select(f => (f.name, IndentContent(f.lines))).ToList();
         }
     }
 }
