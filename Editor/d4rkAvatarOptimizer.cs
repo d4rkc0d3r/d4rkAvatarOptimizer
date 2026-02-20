@@ -613,7 +613,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private string materialAssetBundlePath = null;
     private void CreateUniqueAsset(Object asset, string name)
     {
-        Profiler.StartSection("AssetDatabase.CreateAsset()");
+        Profiler.StartSection($"AssetDatabase.CreateAsset({asset.GetType().Name})");
         var invalids = Path.GetInvalidFileNameChars();
         var sanitizedName = string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
         if (asset is Material)
@@ -1985,28 +1985,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
 
         Profiler.StartSection("AnimatorOptimizer.Run()");
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        try
         {
-            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (controller == null)
-                continue;
-            layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
-            optimizedControllers[i] = controller == GetFXLayer()
-                ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
-                : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
-            optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
-            avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
+            AssetDatabase.StartAssetEditing();
+            for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+            {
+                var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
+                if (controller == null)
+                    continue;
+                layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
+                optimizedControllers[i] = controller == GetFXLayer()
+                    ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
+                    : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
+                optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
+                avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
+            }
+            for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
+            {
+                var controller = avDescriptor.specialAnimationLayers[i].animatorController as AnimatorController;
+                if (controller == null)
+                    continue;
+                var index = i + avDescriptor.baseAnimationLayers.Length;
+                layerCopyPaths[index] = $"{trashBinPath}SpecialAnimationLayer{index}{controller.name}(OptimizedCopy).controller";
+                optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
+                optimizedControllers[index].name = $"SpecialAnimationLayer{index}{controller.name}(OptimizedCopy)";
+                avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
+            }
         }
-        for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
+        finally
         {
-            var controller = avDescriptor.specialAnimationLayers[i].animatorController as AnimatorController;
-            if (controller == null)
-                continue;
-            var index = i + avDescriptor.baseAnimationLayers.Length;
-            layerCopyPaths[index] = $"{trashBinPath}SpecialAnimationLayer{index}{controller.name}(OptimizedCopy).controller";
-            optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
-            optimizedControllers[index].name = $"SpecialAnimationLayer{index}{controller.name}(OptimizedCopy)";
-            avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
+            AssetDatabase.StopAssetEditing();
         }
         Profiler.EndSection();
 
@@ -2022,6 +2030,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"Fixing animation paths in {animations.Count} animation clips");
         using (log.IndentScope())
         {
+            using var _ = new Profiler.Section("FixAnimationClipPaths()");
             foreach (var clip in animations)
             {
                 fixedMotions[clip] = FixAnimationClipPaths(clip);

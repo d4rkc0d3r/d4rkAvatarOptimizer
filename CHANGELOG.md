@@ -1,3 +1,7 @@
+## v4.0.6
+### Changes
+* Add more granular logging of performance of different parts of the optimizer to the log file.
+
 ## v4.0.5
 ### Changes
 * Generated shader code is now indented with 4 spaces per `{` and `}`.
