@@ -872,7 +872,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
         using var _ = new EditorGUILayout.HorizontalScope();
         GUILayout.Space(15 * EditorGUI.indentLevel);
-        if (GUILayout.Button(new GUIContent("Material Merge Analyzer", "Open the \"Why No Material Merge\" window to analyze why some materials can't be merged.")))
+        if (GUILayout.Button(new GUIContent("Open Material Merge Analyzer", "Open the \"Why No Material Merge\" window to analyze why some materials can't be merged.")))
         {
             EditorWindow.GetWindow<WhyNoMaterialMerge>().Show();
         }

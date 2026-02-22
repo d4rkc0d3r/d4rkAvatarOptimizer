@@ -1,6 +1,7 @@
 ## v4.0.6
 ### Changes
 * Add more granular logging of performance of different parts of the optimizer to the log file.
+* Rename `Material Merge Analyzer` button to `Open Material Merge Analyzer`. 
 
 ## v4.0.5
 ### Changes
