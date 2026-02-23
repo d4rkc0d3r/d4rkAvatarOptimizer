@@ -1,15 +1,11 @@
 ﻿#if UNITY_EDITOR
 using UnityEngine;
-using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
-using d4rkpl4y3r.AvatarOptimizer;
-using d4rkpl4y3r.AvatarOptimizer.Util;
-using d4rkpl4y3r.AvatarOptimizer.Extensions;
 
 public class AvatarOptimizerSettings : EditorWindow
 {
-    private static d4rkAvatarOptimizer.Settings defaultSettings = new d4rkAvatarOptimizer.Settings();
+    private static d4rkAvatarOptimizer.Settings defaultSettings = new();
     
     private static readonly string PrefsPrefix = "d4rkpl4y3r_AvatarOptimizer_";
 
@@ -36,11 +32,17 @@ public class AvatarOptimizerSettings : EditorWindow
         get => Mathf.Clamp(EditorPrefs.GetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", 5), 2, 101);
         private set => EditorPrefs.SetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", value);
     }
+
+    public static bool ProfileTimeUsedInUI
+    {
+        get => EditorPrefs.GetBool(PrefsPrefix + "ProfileTimeUsedInUI", false);
+        private set => EditorPrefs.SetBool(PrefsPrefix + "ProfileTimeUsedInUI", value);
+    }
     
     [MenuItem("Tools/d4rkpl4y3r/Avatar Optimizer Settings")]
     static void Init()
     {
-        GetWindow(typeof(AvatarOptimizerSettings));
+        GetWindow<AvatarOptimizerSettings>().Show();
     }
 
     private Vector2 scrollPos;
@@ -78,6 +80,9 @@ public class AvatarOptimizerSettings : EditorWindow
                 DoOptimizeInPlayMode = BoolFieldLeft(
                     new GUIContent("Optimize in Play Mode", "Allows optimizing to run in play mode. (Only relevant with tools that call build in play mode)"),
                     DoOptimizeInPlayMode);
+                ProfileTimeUsedInUI = BoolFieldLeft(
+                    new GUIContent("Profile Time Used in UI", "Whether to show time used for each step of the editor UI at the bottom of the inspector."),
+                    ProfileTimeUsedInUI);
                 AutoRefreshPreviewTimeout = IntFieldLeft(
                     new GUIContent("Auto Refresh Preview Timeout", "In milliseconds. If the preview takes longer than this to refresh, the auto refresh will be disabled."),
                     AutoRefreshPreviewTimeout);
@@ -166,7 +171,7 @@ public class AvatarOptimizerSettings : EditorWindow
         var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
         if (field == null)
         {
-            throw new System.ArgumentException("Field " + key + " does not exist in d4rkAvatarOptimizer.Settings");
+            throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
         }
         return EditorPrefs.GetInt(PrefsPrefix + key, field.FieldType == typeof(bool) ? (bool)field.GetValue(defaultSettings) ? 1 : 0 : (int)field.GetValue(defaultSettings));
     }
@@ -176,7 +181,7 @@ public class AvatarOptimizerSettings : EditorWindow
         var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
         if (field == null)
         {
-            throw new System.ArgumentException("Field " + key + " does not exist in d4rkAvatarOptimizer.Settings");
+            throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
         }
         EditorPrefs.SetInt(PrefsPrefix + key, value);
     }
@@ -188,7 +193,7 @@ public class AvatarOptimizerSettings : EditorWindow
         foreach (var field in fields)
         {
             var val = GetValue(field.Name);
-            field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (object)(val != 0) : (object)val);
+            field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (val != 0) : val);
         }
     }
 }

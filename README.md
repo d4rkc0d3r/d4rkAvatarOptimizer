@@ -189,8 +189,6 @@ It also prevents `Optimize FX Layer` from deleting or merging layers 0, 1 & 2 as
 Deletes all game objects that have no used components and are not referenced in any other used components. This also applies to bones referenced in skinned meshes as long as the bones aren't moved by animations, eye look settings or phys bone components. It re-parents the children of the deleted game objects to their respective parents as well as transfers its weight to the parent.
 ## Use Ring Finger as Foot Collider
 Moves the ring finger collider to match the foot contact. This enables you to touch other players phys bones with your feet.
-## Profile Time Used
-Outputs how much time the different sections in the code took to execute.
 ## Exclusions
 You can exclude certain parts of the model from all optimizations. Any Transform in this list will stop the optimizer from touching anything on that object or anything below it. The number in the parenthesis indicates how many transforms are excluded even if the foldout is closed.
 ## Create Optimized Copy

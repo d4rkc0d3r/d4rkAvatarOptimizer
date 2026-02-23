@@ -52,7 +52,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         public bool DeleteUnusedComponents = true;
         public int DeleteUnusedGameObjects = 0;
         public bool UseRingFingerAsFootCollider = false;
-        public bool ProfileTimeUsed = false;
     }
 
     public Settings settings = new Settings();
@@ -217,8 +216,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (t.childCount == 0 && t.GetComponents<Component>().Length == 1)
                 DestroyImmediate(t.gameObject);
             Profiler.EndSection();
-            if (settings.ProfileTimeUsed)
-                Profiler.PrintTimeUsed();
             LogToFile(string.Join("\n  - ", Profiler.FormatTimeUsed()));
         }
         catch (System.Exception e)
@@ -273,7 +270,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DisablePhysBonesWhenUnused { get { return settings.DisablePhysBonesWhenUnused; } set { settings.DisablePhysBonesWhenUnused = value; } }
     public bool MergeSameRatioBlendShapes { get { return settings.MergeSameRatioBlendShapes; } set { settings.MergeSameRatioBlendShapes = value; } }
     public bool UseRingFingerAsFootCollider { get { return settings.UseRingFingerAsFootCollider; } set { settings.UseRingFingerAsFootCollider = value; } }
-    public bool ProfileTimeUsed { get { return settings.ProfileTimeUsed; } set { settings.ProfileTimeUsed = value; } } 
 
     public bool CanChangeSetting(string fieldName)
     {
@@ -319,7 +315,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {nameof(DisablePhysBonesWhenUnused), "Disable Phys Bones When Unused"},
         {nameof(MergeSameRatioBlendShapes), "Merge Same Ratio Blend Shapes"},
         {nameof(UseRingFingerAsFootCollider), "Use Ring Finger as Foot Collider"},
-        {nameof(ProfileTimeUsed), "Profile Time Used"},
         {nameof(ShowFXLayerMergeErrors), "Show FX Layer Merge Errors"},
     };
 

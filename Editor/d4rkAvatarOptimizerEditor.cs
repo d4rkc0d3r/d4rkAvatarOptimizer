@@ -159,7 +159,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        Profiler.enabled = optimizer.ProfileTimeUsed;
+        Profiler.enabled = AvatarOptimizerSettings.ProfileTimeUsedInUI;
         Profiler.Reset();
 
         Profiler.StartSection("Validate");
@@ -337,8 +337,7 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (Foldout("Debug Info", ref optimizer.ShowDebugInfo, showNonDestructiveToolingWarning: true))
         {
-            ToggleOptimizerProperty(nameof(optimizer.ProfileTimeUsed));
-            EditorGUI.indentLevel++;
+            using var indent = new EditorGUI.IndentLevelScope();
             if (Foldout("Unparsable Materials", ref optimizer.DebugShowUnparsableMaterials))
             {
                 Profiler.StartSection("Unparsable Materials");
@@ -585,9 +584,8 @@ public class d4rkAvatarOptimizerEditor : Editor
                 DrawDebugList(UnmovingBones);
                 Profiler.EndSection();
             }
-            EditorGUI.indentLevel--;
         }
-        if (optimizer.ProfileTimeUsed)
+        if (AvatarOptimizerSettings.ProfileTimeUsedInUI)
         {
             EditorGUILayout.Separator();
             var timeUsed = Profiler.FormatTimeUsed().Take(6).ToArray();
