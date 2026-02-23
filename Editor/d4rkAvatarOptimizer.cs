@@ -197,7 +197,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             OptimizeMaterialSwapMaterials();
             Profiler.StartNextSection("OptimizeMaterialsOnNonSkinnedMeshes()");
             OptimizeMaterialsOnNonSkinnedMeshes();
-            Profiler.StartNextSection("SaveOptimizedMaterials()");
+            Profiler.StartNextSection("OptimizeMaterialsOnPartialExclusions()");
+			OptimizeMaterialsOnPartialExclusions();
+			Profiler.StartNextSection("SaveOptimizedMaterials()");
             DisplayProgressBar("Reload optimized materials", 0.60f);
             SaveOptimizedMaterials();
             Profiler.StartNextSection("DestroyUnusedGameObjects()");
@@ -4864,6 +4866,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
+	// super basic material optimization for partially excluded transforms (sps)
+	private void OptimizeMaterialsOnPartialExclusions() 
+    {
+        var partialExclusions = GetPartiallyExcludedTransforms();
+		var skinnedMeshRenderers = GetRootTransform().GetComponentsInChildren<SkinnedMeshRenderer>(true)
+			.Where(smr => partialExclusions.Contains(smr.transform) && smr.sharedMesh != null).ToArray();
+
+        for(int meshRenderIndex = 0; meshRenderIndex < skinnedMeshRenderers.Length; meshRenderIndex++) 
+        {
+			var meshRenderer = skinnedMeshRenderers[meshRenderIndex];
+            var path = GetPathToRoot(meshRenderer);
+
+			var optimizeMaterialWrapper = meshRenderer.sharedMaterials.Select(m => new List<(Material, List<string>)>() { (m, new List<string> { path } ) }).ToList();
+			var optimizedMaterials = CreateOptimizedMaterials(optimizeMaterialWrapper, 0, path);
+
+			meshRenderer.sharedMaterials = optimizedMaterials;
+		}
+	}
+
     private Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-6f)
     {
         value.x = value.x < threshold && value.x > -threshold ? 0 : value.x;
@@ -5704,6 +5725,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         // flush particle system cache since we merged meshes
         cache_ParticleSystemsUsingRenderer = null;
     }
+
+	// partial set of exclusions to still attempt to do basic shader optimization on
+    // but nothing else
+	private HashSet<Transform> cache_GetPartiallyExcludedTransforms;
+    public HashSet<Transform> GetPartiallyExcludedTransforms() {
+		if(cache_GetPartiallyExcludedTransforms != null)
+			return cache_GetPartiallyExcludedTransforms;
+
+        cache_GetPartiallyExcludedTransforms = new HashSet<Transform>();
+		var partialExcludedTransforms = FindAllPenetrators()
+            .Select(p => p.transform)
+            .Where(t => !ExcludeTransforms.Contains(t) && IsSPSPenetratorRoot(t)).ToList();
+
+		foreach(var excludedTransform in partialExcludedTransforms) {
+			cache_GetPartiallyExcludedTransforms.Add(excludedTransform);
+		}
+        return cache_GetPartiallyExcludedTransforms;
+	}
 
     private HashSet<Transform> cache_GetAllExcludedTransforms;
     public HashSet<Transform> GetAllExcludedTransforms() {
