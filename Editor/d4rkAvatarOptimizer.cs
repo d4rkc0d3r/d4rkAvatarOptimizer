@@ -582,6 +582,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         log = new (Path.Combine(trashBinPath, "_d4rkAvatarOptimizer.log"));
         LogToFile($"d4rk Avatar Optimizer v{packageInfo.version}");
         LogToFile($"Unity Version: {Application.unityVersion}");
+        var vrcPackageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(VRCAvatarDescriptor).Assembly);
+        if (vrcPackageInfo != null)
+        {
+            LogToFile($"VRChat Avatar SDK: {vrcPackageInfo.version}");
+        }
         LogToFile($"Application.isPlaying: {Application.isPlaying}");
         LogToFile($"Build Target: {EditorUserBuildSettings.activeBuildTarget}");
         LogToFile($"SystemInfo.graphicsDeviceType: {SystemInfo.graphicsDeviceType}");
@@ -5824,7 +5829,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             if (component == null)
                 continue;
-            LogToFile($"- {component.GetType().Name} on {GetPathToRoot(component.transform)}", 1);
+            LogToFile($"- {component.GetType().Name} at '{GetPathToRoot(component.transform)}'", 1);
             DestroyImmediate(component);
         }
     }

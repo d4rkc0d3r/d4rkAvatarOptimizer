@@ -5,7 +5,10 @@
   "unity": "2022.3",
   "description": "An optimizer aiming to reduce mesh & material count and more of VRChat 3.0 avatars.",
   "dependencies": {},
-  "url": "",
+  "url": "https://github.com/d4rkc0d3r/d4rkAvatarOptimizer",
+  "author" : {
+    "name" : "d4rkpl4y3r"
+  },
   "changelogUrl": "https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/CHANGELOG.md",
   "gitDependencies": {},
   "vpmDependencies": {
