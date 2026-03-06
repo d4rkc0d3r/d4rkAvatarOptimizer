@@ -6,10 +6,11 @@
 * Rename `Material Merge Analyzer` button to `Open Material Merge Analyzer`.
 * Package json now correctly has the author field filled out as "d4rkpl4y3r".
 * Add vrc sdk version to the log file.
-* Add 3 buttons to settings panel:
+* Add 4 buttons to settings panel:
   * Reset global settings to default values.
   * Open the log file of the last optimization.
   * Open the Trash Bin folder where the generated assets are stored.
+  * Open GitHub Repository.
 
 ## v4.0.5
 ### Changes
