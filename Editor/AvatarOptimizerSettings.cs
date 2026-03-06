@@ -1,76 +1,139 @@
 ﻿#if UNITY_EDITOR
 using UnityEngine;
 using System.Linq;
+using System.IO;
 using UnityEditor;
+using System.IO.Compression;
 
-public class AvatarOptimizerSettings : EditorWindow
+namespace d4rkpl4y3r.AvatarOptimizer
 {
-    private static d4rkAvatarOptimizer.Settings defaultSettings = new();
-    
-    private static readonly string PrefsPrefix = "d4rkpl4y3r_AvatarOptimizer_";
-
-    public static bool DoOptimizeWithDefaultSettingsWhenNoComponent
+    public class AvatarOptimizerSettings : EditorWindow
     {
-        get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", false);
-        private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", value);
-    }
+        private static readonly d4rkAvatarOptimizer.Settings defaultSettings = new();
+        
+        private static readonly string PrefsPrefix = "d4rkpl4y3r_AvatarOptimizer_";
 
-    public static bool DoOptimizeInPlayMode
-    {
-        get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeInPlayMode", true);
-        private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeInPlayMode", value);
-    }
-
-    public static int AutoRefreshPreviewTimeout
-    {
-        get => EditorPrefs.GetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", 500);
-        private set => EditorPrefs.SetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", value);
-    }
-
-    public static int MotionTimeApproximationSampleCount
-    {
-        get => Mathf.Clamp(EditorPrefs.GetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", 5), 2, 101);
-        private set => EditorPrefs.SetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", value);
-    }
-
-    public static bool ProfileTimeUsedInUI
-    {
-        get => EditorPrefs.GetBool(PrefsPrefix + "ProfileTimeUsedInUI", false);
-        private set => EditorPrefs.SetBool(PrefsPrefix + "ProfileTimeUsedInUI", value);
-    }
-    
-    [MenuItem("Tools/d4rkpl4y3r/Avatar Optimizer Settings")]
-    static void Init()
-    {
-        GetWindow<AvatarOptimizerSettings>().Show();
-    }
-
-    private Vector2 scrollPos;
-
-    private class SectionScope : GUI.Scope
-    {
-        public SectionScope(string title)
+        public static bool DoOptimizeWithDefaultSettingsWhenNoComponent
         {
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-            GUILayoutUtility.GetRect(15, 15, GUILayout.Width(15));
-            EditorGUILayout.BeginVertical();
+            get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", false);
+            private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeWithDefaultSettingsWhenNoComponent", value);
         }
-        protected override void CloseScope()
-        {
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space();
-            EditorGUILayout.EndVertical();
-        }
-    }
 
-    public void OnGUI()
-    {
-        using (var scrollView = new EditorGUILayout.ScrollViewScope(scrollPos))
+        public static bool DoOptimizeInPlayMode
         {
+            get => EditorPrefs.GetBool(PrefsPrefix + "DoOptimizeInPlayMode", true);
+            private set => EditorPrefs.SetBool(PrefsPrefix + "DoOptimizeInPlayMode", value);
+        }
+
+        public static int AutoRefreshPreviewTimeout
+        {
+            get => EditorPrefs.GetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", 500);
+            private set => EditorPrefs.SetInt(PrefsPrefix + "AutoRefreshPreviewTimeout", value);
+        }
+
+        public static int MotionTimeApproximationSampleCount
+        {
+            get => Mathf.Clamp(EditorPrefs.GetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", 5), 2, 101);
+            private set => EditorPrefs.SetInt(PrefsPrefix + "MotionTimeApproximationSampleCount", value);
+        }
+
+        public static bool ProfileTimeUsedInUI
+        {
+            get => EditorPrefs.GetBool(PrefsPrefix + "ProfileTimeUsedInUI", false);
+            private set => EditorPrefs.SetBool(PrefsPrefix + "ProfileTimeUsedInUI", value);
+        }
+        
+        [MenuItem("Tools/d4rkpl4y3r/Avatar Optimizer Settings")]
+        static void Init()
+        {
+            GetWindow<AvatarOptimizerSettings>().Show();
+        }
+
+        private Vector2 scrollPos;
+
+        private class SectionScope : GUI.Scope
+        {
+            public SectionScope(string title)
+            {
+                EditorGUILayout.BeginVertical(GUI.skin.box);
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                EditorGUILayout.BeginHorizontal();
+                GUILayoutUtility.GetRect(15, 15, GUILayout.Width(15));
+                EditorGUILayout.BeginVertical();
+            }
+            protected override void CloseScope()
+            {
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.Space();
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        private bool BigIconButton(string iconName, string tooltip = "", float size = 24, float pad = 2)
+        {
+            bool buttonResult = GUILayout.Button(new GUIContent("", tooltip), GUILayout.Width(size), GUILayout.Height(size));
+            var rect = GUILayoutUtility.GetLastRect();
+            rect.x += pad;
+            rect.y += pad;
+            rect.width -= pad * 2;
+            rect.height -= pad * 2;
+            GUI.DrawTexture(rect, EditorGUIUtility.IconContent(iconName).image);
+            return buttonResult;
+        }
+
+        public void OnGUI()
+        {
+            using var scrollView = new EditorGUILayout.ScrollViewScope(scrollPos);
             scrollPos = scrollView.scrollPosition;
+
+            using (new GUILayout.HorizontalScope())
+            {
+                if (BigIconButton("Refresh", "Reset global settings to default"))
+                {
+                    DoOptimizeWithDefaultSettingsWhenNoComponent = false;
+                    DoOptimizeInPlayMode = true;
+                    AutoRefreshPreviewTimeout = 500;
+                    MotionTimeApproximationSampleCount = 5;
+                    ProfileTimeUsedInUI = false;
+                }
+                var trashBinPath = d4rkAvatarOptimizer.GetTrashBinLocation().path;
+                using var disabledScope = new EditorGUI.DisabledScope(!Directory.Exists(trashBinPath));
+                if (BigIconButton("d_TextAsset Icon", "Open log file of last optimization"))
+                {
+                    var logFilePath = trashBinPath + "_d4rkAvatarOptimizer.log";
+                    var logAsset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(logFilePath);
+                    if (logAsset != null)
+                    {
+                        AssetDatabase.OpenAsset(logAsset);
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("No Log File", "No optimization log file found. Make sure you have optimized an avatar at least once.", "OK");
+                    }
+                }
+                if (BigIconButton("d_FolderOpened Icon", "Open Trash Bin folder.\nThis folder contains all the assets generated by the optimizer during the last optimization process.\nThis also creates _TrashBin.zip with the relevant assets for a bug report."))
+                {
+                    var zipPath = trashBinPath + "_TrashBin.zip";
+                    if (!File.Exists(zipPath))
+                    {
+                        var files = Directory.GetFiles(trashBinPath, "*", SearchOption.AllDirectories)
+                            .Select(f => f[trashBinPath.Length..].Replace('\\', '/'))
+                            .Where(f => !f.StartsWith("BinaryAssetBundle"))
+                            .Select(f => $"{trashBinPath}{f}").ToArray();
+                        using var stream = File.OpenWrite(zipPath);
+                        using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+                        foreach (var file in files)
+                        {
+                            var entry = archive.CreateEntry(file[trashBinPath.Length..], System.IO.Compression.CompressionLevel.Optimal);
+                            using var entryStream = entry.Open();
+                            using var fileStream = File.OpenRead(file);
+                            fileStream.CopyTo(entryStream);
+                        }
+                    }
+                    EditorUtility.RevealInFinder(zipPath);
+                }
+            }
 
             using (new SectionScope("Global Settings"))
             {
@@ -113,7 +176,7 @@ public class AvatarOptimizerSettings : EditorWindow
                     {
                         var value = BoolFieldLeft(
                             new GUIContent(d4rkAvatarOptimizer.GetDisplayName(field.Name) +
-                                           (field.GetValue(defaultSettings).Equals(0 != GetValue(field.Name)) ? "" : " *")),
+                                        (field.GetValue(defaultSettings).Equals(0 != GetValue(field.Name)) ? "" : " *")),
                             0 != GetValue(field.Name));
                         SetValue(field.Name, value ? 1 : 0);
                     }
@@ -121,7 +184,7 @@ public class AvatarOptimizerSettings : EditorWindow
                     {
                         var value = PopupFieldLeft(
                             new GUIContent(d4rkAvatarOptimizer.GetDisplayName(field.Name) +
-                                           (field.GetValue(defaultSettings).Equals(GetValue(field.Name)) ? "" : " *")),
+                                        (field.GetValue(defaultSettings).Equals(GetValue(field.Name)) ? "" : " *")),
                             GetValue(field.Name),
                             new string[] { "Off", "On", "Auto" });
                         SetValue(field.Name, value);
@@ -129,12 +192,10 @@ public class AvatarOptimizerSettings : EditorWindow
                 }
             }
         }
-    }
 
-    private int IntFieldLeft(GUIContent label, int value)
-    {
-        using (new EditorGUILayout.HorizontalScope())
+        private int IntFieldLeft(GUIContent label, int value)
         {
+            using var _ = new EditorGUILayout.HorizontalScope();
             var val = EditorGUILayout.IntField(value, GUILayout.Width(50));
             var rect = GUILayoutUtility.GetRect(label, EditorStyles.label);
             rect.xMin -= 2;
@@ -142,21 +203,17 @@ public class AvatarOptimizerSettings : EditorWindow
             EditorGUILayout.Space();
             return val;
         }
-    }
 
-    private bool BoolFieldLeft(GUIContent label, bool value)
-    {
-        using (new EditorGUILayout.HorizontalScope())
+        private bool BoolFieldLeft(GUIContent label, bool value)
         {
+            using var _ = new EditorGUILayout.HorizontalScope();
             GUILayoutUtility.GetRect(35, 15, GUILayout.Width(35));
             return EditorGUILayout.ToggleLeft(label, value);
         }
-    }
 
-    private int PopupFieldLeft(GUIContent label, int value, string[] options)
-    {
-        using (new EditorGUILayout.HorizontalScope())
+        private int PopupFieldLeft(GUIContent label, int value, string[] options)
         {
+            using var _ = new EditorGUILayout.HorizontalScope();
             var val = EditorGUILayout.Popup(value, options, GUILayout.Width(50));
             var rect = GUILayoutUtility.GetRect(label, EditorStyles.label);
             rect.xMin -= 2;
@@ -164,36 +221,36 @@ public class AvatarOptimizerSettings : EditorWindow
             EditorGUILayout.Space();
             return val;
         }
-    }
 
-    public static int GetValue(string key)
-    {
-        var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-        if (field == null)
+        public static int GetValue(string key)
         {
-            throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
+            var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            if (field == null)
+            {
+                throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
+            }
+            return EditorPrefs.GetInt(PrefsPrefix + key, field.FieldType == typeof(bool) ? (bool)field.GetValue(defaultSettings) ? 1 : 0 : (int)field.GetValue(defaultSettings));
         }
-        return EditorPrefs.GetInt(PrefsPrefix + key, field.FieldType == typeof(bool) ? (bool)field.GetValue(defaultSettings) ? 1 : 0 : (int)field.GetValue(defaultSettings));
-    }
 
-    public static void SetValue(string key, int value)
-    {
-        var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-        if (field == null)
+        public static void SetValue(string key, int value)
         {
-            throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
+            var field = typeof(d4rkAvatarOptimizer.Settings).GetField(key, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            if (field == null)
+            {
+                throw new System.ArgumentException($"Field {key} does not exist in d4rkAvatarOptimizer.Settings");
+            }
+            EditorPrefs.SetInt(PrefsPrefix + key, value);
         }
-        EditorPrefs.SetInt(PrefsPrefix + key, value);
-    }
 
-    public static void ApplyDefaults(d4rkAvatarOptimizer optimizer)
-    {
-        var fields = typeof(d4rkAvatarOptimizer.Settings).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-            .Where(f => f.FieldType == typeof(bool) || f.FieldType == typeof(int)).ToArray();
-        foreach (var field in fields)
+        public static void ApplyDefaults(d4rkAvatarOptimizer optimizer)
         {
-            var val = GetValue(field.Name);
-            field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (val != 0) : val);
+            var fields = typeof(d4rkAvatarOptimizer.Settings).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .Where(f => f.FieldType == typeof(bool) || f.FieldType == typeof(int)).ToArray();
+            foreach (var field in fields)
+            {
+                var val = GetValue(field.Name);
+                field.SetValue(optimizer.settings, field.FieldType == typeof(bool) ? (val != 0) : val);
+            }
         }
     }
 }

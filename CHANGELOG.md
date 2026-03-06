@@ -1,11 +1,15 @@
-## v4.0.6
+## v4.1.0
 ### Changes
 * Remove `Profile Time Used` from the optimizer settings as the log file now always contains the profiling time.
 * Add global setting `Profile Time Used in UI` to show the profiling time for the editor UI at the bottom of the inspector. 
 * Add more granular logging of performance of different parts of the optimizer to the log file.
 * Rename `Material Merge Analyzer` button to `Open Material Merge Analyzer`.
 * Package json now correctly has the author field filled out as "d4rkpl4y3r".
-* Added vrc sdk version to the log file.
+* Add vrc sdk version to the log file.
+* Add 3 buttons to settings panel:
+  * Reset global settings to default values.
+  * Open the log file of the last optimization.
+  * Open the Trash Bin folder where the generated assets are stored.
 
 ## v4.0.5
 ### Changes

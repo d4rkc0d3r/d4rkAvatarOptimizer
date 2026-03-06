@@ -23,6 +23,8 @@ using Type = System.Type;
 using Path = System.IO.Path;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
+using CompilationPipeline = UnityEditor.Compilation.CompilationPipeline;
 #endif
 
 [HelpURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/blob/main/README.md")]
@@ -440,8 +442,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    private static string packageRootPath = "Assets/d4rkAvatarOptimizer";
-    private static string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
+    private string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
     private Dictionary<AnimationPath, AnimationPath> newAnimationPaths = new Dictionary<AnimationPath, AnimationPath>();
@@ -556,33 +557,49 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         DisplayProgressBar(text);
     }
 
-    private d4rkpl4y3r.AvatarOptimizer.Util.Logger log = null;
-
-    private void ClearTrashBin()
+    public static (string root, string name, string path) GetTrashBinLocation()
     {
-        Profiler.StartSection("ClearTrashBin()");
-        var path = AssetDatabase.GetAssetPath(MonoScript.FromMonoBehaviour(this));
-        packageRootPath = path.Substring(0, path.LastIndexOf('/'));
-        packageRootPath = packageRootPath.Substring(0, packageRootPath.LastIndexOf('/'));
-        var trashBinRoot = packageRootPath;
-        var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
-        if (packageInfo?.source != UnityEditor.PackageManager.PackageSource.Embedded)
+        var assembly = typeof(d4rkAvatarOptimizer).Assembly;
+        var asmdefPath = CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(assembly.Location);
+        var inPackageAsmdefPath = "/Editor/d4rkpl4y3r.d4rkavataroptimizer.Editor.asmdef";
+        var packageInfo = PackageInfo.FindForAssembly(assembly);
+        string trashBinRoot;
+        if (packageInfo?.source == UnityEditor.PackageManager.PackageSource.Embedded
+            && !string.IsNullOrEmpty(packageInfo.assetPath))
+        {
+            trashBinRoot = packageInfo.assetPath;
+        }
+        else if (asmdefPath.StartsWithSimple("Assets") && asmdefPath.EndsWith(inPackageAsmdefPath))
+        {
+            trashBinRoot = asmdefPath[..^inPackageAsmdefPath.Length];
+        }
+        else
         {
             trashBinRoot = "Assets/d4rkAvatarOptimizer";
-            if (!AssetDatabase.IsValidFolder("Assets/d4rkAvatarOptimizer"))
+            if (!AssetDatabase.IsValidFolder(trashBinRoot))
             {
                 AssetDatabase.CreateFolder("Assets", "d4rkAvatarOptimizer");
             }
         }
-        trashBinPath = trashBinRoot + "/TrashBin/";
-        AssetDatabase.DeleteAsset(trashBinRoot + "/TrashBin");
-        AssetDatabase.CreateFolder(trashBinRoot, "TrashBin");
+        return (trashBinRoot, "TrashBin", $"{trashBinRoot}/TrashBin/");
+    }
+
+    public static d4rkpl4y3r.AvatarOptimizer.Util.Logger log = null;
+
+    private void ClearTrashBin()
+    {
+        Profiler.StartSection("ClearTrashBin()");
+        var packageInfo = PackageInfo.FindForAssembly(typeof(d4rkAvatarOptimizer).Assembly);
+        var (trashBinRoot, trashBinName, path) = GetTrashBinLocation();
+        trashBinPath = path;
+        AssetDatabase.DeleteAsset($"{trashBinRoot}/{trashBinName}");
+        AssetDatabase.CreateFolder(trashBinRoot, trashBinName);
         binaryAssetBundlePath = null;
         materialAssetBundlePath = null;
         log = new (Path.Combine(trashBinPath, "_d4rkAvatarOptimizer.log"));
-        LogToFile($"d4rk Avatar Optimizer v{packageInfo.version}");
+        LogToFile($"d4rk Avatar Optimizer v{packageInfo?.version ?? "unknown"}");
         LogToFile($"Unity Version: {Application.unityVersion}");
-        var vrcPackageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(VRCAvatarDescriptor).Assembly);
+        var vrcPackageInfo = PackageInfo.FindForAssembly(typeof(VRCAvatarDescriptor).Assembly);
         if (vrcPackageInfo != null)
         {
             LogToFile($"VRChat Avatar SDK: {vrcPackageInfo.version}");
@@ -1993,11 +2010,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
                 if (controller == null)
                     continue;
-                layerCopyPaths[i] = $"{trashBinPath}BaseAnimationLayer{i}{controller.name}(OptimizedCopy).controller";
+                layerCopyPaths[i] = $"{trashBinPath}c{i}_{controller.name}.controller";
                 optimizedControllers[i] = controller == GetFXLayer()
                     ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                     : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
-                optimizedControllers[i].name = $"BaseAnimationLayer{i}{controller.name}(OptimizedCopy)";
+                optimizedControllers[i].name = $"BaseAnimationLayer{i}_{controller.name}";
                 avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
             }
             for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
@@ -2006,9 +2023,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 if (controller == null)
                     continue;
                 var index = i + avDescriptor.baseAnimationLayers.Length;
-                layerCopyPaths[index] = $"{trashBinPath}SpecialAnimationLayer{index}{controller.name}(OptimizedCopy).controller";
+                layerCopyPaths[index] = $"{trashBinPath}c{index}_{controller.name}.controller";
                 optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
-                optimizedControllers[index].name = $"SpecialAnimationLayer{index}{controller.name}(OptimizedCopy)";
+                optimizedControllers[index].name = $"SpecialAnimationLayer{index}_{controller.name}";
                 avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
             }
         }

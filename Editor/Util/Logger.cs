@@ -4,7 +4,7 @@ using System.IO;
 
 namespace d4rkpl4y3r.AvatarOptimizer.Util
 {
-    class Logger
+    public class Logger
     {
         public readonly string filePath;
         private readonly List<string> buffer = new();
