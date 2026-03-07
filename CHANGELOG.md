@@ -1,3 +1,7 @@
+## v4.1.1
+### Bug Fixes
+* Fix crash when non fx layers where not sub assets of some other asset. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/180)
+
 ## v4.1.0
 ### Changes
 * Remove `Profile Time Used` from the optimizer settings as the log file now always contains the profiling time.

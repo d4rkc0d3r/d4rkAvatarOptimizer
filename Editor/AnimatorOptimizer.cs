@@ -28,42 +28,33 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
         private bool isFxLayer = false;
 
-        private AnimatorOptimizer(AnimatorController target, AnimatorController source)
+        private AnimatorOptimizer(AnimatorController target, AnimatorController source, string path)
         {
             this.target = target;
             this.source = source;
-            assetPath = AssetDatabase.GetAssetPath(target);
+            assetPath = path;
         }
 
         public static AnimatorController Copy(AnimatorController source, string path, Dictionary<int, int> fxLayerMap)
         {
-            if (AssetDatabase.IsSubAsset(source))
-            {
-                return Run(source, path, fxLayerMap, new List<int>(), new List<int>());
-            }
-            // I try to use CopyAsset for non FX layers as the other way broke falling animations with gogo loco
-            // however I can't use it if the source is a sub asset
-            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(source), path);
-            var target = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
-            target.name = $"{source.name}(Optimized)";
-            var optimizer = new AnimatorOptimizer(target, source);
-            optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
-            optimizer.FixAllLayerControlBehaviours();
-            return target;
+            return Run(source, path, fxLayerMap);
         }
 
-        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge, List<int> layersToDestroy, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
+        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge = null, List<int> layersToDestroy = null, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
         {
             var target = new AnimatorController();
             target.name = $"{source.name}(Optimized)";
-            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<BinarySerializationSO>(), path);
-            AssetDatabase.AddObjectToAsset(target, path);
-            var optimizer = new AnimatorOptimizer(target, source);
+            using (new Profiler.Section($"AnimatorOptimizer.CreateAsset"))
+            {
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<BinarySerializationSO>(), path);
+                AssetDatabase.AddObjectToAsset(target, path);
+            }
+            var optimizer = new AnimatorOptimizer(target, source, path);
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
-            optimizer.layersToMerge = new HashSet<int>(layersToMerge);
-            optimizer.layersToDestroy = new HashSet<int>(layersToDestroy);
+            optimizer.layersToMerge = new HashSet<int>(layersToMerge ?? new());
+            optimizer.layersToDestroy = new HashSet<int>(layersToDestroy ?? new());
             optimizer.isFxLayer = constantCurvesToAdd != null;
-            optimizer.constantCurvesToAdd = constantCurvesToAdd ?? new List<(EditorCurveBinding binding, float value)>();
+            optimizer.constantCurvesToAdd = constantCurvesToAdd ?? new();
             return optimizer.Run();
         }
 
@@ -160,51 +151,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             EditorUtility.SetDirty(target);
 
             return target;
-        }
-
-        private void FixAllLayerControlBehaviours()
-        {
-            var targetLayers = target.layers;
-            for (int i = 0; i < targetLayers.Length; i++)
-            {
-                FixLayerControlBehavioursInStateMachine(targetLayers[i].stateMachine);
-            }
-            EditorUtility.SetDirty(target);
-        }
-
-        private void FixLayerControlBehavioursInStateMachine(AnimatorStateMachine stateMachine)
-        {
-            var behaviours = stateMachine.behaviours;
-            for (int i = 0; i < behaviours.Length; i++)
-            {
-                FixLayerControlBehaviour(behaviours[i]);
-            }
-            var stateMachines = stateMachine.stateMachines;
-            for (int i = 0; i < stateMachines.Length; i++)
-            {
-                FixLayerControlBehavioursInStateMachine(stateMachines[i].stateMachine);
-            }
-            var states = stateMachine.states;
-            for (int i = 0; i < states.Length; i++)
-            {
-                behaviours = states[i].state.behaviours;
-                for (int j = 0; j < behaviours.Length; j++)
-                {
-                    FixLayerControlBehaviour(behaviours[j]);
-                }
-            }
-        }
-
-        private void FixLayerControlBehaviour(StateMachineBehaviour behaviour)
-        {
-            if (behaviour is VRC_AnimatorLayerControl layerControl)
-            {
-                if (layerControl.playable == BlendableLayer.FX && fxLayerMap.TryGetValue(layerControl.layer, out int newLayer))
-                {
-                    layerControl.layer = newLayer;
-                    EditorUtility.SetDirty(layerControl);
-                }
-            }
         }
 
         private AnimationClip CloneAndFlipCurves(AnimationClip clip)
