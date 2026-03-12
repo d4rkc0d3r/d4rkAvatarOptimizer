@@ -3130,26 +3130,26 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 switch (identifier) {
                     case "vertex":
                         if ((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0) {
-                            pragmaOutput.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
+                            output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                         } else {
-                            pragmaOutput.Add(line);
+                            output.Add(line);
                         }
                         break;
                     case "skip_optimizations":
                     case "enable_d3d11_debug_symbols":
                         break;
                     case "multi_compile_fwdbase":
-                        pragmaOutput.Add("#pragma multi_compile DIRECTIONAL");
-                        pragmaOutput.Add("#pragma multi_compile LIGHTPROBE_SH");
+                        output.Add("#pragma multi_compile DIRECTIONAL");
+                        output.Add("#pragma multi_compile LIGHTPROBE_SH");
                         if (!stripShadowVariants)
-                            pragmaOutput.Add("#pragma multi_compile _ SHADOWS_SCREEN");
+                            output.Add("#pragma multi_compile _ SHADOWS_SCREEN");
                         break;
                     case "multi_compile_fwdadd_fullshadows":
-                        pragmaOutput.Add(stripShadowVariants ? "#pragma multi_compile_fwdadd" : "#pragma multi_compile_fwdadd_fullshadows");
+                        output.Add(stripShadowVariants ? "#pragma multi_compile_fwdadd" : "#pragma multi_compile_fwdadd_fullshadows");
                         break;
                     default:
                         if (!identifier.StartsWithSimple("shader_feature")) {
-                            pragmaOutput.Add(line);
+                            output.Add(line);
                         }
                         break;
                 }
@@ -3648,7 +3648,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var includeName = $"{sanitizedShaderName}-{GetMD5Hash(output)[..12]}" + (line == "CGPROGRAM" ? ".cginc" : ".hlsl");
                     outputIncludes.Add((includeName, output));
                     output = pragmaOutput;
-                    output.Add($"#include \"{includeName}\"");
+                    output.Add($"#include_with_pragmas \"{includeName}\"");
                     output.Add(endSymbol);
                 }
             }

@@ -1,3 +1,8 @@
+## v4.1.2
+### Bug Fixes
+* Fix `#pragma` getting pulled out of `#if` structures.
+  * This caused Poi 10.x shaders to compile way too many variants.
+
 ## v4.1.1
 ### Bug Fixes
 * Fix crash when non fx layers where not sub assets of some other asset. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/180)
