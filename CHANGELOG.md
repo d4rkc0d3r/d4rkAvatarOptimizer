@@ -1,4 +1,7 @@
 ## v4.1.2
+### Changes
+* ShaderParser no longer spams warnings for missing include files in the console.
+
 ### Bug Fixes
 * Fix `#pragma` getting pulled out of `#if` structures.
   * This caused Poi 10.x shaders to compile way too many variants.

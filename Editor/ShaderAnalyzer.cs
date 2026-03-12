@@ -124,6 +124,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public HashSet<string> unableToParseIfexStatements = new();
         public List<string> unknownOptimizerComments = new();
         public HashSet<string> requiredConstantProperties = new();
+        public List<string> parserWarnings = new();
 
         public bool CanMerge()
         {
@@ -470,7 +471,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
                     }
                     if (fileName != "UnityLightingCommon.cginc")
-                        Debug.LogWarning("Could not find include file: " + currentFilePath);
+                        parsedShader.parserWarnings.Add($"Could not find include file: {currentFilePath}");
                     return false;
                 }
                 catch (DirectoryNotFoundException)
@@ -483,8 +484,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     // happens for example if audio link is not in the project but the shader has a reference to the include file
                     // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
-                    Debug.LogWarning("Could not find directory for include file: " + currentFilePath);
-                    return false; 
+                    parsedShader.parserWarnings.Add($"Could not find directory for include file: {currentFilePath}");
+                    return false;
                 }
             }
             var trimWhiteSpaceChars = new char[] { ' ', '\t', '\r', '\n' };

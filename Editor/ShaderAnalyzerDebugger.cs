@@ -21,6 +21,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
     private bool showProperties = true;
     private bool showFailedIfex = true;
+    private bool showParserWarnings = true;
 
     private DefaultAsset folder = null;
     private List<Shader> shaders = null;
@@ -29,6 +30,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showUnmergable = true;
     private bool showCustomTextureDeclarations = true;
     private bool showMultiIncludeFiles = true;
+    private bool showWarningShaders = true;
     private bool showErrorLess = true;
     private Vector2 scrollPos;
     private string propertyFilter = "";
@@ -219,6 +221,22 @@ public class ShaderAnalyzerDebugger : EditorWindow
                 }
                 EditorGUI.indentLevel--;
             }
+            var warningShaders = parsedShaders.Where(s => s.parserWarnings.Count > 0).ToList();
+            if (Foldout(ref showWarningShaders, $"Parser Warnings ({warningShaders.Count})"))
+            {
+                EditorGUI.indentLevel++;
+                foreach (var shader in warningShaders)
+                {
+                    ShowShaderWithLabel(shader, $"Has {shader.parserWarnings.Count} warnings");
+                    EditorGUI.indentLevel++;
+                    foreach (var warning in shader.parserWarnings)
+                    {
+                        EditorGUILayout.LabelField(warning);
+                    }
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUI.indentLevel--;
+            }
             var errorLess = parsedShaders.Where(s => s.CanMerge() && !s.mismatchedCurlyBraces).ToList();
             if (Foldout(ref showErrorLess, $"Error Less ({errorLess.Count})"))
             {
@@ -306,12 +324,28 @@ public class ShaderAnalyzerDebugger : EditorWindow
             EditorGUI.indentLevel--;
         }
 
+        if (parsedShader.parserWarnings.Count > 0)
+        {
+            GUILayout.Space(15);
+            var distinctWarnings = parsedShader.parserWarnings.Distinct().ToList();
+            if (Foldout(ref showParserWarnings, $"Parser Warnings ({distinctWarnings.Count})"))
+            {
+                EditorGUI.indentLevel++;
+                foreach (var warning in distinctWarnings)
+                {
+                    EditorGUILayout.LabelField(warning);
+                }
+                EditorGUI.indentLevel--;
+            }
+        }
+
         if (parsedShader.requiredConstantProperties.Count > 0)
         {
             GUILayout.Space(15);
-            GUILayout.Label($"Has {parsedShader.requiredConstantProperties.Count} require_constant properties:");
+            var distinctRequiredConstantProperties = parsedShader.requiredConstantProperties.Distinct().ToList();
+            GUILayout.Label($"Has {distinctRequiredConstantProperties.Count} require_constant properties:");
             EditorGUI.indentLevel++;
-            foreach (var requiredConstantProperty in parsedShader.requiredConstantProperties)
+            foreach (var requiredConstantProperty in distinctRequiredConstantProperties)
             {
                 EditorGUILayout.LabelField(requiredConstantProperty);
             }

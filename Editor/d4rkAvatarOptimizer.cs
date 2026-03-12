@@ -689,6 +689,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             foreach (var shader in mergeable)
             {
                 LogToFile($"- {shader.name}", 2);
+                foreach (var warning in shader.parserWarnings.Distinct())
+                {
+                    LogToFile($"- Warning: {warning}", 3);
+                }
             }
         }
         if (unmergeable.Count > 0)
@@ -701,6 +705,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 foreach (var shader in group)
                 {
                     LogToFile($"- {shader.name}", 3);
+                    foreach (var warning in shader.parserWarnings.Distinct())
+                    {
+                        LogToFile($"- Warning: {warning}", 4);
+                    }
                 }
             }
         }
