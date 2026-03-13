@@ -1,6 +1,8 @@
 ## v4.1.2
 ### Changes
 * ShaderParser no longer spams warnings for missing include files in the console.
+* Custom texture declaration macro detection now ignores unity macros like `UNITY_DECLARE_TEX2D`.
+  * Shaders wanting to support both BiRP and URP might redeclare them and we can be confident that they will only declare a tex2d like in BiRP.
 
 ### Bug Fixes
 * Fix `#pragma` getting pulled out of `#if` structures.

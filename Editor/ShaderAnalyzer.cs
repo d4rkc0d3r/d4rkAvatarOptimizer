@@ -918,23 +918,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (name, returnType);
         }
 
-        private static HashSet<string> FunctionParameterModifiers = new()
-        {
+        private static HashSet<string> FunctionParameterModifiers = new() {
             "in", "out", "inout",
             "point", "line", "triangle",
             "precise", "const", "uniform",
-            "centroid", "linear", "sample", "noperspective", "nointerpolation" };
+            "centroid", "linear", "sample", "noperspective", "nointerpolation"
+        };
+
+        public static void SkipWhitespace(string str, ref int index)
+        {
+            while (index < str.Length && char.IsWhiteSpace(str[index]))
+                index++;
+        }
 
         public static ParsedShader.Function.Parameter ParseNextFunctionParameter(string line, ref int index)
         {
-            while (index < line.Length && char.IsWhiteSpace(line[index]))
-                index++;
+            SkipWhitespace(line, ref index);
             if (index == line.Length)
                 return null;
             if (line[index] == ',') {
                 index++;
-                while (index < line.Length && char.IsWhiteSpace(line[index]))
-                    index++;
+                SkipWhitespace(line, ref index);
             }
             var potentialType = ParseTypeAndTrailingWhitespace(line, ref index);
             if (potentialType == null)
@@ -969,16 +973,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (!int.TryParse(line.Substring(index, endIndex - index).Trim(), out param.arraySize))
                     return null;
                 index = endIndex + 1;
-                while (index < line.Length && char.IsWhiteSpace(line[index]))
-                    index++;
+                SkipWhitespace(line, ref index);
             }
             param.semantic = null;
             if (index == line.Length)
                 return param;
             if (line[index] == ':') {
                 index++;
-                while (index < line.Length && char.IsWhiteSpace(line[index]))
-                    index++;
+                SkipWhitespace(line, ref index);
                 param.semantic = ParseIdentifierAndTrailingWhitespace(line, ref index);
             }
             if (index == line.Length || line[index] != '=')
@@ -1173,10 +1175,32 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        private HashSet<string> unityTextureDeclarationMacros = new() {
+            "UNITY_DECLARE_TEX2D",
+            "UNITY_DECLARE_TEX2D_NOSAMPLER",
+            "UNITY_DECLARE_TEX2D_NOSAMPLER_INT",
+            "UNITY_DECLARE_TEX2D_NOSAMPLER_UINT",
+            "UNITY_DECLARE_TEX2D_HALF",
+            "UNITY_DECLARE_TEX2D_FLOAT",
+            "UNITY_DECLARE_TEX2D_NOSAMPLER_HALF",
+            "UNITY_DECLARE_TEX2D_NOSAMPLER_FLOAT",
+            "UNITY_DECLARE_TEX2DARRAY_MS",
+            "UNITY_DECLARE_TEX2DARRAY_MS_NOSAMPLER",
+            "UNITY_DECLARE_TEX2DARRAY",
+            "UNITY_DECLARE_TEX2DARRAY_NOSAMPLER",
+            "UNITY_DECLARE_FRAMEBUFFER_INPUT_FLOAT_MS",
+            "UNITY_DECLARE_FRAMEBUFFER_INPUT_HALF_MS",
+            "UNITY_DECLARE_FRAMEBUFFER_INPUT_INT_MS",
+            "UNITY_DECLARE_FRAMEBUFFER_INPUT_UINT_MS",
+            "UNITY_DECLARE_DEPTH_TEXTURE_MS",
+            "UNITY_DECLARE_DEPTH_TEXTURE",
+            "UNITY_DECLARE_SCREENSPACE_SHADOWMAP",
+            "UNITY_DECLARE_SCREENSPACE_TEXTURE",
+        };
+
         private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
         {
-            if (alreadyParsed == null)
-                alreadyParsed = new HashSet<string>();
+            alreadyParsed ??= new HashSet<string>();
             for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++) {
                 var currentLine = lines[lineIndex];
                 if (currentLine[0] == '#') {
@@ -1189,7 +1213,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else if (currentLine.StartsWithSimple("#define ")) {
                         if (currentLine.Contains("Texture2D ") || currentLine.Contains("sampler2D ") || currentLine.Contains("##_ST")) {
-                            if (!parsedShader.customTextureDeclarations.Contains(currentLine))
+                            int defineIndex = "#define ".Length;
+                            SkipWhitespace(currentLine, ref defineIndex);
+                            var identifier = ParseIdentifierAndTrailingWhitespace(currentLine, ref defineIndex);
+                            if (!parsedShader.customTextureDeclarations.Contains(currentLine) && !unityTextureDeclarationMacros.Contains(identifier))
                                 parsedShader.customTextureDeclarations.Add(currentLine);
                         }
                     }
