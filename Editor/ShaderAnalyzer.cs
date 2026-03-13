@@ -227,6 +227,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool doneParsing;
         private string[] shaderFileLines;
         private HashSet<string> alreadyIncludedThisPass;
+        private bool replaceCoreTextureMacros = false;
 
         private ShaderAnalyzer(string shaderName, string shaderPath)
         {
@@ -241,13 +242,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 Profiler.StartSection("ORL.ShaderGenerator");
                 try
                 {
-                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath, stripSamplingMacros: true)
+                    shaderFileLines = ORL.ShaderGenerator.ShaderDefinitionImporter.GenerateShader(shaderPath)
                         .Split(new string[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.RemoveEmptyEntries);
                 }
                 catch (IOException e)
                 {
                     parsedShader.errorMessage = e.Message;
                 }
+                replaceCoreTextureMacros = true;
                 Profiler.EndSection();
                 #else
                 parsedShader.errorMessage = "ORLShader Generator 7.1+ is not installed.";
@@ -1196,6 +1198,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             "UNITY_DECLARE_DEPTH_TEXTURE",
             "UNITY_DECLARE_SCREENSPACE_SHADOWMAP",
             "UNITY_DECLARE_SCREENSPACE_TEXTURE",
+            "TEXTURE2D", "TEXTURE2D_PARAM",
         };
 
         private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
@@ -1284,6 +1287,30 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        Regex tex2DDeclaration = new(@"(?:^|(?<!\w))TEXTURE2D(?:_FLOAT|_HALF)?\s*\(([\w\s]+)\)");
+        Regex tex2DParam = new(@"(?:^|(?<!\w))TEXTURE2D_PARAM\s*\(([\w\s]+),([\w\s]+)\)");
+        Regex samplerDeclaration = new(@"(?:^|(?<!\w))SAMPLER\s*\(([\w\s]+)\)");
+
+        private void ReplaceCoreTextureMacros(List<string> lines)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                string line = lines[i];
+                if (line.StartsWithSimple("#"))
+                    continue;
+                if (line.Contains("TEXTURE2D"))
+                {
+                    line = tex2DDeclaration.Replace(line, "Texture2D $1");
+                    line = tex2DParam.Replace(line, "Texture2D $1, SamplerState $2");
+                }
+                if (line.Contains("SAMPLER"))
+                {
+                    line = samplerDeclaration.Replace(line, "SamplerState $1");
+                }
+                lines[i] = line;
+            }
+        }
+
         private void SemanticParseShader()
         {
             ParsedShader.Pass currentPass = null;
@@ -1292,6 +1319,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             List<string> hlslInclude = new();
             List<string> lines = parsedShader.text[".shader"];
             List<string> tags = new();
+            if (replaceCoreTextureMacros)
+            {
+                foreach (var fileLines in parsedShader.text.Values)
+                {
+                    ReplaceCoreTextureMacros(fileLines);
+                }
+            }
             parsedShader.text[".shader"] = output;
             parsedShader.mismatchedCurlyBraces = false;
             int curlyBraceDepth = 0;

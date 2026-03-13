@@ -1,3 +1,7 @@
+## v4.1.3
+### Changes
+* Add special handling for `.orlshader` files to make them support texture array merging.
+
 ## v4.1.2
 ### Changes
 * ShaderParser no longer spams warnings for missing include files in the console.
