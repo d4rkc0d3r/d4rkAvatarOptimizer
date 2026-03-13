@@ -31,6 +31,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showCustomTextureDeclarations = true;
     private bool showMultiIncludeFiles = true;
     private bool showWarningShaders = true;
+    private bool groupWarningShadersByWarning = true;
     private bool showErrorLess = true;
     private Vector2 scrollPos;
     private string propertyFilter = "";
@@ -225,15 +226,39 @@ public class ShaderAnalyzerDebugger : EditorWindow
             if (Foldout(ref showWarningShaders, $"Parser Warnings ({warningShaders.Count})"))
             {
                 EditorGUI.indentLevel++;
-                foreach (var shader in warningShaders)
+                groupWarningShadersByWarning = EditorGUILayout.ToggleLeft("Group by warning", groupWarningShadersByWarning);
+
+                if (groupWarningShadersByWarning)
                 {
-                    ShowShaderWithLabel(shader, $"Has {shader.parserWarnings.Count} warnings");
-                    EditorGUI.indentLevel++;
-                    foreach (var warning in shader.parserWarnings)
+                    var shadersByWarning = warningShaders
+                        .SelectMany(shader => shader.parserWarnings.Distinct().Select(warning => (warning, shader)))
+                        .GroupBy(x => x.warning)
+                        .OrderBy(g => g.Key);
+
+                    foreach (var warningGroup in shadersByWarning)
                     {
-                        EditorGUILayout.LabelField(warning);
+                        EditorGUILayout.LabelField($"{warningGroup.Key} ({warningGroup.Count()})");
+                        EditorGUI.indentLevel++;
+                        foreach (var shader in warningGroup.Select(x => x.shader).Distinct())
+                        {
+                            EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                        }
+                        EditorGUI.indentLevel--;
                     }
-                    EditorGUI.indentLevel--;
+                }
+                else
+                {
+                    foreach (var shader in warningShaders)
+                    {
+                        var distinctWarnings = shader.parserWarnings.Distinct().ToList();
+                        ShowShaderWithLabel(shader, $"Has {distinctWarnings.Count} warnings");
+                        EditorGUI.indentLevel++;
+                        foreach (var warning in distinctWarnings)
+                        {
+                            EditorGUILayout.LabelField(warning);
+                        }
+                        EditorGUI.indentLevel--;
+                    }
                 }
                 EditorGUI.indentLevel--;
             }
