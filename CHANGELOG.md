@@ -1,3 +1,7 @@
+## v4.1.4
+### Bug Fixes
+* Fix error spam when adding the optimizer to a non avatar related game object.
+
 ## v4.1.3
 ### Changes
 * Add special handling for `.orlshader` files to make them support texture array merging.

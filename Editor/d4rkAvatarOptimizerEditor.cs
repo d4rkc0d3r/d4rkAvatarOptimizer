@@ -182,8 +182,12 @@ public class d4rkAvatarOptimizerEditor : Editor
             return;
         }
 
-        EditorGUILayout.Separator();
         GUI.enabled = true;
+        if (optimizer.GetAvatarDescriptor() == null)
+        {
+            return;
+        }
+        EditorGUILayout.Separator();
 
         if (longestTimeUsed > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
         {

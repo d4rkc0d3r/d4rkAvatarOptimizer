@@ -3025,7 +3025,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public bool IsHumanoid()
     {
-        var rootAnimator = GetAvatarDescriptor().GetComponent<Animator>();
+        var avDescriptor = GetAvatarDescriptor();
+        var rootAnimator = avDescriptor != null ? avDescriptor.GetComponent<Animator>() : null;
         return rootAnimator != null && rootAnimator.avatar != null && rootAnimator.avatar.isHuman;
     }
 
