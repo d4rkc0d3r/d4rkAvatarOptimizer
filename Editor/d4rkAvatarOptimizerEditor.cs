@@ -245,9 +245,11 @@ public class d4rkAvatarOptimizerEditor : Editor
                 optimizedTotalMaterialCount += 1;
             }
         }
-        PerfRankChangeLabel("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount);
-        PerfRankChangeLabel("Mesh Renderers", meshRenderers.Count, optimizedMeshCount, PerformanceCategory.MeshCount);
-        PerfRankChangeLabel("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount);
+        var perfRankChanges = new List<(string label, int oldValue, int newValue, PerformanceCategory category)> {
+            ("Skinned Mesh Renderers", skinnedMeshes.Count, optimizedSkinnedMeshCount, PerformanceCategory.SkinnedMeshCount),
+            ("Mesh Renderers", meshRenderers.Count, optimizedMeshCount, PerformanceCategory.MeshCount),
+            ("Material Slots", totalMaterialCount, optimizedTotalMaterialCount, PerformanceCategory.MaterialCount),
+        };
         if (optimizer.GetFXLayer() != null)
         {
             var nonErrors = new HashSet<string>() {"toggle", "motion time", "blend tree", "multi toggle"};
@@ -256,9 +258,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             var optimizedLayerCount = mergedLayerCount > 1 ? layerCount - mergedLayerCount + 1 : layerCount;
             if (optimizer.OptimizeFXLayer)
                 optimizedLayerCount -= optimizer.FindUselessFXLayers().Count;
-            PerfRankChangeLabel("FX Layers", layerCount, optimizedLayerCount, PerformanceCategory.FXLayerCount);
+            perfRankChanges.Add(("FX Layers", layerCount, optimizedLayerCount, PerformanceCategory.FXLayerCount));
         }
-        PerfRankChangeLabel("Blend Shapes", totalBlendShapePaths.Count, KeptBlendShapePaths.Count, PerformanceCategory.BlendShapeCount);
+        perfRankChanges.Add(("Blend Shapes", totalBlendShapePaths.Count, KeptBlendShapePaths.Count, PerformanceCategory.BlendShapeCount));
+        PerfRankChangeLabel(perfRankChanges);
         Profiler.EndSection();
 
         EditorGUILayout.Separator();
@@ -1596,37 +1599,42 @@ public class d4rkAvatarOptimizerEditor : Editor
         { PerformanceCategory.BlendShapeCount, new int[] {24, 32, 48, 64, int.MaxValue} },
     };
 
-    private void PerfRankChangeLabel(string label, int oldValue, int newValue, PerformanceCategory category)
+    private void PerfRankChangeLabel(List<(string label, int oldValue, int newValue, PerformanceCategory category)> changes)
     {
-        var oldRating = PerformanceRating.VeryPoor;
-        var newRating = PerformanceRating.VeryPoor;
-        var perfLevels = d4rkAvatarOptimizer.HasCustomShaderSupport ? _perfLevelsWindows : _perfLevelsAndroid;
-        if (perfLevels.ContainsKey(category))
+        float oldValueWidth = changes.Max(c => c.oldValue.ToString().Length) * 7 + 7;
+        float newValueWidth = changes.Max(c => c.newValue.ToString().Length) * 7 + 7;
+        for (int i = 0; i < changes.Count; i++)
         {
-            oldRating = GetPerfRank(oldValue, perfLevels[category]);
-            newRating = GetPerfRank(newValue, perfLevels[category]);
-        }
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            EditorGUILayout.LabelField(GetPerformanceIconForRating(oldRating), GUILayout.Width(20));
-            EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(25));
-            EditorGUILayout.LabelField($"->", GUILayout.Width(20));
-            EditorGUILayout.LabelField(GetPerformanceIconForRating(newRating), GUILayout.Width(20));
-            EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(25));
-            EditorGUILayout.LabelField(label);
-        }
-
-        // Hacky way to only show the warning icon for the first perf rank change label
-        if (label == "Skinned Mesh Renderers")
-        {
-            var warning = GetNonDestructiveToolingWarning("Performance Rank Change Preview");
-            if (!string.IsNullOrEmpty(warning))
+            var (label, oldValue, newValue, category) = changes[i];
+            var oldRating = PerformanceRating.VeryPoor;
+            var newRating = PerformanceRating.VeryPoor;
+            var perfLevels = d4rkAvatarOptimizer.HasCustomShaderSupport ? _perfLevelsWindows : _perfLevelsAndroid;
+            if (perfLevels.ContainsKey(category))
             {
-                var rect = GUILayoutUtility.GetLastRect();
-                rect.x += rect.width - 20;
-                rect.width = 20;
-                DrawWarningIconWithTooltip(warning, rect);
+                oldRating = GetPerfRank(oldValue, perfLevels[category]);
+                newRating = GetPerfRank(newValue, perfLevels[category]);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(GetPerformanceIconForRating(oldRating), GUILayout.Width(20));
+                EditorGUILayout.LabelField($"{oldValue}", GUILayout.Width(oldValueWidth));
+                EditorGUILayout.LabelField($"->", GUILayout.Width(20));
+                EditorGUILayout.LabelField(GetPerformanceIconForRating(newRating), GUILayout.Width(20));
+                EditorGUILayout.LabelField($"{newValue}", GUILayout.Width(newValueWidth));
+                EditorGUILayout.LabelField(label);
+            }
+
+            if (i == 0)
+            {
+                var warning = GetNonDestructiveToolingWarning("Performance Rank Change Preview");
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    var rect = GUILayoutUtility.GetLastRect();
+                    rect.x += rect.width - 20;
+                    rect.width = 20;
+                    DrawWarningIconWithTooltip(warning, rect);
+                }
             }
         }
     }

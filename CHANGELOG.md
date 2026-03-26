@@ -1,6 +1,7 @@
 ## v4.1.4
 ### Bug Fixes
 * Fix error spam when adding the optimizer to a non avatar related game object.
+* Fix numbers in performance rank change preview getting cut off when they have more than 3 digits.
 
 ## v4.1.3
 ### Changes
