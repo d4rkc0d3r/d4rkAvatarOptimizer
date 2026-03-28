@@ -2,6 +2,7 @@
 ### Bug Fixes
 * Fix error spam when adding the optimizer to a non avatar related game object.
 * Fix numbers in performance rank change preview getting cut off when they have more than 3 digits.
+* Fix some parts of the optimizer only checking for animations in the fxlayer and not the others.
 
 ## v4.1.3
 ### Changes

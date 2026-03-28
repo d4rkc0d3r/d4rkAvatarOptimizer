@@ -2727,18 +2727,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_GetAllUsedAnimationClips = usedClips;
     }
 
-    private HashSet<EditorCurveBinding> cache_GetAllUsedFXLayerCurveBindings = null;
-    private HashSet<EditorCurveBinding> GetAllUsedFXLayerCurveBindings()
+    private HashSet<EditorCurveBinding> cache_GetAllUsedCurveBindings = null;
+    private HashSet<EditorCurveBinding> GetAllUsedCurveBindings()
     {
-        if (cache_GetAllUsedFXLayerCurveBindings != null)
-            return cache_GetAllUsedFXLayerCurveBindings;
+        if (cache_GetAllUsedCurveBindings != null)
+            return cache_GetAllUsedCurveBindings;
         var result = new HashSet<EditorCurveBinding>();
-        foreach (var clip in GetAllUsedFXLayerAnimationClips())
+        foreach (var clip in GetAllUsedAnimationClips())
         {
             result.UnionWith(AnimationUtility.GetCurveBindings(clip));
             result.UnionWith(AnimationUtility.GetObjectReferenceCurveBindings(clip));
         }
-        return cache_GetAllUsedFXLayerCurveBindings = result;
+        return cache_GetAllUsedCurveBindings = result;
     }
 
     private Dictionary<VRCPhysBoneBase, HashSet<Object>> cache_FindAllPhysBoneDependencies = null;
@@ -3364,7 +3364,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return map;
-        foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
+        foreach (var binding in GetAllUsedCurveBindings()) {
             if (!binding.propertyName.StartsWithSimple("material.") || !typeof(Renderer).IsAssignableFrom(binding.type))
                 continue;
             if (!map.TryGetValue(binding.path, out var props)) {
@@ -3390,7 +3390,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return togglePaths;
-        foreach (var binding in GetAllUsedFXLayerCurveBindings())
+        foreach (var binding in GetAllUsedCurveBindings())
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 togglePaths.Add(binding.path);
@@ -3404,7 +3404,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_FindAllRendererTogglePaths != null)
             return cache_FindAllRendererTogglePaths;
         var togglePaths = new HashSet<string>();
-        foreach (var binding in GetAllUsedFXLayerCurveBindings())
+        foreach (var binding in GetAllUsedCurveBindings())
         {
             if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
                 togglePaths.Add(binding.path);
@@ -3457,7 +3457,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (fxLayer == null)
             return new HashSet<Component>();
         var behaviourToggles = new HashSet<string>();
-        foreach (var binding in GetAllUsedFXLayerCurveBindings()) {
+        foreach (var binding in GetAllUsedCurveBindings()) {
             if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
                 behaviourToggles.Add(binding.path);
             } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
