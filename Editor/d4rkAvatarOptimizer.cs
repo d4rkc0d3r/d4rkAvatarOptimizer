@@ -9,6 +9,7 @@ using System.IO;
 
 #if UNITY_EDITOR
 using System.Threading.Tasks;
+using System.Reflection;
 using UnityEngine.Rendering;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -929,7 +930,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public void ClearCaches()
     {
-        var fields = GetType().GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var fields = GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
         foreach (var field in fields)
         {
             if (field.Name.StartsWithSimple("cache_"))
@@ -3381,23 +3382,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllAnimatedMaterialProperties = map;
     }
 
-    private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
-    public HashSet<string> FindAllGameObjectTogglePaths()
-    {
-        if (cache_FindAllGameObjectTogglePaths != null)
-            return cache_FindAllGameObjectTogglePaths;
-        var togglePaths = new HashSet<string>();
-        var fxLayer = GetFXLayer();
-        if (fxLayer == null)
-            return togglePaths;
-        foreach (var binding in GetAllUsedCurveBindings())
-        {
-            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
-                togglePaths.Add(binding.path);
-        }
-        return cache_FindAllGameObjectTogglePaths = togglePaths;
-    }
-
     private HashSet<string> cache_FindAllRendererTogglePaths = null;
     public HashSet<string> FindAllRendererTogglePaths()
     {
@@ -3413,39 +3397,112 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllRendererTogglePaths = togglePaths;
     }
 
-    private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
+    public HashSet<string> FindAllGameObjectTogglePaths()
+    {
+        AnalyzeGameObjectToggles();
+        return cache_FindAllGameObjectTogglePaths;
+    }
+
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
-        if (cache_FindAllAlwaysDisabledGameObjects != null)
-            return cache_FindAllAlwaysDisabledGameObjects;
-        var togglePaths = FindAllGameObjectTogglePaths();
-        var disabledGameObjects = new HashSet<Transform>();
-        var queue = new Queue<Transform>();
-        var exclusions = GetAllExcludedTransforms();
-        var root = GetRootTransform();
-        queue.Enqueue(root);
-        while (queue.Count > 0)
+        AnalyzeGameObjectToggles();
+        return cache_FindAllAlwaysDisabledGameObjects;
+    }
+
+    private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
+    private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
+    private void AnalyzeGameObjectToggles()
+    {
+        if (cache_FindAllGameObjectTogglePaths != null && cache_FindAllAlwaysDisabledGameObjects != null)
+            return;
+        using var _ = new Profiler.Section("AnalyzeGameObjectToggles()");
+
+        var animatedTogglePaths = new HashSet<string>();
+        foreach (var binding in GetAllUsedCurveBindings())
         {
-            var current = queue.Dequeue();
-            if (exclusions.Contains(current))
-                continue;
-            if (current != root && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
-            {
-                disabledGameObjects.Add(current);
-                foreach (var child in current.GetAllDescendants())
-                {
-                    disabledGameObjects.Add(child);
-                }
-            }
-            else
-            {
-                foreach (Transform child in current)
-                {
-                    queue.Enqueue(child);
-                }
-            }
+            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+                animatedTogglePaths.Add(binding.path);
         }
-        return cache_FindAllAlwaysDisabledGameObjects = disabledGameObjects;
+        
+        var raycastTogglePaths = new HashSet<string>();
+        var animatesDisableOnMiss = new HashSet<string>();
+        foreach (var binding in GetAllUsedCurveBindings())
+        {
+            if (binding.propertyName == "m_Enabled" && binding.type.Name == "VRCRaycast")
+                raycastTogglePaths.Add(binding.path);
+            if (binding.propertyName == "disableOnMiss" && binding.type.Name == "VRCRaycast")
+                animatesDisableOnMiss.Add(binding.path);
+        }
+        var raycastType = System.AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
+            .FirstOrDefault(type => type != null);
+
+        HashSet<string> CalculateRaycastTogglePaths(HashSet<Transform> alwaysDisabled)
+        {
+            if (raycastType == null)
+                return new();
+            var raycasts = GetNonEditorOnlyComponentsInChildren<MonoBehaviour>()
+                .Where(c => c != null && raycastType == c.GetType())
+                .Where(c => !alwaysDisabled.Contains(c.transform))
+                .Where(c => c.enabled || raycastTogglePaths.Contains(GetPathToRoot(c)));
+            var disableOnMissField = raycastType.GetField("disableOnMiss", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+            var resultTransformField = raycastType.GetField("resultTransform", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+            var results = new HashSet<string>();
+            foreach (var raycast in raycasts)
+            {
+                var t = resultTransformField.GetValue(raycast) as Transform;
+                if (t == null)
+                    continue;
+                bool disableOnMiss = disableOnMissField.GetValue(raycast) as bool? == true
+                    || animatesDisableOnMiss.Contains(GetPathToRoot(raycast));
+                if (!disableOnMiss)
+                    continue;
+                results.Add(GetPathToRoot(t));
+            }
+            return results;
+        }
+        HashSet<Transform> CalculateAlwaysDisabledGameObjects(HashSet<string> togglePaths)
+        {
+            var disabledGameObjects = new HashSet<Transform>();
+            var queue = new Queue<Transform>();
+            var exclusions = GetAllExcludedTransforms();
+            var root = GetRootTransform();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                if (exclusions.Contains(current))
+                    continue;
+                if (current != root && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
+                {
+                    disabledGameObjects.Add(current);
+                    foreach (var child in current.GetAllDescendants())
+                    {
+                        disabledGameObjects.Add(child);
+                    }
+                }
+                else
+                {
+                    foreach (Transform child in current)
+                    {
+                        queue.Enqueue(child);
+                    }
+                }
+            }
+            return disabledGameObjects;
+        }
+
+        var currentTogglePaths = new HashSet<string>(animatedTogglePaths);
+        currentTogglePaths.UnionWith(CalculateRaycastTogglePaths(new()));
+
+        var conservativeAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
+
+        currentTogglePaths = new HashSet<string>(animatedTogglePaths);
+        currentTogglePaths.UnionWith(CalculateRaycastTogglePaths(conservativeAlwaysDisabledGameObjects));
+
+        cache_FindAllAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
+        cache_FindAllGameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
+        cache_FindAllGameObjectTogglePaths.UnionWith(CalculateRaycastTogglePaths(cache_FindAllAlwaysDisabledGameObjects));
     }
 
     private HashSet<Component> cache_FindAllUnusedComponents = null;
@@ -3559,6 +3616,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
 
         var alwaysDisabledComponents = FindAllUnusedComponents();
+        var raycastType = System.AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
+            .FirstOrDefault(type => type != null);
+        if (raycastType != null)
+        {
+            var resultTransformField = raycastType.GetField("resultTransform", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+            if (resultTransformField != null)
+            {
+                foreach (var raycast in GetNonEditorOnlyComponentsInChildren<MonoBehaviour>()
+                    .Where(component => component != null && raycastType == component.GetType())
+                    .Where(component => !alwaysDisabledComponents.Contains(component)))
+                {
+                    if (resultTransformField.GetValue(raycast) is Transform resultTransform)
+                    {
+                        transforms.Add(resultTransform);
+                    }
+                }
+            }
+        }
         var physBones = avDescriptor.GetComponentsInChildren<VRCPhysBoneBase>(true)
             .Where(pb => !alwaysDisabledComponents.Contains(pb)).ToList();
         foreach (var physBone in physBones)
@@ -4759,8 +4835,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 Mesh newMesh = new Mesh();
                 newMesh.name = mesh.name;
                 newMesh.indexFormat = targetVertices.Count >= 65536
-                    ? UnityEngine.Rendering.IndexFormat.UInt32
-                    : UnityEngine.Rendering.IndexFormat.UInt16;
+                    ? IndexFormat.UInt32
+                    : IndexFormat.UInt16;
                 newMesh.SetVertices(targetVertices);
                 newMesh.bindposes = mesh.bindposes;
                 newMesh.SetBoneWeights(targetWeights.ToArray());

@@ -1,4 +1,7 @@
 ## v4.2.0
+### Features
+* Add support for `VRCRaycast` components.
+
 ### Changes
 * Right click on a foldout in the optimizer UI now forces a cache refresh for the previews.
 
