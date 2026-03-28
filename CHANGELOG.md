@@ -1,4 +1,7 @@
-## v4.1.4
+## v4.2.0
+### Changes
+* Right click on a foldout in the optimizer UI now forces a cache refresh for the previews.
+
 ### Bug Fixes
 * Fix error spam when adding the optimizer to a non avatar related game object.
 * Fix numbers in performance rank change preview getting cut off when they have more than 3 digits.

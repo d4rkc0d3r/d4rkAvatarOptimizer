@@ -920,9 +920,9 @@ public class d4rkAvatarOptimizerEditor : Editor
     private Dictionary<Mesh, (int count, float maxValue, float medianValue)[]> meshBoneWeightStatsCache = null;
     private Dictionary<Material, bool> hasPropertiesMarkedAsRenameAnimatedCache = null;
 
-    private void ClearUICaches()
+    private void ClearUICaches(bool force = false)
     {
-        if (longestTimeUsed > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
+        if (!force && longestTimeUsed > AvatarOptimizerSettings.AutoRefreshPreviewTimeout)
             return;
         mergedMaterialPreviewCache = null;
         unmovingBonesCache = null;
@@ -1386,6 +1386,11 @@ public class d4rkAvatarOptimizerEditor : Editor
         var content = GetLabelWithTooltip(label);
         bool output = EditorGUILayout.Foldout(value, content, true);
         var rect = GUILayoutUtility.GetLastRect();
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 1 && rect.Contains(Event.current.mousePosition))
+        {
+            ClearUICaches(force: true);
+            Event.current.Use();
+        }
         rect.x += rect.width;
         rect.width = 20;
         if (!string.IsNullOrEmpty(content.tooltip))
