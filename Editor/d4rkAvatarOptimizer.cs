@@ -995,6 +995,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return false;
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
             return false;
+        if (FindAllRaycastTogglePaths().Contains(GetPathToRoot(candidate)))
+            return false;
         return true;
     }
 
@@ -3403,6 +3405,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllGameObjectTogglePaths;
     }
 
+    public HashSet<string> FindAllRaycastTogglePaths()
+    {
+        AnalyzeGameObjectToggles();
+        return cache_FindAllRaycastTogglePaths;
+    }
+
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
         AnalyzeGameObjectToggles();
@@ -3410,6 +3418,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
+    private HashSet<string> cache_FindAllRaycastTogglePaths = null;
     private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
     private void AnalyzeGameObjectToggles()
     {
@@ -3501,8 +3510,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         currentTogglePaths.UnionWith(CalculateRaycastTogglePaths(conservativeAlwaysDisabledGameObjects));
 
         cache_FindAllAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
+        cache_FindAllRaycastTogglePaths = CalculateRaycastTogglePaths(cache_FindAllAlwaysDisabledGameObjects);
         cache_FindAllGameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
-        cache_FindAllGameObjectTogglePaths.UnionWith(CalculateRaycastTogglePaths(cache_FindAllAlwaysDisabledGameObjects));
+        cache_FindAllGameObjectTogglePaths.UnionWith(cache_FindAllRaycastTogglePaths);
     }
 
     private HashSet<Component> cache_FindAllUnusedComponents = null;
