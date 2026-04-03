@@ -5827,21 +5827,25 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
         var allExcludedTransforms = new HashSet<Transform>();
-        var automaticExclusions = new List<string>() {
-            "_VirtualLens_Root",
-        }.Select(s => GetTransformFromPath(s)).ToList();
+        List<(Transform t, string exclusionSource)> automaticExclusions = new();
+        automaticExclusions.Add((GetTransformFromPath("_VirtualLens_Root"), "Virtual Lens Root"));
         automaticExclusions.AddRange(GetRootTransform().GetComponentsInChildren<VRCContactSender>(true)
             .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
             .Select(c => c.transform.parent)
             .Where(t => t != null)
             .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
-            .Where(t => t != null));
-        automaticExclusions.AddRange(FindAllPenetrators().Select(p => p.transform));
-        automaticExclusions = automaticExclusions.Where(t => t != null).ToList();
+            .Where(t => t != null)
+            .Select(t => (t, "Real Kiss System")));
+        automaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator")));
+        automaticExclusions = automaticExclusions.Where(p => p.t != null).ToList();
         if (automaticExclusions.Count > 0) {
             LogToFile($"Automatically excluding {automaticExclusions.Count} transforms from optimization:");
-            foreach (var t in automaticExclusions) {
-                LogToFile($"- {GetPathToRoot(t)}", 1);
+            var groupedBySource = automaticExclusions.GroupBy(p => p.exclusionSource);
+            foreach (var group in groupedBySource) {
+                LogToFile($"- {group.Key}", 1);
+                foreach (var item in group) {
+                    LogToFile($"- {GetPathToRoot(item.t)}", 2);
+                }
             }
         }
         var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
@@ -5851,7 +5855,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogToFile($"- {GetPathToRoot(t)}", 1);
             }
         }
-        foreach (var excludedTransform in manualExclusions.Concat(automaticExclusions)) {
+        foreach (var excludedTransform in manualExclusions.Concat(automaticExclusions.Select(p => p.t))) {
             allExcludedTransforms.Add(excludedTransform);
             allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
         }

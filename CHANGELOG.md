@@ -1,9 +1,14 @@
+## v4.2.1
+### Changes
+* Log file changes:
+  * Automatic exclusions are now grouped by their source and the source is logged as well.
+
 ## v4.2.0
 ### Features
 * Add support for `VRCRaycast` components.
 
 ### Changes
-* Right click on a foldout in the optimizer UI now forces a cache refresh for the previews.
+* Right click on a foldout label in the optimizer UI now forces a cache refresh for the previews.
 
 ### Bug Fixes
 * Fix error spam when adding the optimizer to a non avatar related game object.
