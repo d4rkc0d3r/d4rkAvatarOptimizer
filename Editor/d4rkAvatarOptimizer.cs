@@ -5826,6 +5826,55 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public HashSet<Transform> GetAllExcludedTransforms() {
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
+
+        bool IsSameOrChildPath(string path, string parentPath)
+        {
+            return path == parentPath
+                || (path.Length > parentPath.Length && path.StartsWithSimple(parentPath) && path[parentPath.Length] == '/');
+        }
+
+        List<(Transform t, string exclusionSource)> DeduplicateAndCollapseExclusions(IEnumerable<(Transform t, string exclusionSource)> exclusions)
+        {
+            var uniqueExclusions = exclusions.Where(p => p.t != null)
+                .Distinct()
+                .Select((p, index) => (p.t, p.exclusionSource, path: GetPathToRoot(p.t), index))
+                .GroupBy(p => p.path)
+                .Select(g => g.OrderBy(p => p.index).First())
+                .OrderBy(p => p.path.Count(c => c == '/'))
+                .ThenBy(p => p.index)
+                .ToList();
+            var keptPaths = new List<string>();
+            var result = new List<(Transform t, string exclusionSource)>();
+            foreach (var exclusion in uniqueExclusions)
+            {
+                if (keptPaths.Any(parentPath => IsSameOrChildPath(exclusion.path, parentPath)))
+                    continue;
+                keptPaths.Add(exclusion.path);
+                result.Add((exclusion.t, exclusion.exclusionSource));
+            }
+            return result;
+        }
+
+        List<(Transform t, string exclusionSource)> GetSubAnimatorExclusions()
+        {
+            var root = GetRootTransform();
+            var result = new List<(Transform t, string exclusionSource)>();
+            foreach (var animator in root.GetComponentsInChildren<Animator>(true).Where(a => a != null && a.transform != root))
+            {
+                var animatorController = animator.runtimeAnimatorController;
+                if (animatorController == null)
+                    continue;
+                var animatorPath = GetPathToRoot(animator);
+                var exclusionSource = $"Sub Animator at '{animatorPath}'";
+                var animatedPaths = animatorController.animationClips
+                    .Where(clip => clip != null)
+                    .SelectMany(clip => AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)))
+                    .Select(binding => string.IsNullOrEmpty(binding.path) ? animatorPath : $"{animatorPath}/{binding.path}");
+                result.AddRange(DeduplicateAndCollapseExclusions(animatedPaths.Select(path => (GetTransformFromPath(path), exclusionSource))));
+            }
+            return result;
+        }
+
         var allExcludedTransforms = new HashSet<Transform>();
         List<(Transform t, string exclusionSource)> automaticExclusions = new();
         automaticExclusions.Add((GetTransformFromPath("_VirtualLens_Root"), "Virtual Lens Root"));
@@ -5835,9 +5884,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Where(t => t != null)
             .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
             .Where(t => t != null)
-            .Select(t => (t, "Real Kiss System")));
-        automaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator")));
-        automaticExclusions = automaticExclusions.Where(p => p.t != null).ToList();
+            .Select(t => (t, "Real Kiss System Mesh")));
+        automaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator Mesh")));
+        automaticExclusions.AddRange(GetSubAnimatorExclusions());
+        var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
+        automaticExclusions = DeduplicateAndCollapseExclusions(manualExclusions.Select(t => (t, string.Empty)).Concat(automaticExclusions))
+            .Where(p => !string.IsNullOrEmpty(p.exclusionSource))
+            .ToList();
         if (automaticExclusions.Count > 0) {
             LogToFile($"Automatically excluding {automaticExclusions.Count} transforms from optimization:");
             var groupedBySource = automaticExclusions.GroupBy(p => p.exclusionSource);
@@ -5848,7 +5901,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
         }
-        var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
         if (manualExclusions.Count > 0) {
             LogToFile($"Excluding {manualExclusions.Count} user-specified transforms from optimization:");
             foreach (var t in manualExclusions) {

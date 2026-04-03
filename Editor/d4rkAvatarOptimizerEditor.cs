@@ -703,29 +703,6 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var exclusions = optimizer.GetAllExcludedTransforms();
 
-        var animatorsExcludingRoot = avDescriptor.GetComponentsInChildren<Animator>(true)
-            .Where(a => a.gameObject != avDescriptor.gameObject)
-            .Where(a => !exclusions.Contains(a.transform))
-            .Where(a => a.runtimeAnimatorController != null)
-            .ToArray();
-
-        if (animatorsExcludingRoot.Length > 0)
-        {
-            EditorGUILayout.HelpBox(
-                "Some animators exist that are not on the root object.\n" +
-                "The optimizer only supports animators in the custom playable layers in the avatar descriptor.\n" +
-                "If the optimized copy is broken, try to add the animators to the exclusion list.", MessageType.Warning);
-            if (GUILayout.Button("Auto add extra animators to exclusion list"))
-            {
-                foreach (var animator in animatorsExcludingRoot)
-                {
-                    optimizer.ExcludeTransforms.Add(animator.transform);
-                }
-                optimizer.ShowExcludedTransforms = true;
-                ClearUICaches();
-            }
-        }
-
         if (optimizer.DeleteUnusedGameObjects && optimizer.UsesAnyLayerMasks())
         {
             EditorGUILayout.HelpBox(

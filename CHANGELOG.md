@@ -1,7 +1,8 @@
 ## v4.2.1
 ### Changes
-* Log file changes:
-  * Automatic exclusions are now grouped by their source and the source is logged as well.
+* Animators that are not on the root no longer show a validation warning.  
+  Instead they automatically add all things they animate to the exclusions on build.
+* Automatic exclusions are now grouped by their source in the log file.
 
 ## v4.2.0
 ### Features
