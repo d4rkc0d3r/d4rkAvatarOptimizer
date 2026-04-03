@@ -379,6 +379,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return conditions;
         }
 
+        private static string FormatWarningPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+            int assetsIndex = path.IndexOf("Assets", System.StringComparison.OrdinalIgnoreCase);
+            int packagesIndex = path.IndexOf("Packages", System.StringComparison.OrdinalIgnoreCase);
+            int startIndex = -1;
+            if (assetsIndex >= 0 && packagesIndex >= 0)
+                startIndex = System.Math.Min(assetsIndex, packagesIndex);
+            else if (assetsIndex >= 0)
+                startIndex = assetsIndex;
+            else if (packagesIndex >= 0)
+                startIndex = packagesIndex;
+            return startIndex >= 0 ? path[startIndex..] : path;
+        }
+
         private bool RecursiveParseFile(string currentFileName, bool isTopLevelFile, string callerPath)
         {
             var processedLines = new List<string>();
@@ -473,7 +489,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         throw new ParserException("This is a unity build in shader. It is not a normal asset and can't be read.");
                     }
                     if (fileName != "UnityLightingCommon.cginc")
-                        parsedShader.parserWarnings.Add($"Could not find include file: {currentFilePath}");
+                        parsedShader.parserWarnings.Add($"Could not find include file: '{FormatWarningPath(currentFilePath)}'");
                     return false;
                 }
                 catch (DirectoryNotFoundException)
@@ -486,7 +502,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     // happens for example if audio link is not in the project but the shader has a reference to the include file
                     // returning false here will cause the #include directive to be kept in the shader instead of getting inlined
-                    parsedShader.parserWarnings.Add($"Could not find directory for include file: {currentFilePath}");
+                    parsedShader.parserWarnings.Add($"Could not find directory for include file: '{FormatWarningPath(currentFilePath)}'");
                     return false;
                 }
             }
