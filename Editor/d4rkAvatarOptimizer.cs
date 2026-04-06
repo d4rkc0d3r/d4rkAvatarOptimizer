@@ -5057,6 +5057,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .ToArray();
         if (combinableSkinnedMeshList.Length == 0)
             return;
+        HashSet<Transform> humanoidBones = new();
+        HashSet<Transform> childrenOfHumanoidBones = new();
+        if (IsHumanoid())
+        {
+            var animator = avDescriptor.GetComponent<Animator>();
+            foreach (var humanBone in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
+            {
+                if (humanBone == HumanBodyBones.LastBone)
+                    continue;
+                var boneTransform = animator.GetBoneTransform(humanBone);
+                if (boneTransform != null)
+                {
+                    humanoidBones.Add(boneTransform);
+                    childrenOfHumanoidBones.UnionWith(boneTransform.GetAllDescendants());
+                }
+            }
+            childrenOfHumanoidBones.ExceptWith(humanoidBones);
+        }
         var originalRootPosition = GetRootTransform().position;
         var originalRootRotation = GetRootTransform().rotation;
         GetRootTransform().SetPositionAndRotation(Vector3.zero, Quaternion.identity);
@@ -5147,7 +5165,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var targetTangents = new List<Vector4>(totalVertexCount);
             var targetWeights = new List<BoneWeight>(totalVertexCount);
             var targetBounds = combinableSkinnedMeshes[0].localBounds;
-            var targetRootBone = combinableSkinnedMeshes[0].rootBone == null ? combinableSkinnedMeshes[0].transform : combinableSkinnedMeshes[0].rootBone;
+
+            int GetTransformPriority(Transform t)
+            {
+                if (t == null)
+                    return 9_000;
+                if (humanoidBones.Contains(t))
+                    return 0;
+                if (childrenOfHumanoidBones.Contains(t))
+                    return 1_000;
+                return 2_000;
+            }
+            var rootBoneGrouping = combinableSkinnedMeshes.Select((mesh, index) =>
+                (mesh, transform: mesh.rootBone == null ? mesh.transform : mesh.rootBone, index: GetTransformPriority(mesh.rootBone) + index))
+                .GroupBy(t => t.transform)
+                .OrderByDescending(g => g.Count())
+                .ThenBy(g => g.First().index)
+                .ToList();
+            var probeAnchorGrouping = combinableSkinnedMeshes.Select((mesh, index) =>
+                (mesh, transform: mesh.probeAnchor == null ? mesh.transform : mesh.probeAnchor, index: GetTransformPriority(mesh.probeAnchor) + index))
+                .GroupBy(t => t.transform)
+                .OrderByDescending(g => g.Count())
+                .ThenBy(g => g.First().index)
+                .ToList();
+
+            var targetRootBone = rootBoneGrouping[0].Key;
+            var targetProbeAnchor = probeAnchorGrouping[0].Key;
 
             // if NaNimation is enabled check if target root bone is Head bone or a child of Head and if so reassign it to the Hip bone
             // we do this since NaNimation disables Update when Offscreen and the head gets scaled down locally
@@ -5205,15 +5248,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogToFile($"- Total vertices: {totalVertexCount}");
                 LogToFile($"- Total submeshes: {basicMergedMeshesList.Sum(m => m.sharedMesh.subMeshCount)}");
                 LogToFile($"- Target root bone: '{GetPathToRoot(targetRootBone)}'");
+                LogToFile($"- Target light anchor: '{GetPathToRoot(targetProbeAnchor)}'");
                 var usedAttributes = new Dictionary<string, int>();
-                var sourceRootBones = new HashSet<string>();
-                var sourceLightAnchors = new HashSet<string>();
-                var sourcesWithExtraMaterialSlots = new HashSet<string>();
+                var sourcesWithExtraMaterialSlots = new List<SkinnedMeshRenderer>();
                 foreach (var skinnedMesh in basicMergedMeshesList)
                 {
-                    var path = GetPathToRoot(skinnedMesh);
-                    sourceRootBones.Add(skinnedMesh.rootBone == null ? path : GetPathToRoot(skinnedMesh.rootBone));
-                    sourceLightAnchors.Add(skinnedMesh.probeAnchor == null ? path : GetPathToRoot(skinnedMesh.probeAnchor));
                     var mesh = skinnedMesh.sharedMesh;
                     for (int i = 0; i < mesh.vertexAttributeCount; i++)
                     {
@@ -5225,7 +5264,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     }
                     if (skinnedMesh.sharedMaterials.Length > mesh.subMeshCount)
                     {
-                        sourcesWithExtraMaterialSlots.Add(path);
+                        sourcesWithExtraMaterialSlots.Add(skinnedMesh);
                     }
                 }
                 LogToFile($"- Source vertex attributes:");
@@ -5233,25 +5272,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     LogToFile($"{attr} {count,3}", 1);
                 }
-                void LogList(HashSet<string> list, string title)
+                void LogGrouping(List<IGrouping<Transform, (SkinnedMeshRenderer mesh, Transform transform, int index)>> grouping, string title)
                 {
-                    if (list.Count == 1)
+                    if (grouping.Count == 1)
                     {
-                        LogToFile($"- {title}: '{list.First()}'");
+                        LogToFile($"- {title}: '{GetPathToRoot(grouping.First().Key)}'");
                     }
                     else
                     {
-                        LogToFile($"- {title} ({list.Count}):");
-                        foreach (var s in list)
+                        LogToFile($"- {title} ({grouping.Count}):");
+                        bool showGroupCounts = grouping.Any(g => g.Count() != 1);
+                        foreach (var group in grouping)
                         {
-                            LogToFile($"- {s}", 1);
+                            LogToFile($"- {GetPathToRoot(group.Key)}{(showGroupCounts ? $" ({group.Count()})" : "")}", 1);
                         }
                     }
                 }
-                LogList(sourceRootBones, "Source root bone");
-                LogList(sourceLightAnchors, "Source light anchor");
+                LogGrouping(rootBoneGrouping, "Source root bone");
+                LogGrouping(probeAnchorGrouping, "Source light anchor");
                 if (sourcesWithExtraMaterialSlots.Count > 0)
-                    LogList(sourcesWithExtraMaterialSlots, "Extra material slot mesh");
+                    LogGrouping(sourcesWithExtraMaterialSlots.Select((mesh, index) => (mesh, mesh.transform, index)).GroupBy(x => x.transform).ToList(), "Extra material slot mesh");
             }
 
             foreach (SkinnedMeshRenderer skinnedMesh in basicMergedMeshesList)
@@ -5755,6 +5795,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
             targetRenderer.rootBone = targetRootBone;
+            targetRenderer.probeAnchor = targetProbeAnchor;
             targetRenderer.sharedMesh = combinedMesh;
             targetRenderer.sharedMaterials = materials;
             targetRenderer.bones = targetBones.ToArray();
