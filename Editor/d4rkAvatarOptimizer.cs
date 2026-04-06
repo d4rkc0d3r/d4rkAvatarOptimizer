@@ -995,7 +995,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return false;
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
             return false;
-        if (FindAllRaycastTogglePaths().Contains(GetPathToRoot(candidate)))
+        if (FindAllToggledByComponentPaths().Contains(GetPathToRoot(candidate)))
             return false;
         return true;
     }
@@ -1486,12 +1486,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     private void DeleteAllUnusedSkinnedMeshRenderers()
     {
+        // CombineSkinnedMeshes relies on unused SkinnedMeshRenderers getting deleted beforehand
+        // so we run this one when DeleteUnusedComponents is disabled
+        if (!(MergeSkinnedMeshes && !DeleteUnusedComponents))
+            return;
+        List<string> deletedPaths = new();
         foreach (var skinnedMeshRenderer in FindAllUnusedSkinnedMeshRenderers())
         {
             var obj = skinnedMeshRenderer.gameObject;
+            deletedPaths.Add(GetPathToRoot(obj));
             DestroyImmediate(skinnedMeshRenderer);
-            if (!keepTransforms.Contains(obj.transform) && (obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1))
+            if (obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
                 DestroyImmediate(obj);
+        }
+        if (deletedPaths.Count > 0)
+        {
+            LogToFile($"Deleting {deletedPaths.Count} unused SkinnedMeshRenderers:");
+            foreach (var path in deletedPaths)
+            {
+                LogToFile($"- {path}", 1);
+            }
         }
     }
 
@@ -3405,10 +3419,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllGameObjectTogglePaths;
     }
 
-    public HashSet<string> FindAllRaycastTogglePaths()
+    public HashSet<string> FindAllToggledByComponentPaths()
     {
         AnalyzeGameObjectToggles();
-        return cache_FindAllRaycastTogglePaths;
+        return cache_FindAllToggledByComponentPaths;
     }
 
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
@@ -3418,7 +3432,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
-    private HashSet<string> cache_FindAllRaycastTogglePaths = null;
+    private HashSet<string> cache_FindAllToggledByComponentPaths = null;
     private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
     private void AnalyzeGameObjectToggles()
     {
@@ -3446,7 +3460,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
             .FirstOrDefault(type => type != null);
 
-        HashSet<string> CalculateRaycastTogglePaths(HashSet<Transform> alwaysDisabled)
+        HashSet<string> CalculatePathsToggledByComponent(HashSet<Transform> alwaysDisabled)
         {
             if (raycastType == null)
                 return new();
@@ -3502,17 +3516,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
 
         var currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-        currentTogglePaths.UnionWith(CalculateRaycastTogglePaths(new()));
+        currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(new()));
 
         var conservativeAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
 
         currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-        currentTogglePaths.UnionWith(CalculateRaycastTogglePaths(conservativeAlwaysDisabledGameObjects));
+        currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(conservativeAlwaysDisabledGameObjects));
 
         cache_FindAllAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
-        cache_FindAllRaycastTogglePaths = CalculateRaycastTogglePaths(cache_FindAllAlwaysDisabledGameObjects);
+        cache_FindAllToggledByComponentPaths = CalculatePathsToggledByComponent(cache_FindAllAlwaysDisabledGameObjects);
         cache_FindAllGameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
-        cache_FindAllGameObjectTogglePaths.UnionWith(cache_FindAllRaycastTogglePaths);
+        cache_FindAllGameObjectTogglePaths.UnionWith(cache_FindAllToggledByComponentPaths);
     }
 
     private HashSet<Component> cache_FindAllUnusedComponents = null;
@@ -3544,6 +3558,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
 
         alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
+            .Where(t => t != null)
             .SelectMany(t => t.GetNonNullComponents()
                 .Where(c => !(c is Transform)))
                 .Where(c => !c.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
@@ -3825,15 +3840,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public List<T> GetUsedComponentsInChildren<T>() where T : Component
     {
-        Profiler.StartSection("GetUsedComponentsInChildren()");
-        var result = new List<T>();
-        var stack = new Stack<Transform>();
-        var alwaysDisabledGameObjects = FindAllAlwaysDisabledGameObjects();
-        var unusedComponents = FindAllUnusedComponents();
-        if (!DeleteUnusedComponents)
+        using var _ = new Profiler.Section("GetUsedComponentsInChildren()");
+        List<T> result = new();
+        Stack<Transform> stack = new();
+        HashSet<Transform> alwaysDisabledGameObjects = new();
+        HashSet<Component> unusedComponents = new();
+        if (DeleteUnusedComponents)
         {
-            alwaysDisabledGameObjects = new HashSet<Transform>();
-            unusedComponents = new HashSet<Component>();
+            alwaysDisabledGameObjects = FindAllAlwaysDisabledGameObjects();
+            unusedComponents = FindAllUnusedComponents();
         }
         stack.Push(GetRootTransform());
         while (stack.Count > 0)
@@ -3847,7 +3862,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 stack.Push(child);
             }
         }
-        Profiler.EndSection();
         return result;
     }
 

@@ -4,6 +4,9 @@
   Instead they automatically add all things they animate to the exclusions on build.
 * Automatic exclusions are now grouped by their source in the log file.
 
+### Bug Fixes
+* Fix crash when having `Delete Unused Components` disabled.
+
 ## v4.2.0
 ### Features
 * Add support for `VRCRaycast` components.
