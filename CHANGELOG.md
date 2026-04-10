@@ -1,4 +1,7 @@
 ## v4.3.0
+### Features
+* `Delete Unused GameObjects` now supports animator layer masks.
+
 ### Changes
 * Animators that are not on the root no longer show a validation warning.  
   Instead they automatically add all things they animate to the exclusions on build.

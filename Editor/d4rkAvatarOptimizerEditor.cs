@@ -703,13 +703,6 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         var exclusions = optimizer.GetAllExcludedTransforms();
 
-        if (optimizer.DeleteUnusedGameObjects && optimizer.UsesAnyLayerMasks())
-        {
-            EditorGUILayout.HelpBox(
-                "Animator layer masks are not supported when deleting unused game objects.\n" +
-                "If the optimized copy is broken, try to disable the option.", MessageType.Warning);
-        }
-
         if ((optimizer.MergeSkinnedMeshesWithNaNimation || optimizer.MergeSkinnedMeshesWithShaderToggle)
             && optimizer.GetPolyCount() > d4rkAvatarOptimizer.MaxPolyCountForAutoShaderToggle)
         {

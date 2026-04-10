@@ -53,7 +53,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         public bool MergeSameRatioBlendShapes = true;
         public bool MMDCompatibility = true;
         public bool DeleteUnusedComponents = true;
-        public int DeleteUnusedGameObjects = 0;
+        public bool DeleteUnusedGameObjects = false;
         public bool UseRingFingerAsFootCollider = false;
     }
 
@@ -265,7 +265,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         set { settings.MergeMainTex = value; } }
     public bool MMDCompatibility { get { return settings.MMDCompatibility; } set { settings.MMDCompatibility = value; } }
     public bool DeleteUnusedComponents { get { return settings.DeleteUnusedComponents; } set { settings.DeleteUnusedComponents = value; } }
-    public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects != 0; } set { settings.DeleteUnusedGameObjects = value ? 1 : 0; } }
+    public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects; } set { settings.DeleteUnusedGameObjects = value; } }
     public bool OptimizeFXLayer { get { return settings.OptimizeFXLayer; } set { settings.OptimizeFXLayer = value; } }
     public bool CombineApproximateMotionTimeAnimations {
         get { return settings.OptimizeFXLayer && settings.CombineApproximateMotionTimeAnimations; }
@@ -350,7 +350,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), true},
             {nameof(Settings.DeleteUnusedComponents), true},
-            {nameof(Settings.DeleteUnusedGameObjects), 0},
+            {nameof(Settings.DeleteUnusedGameObjects), false},
         }),
         ("Shader Toggles", new Dictionary<string, object>() {
             {nameof(Settings.ApplyOnUpload), true},
@@ -370,7 +370,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), true},
             {nameof(Settings.DeleteUnusedComponents), true},
-            {nameof(Settings.DeleteUnusedGameObjects), 0},
+            {nameof(Settings.DeleteUnusedGameObjects), false},
         }),
         ("Full", new Dictionary<string, object>() {
             {nameof(Settings.ApplyOnUpload), true},
@@ -390,7 +390,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), false},
             {nameof(Settings.DeleteUnusedComponents), true},
-            {nameof(Settings.DeleteUnusedGameObjects), 1},
+            {nameof(Settings.DeleteUnusedGameObjects), true},
         }),
     };
 
@@ -429,10 +429,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public void ApplyAutoSettings()
     {
         DoAutoSettings = false;
-        if (settings.DeleteUnusedGameObjects == 2)
-        {
-            DeleteUnusedGameObjects = !UsesAnyLayerMasks();
-        }
         if (settings.MergeSkinnedMeshesWithShaderToggle == 2)
         {
             MergeSkinnedMeshesWithShaderToggle = GetPolyCount() < MaxPolyCountForAutoShaderToggle;
@@ -1967,6 +1963,37 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         return motion;
     }
+
+    private Dictionary<AvatarMask, AvatarMask> cache_FixAvatarMask = null;
+    private AvatarMask FixAvatarMask(AvatarMask mask)
+    {
+        if (mask == null)
+            return null;
+        cache_FixAvatarMask ??= new Dictionary<AvatarMask, AvatarMask>();
+        if (cache_FixAvatarMask.TryGetValue(mask, out var cachedMask))
+            return cachedMask;
+        var newMask = Instantiate(mask);
+        bool changed = false;
+        for (int i = 0; i < newMask.transformCount; i++)
+        {
+            var oldPath = newMask.GetTransformPath(i);
+            if (transformFromOldPath.TryGetValue(oldPath, out var transform) && transform != null)
+            {
+                var newPath = GetPathToRoot(transform);
+                if (newPath != oldPath)
+                {
+                    newMask.SetTransformPath(i, newPath);
+                    changed = true;
+                }
+            }
+        }
+        if (changed)
+        {
+            CreateUniqueAsset(newMask, newMask.name + ".mask");
+            return cache_FixAvatarMask[mask] = newMask;
+        }
+        return cache_FixAvatarMask[mask] = mask;
+    }
     
     private void FixAllAnimationPaths()
     {
@@ -2086,6 +2113,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 continue;
 
             var layers = newController.layers;
+            bool applyLayerChanges = false;
 
             foreach (var state in layers.SelectMany(layer => layer.stateMachine.EnumerateAllStates()))
             {
@@ -2099,6 +2127,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 foreach (var stateMotionPair in syncedLayer.EnumerateAllMotionOverrides())
                 {
                     syncedLayer.SetOverrideMotion(stateMotionPair.state, FixMotion(stateMotionPair.motion, fixedMotions, layerCopyPaths[i]));
+                    applyLayerChanges = true;
                 }
             }
 
@@ -2112,6 +2141,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         playAudio.SourcePath = GetPathToRoot(transform);
                     }
                 }
+            }
+
+            foreach (var layer in layers)
+            {
+                var oldMask = layer.avatarMask;
+                var newMask = FixAvatarMask(oldMask);
+                if (newMask != oldMask)
+                {
+                    layer.avatarMask = newMask;
+                    applyLayerChanges = true;
+                }
+            }
+
+            if (applyLayerChanges)
+            {
+                newController.layers = layers;
             }
         }
         Profiler.StartSection("AssetDatabase.SaveAssets()");
