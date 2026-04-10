@@ -155,6 +155,8 @@ Deletes all layers in the FX Layer that are considered useless:
   * Has 0 weight and is not affected by any layer weight control and has no state behaviours.
   * Has no state behaviours and only animates bindings that don't exist.
 
+Deletes children in direct blend trees that don't animate any existing bindings.
+
 Tries to merge layers that are only doing toggles into a direct blend tree.
 You can read about this technique [here](https://notes.sleightly.dev/dbt-combining/).
 

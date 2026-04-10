@@ -1750,7 +1750,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_DisabledMaterial;
     }
     
+    private static readonly string DummyAnimationClipPrefix = "d4rkAO_DummyClip_";
     private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
+    private bool TryGetDummyAnimationClipLength(Motion motion, out AnimationClip dummyClip, out float length)
+    {
+        dummyClip = motion as AnimationClip;
+        length = 0;
+        if (dummyClip == null || string.IsNullOrEmpty(dummyClip.name) || !dummyClip.name.StartsWith(DummyAnimationClipPrefix))
+            return false;
+        return float.TryParse(dummyClip.name[DummyAnimationClipPrefix.Length..], out length);
+    }
+
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
         if (clip.name == "d4rkAvatarOptimizer_MergedLayers_Constants")
@@ -1891,12 +1901,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
             changed = true;
             if (lastUsedKeyframeTime == -1) {
-                if (cache_DummyAnimationClipOfLength == null) {
-                    cache_DummyAnimationClipOfLength = new Dictionary<float, AnimationClip>();
-                }
+                cache_DummyAnimationClipOfLength ??= new();
                 LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip");
                 if (!cache_DummyAnimationClipOfLength.TryGetValue(lastUnusedKeyframeTime, out var dummyClip)) {
-                    newClip.name = $"DummyClip_{lastUnusedKeyframeTime}";
+                    newClip.name = $"{DummyAnimationClipPrefix}{lastUnusedKeyframeTime}";
                     CreateUniqueAsset(newClip, newClip.name + ".anim");
                     cache_DummyAnimationClipOfLength[lastUnusedKeyframeTime] = dummyClip = newClip;
                 }
@@ -1931,14 +1939,48 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return clip;
     }
 
-    private Motion FixMotion(Motion motion, Dictionary<Motion, Motion> fixedMotions, string assetPath)
+    private Motion FixMotion(Motion motion, Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion> fixedMotions, string assetPath, bool stateUsesWriteDefaults)
     {
         if (motion == null)
             return null;
-        if (fixedMotions.TryGetValue(motion, out var fixedMotionValue))
+        if (fixedMotions.TryGetValue((motion, stateUsesWriteDefaults), out var fixedMotionValue))
             return fixedMotionValue;
         if (motion is BlendTree oldTree)
         {
+            var childNodes = oldTree.children;
+            for (int j = 0; j < childNodes.Length; j++)
+            {
+                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedMotions, assetPath, stateUsesWriteDefaults);
+            }
+
+            if (OptimizeFXLayer && childNodes.Length > 0)
+            {
+                bool allChildrenAreDummyClips = true;
+                AnimationClip longestDummyClip = null;
+                float longestDummyClipLength = float.MinValue;
+                for (int j = 0; j < childNodes.Length; j++)
+                {
+                    if (!TryGetDummyAnimationClipLength(childNodes[j].motion, out var dummyClip, out var dummyClipLength))
+                    {
+                        allChildrenAreDummyClips = false;
+                        break;
+                    }
+                    if (dummyClipLength > longestDummyClipLength)
+                    {
+                        longestDummyClip = dummyClip;
+                        longestDummyClipLength = dummyClipLength;
+                    }
+                }
+                if (allChildrenAreDummyClips)
+                {
+                    return fixedMotions[(motion, stateUsesWriteDefaults)] = longestDummyClip;
+                }
+                if (stateUsesWriteDefaults && oldTree.blendType == BlendTreeType.Direct)
+                {
+                    childNodes = childNodes.Where(child => !TryGetDummyAnimationClipLength(child.motion, out _, out _)).ToArray();
+                }
+            }
+
             var newTree = new BlendTree();
             newTree.name = oldTree.name;
             newTree.blendType = oldTree.blendType;
@@ -1947,13 +1989,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             newTree.minThreshold = oldTree.minThreshold;
             newTree.maxThreshold = oldTree.maxThreshold;
             newTree.useAutomaticThresholds = oldTree.useAutomaticThresholds;
-            var childNodes = oldTree.children;
-            for (int j = 0; j < childNodes.Length; j++)
-            {
-                childNodes[j].motion = FixMotion(childNodes[j].motion, fixedMotions, assetPath);
-            }
             newTree.children = childNodes;
-            fixedMotions[motion] = newTree;
+            fixedMotions[(motion, stateUsesWriteDefaults)] = newTree;
             newTree.hideFlags = HideFlags.HideInHierarchy;
             AnimatorOptimizer.CopyNormalizedBlendValuesProperty(oldTree, newTree);
             Profiler.StartSection("AssetDatabase.AddObjectToAsset()");
@@ -2095,14 +2132,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             animations.UnionWith(optimizedControllers[i].animationClips);
         }
 
-        var fixedMotions = new Dictionary<Motion, Motion>();
+        var fixedMotions = new Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion>();
         LogToFile($"Fixing animation paths in {animations.Count} animation clips");
         using (log.IndentScope())
         {
             using var _ = new Profiler.Section("FixAnimationClipPaths()");
             foreach (var clip in animations)
             {
-                fixedMotions[clip] = FixAnimationClipPaths(clip);
+                var fixedClip = FixAnimationClipPaths(clip);
+                fixedMotions[(clip, false)] = fixedClip;
+                fixedMotions[(clip, true)] = fixedClip;
             }
         }
         
@@ -2117,7 +2156,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
             foreach (var state in layers.SelectMany(layer => layer.stateMachine.EnumerateAllStates()))
             {
-                state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i]);
+                state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i], state.writeDefaultValues);
             }
 
             var syncedLayerIndices = layers.Select((layer, index) => (layer, index)).Where(p => p.layer != null && p.layer.syncedLayerIndex >= 0).Select(p => p.index).ToArray();
@@ -2126,7 +2165,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var syncedLayer = layers[syncedLayerIndex];
                 foreach (var stateMotionPair in syncedLayer.EnumerateAllMotionOverrides())
                 {
-                    syncedLayer.SetOverrideMotion(stateMotionPair.state, FixMotion(stateMotionPair.motion, fixedMotions, layerCopyPaths[i]));
+                    syncedLayer.SetOverrideMotion(stateMotionPair.state, FixMotion(stateMotionPair.motion, fixedMotions, layerCopyPaths[i], stateMotionPair.state.writeDefaultValues));
                     applyLayerChanges = true;
                 }
             }

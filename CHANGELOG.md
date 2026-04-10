@@ -1,6 +1,8 @@
 ## v4.3.0
 ### Features
 * `Delete Unused GameObjects` now supports animator layer masks.
+* `Optimize FX Layer` now also deletes unused motions from blend trees in all layers.
+  * This is useful for avatars that come with pre optimized DBTs where you delete some of the gimmicks but don't want to manually touch the blend tree in the animator.
 
 ### Changes
 * Animators that are not on the root no longer show a validation warning.  
