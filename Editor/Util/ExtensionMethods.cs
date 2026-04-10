@@ -163,27 +163,6 @@ namespace d4rkpl4y3r.AvatarOptimizer.Extensions
 
     public static class AnimatorControllerExtensions
     {
-        public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorController controller)
-        {
-            var queue = new Queue<AnimatorStateMachine>();
-            foreach (var layer in controller.layers)
-            {
-                queue.Enqueue(layer.stateMachine);
-                while (queue.Count > 0)
-                {
-                    var stateMachine = queue.Dequeue();
-                    foreach (var subStateMachine in stateMachine.stateMachines)
-                    {
-                        queue.Enqueue(subStateMachine.stateMachine);
-                    }
-                    foreach (var state in stateMachine.states.Select(s => s.state))
-                    {
-                        yield return state;
-                    }
-                }
-            }
-        }
-
         public static IEnumerable<AnimatorState> EnumerateAllStates(this AnimatorStateMachine stateMachine)
         {
             var queue = new Queue<AnimatorStateMachine>();

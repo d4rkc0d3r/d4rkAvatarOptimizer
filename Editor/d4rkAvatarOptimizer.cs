@@ -2085,12 +2085,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (newController == null)
                 continue;
 
-            foreach (var state in newController.EnumerateAllStates())
+            var layers = newController.layers;
+
+            foreach (var state in layers.SelectMany(layer => layer.stateMachine.EnumerateAllStates()))
             {
                 state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i]);
             }
 
-            var layers = newController.layers;
             var syncedLayerIndices = layers.Select((layer, index) => (layer, index)).Where(p => p.layer != null && p.layer.syncedLayerIndex >= 0).Select(p => p.index).ToArray();
             foreach (var syncedLayerIndex in syncedLayerIndices)
             {
@@ -2100,22 +2101,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     syncedLayer.SetOverrideMotion(stateMotionPair.state, FixMotion(stateMotionPair.motion, fixedMotions, layerCopyPaths[i]));
                 }
             }
-            if (syncedLayerIndices.Length > 0)
-            {
-                newController.layers = layers;
-            }
 
-            if (DeleteUnusedGameObjects)
+            foreach (var behavior in layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours()))
             {
-                foreach (var behavior in newController.layers.SelectMany(layer => layer.stateMachine.EnumerateAllBehaviours()))
+                if (behavior is VRC.SDKBase.VRC_AnimatorPlayAudio playAudio)
                 {
-                    if (behavior is VRC.SDKBase.VRC_AnimatorPlayAudio playAudio)
+                    var path = playAudio.SourcePath ?? "";
+                    if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null)
                     {
-                        var path = playAudio.SourcePath ?? "";
-                        if (transformFromOldPath.TryGetValue(path, out var transform) && transform != null)
-                        {
-                            playAudio.SourcePath = GetPathToRoot(transform);
-                        }
+                        playAudio.SourcePath = GetPathToRoot(transform);
                     }
                 }
             }

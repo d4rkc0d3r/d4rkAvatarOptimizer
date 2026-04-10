@@ -1,4 +1,4 @@
-## v4.2.1
+## v4.3.0
 ### Changes
 * Animators that are not on the root no longer show a validation warning.  
   Instead they automatically add all things they animate to the exclusions on build.
@@ -6,6 +6,7 @@
 * Better selection of root bone and probe anchor when merging meshes with different ones.
   * Highest priority is for the bone set by the most meshes
   * Tie breaker is in order of humanoid bone > child of humanoid bone > any other bone
+* Minor optimizer performance improvements on avatars with a lot of animator layers.
 
 ### Bug Fixes
 * Fix crash when having `Delete Unused Components` disabled.
