@@ -1973,11 +1973,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
                 if (allChildrenAreDummyClips)
                 {
+                    LogToFile($"- Replacing blend tree '{oldTree.name}' with dummy clip of length {longestDummyClipLength}");
                     return fixedMotions[(motion, stateUsesWriteDefaults)] = longestDummyClip;
                 }
                 if (stateUsesWriteDefaults && oldTree.blendType == BlendTreeType.Direct)
                 {
+                    int originalChildCount = childNodes.Length;
                     childNodes = childNodes.Where(child => !TryGetDummyAnimationClipLength(child.motion, out _, out _)).ToArray();
+                    if (childNodes.Length != originalChildCount)
+                    {
+                        LogToFile($"- Removed {originalChildCount - childNodes.Length} dummy clips from direct blend tree '{oldTree.name}'");
+                    }
                 }
             }
 
@@ -2010,7 +2016,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_FixAvatarMask.TryGetValue(mask, out var cachedMask))
             return cachedMask;
         var newMask = Instantiate(mask);
+        newMask.name = mask.name;
         bool changed = false;
+        List<string> logEntries = new();
         for (int i = 0; i < newMask.transformCount; i++)
         {
             var oldPath = newMask.GetTransformPath(i);
@@ -2021,12 +2029,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     newMask.SetTransformPath(i, newPath);
                     changed = true;
+                    logEntries.Add($"- '{oldPath}' => '{newPath}'");
                 }
             }
         }
         if (changed)
         {
-            CreateUniqueAsset(newMask, newMask.name + ".mask");
+            CreateUniqueAsset(newMask, mask.name + ".mask");
+            LogToFile($"- Changes to avatar mask '{mask.name}' ({logEntries.Count}):");
+            foreach (var logEntry in logEntries)
+            {
+                LogToFile(logEntry, 1);
+            }
             return cache_FixAvatarMask[mask] = newMask;
         }
         return cache_FixAvatarMask[mask] = mask;
@@ -2145,21 +2159,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
         
+        LogToFile($"Fixing animator controllers");
         for (int i = 0; i < optimizedControllers.Length; i++)
         {
+            using var _ = log.IndentScope();
             var newController = optimizedControllers[i];
             if (newController == null)
                 continue;
 
+            LogToFile($"- '{newController.name}'");
+            using var __ = log.IndentScope();
+
             var layers = newController.layers;
             bool applyLayerChanges = false;
+            var states = layers.SelectMany(layer => layer.stateMachine.EnumerateAllStates()).ToArray();
 
-            foreach (var state in layers.SelectMany(layer => layer.stateMachine.EnumerateAllStates()))
+            LogToFile($"- Fixing motions in {states.Length} states");
+            using (log.IndentScope())
+            foreach (var state in states)
             {
                 state.motion = FixMotion(state.motion, fixedMotions, layerCopyPaths[i], state.writeDefaultValues);
             }
 
             var syncedLayerIndices = layers.Select((layer, index) => (layer, index)).Where(p => p.layer != null && p.layer.syncedLayerIndex >= 0).Select(p => p.index).ToArray();
+            if (syncedLayerIndices.Length > 0)
+                LogToFile($"- Fixing synced layers: {string.Join(", ", syncedLayerIndices)}");
             foreach (var syncedLayerIndex in syncedLayerIndices)
             {
                 var syncedLayer = layers[syncedLayerIndex];
@@ -2182,14 +2206,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
-            foreach (var layer in layers)
+            if (layers.Any(layer => layer.avatarMask != null))
             {
-                var oldMask = layer.avatarMask;
-                var newMask = FixAvatarMask(oldMask);
-                if (newMask != oldMask)
+                LogToFile($"- Fixing avatar masks");
+                using (log.IndentScope())
+                foreach (var layer in layers)
                 {
-                    layer.avatarMask = newMask;
-                    applyLayerChanges = true;
+                    var oldMask = layer.avatarMask;
+                    var newMask = FixAvatarMask(oldMask);
+                    if (newMask != oldMask)
+                    {
+                        layer.avatarMask = newMask;
+                        applyLayerChanges = true;
+                    }
                 }
             }
 
