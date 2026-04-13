@@ -5988,6 +5988,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public HashSet<Transform> GetAllExcludedTransforms() {
         if (cache_GetAllExcludedTransforms != null)
             return cache_GetAllExcludedTransforms;
+        using var _ = new Profiler.Section("GetAllExcludedTransforms()");
 
         bool IsSameOrChildPath(string path, string parentPath)
         {

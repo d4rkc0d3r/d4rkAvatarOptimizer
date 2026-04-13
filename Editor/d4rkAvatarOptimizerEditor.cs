@@ -64,7 +64,9 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         settingsRect.width = 24;
         settingsRect.height = 24;
-        if (GUI.Button(settingsRect, new GUIContent("", "Global settings and defaults for new optimizer components can be changed here.")))
+        if (GUI.Button(settingsRect, new GUIContent("",
+            "Global settings and defaults for new optimizer components can be changed here."
+            + "\nAlso a couple buttons for quick access to the log file & github.")))
         {
             EditorWindow.GetWindow(typeof(AvatarOptimizerSettings));
         }
