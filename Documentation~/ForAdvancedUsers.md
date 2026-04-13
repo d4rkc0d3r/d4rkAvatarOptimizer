@@ -1,6 +1,25 @@
 # Tips and info for advanced users
 Here I will note down more specific details on how the optimizer works and changes in workflow to use it to its fullest extend.
 
+## Tradeoffs of the Basic preset
+The Basic preset is designed to be conservative and not change behavior of your avatar.  
+However there are a couple things it does not consider breakage as otherwise almost no optimizations would be possible.
+1. SkinnedMeshRenderer root bone & probe anchor are ignored when merging.  
+   When merging meshes it will try to pick the "best" root bone and probe anchor from the source meshes:
+   - The most common root bone/probe anchor among the source meshes
+   - On tie it picks in order: humanoid > some parent is a humanoid > any specified > first mesh transform
+2. Worlds might animate anything on an avatar via stations. This is ignored as following this would require preserving the hierarchy as is. No deleting unused anything, no merging anything, no reordering anything. This would make the optimizer basically useless.  
+   The one exception to this is MMD worlds which are supported by the `MMD Compatibility` setting.
+3. `SV_VertexID` & `SV_PrimitiveID` in shaders is not guaranteed to stay the same after optimization. Not ignoring this would require never merging any meshes/materials which would defeat the point of the optimizer.  
+   If one of your effects relies on stable vertex/primitive ids you have to put that mesh in the `Exclusions` list.
+
+### Automatic exclusions
+If you are a prefab creator and one of your prefabs breaks due to any of the above reasons, contact me. I have an automatic exclusion system in place and we can work to either support the prefab outright or add detection for it.  
+Currently these get automatically excluded:
+- DPS/TPS/SPS Penetrator Mesh
+- Real Kiss System Mesh
+- `_VirtualLens_Root` from Virtual Lens
+
 ## Switching from poiyomi lock in workflow to optimizer shader toggles
 Keep materials unlocked with shader toggles. The `Write Properties as Static Values` option is very similar to what poi lock in does and is forced when using shader toggles.
 
