@@ -12,6 +12,9 @@ However there are a couple things it does not consider breakage as otherwise alm
    The one exception to this is MMD worlds which are supported by the `MMD Compatibility` setting.
 3. `SV_VertexID` & `SV_PrimitiveID` in shaders is not guaranteed to stay the same after optimization. Not ignoring this would require never merging any meshes/materials which would defeat the point of the optimizer.  
    If one of your effects relies on stable vertex/primitive ids you have to put that mesh in the `Exclusions` list.
+4. Miss matched vertex attributes between meshes. This isn't breakage per se but it can increase mesh size.  
+   For example if one of your meshes has 3 different uv sets but the others only have 1, then after getting merged the resulting mesh will have 3 uv sets.  
+   The optimizer will copy the last existing uv set for the meshes that don't have as many into the extra slots to match shader behavior when querying non existing uv sets.
 
 ### Automatic exclusions
 If you are a prefab creator and one of your prefabs breaks due to any of the above reasons, contact me. I have an automatic exclusion system in place and we can work to either support the prefab outright or add detection for it.  
@@ -19,6 +22,12 @@ Currently these get automatically excluded:
 - DPS/TPS/SPS Penetrator Mesh
 - Real Kiss System Mesh
 - `_VirtualLens_Root` from Virtual Lens
+
+## Log file
+The optimizer creates a log file at `TrashBin/_d4rkAvatarOptimizer.log`.  
+You can quickly open it by pressing the gear wheel settings button in the top left of the optimizer inspector and then the button with the text file icon in the settings window.
+
+The log is organized by indentation level so I highly recommend using a text editor that supports folding to view it.
 
 ## Switching from poiyomi lock in workflow to optimizer shader toggles
 Keep materials unlocked with shader toggles. The `Write Properties as Static Values` option is very similar to what poi lock in does and is forced when using shader toggles.
