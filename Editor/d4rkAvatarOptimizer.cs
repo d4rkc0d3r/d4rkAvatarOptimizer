@@ -3522,56 +3522,121 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     public HashSet<string> FindAllGameObjectTogglePaths()
     {
-        AnalyzeGameObjectToggles();
+        AnalyzeTogglesAndExclusions();
         return cache_FindAllGameObjectTogglePaths;
     }
 
     public HashSet<string> FindAllToggledByComponentPaths()
     {
-        AnalyzeGameObjectToggles();
+        AnalyzeTogglesAndExclusions();
         return cache_FindAllToggledByComponentPaths;
     }
 
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
-        AnalyzeGameObjectToggles();
+        AnalyzeTogglesAndExclusions();
         return cache_FindAllAlwaysDisabledGameObjects;
+    }
+
+    public HashSet<Component> FindAllUnusedComponents()
+    {
+        AnalyzeTogglesAndExclusions();
+        return cache_FindAllUnusedComponents;
+    }
+
+    public HashSet<Transform> GetAllExcludedTransforms()
+    {
+        AnalyzeTogglesAndExclusions();
+        return cache_GetAllExcludedTransforms;
     }
 
     private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
     private HashSet<string> cache_FindAllToggledByComponentPaths = null;
     private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
-    private void AnalyzeGameObjectToggles()
+    private HashSet<Component> cache_FindAllUnusedComponents = null;
+    private HashSet<Transform> cache_GetAllExcludedTransforms = null;
+    private void AnalyzeTogglesAndExclusions()
     {
-        if (cache_FindAllGameObjectTogglePaths != null && cache_FindAllAlwaysDisabledGameObjects != null)
+        if (cache_FindAllGameObjectTogglePaths != null
+            && cache_FindAllToggledByComponentPaths != null
+            && cache_FindAllAlwaysDisabledGameObjects != null
+            && cache_FindAllUnusedComponents != null
+            && cache_GetAllExcludedTransforms != null)
             return;
-        using var _ = new Profiler.Section("AnalyzeGameObjectToggles()");
+        using var _ = new Profiler.Section("AnalyzeTogglesAndExclusions()");
+
+        bool IsSameOrChildPath(string path, string parentPath)
+        {
+            return path == parentPath
+                || (path.Length > parentPath.Length && path.StartsWithSimple(parentPath) && path[parentPath.Length] == '/');
+        }
+
+        List<(Transform t, string exclusionSource)> DeduplicateAndCollapseExclusions(IEnumerable<(Transform t, string exclusionSource)> exclusions)
+        {
+            var uniqueExclusions = exclusions.Where(p => p.t != null)
+                .Distinct()
+                .Select((p, index) => (p.t, p.exclusionSource, path: GetPathToRoot(p.t), index))
+                .GroupBy(p => p.path)
+                .Select(g => g.OrderBy(p => p.index).First())
+                .OrderBy(p => p.path.Count(c => c == '/'))
+                .ThenBy(p => p.index)
+                .ToList();
+            var keptPaths = new List<string>();
+            var result = new List<(Transform t, string exclusionSource)>();
+            foreach (var exclusion in uniqueExclusions)
+            {
+                if (keptPaths.Any(parentPath => IsSameOrChildPath(exclusion.path, parentPath)))
+                    continue;
+                keptPaths.Add(exclusion.path);
+                result.Add((exclusion.t, exclusion.exclusionSource));
+            }
+            return result;
+        }
+
+        var curveBindings = GetAllUsedCurveBindings();
+        var root = GetRootTransform();
+        var subAnimators = root.GetComponentsInChildren<Animator>(true).Where(a => a != null && a.transform != root).ToList();
+        var nonEditorOnlyMonoBehaviours = GetNonEditorOnlyComponentsInChildren<MonoBehaviour>();
+        var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
 
         var animatedTogglePaths = new HashSet<string>();
-        foreach (var binding in GetAllUsedCurveBindings())
+        var raycastTogglePaths = new HashSet<string>();
+        var animatesDisableOnMiss = new HashSet<string>();
+        var behaviourToggles = new HashSet<string>();
+        foreach (var binding in curveBindings)
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 animatedTogglePaths.Add(binding.path);
-        }
-        
-        var raycastTogglePaths = new HashSet<string>();
-        var animatesDisableOnMiss = new HashSet<string>();
-        foreach (var binding in GetAllUsedCurveBindings())
-        {
             if (binding.propertyName == "m_Enabled" && binding.type.Name == "VRCRaycast")
                 raycastTogglePaths.Add(binding.path);
             if (binding.propertyName == "disableOnMiss" && binding.type.Name == "VRCRaycast")
                 animatesDisableOnMiss.Add(binding.path);
+            if (binding.propertyName == "m_Enabled"
+                && (typeof(Behaviour).IsAssignableFrom(binding.type) || typeof(Renderer).IsAssignableFrom(binding.type)))
+            {
+                behaviourToggles.Add(binding.path);
+            }
         }
         var raycastType = System.AppDomain.CurrentDomain.GetAssemblies()
             .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
             .FirstOrDefault(type => type != null);
 
+        var baseAutomaticExclusions = new List<(Transform t, string exclusionSource)>();
+        baseAutomaticExclusions.Add((GetTransformFromPath("_VirtualLens_Root"), "Virtual Lens Root"));
+        baseAutomaticExclusions.AddRange(root.GetComponentsInChildren<VRCContactSender>(true)
+            .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
+            .Select(c => c.transform.parent)
+            .Where(t => t != null)
+            .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
+            .Where(t => t != null)
+            .Select(t => (t, "Real Kiss System Mesh")));
+        baseAutomaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator Mesh")));
+
         HashSet<string> CalculatePathsToggledByComponent(HashSet<Transform> alwaysDisabled)
         {
             if (raycastType == null)
                 return new();
-            var raycasts = GetNonEditorOnlyComponentsInChildren<MonoBehaviour>()
+            var raycasts = nonEditorOnlyMonoBehaviours
                 .Where(c => c != null && raycastType == c.GetType())
                 .Where(c => !alwaysDisabled.Contains(c.transform))
                 .Where(c => c.enabled || raycastTogglePaths.Contains(GetPathToRoot(c)));
@@ -3591,108 +3656,176 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
             return results;
         }
-        HashSet<Transform> CalculateAlwaysDisabledGameObjects(HashSet<string> togglePaths)
+
+        (HashSet<string> gameObjectTogglePaths, HashSet<string> toggledByComponentPaths, HashSet<Transform> alwaysDisabledGameObjects) CalculateToggleAnalysis(HashSet<Transform> exclusions)
         {
-            var disabledGameObjects = new HashSet<Transform>();
-            var queue = new Queue<Transform>();
-            var exclusions = GetAllExcludedTransforms();
-            var root = GetRootTransform();
-            queue.Enqueue(root);
-            while (queue.Count > 0)
+            HashSet<Transform> CalculateAlwaysDisabledGameObjects(HashSet<string> togglePaths)
             {
-                var current = queue.Dequeue();
-                if (exclusions.Contains(current))
+                var disabledGameObjects = new HashSet<Transform>();
+                var queue = new Queue<Transform>();
+                queue.Enqueue(root);
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    if (exclusions.Contains(current))
+                        continue;
+                    if (current != root && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
+                    {
+                        disabledGameObjects.Add(current);
+                        foreach (var child in current.GetAllDescendants())
+                        {
+                            disabledGameObjects.Add(child);
+                        }
+                    }
+                    else
+                    {
+                        foreach (Transform child in current)
+                        {
+                            queue.Enqueue(child);
+                        }
+                    }
+                }
+                return disabledGameObjects;
+            }
+
+            var currentTogglePaths = new HashSet<string>(animatedTogglePaths);
+            currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(new()));
+
+            var conservativeAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
+
+            currentTogglePaths = new HashSet<string>(animatedTogglePaths);
+            currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(conservativeAlwaysDisabledGameObjects));
+
+            var alwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
+            var toggledByComponentPaths = CalculatePathsToggledByComponent(alwaysDisabledGameObjects);
+            var gameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
+            gameObjectTogglePaths.UnionWith(toggledByComponentPaths);
+            return (gameObjectTogglePaths, toggledByComponentPaths, alwaysDisabledGameObjects);
+        }
+
+        HashSet<Component> CalculateUnusedComponents(HashSet<Transform> alwaysDisabledGameObjects, HashSet<Transform> exclusions)
+        {
+            var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
+                .Where(b => b != null && !b.enabled)
+                .Where(b => !(b is VRCPhysBoneColliderBase))
+                .Where(b => !behaviourToggles.Contains(GetPathToRoot(b)))
+                .Where(b => !b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
+
+            alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<Renderer>(true)
+                .Where(r => r != null && !r.enabled && !(r is ParticleSystemRenderer))
+                .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
+
+            alwaysDisabledBehaviours.UnionWith(alwaysDisabledGameObjects
+                .Where(t => t != null)
+                .SelectMany(t => t.GetNonNullComponents()
+                    .Where(c => !(c is Transform)))
+                    .Where(c => !c.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
+
+            foreach (var entry in FindAllPhysBoneDependencies())
+            {
+                if (exclusions.Contains(entry.Key.transform))
                     continue;
-                if (current != root && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
+                var dependencies = entry.Value.Select(d => d as Component).Where(d => d != null);
+                if (!entry.Value.Any(d => d is AnimatorController) && dependencies.All(d => alwaysDisabledBehaviours.Contains(d)))
                 {
-                    disabledGameObjects.Add(current);
-                    foreach (var child in current.GetAllDescendants())
-                    {
-                        disabledGameObjects.Add(child);
-                    }
-                }
-                else
-                {
-                    foreach (Transform child in current)
-                    {
-                        queue.Enqueue(child);
-                    }
+                    alwaysDisabledBehaviours.Add(entry.Key);
                 }
             }
-            return disabledGameObjects;
+
+            var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
+                .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
+                .SelectMany(pb => pb.colliders);
+
+            alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
+                .Where(c => !usedPhysBoneColliders.Contains(c)));
+
+            alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform) || c.transform == root);
+
+            return alwaysDisabledBehaviours;
         }
 
-        var currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-        currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(new()));
-
-        var conservativeAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
-
-        currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-        currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(conservativeAlwaysDisabledGameObjects));
-
-        cache_FindAllAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
-        cache_FindAllToggledByComponentPaths = CalculatePathsToggledByComponent(cache_FindAllAlwaysDisabledGameObjects);
-        cache_FindAllGameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
-        cache_FindAllGameObjectTogglePaths.UnionWith(cache_FindAllToggledByComponentPaths);
-    }
-
-    private HashSet<Component> cache_FindAllUnusedComponents = null;
-    public HashSet<Component> FindAllUnusedComponents()
-    {
-        if (cache_FindAllUnusedComponents != null)
-            return cache_FindAllUnusedComponents;
-        var fxLayer = GetFXLayer();
-        if (fxLayer == null)
-            return new HashSet<Component>();
-        var behaviourToggles = new HashSet<string>();
-        foreach (var binding in GetAllUsedCurveBindings()) {
-            if (typeof(Behaviour).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
-                behaviourToggles.Add(binding.path);
-            } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
-                behaviourToggles.Add(binding.path);
-            }
-        }
-        var root = GetRootTransform();
-
-        var alwaysDisabledBehaviours = new HashSet<Component>(root.GetComponentsInChildren<Behaviour>(true)
-            .Where(b => b != null && !b.enabled)
-            .Where(b => !(b is VRCPhysBoneColliderBase))
-            .Where(b => !behaviourToggles.Contains(GetPathToRoot(b)))
-            .Where(b => !b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
-
-        alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<Renderer>(true)
-            .Where(r => r != null && !r.enabled && !(r is ParticleSystemRenderer))
-            .Where(r => !behaviourToggles.Contains(GetPathToRoot(r))));
-
-        alwaysDisabledBehaviours.UnionWith(FindAllAlwaysDisabledGameObjects()
-            .Where(t => t != null)
-            .SelectMany(t => t.GetNonNullComponents()
-                .Where(c => !(c is Transform)))
-                .Where(c => !c.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")));
-        
-        var exclusions = GetAllExcludedTransforms();
-
-        foreach(var entry in FindAllPhysBoneDependencies())
+        List<(Transform t, string exclusionSource)> GetSubAnimatorExclusions(HashSet<Transform> alwaysDisabledGameObjects, HashSet<Component> unusedComponents)
         {
-            if (exclusions.Contains(entry.Key.transform))
-                continue;
-            var dependencies = entry.Value.Select(d => d as Component).Where(d => d != null);
-            if (!entry.Value.Any(d => d is AnimatorController) && dependencies.All(d => alwaysDisabledBehaviours.Contains(d)))
+            var result = new List<(Transform t, string exclusionSource)>();
+            foreach (var animator in subAnimators)
             {
-                alwaysDisabledBehaviours.Add(entry.Key);
+                if (alwaysDisabledGameObjects.Contains(animator.transform) || unusedComponents.Contains(animator))
+                    continue;
+                var animatorController = animator.runtimeAnimatorController;
+                if (animatorController == null)
+                    continue;
+                var animatorPath = GetPathToRoot(animator);
+                var exclusionSource = $"Sub Animator at '{animatorPath}'";
+                var animatedPaths = animatorController.animationClips
+                    .Where(clip => clip != null)
+                    .SelectMany(clip => AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)))
+                    .Select(binding => string.IsNullOrEmpty(binding.path) ? animatorPath : $"{animatorPath}/{binding.path}");
+                result.AddRange(DeduplicateAndCollapseExclusions(animatedPaths.Select(path => (GetTransformFromPath(path), exclusionSource))));
             }
+            return result;
         }
 
-        var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
-            .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
-            .SelectMany(pb => pb.colliders);
+        HashSet<Transform> CalculateExcludedTransforms(HashSet<Transform> alwaysDisabledGameObjects, HashSet<Component> unusedComponents, out List<(Transform t, string exclusionSource)> automaticExclusions)
+        {
+            automaticExclusions = DeduplicateAndCollapseExclusions(manualExclusions.Select(t => (t, string.Empty))
+                .Concat(baseAutomaticExclusions)
+                .Concat(GetSubAnimatorExclusions(alwaysDisabledGameObjects, unusedComponents)))
+                .Where(p => !string.IsNullOrEmpty(p.exclusionSource))
+                .ToList();
 
-        alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
-            .Where(c => !usedPhysBoneColliders.Contains(c)));
+            var allExcludedTransforms = new HashSet<Transform>();
+            foreach (var excludedTransform in manualExclusions.Concat(automaticExclusions.Select(p => p.t)))
+            {
+                allExcludedTransforms.Add(excludedTransform);
+                allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
+            }
+            return allExcludedTransforms;
+        }
 
-        alwaysDisabledBehaviours.RemoveWhere(c => exclusions.Contains(c.transform) || c.transform == root);
+        var exclusions = CalculateExcludedTransforms(new HashSet<Transform>(), new HashSet<Component>(), out var automaticExclusions);
+        var maxIterations = subAnimators.Count + 1;
 
-        return cache_FindAllUnusedComponents = alwaysDisabledBehaviours;
+        for (int iteration = 0; iteration < maxIterations; iteration++)
+        {
+            var currentExclusions = exclusions;
+            var (gameObjectTogglePaths, toggledByComponentPaths, alwaysDisabledGameObjects) = CalculateToggleAnalysis(currentExclusions);
+            var unusedComponents = CalculateUnusedComponents(alwaysDisabledGameObjects, currentExclusions);
+            var nextExclusions = CalculateExcludedTransforms(alwaysDisabledGameObjects, unusedComponents, out automaticExclusions);
+
+            exclusions = nextExclusions;
+            if (nextExclusions.SetEquals(currentExclusions))
+                break;
+        }
+
+        var finalToggleAnalysis = CalculateToggleAnalysis(exclusions);
+        cache_FindAllGameObjectTogglePaths = finalToggleAnalysis.gameObjectTogglePaths;
+        cache_FindAllToggledByComponentPaths = finalToggleAnalysis.toggledByComponentPaths;
+        cache_FindAllAlwaysDisabledGameObjects = finalToggleAnalysis.alwaysDisabledGameObjects;
+        cache_FindAllUnusedComponents = CalculateUnusedComponents(cache_FindAllAlwaysDisabledGameObjects, exclusions);
+        cache_GetAllExcludedTransforms = CalculateExcludedTransforms(cache_FindAllAlwaysDisabledGameObjects, cache_FindAllUnusedComponents, out automaticExclusions);
+        cache_GetAllExcludedTransformPaths = new HashSet<string>(cache_GetAllExcludedTransforms.Select(t => GetPathToRoot(t)));
+
+        if (automaticExclusions.Count > 0)
+        {
+            LogToFile($"Automatically excluding {automaticExclusions.Count} transforms from optimization:");
+            var groupedBySource = automaticExclusions.GroupBy(p => p.exclusionSource);
+            foreach (var group in groupedBySource)
+            {
+                LogToFile($"- {group.Key}", 1);
+                foreach (var item in group)
+                {
+                    LogToFile($"- {GetPathToRoot(item.t)}", 2);
+                }
+            }
+        }
+        if (manualExclusions.Count > 0)
+        {
+            LogToFile($"Excluding {manualExclusions.Count} user-specified transforms from optimization:");
+            foreach (var t in manualExclusions)
+            {
+                LogToFile($"- {GetPathToRoot(t)}", 1);
+            }
+        }
     }
 
     private HashSet<Transform> cache_FindAllMovingTransforms = null;
@@ -5982,99 +6115,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         // flush particle system cache since we merged meshes
         cache_ParticleSystemsUsingRenderer = null;
-    }
-
-    private HashSet<Transform> cache_GetAllExcludedTransforms;
-    public HashSet<Transform> GetAllExcludedTransforms() {
-        if (cache_GetAllExcludedTransforms != null)
-            return cache_GetAllExcludedTransforms;
-        using var _ = new Profiler.Section("GetAllExcludedTransforms()");
-
-        bool IsSameOrChildPath(string path, string parentPath)
-        {
-            return path == parentPath
-                || (path.Length > parentPath.Length && path.StartsWithSimple(parentPath) && path[parentPath.Length] == '/');
-        }
-
-        List<(Transform t, string exclusionSource)> DeduplicateAndCollapseExclusions(IEnumerable<(Transform t, string exclusionSource)> exclusions)
-        {
-            var uniqueExclusions = exclusions.Where(p => p.t != null)
-                .Distinct()
-                .Select((p, index) => (p.t, p.exclusionSource, path: GetPathToRoot(p.t), index))
-                .GroupBy(p => p.path)
-                .Select(g => g.OrderBy(p => p.index).First())
-                .OrderBy(p => p.path.Count(c => c == '/'))
-                .ThenBy(p => p.index)
-                .ToList();
-            var keptPaths = new List<string>();
-            var result = new List<(Transform t, string exclusionSource)>();
-            foreach (var exclusion in uniqueExclusions)
-            {
-                if (keptPaths.Any(parentPath => IsSameOrChildPath(exclusion.path, parentPath)))
-                    continue;
-                keptPaths.Add(exclusion.path);
-                result.Add((exclusion.t, exclusion.exclusionSource));
-            }
-            return result;
-        }
-
-        List<(Transform t, string exclusionSource)> GetSubAnimatorExclusions()
-        {
-            var root = GetRootTransform();
-            var result = new List<(Transform t, string exclusionSource)>();
-            foreach (var animator in root.GetComponentsInChildren<Animator>(true).Where(a => a != null && a.transform != root))
-            {
-                var animatorController = animator.runtimeAnimatorController;
-                if (animatorController == null)
-                    continue;
-                var animatorPath = GetPathToRoot(animator);
-                var exclusionSource = $"Sub Animator at '{animatorPath}'";
-                var animatedPaths = animatorController.animationClips
-                    .Where(clip => clip != null)
-                    .SelectMany(clip => AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)))
-                    .Select(binding => string.IsNullOrEmpty(binding.path) ? animatorPath : $"{animatorPath}/{binding.path}");
-                result.AddRange(DeduplicateAndCollapseExclusions(animatedPaths.Select(path => (GetTransformFromPath(path), exclusionSource))));
-            }
-            return result;
-        }
-
-        var allExcludedTransforms = new HashSet<Transform>();
-        List<(Transform t, string exclusionSource)> automaticExclusions = new();
-        automaticExclusions.Add((GetTransformFromPath("_VirtualLens_Root"), "Virtual Lens Root"));
-        automaticExclusions.AddRange(GetRootTransform().GetComponentsInChildren<VRCContactSender>(true)
-            .Where(c => c.collisionTags.Any(t => t == "superneko.realkiss.contact.mouth"))
-            .Select(c => c.transform.parent)
-            .Where(t => t != null)
-            .Select(t => t.Cast<Transform>().FirstOrDefault(child => child.TryGetComponent(out SkinnedMeshRenderer _)))
-            .Where(t => t != null)
-            .Select(t => (t, "Real Kiss System Mesh")));
-        automaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator Mesh")));
-        automaticExclusions.AddRange(GetSubAnimatorExclusions());
-        var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
-        automaticExclusions = DeduplicateAndCollapseExclusions(manualExclusions.Select(t => (t, string.Empty)).Concat(automaticExclusions))
-            .Where(p => !string.IsNullOrEmpty(p.exclusionSource))
-            .ToList();
-        if (automaticExclusions.Count > 0) {
-            LogToFile($"Automatically excluding {automaticExclusions.Count} transforms from optimization:");
-            var groupedBySource = automaticExclusions.GroupBy(p => p.exclusionSource);
-            foreach (var group in groupedBySource) {
-                LogToFile($"- {group.Key}", 1);
-                foreach (var item in group) {
-                    LogToFile($"- {GetPathToRoot(item.t)}", 2);
-                }
-            }
-        }
-        if (manualExclusions.Count > 0) {
-            LogToFile($"Excluding {manualExclusions.Count} user-specified transforms from optimization:");
-            foreach (var t in manualExclusions) {
-                LogToFile($"- {GetPathToRoot(t)}", 1);
-            }
-        }
-        foreach (var excludedTransform in manualExclusions.Concat(automaticExclusions.Select(p => p.t))) {
-            allExcludedTransforms.Add(excludedTransform);
-            allExcludedTransforms.UnionWith(excludedTransform.GetAllDescendants());
-        }
-        return cache_GetAllExcludedTransforms = allExcludedTransforms;
     }
 
     private HashSet<string> cache_GetAllExcludedTransformPaths;
