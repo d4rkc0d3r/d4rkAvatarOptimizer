@@ -3276,9 +3276,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public List<List<(string blendshape, float value)>> FindMergeableBlendShapes(IEnumerable<Renderer> mergedMeshBlob)
     {
         var avDescriptor = GetAvatarDescriptor();
-        var fxLayer = GetFXLayer();
-        if (avDescriptor == null || fxLayer == null)
-            return new List<List<(string blendshape, float value)>>();
         var exclusions = GetAllExcludedTransforms();
         var validPaths = new HashSet<string>();
         var blendShapeNameToID = new Dictionary<string, int>();
@@ -3292,7 +3289,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             blendShapeIDToName.Add(name);
             return id;
         }
-        var ratiosDict = new List<Dictionary<int, float>>() { new Dictionary<int, float>() };
+        var ratiosDict = new List<Dictionary<int, float>>() { new() };
         foreach (var renderer in mergedMeshBlob)
         {
             var skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
@@ -3485,9 +3482,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_FindAllAnimatedMaterialProperties != null)
             return cache_FindAllAnimatedMaterialProperties;
         var map = new Dictionary<string, HashSet<string>>();
-        var fxLayer = GetFXLayer();
-        if (fxLayer == null)
-            return map;
         foreach (var binding in GetAllUsedCurveBindings()) {
             if (!binding.propertyName.StartsWithSimple("material.") || !typeof(Renderer).IsAssignableFrom(binding.type))
                 continue;
