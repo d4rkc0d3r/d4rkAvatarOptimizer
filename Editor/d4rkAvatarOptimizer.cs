@@ -729,49 +729,56 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"- Total BlendShapes: {skinnedMeshRenderers.Sum(r => r.sharedMesh == null ? 0 : r.sharedMesh.blendShapeCount)}");
         LogToFile($"- Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
 
-        var animatorControllers = av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
-        var animatorLayers = animatorControllers.SelectMany(c => c.layers).ToArray();
-        LogToFile($"- Animator Layers: {animatorLayers.Length}");
-        static int CalculateBlendTreePerfRank(BlendTree tree)
+        using (new Profiler.Section("LogAvatarStats() - Animator Analysis"))
         {
-            if (tree == null)
-                return 0;
-            if (tree.blendType == BlendTreeType.Direct)
+            var animatorControllers = av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
+            var animatorLayers = animatorControllers.SelectMany(c => c.layers).ToArray();
+            LogToFile($"- Animator Layers: {animatorLayers.Length}");
+            static int CalculateBlendTreePerfRank(BlendTree tree)
             {
-                return tree.children.Sum(c =>
-                {
-                    if (c.motion is AnimationClip)
-                        return 1;
-                    if (c.motion is BlendTree subTree)
-                        return CalculateBlendTreePerfRank(subTree);
+                if (tree == null)
                     return 0;
-                });
-            }
-            else
-            {
-                int worst = 0;
-                foreach (var c in tree.children)
+                if (tree.blendType == BlendTreeType.Direct)
                 {
-                    int rank = 0;
-                    if (c.motion is AnimationClip)
-                        rank = 1;
-                    else if (c.motion is BlendTree subTree)
-                        rank = CalculateBlendTreePerfRank(subTree);
-                    if (rank > worst)
-                        worst = rank;
+                    return tree.children.Sum(c =>
+                    {
+                        if (c.motion is AnimationClip)
+                            return 1;
+                        if (c.motion is BlendTree subTree)
+                            return CalculateBlendTreePerfRank(subTree);
+                        return 0;
+                    });
                 }
-                return tree.blendType == BlendTreeType.Simple1D ? worst * 2 : worst * 3;
+                else
+                {
+                    int worst = 0;
+                    foreach (var c in tree.children)
+                    {
+                        int rank = 0;
+                        if (c.motion is AnimationClip)
+                            rank = 1;
+                        else if (c.motion is BlendTree subTree)
+                            rank = CalculateBlendTreePerfRank(subTree);
+                        if (rank > worst)
+                            worst = rank;
+                    }
+                    return tree.blendType == BlendTreeType.Simple1D ? worst * 2 : worst * 3;
+                }
             }
+            int blendTreeRank = animatorLayers.Sum(l => l == null || l.stateMachine == null ? 0
+                : l.stateMachine.EnumerateAllStates().Select(s => CalculateBlendTreePerfRank(s.motion as BlendTree)).Aggregate(0, (a, b) => a > b ? a : b));
+            LogToFile($"- Blend Tree Perf Rank: {blendTreeRank}");
+            // a single layer with a simple toggle is approximately 4 times as expensive a simple 1d blend tree inside a direct blend tree
+            // from: https://vrc.school/docs/Other/Benchmarks/#direct-blend-trees
+            // 1d inside direct is 2 score so the layer is 8 score
+            LogToFile($"- Animator Complexity Score: {animatorLayers.Length * 8 + blendTreeRank}");
+            var uniqueClips = animatorControllers.SelectMany(c => c.animationClips).Where(c => c != null).Distinct().ToArray();
+            LogToFile($"- Animation Clips: {uniqueClips.Length}");
+            var uniqueBindings = uniqueClips.SelectMany(c => AnimationUtility.GetCurveBindings(c))
+                .Concat(uniqueClips.SelectMany(c => AnimationUtility.GetObjectReferenceCurveBindings(c)))
+                .Distinct().ToArray();
+            LogToFile($"- Unique Curve Bindings: {uniqueBindings.Length}");
         }
-        int blendTreeRank = animatorLayers.Sum(l => l == null || l.stateMachine == null ? 0
-            : l.stateMachine.EnumerateAllStates().Select(s => CalculateBlendTreePerfRank(s.motion as BlendTree)).Aggregate(0, (a, b) => a > b ? a : b));
-        LogToFile($"- Blend Tree Perf Rank: {blendTreeRank}");
-        // a single layer with a simple toggle is approximately 4 times as expensive a simple 1d blend tree inside a direct blend tree
-        // from: https://vrc.school/docs/Other/Benchmarks/#direct-blend-trees
-        // 1d inside direct is 2 score so the layer is 8 score
-        LogToFile($"- Animator Complexity Score: {animatorLayers.Length * 8 + blendTreeRank}");
-        var animationClipCount = animatorControllers.SelectMany(c => c.animationClips).Distinct().Count();
-        LogToFile($"- Animation Clip Count: {animationClipCount}");
 
         var stack = new Stack<Transform>();
         stack.Push(GetRootTransform());

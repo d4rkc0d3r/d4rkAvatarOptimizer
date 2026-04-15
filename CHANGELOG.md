@@ -7,7 +7,9 @@
 ### Changes
 * Animators that are not on the root no longer show a validation warning.  
   Instead they automatically add all things they animate to the exclusions on build.
-* Automatic exclusions are now grouped by their source in the log file.
+* Log file changes:
+  * Automatic exclusions are now grouped by their source.
+  * Avatar stats now include number of unique curve bindings.
 * Better selection of root bone and probe anchor when merging meshes with different ones.
   * Highest priority is for the bone set by the most meshes
   * Tie breaker is in order of humanoid bone > child of humanoid bone > any other bone
