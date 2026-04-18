@@ -998,8 +998,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return false;
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
             return false;
-        if (FindAllToggledByComponentPaths().Contains(GetPathToRoot(candidate)))
-            return false;
         return true;
     }
 
@@ -3527,12 +3525,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllGameObjectTogglePaths;
     }
 
-    public HashSet<string> FindAllToggledByComponentPaths()
-    {
-        AnalyzeTogglesAndExclusions();
-        return cache_FindAllToggledByComponentPaths;
-    }
-
     public HashSet<Transform> FindAllAlwaysDisabledGameObjects()
     {
         AnalyzeTogglesAndExclusions();
@@ -3552,14 +3544,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     private HashSet<string> cache_FindAllGameObjectTogglePaths = null;
-    private HashSet<string> cache_FindAllToggledByComponentPaths = null;
     private HashSet<Transform> cache_FindAllAlwaysDisabledGameObjects = null;
     private HashSet<Component> cache_FindAllUnusedComponents = null;
     private HashSet<Transform> cache_GetAllExcludedTransforms = null;
     private void AnalyzeTogglesAndExclusions()
     {
         if (cache_FindAllGameObjectTogglePaths != null
-            && cache_FindAllToggledByComponentPaths != null
             && cache_FindAllAlwaysDisabledGameObjects != null
             && cache_FindAllUnusedComponents != null
             && cache_GetAllExcludedTransforms != null)
@@ -3601,26 +3591,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var manualExclusions = ExcludeTransforms.Where(t => t != null).ToList();
 
         var animatedTogglePaths = new HashSet<string>();
-        var raycastTogglePaths = new HashSet<string>();
-        var animatesDisableOnMiss = new HashSet<string>();
         var behaviourToggles = new HashSet<string>();
         foreach (var binding in curveBindings)
         {
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
                 animatedTogglePaths.Add(binding.path);
-            if (binding.propertyName == "m_Enabled" && binding.type.Name == "VRCRaycast")
-                raycastTogglePaths.Add(binding.path);
-            if (binding.propertyName == "disableOnMiss" && binding.type.Name == "VRCRaycast")
-                animatesDisableOnMiss.Add(binding.path);
             if (binding.propertyName == "m_Enabled"
                 && (typeof(Behaviour).IsAssignableFrom(binding.type) || typeof(Renderer).IsAssignableFrom(binding.type)))
             {
                 behaviourToggles.Add(binding.path);
             }
         }
-        var raycastType = System.AppDomain.CurrentDomain.GetAssemblies()
-            .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
-            .FirstOrDefault(type => type != null);
 
         var baseAutomaticExclusions = new List<(Transform t, string exclusionSource)>();
         baseAutomaticExclusions.Add((GetTransformFromPath("_VirtualLens_Root"), "Virtual Lens Root"));
@@ -3633,75 +3614,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Select(t => (t, "Real Kiss System Mesh")));
         baseAutomaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator Mesh")));
 
-        HashSet<string> CalculatePathsToggledByComponent(HashSet<Transform> alwaysDisabled)
+        HashSet <Transform> CalculateAlwaysDisabledGameObjects(HashSet<Transform> exclusions)
         {
-            if (raycastType == null)
-                return new();
-            var raycasts = nonEditorOnlyMonoBehaviours
-                .Where(c => c != null && raycastType == c.GetType())
-                .Where(c => !alwaysDisabled.Contains(c.transform))
-                .Where(c => c.enabled || raycastTogglePaths.Contains(GetPathToRoot(c)));
-            var disableOnMissField = raycastType.GetField("disableOnMiss", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-            var resultTransformField = raycastType.GetField("resultTransform", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-            var results = new HashSet<string>();
-            foreach (var raycast in raycasts)
+            var disabledGameObjects = new HashSet<Transform>();
+            var queue = new Queue<Transform>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
             {
-                var t = resultTransformField.GetValue(raycast) as Transform;
-                if (t == null)
+                var current = queue.Dequeue();
+                if (exclusions.Contains(current))
                     continue;
-                bool disableOnMiss = disableOnMissField.GetValue(raycast) as bool? == true
-                    || animatesDisableOnMiss.Contains(GetPathToRoot(raycast));
-                if (!disableOnMiss)
-                    continue;
-                results.Add(GetPathToRoot(t));
-            }
-            return results;
-        }
-
-        (HashSet<string> gameObjectTogglePaths, HashSet<string> toggledByComponentPaths, HashSet<Transform> alwaysDisabledGameObjects) CalculateToggleAnalysis(HashSet<Transform> exclusions)
-        {
-            HashSet<Transform> CalculateAlwaysDisabledGameObjects(HashSet<string> togglePaths)
-            {
-                var disabledGameObjects = new HashSet<Transform>();
-                var queue = new Queue<Transform>();
-                queue.Enqueue(root);
-                while (queue.Count > 0)
+                if (current != root && !current.gameObject.activeSelf && !animatedTogglePaths.Contains(GetPathToRoot(current)))
                 {
-                    var current = queue.Dequeue();
-                    if (exclusions.Contains(current))
-                        continue;
-                    if (current != root && !current.gameObject.activeSelf && !togglePaths.Contains(GetPathToRoot(current)))
+                    disabledGameObjects.Add(current);
+                    foreach (var child in current.GetAllDescendants())
                     {
-                        disabledGameObjects.Add(current);
-                        foreach (var child in current.GetAllDescendants())
-                        {
-                            disabledGameObjects.Add(child);
-                        }
-                    }
-                    else
-                    {
-                        foreach (Transform child in current)
-                        {
-                            queue.Enqueue(child);
-                        }
+                        disabledGameObjects.Add(child);
                     }
                 }
-                return disabledGameObjects;
+                else
+                {
+                    foreach (Transform child in current)
+                    {
+                        queue.Enqueue(child);
+                    }
+                }
             }
-
-            var currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-            currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(new()));
-
-            var conservativeAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
-
-            currentTogglePaths = new HashSet<string>(animatedTogglePaths);
-            currentTogglePaths.UnionWith(CalculatePathsToggledByComponent(conservativeAlwaysDisabledGameObjects));
-
-            var alwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentTogglePaths);
-            var toggledByComponentPaths = CalculatePathsToggledByComponent(alwaysDisabledGameObjects);
-            var gameObjectTogglePaths = new HashSet<string>(animatedTogglePaths);
-            gameObjectTogglePaths.UnionWith(toggledByComponentPaths);
-            return (gameObjectTogglePaths, toggledByComponentPaths, alwaysDisabledGameObjects);
+            return disabledGameObjects;
         }
 
         HashSet<Component> CalculateUnusedComponents(HashSet<Transform> alwaysDisabledGameObjects, HashSet<Transform> exclusions)
@@ -3789,7 +3728,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         for (int iteration = 0; iteration < maxIterations; iteration++)
         {
             var currentExclusions = exclusions;
-            var (gameObjectTogglePaths, toggledByComponentPaths, alwaysDisabledGameObjects) = CalculateToggleAnalysis(currentExclusions);
+            var alwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(currentExclusions);
             var unusedComponents = CalculateUnusedComponents(alwaysDisabledGameObjects, currentExclusions);
             var nextExclusions = CalculateExcludedTransforms(alwaysDisabledGameObjects, unusedComponents, out automaticExclusions);
 
@@ -3798,13 +3737,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 break;
         }
 
-        var finalToggleAnalysis = CalculateToggleAnalysis(exclusions);
-        cache_FindAllGameObjectTogglePaths = finalToggleAnalysis.gameObjectTogglePaths;
-        cache_FindAllToggledByComponentPaths = finalToggleAnalysis.toggledByComponentPaths;
-        cache_FindAllAlwaysDisabledGameObjects = finalToggleAnalysis.alwaysDisabledGameObjects;
+        cache_FindAllGameObjectTogglePaths = animatedTogglePaths;
+        cache_FindAllAlwaysDisabledGameObjects = CalculateAlwaysDisabledGameObjects(exclusions);
         cache_FindAllUnusedComponents = CalculateUnusedComponents(cache_FindAllAlwaysDisabledGameObjects, exclusions);
         cache_GetAllExcludedTransforms = CalculateExcludedTransforms(cache_FindAllAlwaysDisabledGameObjects, cache_FindAllUnusedComponents, out automaticExclusions);
-        cache_GetAllExcludedTransformPaths = new HashSet<string>(cache_GetAllExcludedTransforms.Select(t => GetPathToRoot(t)));
+        cache_GetAllExcludedTransformPaths = new(cache_GetAllExcludedTransforms.Select(t => GetPathToRoot(t)));
 
         if (automaticExclusions.Count > 0)
         {

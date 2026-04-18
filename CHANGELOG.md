@@ -1,3 +1,7 @@
+## v4.3.1
+### Bug Fixes
+* Fix crash when using `VRCRaycast` components in vrc sdk 3.10.3
+
 ## v4.3.0
 ### Features
 * `Delete Unused GameObjects` now supports animator layer masks.
