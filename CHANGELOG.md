@@ -1,6 +1,10 @@
 ## v4.3.2
 ### Bug Fixes
 * Fix crash when animator controllers have illegal file name characters in their name.
+* Improved animation clip handling:
+  * Deduplication now differentiates by looping and framerate as well
+  * Clips with non standard clip settings will no longer get turned into dummy clips
+  * additiveReferencePoseClip references now get their clips replaced by fixed clips
 
 ## v4.3.1
 ### Bug Fixes

@@ -22,6 +22,7 @@ using VRC.SDK3.Avatars.Components;
 using Math = System.Math;
 using Type = System.Type;
 using Path = System.IO.Path;
+using Object = UnityEngine.Object;
 using AnimationPath = System.ValueTuple<string, string, System.Type>;
 using BlendableLayer = VRC.SDKBase.VRC_AnimatorLayerControl.BlendableLayer;
 using PackageInfo = UnityEditor.PackageManager.PackageInfo;
@@ -1761,14 +1762,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
     
     private static readonly string DummyAnimationClipPrefix = "d4rkAO_DummyClip_";
-    private Dictionary<float, AnimationClip> cache_DummyAnimationClipOfLength = null;
-    private bool TryGetDummyAnimationClipLength(Motion motion, out AnimationClip dummyClip, out float length)
-    {
-        dummyClip = motion as AnimationClip;
-        length = 0;
-        if (dummyClip == null || string.IsNullOrEmpty(dummyClip.name) || !dummyClip.name.StartsWith(DummyAnimationClipPrefix))
-            return false;
-        return float.TryParse(dummyClip.name[DummyAnimationClipPrefix.Length..], out length);
+        private Dictionary<(float length, float frameRate, bool isLooping), AnimationClip> cache_DummyAnimationClipBySettings = null;
+        private static string GetDummyAnimationClipName((float length, float frameRate, bool isLooping) dummyClipInfo)
+        {
+            return $"{DummyAnimationClipPrefix}{dummyClipInfo.length:G9}_fr{dummyClipInfo.frameRate:G9}_loop{(dummyClipInfo.isLooping ? 1 : 0)}";
+        }
+
+        private static bool TryGetDummyAnimationClipInfo(Motion motion, out AnimationClip dummyClip, out (float length, float frameRate, bool isLooping) dummyClipInfo)
+        {
+            dummyClipInfo = default;
+            dummyClip = motion as AnimationClip;
+            if (dummyClip == null || string.IsNullOrEmpty(dummyClip.name) || !dummyClip.name.StartsWith(DummyAnimationClipPrefix))
+                return false;
+            dummyClipInfo = (dummyClip.length, dummyClip.frameRate, AnimationUtility.GetAnimationClipSettings(dummyClip).loopTime);
+            return true;
     }
 
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
@@ -1911,14 +1918,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
             changed = true;
             if (lastUsedKeyframeTime == -1) {
-                cache_DummyAnimationClipOfLength ??= new();
-                LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip");
-                if (!cache_DummyAnimationClipOfLength.TryGetValue(lastUnusedKeyframeTime, out var dummyClip)) {
-                    newClip.name = $"{DummyAnimationClipPrefix}{lastUnusedKeyframeTime}";
+                cache_DummyAnimationClipBySettings ??= new();
+                var clipSettings = AnimationUtility.GetAnimationClipSettings(clip);
+                var shouldCache = clipSettings.hasAdditiveReferencePose == false
+                    && clipSettings.startTime == 0
+                    && clipSettings.orientationOffsetY == 0
+                    && clipSettings.level == 0
+                    && clipSettings.cycleOffset == 0;
+                if (shouldCache) {
+                    var dummyClipKey = (length: lastUnusedKeyframeTime, clip.frameRate, isLooping: clipSettings.loopTime);
+                    LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip ({dummyClipKey.frameRate} fps, looping: {dummyClipKey.isLooping})");
+                    if (!cache_DummyAnimationClipBySettings.TryGetValue(dummyClipKey, out var dummyClip)) {
+                        newClip.name = GetDummyAnimationClipName(dummyClipKey);
+                        CreateUniqueAsset(newClip, newClip.name + ".anim");
+                        cache_DummyAnimationClipBySettings[dummyClipKey] = dummyClip = newClip;
+                    }
+                    return dummyClip;
+                } else {
+                    LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, not using dummy clip because of non-default clip settings");
                     CreateUniqueAsset(newClip, newClip.name + ".anim");
-                    cache_DummyAnimationClipOfLength[lastUnusedKeyframeTime] = dummyClip = newClip;
+                    return newClip;
                 }
-                return dummyClip;
             }
         }
         if (changed)
@@ -1967,29 +1987,29 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 bool allChildrenAreDummyClips = true;
                 AnimationClip longestDummyClip = null;
-                float longestDummyClipLength = float.MinValue;
+                (float length, float frameRate, bool isLooping) longestDummyClipInfo = default;
                 for (int j = 0; j < childNodes.Length; j++)
                 {
-                    if (!TryGetDummyAnimationClipLength(childNodes[j].motion, out var dummyClip, out var dummyClipLength))
+                    if (!TryGetDummyAnimationClipInfo(childNodes[j].motion, out var dummyClip, out var dummyClipInfo))
                     {
                         allChildrenAreDummyClips = false;
                         break;
                     }
-                    if (dummyClipLength > longestDummyClipLength)
+                    if (longestDummyClip == null || dummyClipInfo.length > longestDummyClipInfo.length)
                     {
                         longestDummyClip = dummyClip;
-                        longestDummyClipLength = dummyClipLength;
+                        longestDummyClipInfo = dummyClipInfo;
                     }
                 }
                 if (allChildrenAreDummyClips)
                 {
-                    LogToFile($"- Replacing blend tree '{oldTree.name}' with dummy clip of length {longestDummyClipLength}");
+                    LogToFile($"- Replacing blend tree '{oldTree.name}' with dummy clip of length {longestDummyClipInfo.length} ({longestDummyClipInfo.frameRate} fps, looping: {longestDummyClipInfo.isLooping})");
                     return fixedMotions[(motion, stateUsesWriteDefaults)] = longestDummyClip;
                 }
                 if (stateUsesWriteDefaults && oldTree.blendType == BlendTreeType.Direct)
                 {
                     int originalChildCount = childNodes.Length;
-                    childNodes = childNodes.Where(child => !TryGetDummyAnimationClipLength(child.motion, out _, out _)).ToArray();
+                    childNodes = childNodes.Where(child => !TryGetDummyAnimationClipInfo(child.motion, out _, out _)).ToArray();
                     if (childNodes.Length != originalChildCount)
                     {
                         LogToFile($"- Removed {originalChildCount - childNodes.Length} dummy clips from direct blend tree '{oldTree.name}'");
@@ -2164,6 +2184,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 continue;
             animations.UnionWith(optimizedControllers[i].animationClips);
         }
+        animations.UnionWith(animations.Select(clip => AnimationUtility.GetAnimationClipSettings(clip).additiveReferencePoseClip)
+            .Where(clip => clip != null));
 
         var fixedMotions = new Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion>();
         LogToFile($"Fixing animation paths in {animations.Count} animation clips");
@@ -2175,6 +2197,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var fixedClip = FixAnimationClipPaths(clip);
                 fixedMotions[(clip, false)] = fixedClip;
                 fixedMotions[(clip, true)] = fixedClip;
+            }
+            foreach (var kvp in fixedMotions.ToList())
+            {
+                if (kvp.Key.stateUsesWriteDefaults)
+                    continue;
+                var clipSettings = AnimationUtility.GetAnimationClipSettings(kvp.Value as AnimationClip);
+                if (clipSettings.additiveReferencePoseClip == null)
+                    continue;
+                var sourceReferencePoseClip = clipSettings.additiveReferencePoseClip;
+                var fixedReferencePoseClip = fixedMotions[(sourceReferencePoseClip, false)] as AnimationClip;
+                if (sourceReferencePoseClip == fixedReferencePoseClip)
+                    continue;
+                var sourceClip = kvp.Key.motion as AnimationClip;
+                var fixedClip = kvp.Value as AnimationClip;
+                LogToFile($"- clip '{fixedClip.name}' has additive reference pose clip '{sourceReferencePoseClip.name}'");
+                fixedClip = Instantiate(fixedClip);
+                fixedClip.name = sourceClip.name;
+                clipSettings.additiveReferencePoseClip = fixedReferencePoseClip;
+                AnimationUtility.SetAnimationClipSettings(fixedClip, clipSettings);
+                CreateUniqueAsset(fixedClip, fixedClip.name + ".anim");
+                fixedMotions[(sourceClip, false)] = fixedClip;
+                fixedMotions[(sourceClip, true)] = fixedClip;
             }
         }
         
