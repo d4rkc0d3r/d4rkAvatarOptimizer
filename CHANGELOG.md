@@ -1,3 +1,7 @@
+## v4.3.2
+### Bug Fixes
+* Fix crash when animator controllers have illegal file name characters in their name.
+
 ## v4.3.1
 ### Bug Fixes
 * Fix crash when using `VRCRaycast` components in vrc sdk 3.10.3

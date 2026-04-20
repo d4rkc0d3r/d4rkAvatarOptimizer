@@ -623,13 +623,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         Profiler.EndSection();
     }
 
+    private static string SanitizeName(string name)
+    {
+        var invalids = Path.GetInvalidFileNameChars();
+        return string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
+    }
+
     private string binaryAssetBundlePath = null;
     private string materialAssetBundlePath = null;
     private void CreateUniqueAsset(Object asset, string name)
     {
         Profiler.StartSection($"AssetDatabase.CreateAsset({asset.GetType().Name})");
-        var invalids = Path.GetInvalidFileNameChars();
-        var sanitizedName = string.Join("_", name.Split(invalids, System.StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
+        var sanitizedName = SanitizeName(name);
         if (asset is Material)
         {
             if (materialAssetBundlePath == null)
@@ -2112,17 +2117,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         Profiler.StartSection("AnimatorOptimizer.Run()");
         try
         {
+            static string GetControllerFileName(AnimatorController controller)
+            {
+                string sanitized = SanitizeName(controller.name);
+                if (sanitized.Length > 32)
+                {
+                    sanitized = sanitized[..30] + (sanitized.GetHashCode() & 0xFF).ToString("X");
+                }
+                return sanitized;
+            }
             AssetDatabase.StartAssetEditing();
             for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
             {
                 var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
                 if (controller == null)
                     continue;
-                layerCopyPaths[i] = $"{trashBinPath}c{i}_{controller.name}.controller";
+                layerCopyPaths[i] = $"{trashBinPath}c{i}_{GetControllerFileName(controller)}.controller";
                 optimizedControllers[i] = controller == GetFXLayer()
                     ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
                     : AnimatorOptimizer.Copy(controller, layerCopyPaths[i], fxLayerMap);
-                optimizedControllers[i].name = $"BaseAnimationLayer{i}_{controller.name}";
+                optimizedControllers[i].name = $"Base{i}_{GetControllerFileName(controller)}";
                 avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
             }
             for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
@@ -2131,9 +2145,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 if (controller == null)
                     continue;
                 var index = i + avDescriptor.baseAnimationLayers.Length;
-                layerCopyPaths[index] = $"{trashBinPath}c{index}_{controller.name}.controller";
+                layerCopyPaths[index] = $"{trashBinPath}c{index}_{GetControllerFileName(controller)}.controller";
                 optimizedControllers[index] = AnimatorOptimizer.Copy(controller, layerCopyPaths[index], fxLayerMap);
-                optimizedControllers[index].name = $"SpecialAnimationLayer{index}_{controller.name}";
+                optimizedControllers[index].name = $"Special{index}_{GetControllerFileName(controller)}";
                 avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
             }
         }
