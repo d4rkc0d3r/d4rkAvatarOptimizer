@@ -221,11 +221,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 } else if (s.motion is AnimationClip clip) {
                     (AnimationCurve curve, bool isEulerAngleBinding)[] curves = AnimationUtility.GetCurveBindings(clip)
                         .Select(binding => (AnimationUtility.GetEditorCurve(clip, binding), binding.propertyName.Contains("localEulerAngles"))).ToArray();
-                    float maxKeyframeTime = curves.Max(x => (float?)x.curve.keys.Max(y => y.time)) ?? 0;
+                    var keys = curves.SelectMany(x => x.curve.keys.Select(k => k.time)).Distinct().ToArray();
+                    float maxKeyframeTime = keys.Length > 0 ? keys.Max() : 0;
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
-                    var interpolationPoints = motionTimeSamplePoints.ToList();
+                    var interpolationPoints = motionTimeSamplePoints
+                        .Concat(keys.Select(t => t / maxKeyframeTime))
+                        .Distinct()
+                        .OrderBy(x => x)
+                        .ToList();
                     bool removedSomePoint = true;
                     while (removedSomePoint) {
                         removedSomePoint = false;
