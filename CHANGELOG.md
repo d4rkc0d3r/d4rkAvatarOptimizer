@@ -1,8 +1,12 @@
+## v4.3.3
+### Bug Fixes
+* Fix crash when an animation clip has a additive reference pose clip. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/187)
+
 ## v4.3.2
 ### Bug Fixes
 * Fix crash when animator controllers have illegal file name characters in their name.
 * Improved animation clip handling:
-  * Deduplication now differentiates by looping and framerate as well
+  * Deduplication of dummy clips now differentiates by looping and framerate
   * Clips with non standard clip settings will no longer get turned into dummy clips
   * additiveReferencePoseClip references now get their clips replaced by fixed clips
 

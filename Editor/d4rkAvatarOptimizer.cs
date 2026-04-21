@@ -2184,8 +2184,21 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 continue;
             animations.UnionWith(optimizedControllers[i].animationClips);
         }
-        animations.UnionWith(animations.Select(clip => AnimationUtility.GetAnimationClipSettings(clip).additiveReferencePoseClip)
-            .Where(clip => clip != null));
+        void AddReferencePoseClips(AnimationClip clip)
+        {
+            var clipSettings = AnimationUtility.GetAnimationClipSettings(clip);
+            if (clipSettings.additiveReferencePoseClip != null)
+            {
+                if (animations.Add(clipSettings.additiveReferencePoseClip))
+                {
+                    AddReferencePoseClips(clipSettings.additiveReferencePoseClip);
+                }
+            }
+        }
+        foreach (var clip in animations.ToArray())
+        {
+            AddReferencePoseClips(clip);
+        }
 
         var fixedMotions = new Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion>();
         LogToFile($"Fixing animation paths in {animations.Count} animation clips");
@@ -2198,28 +2211,32 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 fixedMotions[(clip, false)] = fixedClip;
                 fixedMotions[(clip, true)] = fixedClip;
             }
-            foreach (var kvp in fixedMotions.ToList())
+            bool changedReferencePoseClip;
+            do
             {
-                if (kvp.Key.stateUsesWriteDefaults)
-                    continue;
-                var clipSettings = AnimationUtility.GetAnimationClipSettings(kvp.Value as AnimationClip);
-                if (clipSettings.additiveReferencePoseClip == null)
-                    continue;
-                var sourceReferencePoseClip = clipSettings.additiveReferencePoseClip;
-                var fixedReferencePoseClip = fixedMotions[(sourceReferencePoseClip, false)] as AnimationClip;
-                if (sourceReferencePoseClip == fixedReferencePoseClip)
-                    continue;
-                var sourceClip = kvp.Key.motion as AnimationClip;
-                var fixedClip = kvp.Value as AnimationClip;
-                LogToFile($"- clip '{fixedClip.name}' has additive reference pose clip '{sourceReferencePoseClip.name}'");
-                fixedClip = Instantiate(fixedClip);
-                fixedClip.name = sourceClip.name;
-                clipSettings.additiveReferencePoseClip = fixedReferencePoseClip;
-                AnimationUtility.SetAnimationClipSettings(fixedClip, clipSettings);
-                CreateUniqueAsset(fixedClip, fixedClip.name + ".anim");
-                fixedMotions[(sourceClip, false)] = fixedClip;
-                fixedMotions[(sourceClip, true)] = fixedClip;
-            }
+                changedReferencePoseClip = false;
+                foreach (var key in fixedMotions.Keys.Where(key => !key.stateUsesWriteDefaults).ToList())
+                {
+                    var sourceClip = key.motion as AnimationClip;
+                    var currentFixedClip = fixedMotions[key] as AnimationClip;
+                    var clipSettings = AnimationUtility.GetAnimationClipSettings(currentFixedClip);
+                    if (clipSettings.additiveReferencePoseClip == null)
+                        continue;
+                    var sourceReferencePoseClip = clipSettings.additiveReferencePoseClip;
+                    var fixedReferencePoseClip = fixedMotions[(sourceReferencePoseClip, false)] as AnimationClip;
+                    if (sourceReferencePoseClip == fixedReferencePoseClip)
+                        continue;
+                    LogToFile($"- clip '{currentFixedClip.name}' has additive reference pose clip '{sourceReferencePoseClip.name}'");
+                    var rewrittenClip = Instantiate(currentFixedClip);
+                    rewrittenClip.name = sourceClip.name;
+                    clipSettings.additiveReferencePoseClip = fixedReferencePoseClip;
+                    AnimationUtility.SetAnimationClipSettings(rewrittenClip, clipSettings);
+                    CreateUniqueAsset(rewrittenClip, rewrittenClip.name + ".anim");
+                    fixedMotions[(sourceClip, false)] = rewrittenClip;
+                    fixedMotions[(sourceClip, true)] = rewrittenClip;
+                    changedReferencePoseClip = true;
+                }
+            } while (changedReferencePoseClip);
         }
         
         LogToFile($"Fixing animator controllers");
