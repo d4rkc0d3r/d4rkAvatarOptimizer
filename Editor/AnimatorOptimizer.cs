@@ -35,11 +35,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             assetPath = path;
         }
 
-        public static AnimatorController Copy(AnimatorController source, string path, Dictionary<int, int> fxLayerMap)
-        {
-            return Run(source, path, fxLayerMap);
-        }
-
         public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<int> layersToMerge = null, List<int> layersToDestroy = null, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
         {
             var target = new AnimatorController();
