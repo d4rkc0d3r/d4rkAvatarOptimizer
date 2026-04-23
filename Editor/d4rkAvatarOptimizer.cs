@@ -2211,8 +2211,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 fixedMotions[(clip, false)] = fixedClip;
                 fixedMotions[(clip, true)] = fixedClip;
             }
-            bool changedReferencePoseClip;
-            do
+            bool changedReferencePoseClip = true;
+            while (changedReferencePoseClip)
             {
                 changedReferencePoseClip = false;
                 foreach (var key in fixedMotions.Keys.Where(key => !key.stateUsesWriteDefaults).ToList())
@@ -2223,10 +2223,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     if (clipSettings.additiveReferencePoseClip == null)
                         continue;
                     var sourceReferencePoseClip = clipSettings.additiveReferencePoseClip;
-                    var fixedReferencePoseClip = fixedMotions[(sourceReferencePoseClip, false)] as AnimationClip;
+                    if (!fixedMotions.TryGetValue((sourceReferencePoseClip, false), out var fixedReferencePoseMotion))
+                        continue;
+                    var fixedReferencePoseClip = fixedReferencePoseMotion as AnimationClip;
                     if (sourceReferencePoseClip == fixedReferencePoseClip)
                         continue;
-                    LogToFile($"- clip '{currentFixedClip.name}' has additive reference pose clip '{sourceReferencePoseClip.name}'");
+                    LogToFile($"- clip '{currentFixedClip.name}' updating additive reference pose clip '{sourceReferencePoseClip.name}'");
                     var rewrittenClip = Instantiate(currentFixedClip);
                     rewrittenClip.name = sourceClip.name;
                     clipSettings.additiveReferencePoseClip = fixedReferencePoseClip;
@@ -2236,7 +2238,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     fixedMotions[(sourceClip, true)] = rewrittenClip;
                     changedReferencePoseClip = true;
                 }
-            } while (changedReferencePoseClip);
+            }
         }
         
         LogToFile($"Fixing animator controllers");

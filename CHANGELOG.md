@@ -1,3 +1,7 @@
+## v4.3.4
+### Bug Fixes
+* Fix crash when an animation clip has a additive reference pose clip (for real this time). [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/188)
+
 ## v4.3.3
 ### Changes
 * `Combine Motion Time Approximation` now also takes samples at the keyframes of the curves.
