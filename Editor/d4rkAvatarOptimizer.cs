@@ -1455,23 +1455,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    public bool UsesAnyLayerMasks()
-    {
-        var avDescriptor = GetAvatarDescriptor();
-        if (avDescriptor == null)
-            return false;
-        var playableLayers = avDescriptor.baseAnimationLayers.Union(avDescriptor.specialAnimationLayers).ToArray();
-        foreach (var playableLayer in playableLayers)
-        {
-            var controller = playableLayer.animatorController as AnimatorController;
-            if (controller == null)
-                continue;
-            if (controller.layers.Any(layer => layer.avatarMask != null))
-                return true;
-        }
-        return false;
-    }
-
     private HashSet<SkinnedMeshRenderer> FindAllUnusedSkinnedMeshRenderers()
     {
         var togglePaths = FindAllGameObjectTogglePaths();
