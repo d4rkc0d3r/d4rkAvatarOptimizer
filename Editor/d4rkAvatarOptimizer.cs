@@ -2167,21 +2167,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 continue;
             animations.UnionWith(optimizedControllers[i].animationClips);
         }
-        void AddReferencePoseClips(AnimationClip clip)
-        {
-            var clipSettings = AnimationUtility.GetAnimationClipSettings(clip);
-            if (clipSettings.additiveReferencePoseClip != null)
-            {
-                if (animations.Add(clipSettings.additiveReferencePoseClip))
-                {
-                    AddReferencePoseClips(clipSettings.additiveReferencePoseClip);
-                }
-            }
-        }
-        foreach (var clip in animations.ToArray())
-        {
-            AddReferencePoseClips(clip);
-        }
+        AddReferencePoseClips(animations);
 
         var fixedMotions = new Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion>();
         LogToFile($"Fixing animation paths in {animations.Count} animation clips");
@@ -2887,6 +2873,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return false;
     }
 
+    private void AddReferencePoseClips(HashSet<AnimationClip> clips)
+    {
+        void AddReferencePoseClips(AnimationClip clip)
+        {
+            var settings = AnimationUtility.GetAnimationClipSettings(clip);
+            if (settings.additiveReferencePoseClip != null
+                && clips.Add(settings.additiveReferencePoseClip))
+            {
+                AddReferencePoseClips(settings.additiveReferencePoseClip);
+            }
+        }
+        foreach (var clip in clips.ToArray())
+        {
+            AddReferencePoseClips(clip);
+        }
+    }
 
     private HashSet<AnimationClip> cache_GetAllUsedAnimationClips = null;
     private HashSet<AnimationClip> GetAllUsedAnimationClips()
@@ -2913,6 +2915,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             usedClips.UnionWith(controller.animationClips);
         }
         usedClips.UnionWith(GetAllUsedFXLayerAnimationClips());
+        AddReferencePoseClips(usedClips);
         return cache_GetAllUsedAnimationClips = usedClips;
     }
 
