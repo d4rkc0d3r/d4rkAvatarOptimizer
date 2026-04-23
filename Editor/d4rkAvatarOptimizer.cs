@@ -5259,8 +5259,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         oldPathToMergedPaths.Clear();
         oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
-        // TODO: this map is currently unused.
-        // It should be used to reparent bones that are non moving to the first parent that does when using "Delete Unused GameObjects"
         movingParentMap = FindMovingParent();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
@@ -5301,6 +5299,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         for (int combinedMeshID = 0; combinedMeshID < combinableSkinnedMeshList.Length; combinedMeshID++)
         {
             var combinableSkinnedMeshes = combinableSkinnedMeshList[combinedMeshID];
+            var reparentedBoneReferences = new HashSet<(Transform sourceBone, Transform targetBone)>();
 
             var basicMergedMeshes = new List<List<Renderer>>();
             foreach (var renderer in combinableSkinnedMeshes)
@@ -5613,6 +5612,38 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     bindPoseCount = 1;
                 }
 
+                var sourceBoneReparentMap = new Dictionary<int, int>();
+                bool canReparentSourceBones = DeleteUnusedGameObjects
+                    && mesh.HasVertexAttribute(VertexAttribute.BlendWeight)
+                    && mesh.GetVertexAttributeDimension(VertexAttribute.BlendWeight) > 1;
+                if (canReparentSourceBones)
+                {
+                    var sourceBoneIndices = new Dictionary<Transform, int>();
+                    for (int i = 0; i < bindPoseCount; i++)
+                    {
+                        if (!sourceBoneIndices.ContainsKey(sourceBones[i]))
+                        {
+                            sourceBoneIndices[sourceBones[i]] = i;
+                        }
+                    }
+
+                    for (int i = 0; i < bindPoseCount; i++)
+                    {
+                        var sourceBone = sourceBones[i];
+                        if (sourceBone == null)
+                            continue;
+                        if (!movingParentMap.TryGetValue(sourceBone, out var movingParent))
+                            continue;
+                        if (movingParent == null || movingParent == sourceBone)
+                            continue;
+                        if (!sourceBoneIndices.TryGetValue(movingParent, out int movingParentIndex))
+                            continue;
+
+                        sourceBoneReparentMap[i] = movingParentIndex;
+                        reparentedBoneReferences.Add((sourceBone, movingParent));
+                    }
+                }
+
                 var currentHasUvSet = new bool[8] {
                     true,
                     mesh.HasVertexAttribute(VertexAttribute.TexCoord1),
@@ -5701,6 +5732,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     int GetNewBoneIndexForCurrentMesh(int oldIndex)
                     {
                         oldIndex = oldIndex >= bindPoseCount ? 0 : Math.Max(0, oldIndex);
+                        if (sourceBoneReparentMap.TryGetValue(oldIndex, out int reparentedBoneIndex))
+                        {
+                            oldIndex = reparentedBoneIndex;
+                        }
                         if (!bindPoseIDMap.TryGetValue(oldIndex, out int newIndex))
                         {
                             newIndex = GetNewBoneIndex(oldIndex, bindPoseMeshID, sourceBones[oldIndex], sourceBindPoses[oldIndex]);
@@ -6086,6 +6121,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
+
+            if (reparentedBoneReferences.Count > 0)
+            {
+                LogToFile($"- Reparented {reparentedBoneReferences.Count} skinned mesh bone references during merge:");
+                var groupedByTarget = reparentedBoneReferences.GroupBy(r => r.targetBone).ToList();
+                using (log.IndentScope())
+                foreach (var group in groupedByTarget)
+                {
+                    var parentPath = GetPathToRoot(group.Key);
+                    LogToFile($"- Reparented {group.Count()} bones to '{parentPath}':");
+                    foreach (var reparent in group)
+                    {
+                        LogToFile($"- {GetPathToRoot(reparent.sourceBone)[(parentPath.Length + 1)..]}", 1);
+                    }
+                }
+            }
         }
         GetRootTransform().SetPositionAndRotation(originalRootPosition, originalRootRotation);
 
