@@ -1,6 +1,7 @@
 ## v4.3.4
 ### Changes
 * `Delete Unused GameObjects` now re-parents non moving bones to the first moving parent again.
+* Count total unique bones in the avatar stats in the log file.
 
 ### Bug Fixes
 * Fix crash when an animation clip has a additive reference pose clip (for real this time). [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/188)

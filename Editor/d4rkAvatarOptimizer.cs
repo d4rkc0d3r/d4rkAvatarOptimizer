@@ -739,6 +739,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var skinnedMeshRenderers = components.Where(g => g.Key == typeof(SkinnedMeshRenderer)).SelectMany(g => g).Cast<SkinnedMeshRenderer>().ToArray();
         LogToFile($"- Total Poly Count: {renderers.Sum(r => GetRendererPolyCount(r))}");
         LogToFile($"- Total BlendShapes: {skinnedMeshRenderers.Sum(r => r.sharedMesh == null ? 0 : r.sharedMesh.blendShapeCount)}");
+        LogToFile($"- Total Unique Bones: {skinnedMeshRenderers.SelectMany(r => r.bones).Where(b => b != null).Distinct().Count()}");
         LogToFile($"- Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
 
         using (new Profiler.Section("LogAvatarStats() - Animator Analysis"))
