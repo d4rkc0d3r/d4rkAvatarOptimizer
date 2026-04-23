@@ -717,6 +717,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
+    private AnimatorController[] GetAvDescriptorControllers()
+    {
+        var av = GetAvatarDescriptor();
+        return av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
+    }
+
     private void LogAvatarStats(string header)
     {
         using var _ = new Profiler.Section("LogAvatarStats()");
@@ -737,7 +743,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         using (new Profiler.Section("LogAvatarStats() - Animator Analysis"))
         {
-            var animatorControllers = av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
+            var animatorControllers = GetAvDescriptorControllers();
             var animatorLayers = animatorControllers.SelectMany(c => c.layers).ToArray();
             LogToFile($"- Animator Layers: {animatorLayers.Length}");
             static int CalculateBlendTreePerfRank(BlendTree tree)
@@ -2322,15 +2328,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var fxLayerLayers = GetFXLayerLayers();
         var errorMessages = fxLayerLayers.Select(layer => new List<string>()).ToList();
 
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        foreach (var controller in GetAvDescriptorControllers())
         {
-            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (controller == null)
-                continue;
             var controllerLayers = controller.layers;
-            for (int j = 0; j < controllerLayers.Length; j++)
+            for (int i = 0; i < controllerLayers.Length; i++)
             {
-                var layer = controllerLayers[j];
+                var layer = controllerLayers[i];
                 var stateMachine = layer.stateMachine;
                 if (stateMachine == null)
                     continue;
@@ -2340,8 +2343,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     {
                         if (layerControl.layer <= errorMessages.Count && layerControl.playable == BlendableLayer.FX)
                         {
-                            var playableName = new string[] { "Base", "Additive", "Gesture", "Action", "FX" }[i];
-                            errorMessages[layerControl.layer].Add($"layer control from {playableName} {j} {layer.name}");
+                            errorMessages[layerControl.layer].Add($"layer control from {controller.name} {i} {layer.name}");
                         }
                     }
                 }
@@ -2719,19 +2721,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (fxLayer == null || !OptimizeFXLayer)
             return new HashSet<int>();
         Profiler.StartSection("FindUselessFXLayers()");
-        var avDescriptor = GetAvatarDescriptor();
 
         var isAffectedByLayerWeightControl = new HashSet<int>();
-
-        for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
+        foreach (var controller in GetAvDescriptorControllers())
         {
-            var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
-            if (controller == null)
-                continue;
             var controllerLayers = controller.layers;
-            for (int j = 0; j < controllerLayers.Length; j++)
+            for (int i = 0; i < controllerLayers.Length; i++)
             {
-                var stateMachine = controllerLayers[j].stateMachine;
+                var stateMachine = controllerLayers[i].stateMachine;
                 if (stateMachine == null)
                     continue;
                 foreach (var behaviour in stateMachine.EnumerateAllBehaviours())
@@ -2896,21 +2893,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (cache_GetAllUsedAnimationClips != null)
             return cache_GetAllUsedAnimationClips;
         var usedClips = new HashSet<AnimationClip>();
-        var avDescriptor = GetAvatarDescriptor();
-        if (avDescriptor == null)
-            return usedClips;
         var fxLayer = GetFXLayer();
-        foreach (var layer in avDescriptor.baseAnimationLayers)
+        foreach (var controller in GetAvDescriptorControllers())
         {
-            var controller = layer.animatorController as AnimatorController;
-            if (controller == null || controller == fxLayer)
-                continue;
-            usedClips.UnionWith(controller.animationClips);
-        }
-        foreach (var layer in avDescriptor.specialAnimationLayers)
-        {
-            var controller = layer.animatorController as AnimatorController;
-            if (controller == null)
+            if (controller == fxLayer)
                 continue;
             usedClips.UnionWith(controller.animationClips);
         }
@@ -2948,7 +2934,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             physBonePath[GetPathToRoot(physBone)] = physBone;
         }
         var parameterSuffixes = new string[] { "_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish" };
-        foreach (var controller in avDescriptor.baseAnimationLayers.Select(l => l.animatorController as AnimatorController).Where(c => c != null))
+        foreach (var controller in GetAvDescriptorControllers())
         {
             var parameterNames = new HashSet<string>(controller.parameters.Select(p => p.name));
             foreach (var physBone in physBones)
