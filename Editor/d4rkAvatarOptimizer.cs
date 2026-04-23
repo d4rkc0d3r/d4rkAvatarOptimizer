@@ -5222,14 +5222,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    private Vector3 CleanUpSmallValues(Vector3 value, float threshold = 1e-6f)
-    {
-        value.x = value.x < threshold && value.x > -threshold ? 0 : value.x;
-        value.y = value.y < threshold && value.y > -threshold ? 0 : value.y;
-        value.z = value.z < threshold && value.z > -threshold ? 0 : value.z;
-        return value;
-    }
-
     private Dictionary<Transform, Transform> FindMovingParent()
     {
         var nonMovingTransforms = FindAllUnmovingTransforms();
@@ -5249,12 +5241,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private Dictionary<string, HashSet<string>> cache_SameAnimatedPropertiesOnMergedMesh = null;
     private HashSet<string> GetSameAnimatedPropertiesOnMergedMesh(string path)
     {
-        if (cache_SameAnimatedPropertiesOnMergedMesh == null) {
-            cache_SameAnimatedPropertiesOnMergedMesh = new Dictionary<string, HashSet<string>>();
-        }
-        if (cache_SameAnimatedPropertiesOnMergedMesh.TryGetValue(path, out var result)) {
+        cache_SameAnimatedPropertiesOnMergedMesh ??= new Dictionary<string, HashSet<string>>();
+        if (cache_SameAnimatedPropertiesOnMergedMesh.TryGetValue(path, out var result))
             return result;
-        }
         return cache_SameAnimatedPropertiesOnMergedMesh[path] = new HashSet<string>();
     }
 
