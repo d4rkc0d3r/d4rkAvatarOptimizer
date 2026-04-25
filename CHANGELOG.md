@@ -1,3 +1,9 @@
+## v4.3.5
+### Changes
+* Log file:
+  * Merged meshes now log if they delete their source game objects.
+  * Merged meshes now log if they create new sub-container game objects.
+
 ## v4.3.4
 ### Changes
 * `Delete Unused GameObjects` now re-parents non moving bones to the first moving parent again.

@@ -5428,6 +5428,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
+            keepTransforms.Add(targetProbeAnchor);
+            keepTransforms.Add(targetRootBone);
+
             var toLocal = targetRootBone.worldToLocalMatrix;
 
             AddNewBone(combinableSkinnedMeshes[0].transform, combinableSkinnedMeshes[0].transform.worldToLocalMatrix);
@@ -6074,8 +6077,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     var subContainer = new GameObject("d4rkAO_mergeTargetRoot");
                     subContainer.transform.parent = go.transform;
-                    subContainer.transform.localPosition = Vector3.zero;
-                    subContainer.transform.localRotation = Quaternion.identity;
+                    subContainer.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
                     subContainer.transform.localScale = Vector3.one;
                     subContainer.SetActive(targetRenderer.gameObject.activeSelf);
                     transformFromOldPath[GetPathToRoot(go)] = subContainer.transform;
@@ -6091,6 +6093,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
                         DestroyImmediate(comp);
                     }
+
+                    LogToFile($"- Created sub-container '{GetPathToRoot(subContainer.transform)}' and moved {children.Count} child transforms and {componentsToMove.Count} components.");
                 }
                 else
                 {
@@ -6111,12 +6115,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
+            List<string> destroyedGameObjects = new();
             for (int meshID = 1; meshID < combinableSkinnedMeshes.Count; meshID++)
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
                 if (!keepTransforms.Contains(obj.transform) && obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
+                {
+                    destroyedGameObjects.Add(GetPathToRoot(obj.transform));
                     DestroyImmediate(obj);
+                }
+            }
+            if (destroyedGameObjects.Count > 0)
+            {
+                LogToFile($"- Destroyed {destroyedGameObjects.Count} now-unused GameObjects after merging meshes:");
+                foreach (var path in destroyedGameObjects)
+                {
+                    LogToFile($"- {path}", 1);
+                }
             }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
