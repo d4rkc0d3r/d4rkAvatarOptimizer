@@ -2,6 +2,8 @@
 ### Bug Fixes
 * Clear material property block after merging meshes.
   * This fixes inconsistencies between editor and in game.
+* Reorder material slot in merged meshes so that a compatible shader is in slot 0 when using `Shader Toggles`.
+  * This fixes a bug with wd on affecting the shader toggle material property animation.
 
 ## v4.3.5
 ### Changes

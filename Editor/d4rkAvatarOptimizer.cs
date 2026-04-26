@@ -4906,6 +4906,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
         }
+        if (MergeSkinnedMeshesWithShaderToggle)
+        {
+            var indexOfFirstCompatibleShaderGroup = matched
+                .FindIndex(group => group[0].material != null && ShaderAnalyzer.Parse(group[0].material.shader).parsedCorrectly);
+            if (indexOfFirstCompatibleShaderGroup > 0)
+            {
+                var compatibleGroup = matched[indexOfFirstCompatibleShaderGroup];
+                matched.RemoveAt(indexOfFirstCompatibleShaderGroup);
+                matched.Insert(0, compatibleGroup);
+            }
+        }
         return matched;
     }
 
