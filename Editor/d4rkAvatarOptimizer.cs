@@ -5284,6 +5284,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             var combinableSkinnedMeshes = combinableSkinnedMeshList[combinedMeshID];
             var reparentedBoneReferences = new HashSet<(Transform sourceBone, Transform targetBone)>();
+            var differentParentToLocalMatrix = new HashSet<Transform>();
 
             var basicMergedMeshes = new List<List<Renderer>>();
             foreach (var renderer in combinableSkinnedMeshes)
@@ -5603,7 +5604,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var sourceBoneIndices = new Dictionary<Transform, int>();
                 for (int i = 0; i < bindPoseCount; i++)
                 {
-                    if (!sourceBoneIndices.ContainsKey(sourceBones[i]))
+                    if (sourceBones[i] != null && !sourceBoneIndices.ContainsKey(sourceBones[i]))
                     {
                         sourceBoneIndices[sourceBones[i]] = i;
                     }
@@ -5619,10 +5620,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     var sourceBone = sourceBones[boneIndex];
                     if (sourceBone == null || movingTransforms.Contains(sourceBone))
                         return sourceBoneReparentMap[boneIndex] = boneIndex;
-                    var parent = sourceBone.parent;
-                    if (parent == null || !sourceBoneIndices.TryGetValue(parent, out int parentBoneIndex))
+                    var parentBone = sourceBone.parent;
+                    if (parentBone == null || !sourceBoneIndices.TryGetValue(parentBone, out int parentBoneIndex))
                         return sourceBoneReparentMap[boneIndex] = boneIndex;
+                    var parentToChildViaBindPose = sourceBindPoses[boneIndex] * sourceBindPoses[parentBoneIndex].inverse;
+                    var parentToChildViaTransform = sourceBone.worldToLocalMatrix * sourceBones[parentBoneIndex].localToWorldMatrix;
+                    bool ApproximatelyEqual(Matrix4x4 a, Matrix4x4 b, float tolerance = 1e-4f)
+                    {
+                        for (int i = 0; i < 16; i++)
+                            if (Mathf.Abs(a[i] - b[i]) > tolerance)
+                                return false;
+                        return true;
+                    }
+                    if (!ApproximatelyEqual(parentToChildViaBindPose, parentToChildViaTransform))
+                    {
+                        differentParentToLocalMatrix.Add(sourceBone);
+                        return sourceBoneReparentMap[boneIndex] = boneIndex;
+                    }
                     var remappedIndex = ParentBoneRemap(parentBoneIndex);
+                    if (sourceBones[remappedIndex] == null)
+                        return sourceBoneReparentMap[boneIndex] = boneIndex;
                     reparentedBoneReferences.Add((sourceBone, sourceBones[remappedIndex]));
                     return sourceBoneReparentMap[boneIndex] = remappedIndex;
                 }
@@ -6114,6 +6131,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
             Profiler.EndSection();
+
+            if (differentParentToLocalMatrix.Count > 0)
+            {
+                LogToFile($"- Detected {differentParentToLocalMatrix.Count} bones with different parent-to-local matrices between bind pose and transform hierarchy:");
+                foreach (var bone in differentParentToLocalMatrix)
+                {
+                    LogToFile($"- {GetPathToRoot(bone)}", 1);
+                }
+            }
 
             if (reparentedBoneReferences.Count > 0)
             {

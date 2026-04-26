@@ -1,8 +1,11 @@
 ## v4.3.5
 ### Changes
 * Log file:
-  * Merged meshes now log if they delete their source game objects.
-  * Merged meshes now log if they create new sub-container game objects.
+  * Merged meshes now log when they delete their source game objects.
+  * Merged meshes now log when they create new sub-container game objects.
+
+### Bug Fixes
+* Fix bones getting reparented even if their parent to local matrix is different in the bind pose and the transform hierarchy.
 
 ## v4.3.4
 ### Changes
