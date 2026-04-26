@@ -3,6 +3,7 @@
 * Log file:
   * Merged meshes now log when they delete their source game objects.
   * Merged meshes now log when they create new sub-container game objects.
+  * Only list reparented bones that actually had vertices weighted to them.
 
 ### Bug Fixes
 * Fix bones getting reparented even if their parent to local matrix is different in the bind pose and the transform hierarchy.
