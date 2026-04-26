@@ -3816,7 +3816,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     private HashSet<Transform> cache_FindAllMovingTransforms = null;
-    private HashSet<Transform> FindAllMovingTransforms()
+    public HashSet<Transform> FindAllMovingTransforms()
     {
         if (cache_FindAllMovingTransforms != null)
             return cache_FindAllMovingTransforms;
@@ -3954,18 +3954,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Where(rb => !alwaysDisabledComponents.Contains(rb)).Select(rb => rb.transform));
 
         return cache_FindAllMovingTransforms = transforms;
-    }
-
-    private HashSet<Transform> cache_FindAllUnmovingTransforms = null;
-    public  HashSet<Transform> FindAllUnmovingTransforms()
-    {
-        if (cache_FindAllUnmovingTransforms != null)
-            return cache_FindAllUnmovingTransforms;
-        var avDescriptor = GetAvatarDescriptor();
-        if (avDescriptor == null)
-            return new HashSet<Transform>();
-        var moving = FindAllMovingTransforms();
-        return cache_FindAllUnmovingTransforms = new HashSet<Transform>(GetRootTransform().GetAllDescendants().Where(t => !moving.Contains(t)));
     }
 
     private bool IsDPSPenetratorTipLight(Light light)

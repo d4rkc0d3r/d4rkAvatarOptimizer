@@ -1,11 +1,9 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEditor;
-using UnityEditor.Animations;
 using d4rkpl4y3r.AvatarOptimizer;
 using d4rkpl4y3r.AvatarOptimizer.Util;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
@@ -13,9 +11,7 @@ using VRC.SDK3.Avatars.Components;
 using VRC.Dynamics;
 using VRC.SDKBase.Validation.Performance;
 
-using Type = System.Type;
 using MaterialSlot = d4rkAvatarOptimizer.MaterialSlot;
-using Settings = d4rkAvatarOptimizer.Settings;
 using d4rkpl4y3r.d4rkavataroptimizer;
 
 [CustomEditor(typeof(d4rkAvatarOptimizer))]
@@ -1059,9 +1055,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (unmovingBonesCache == null)
             {
                 var bones = new HashSet<Transform>();
-                var unmoving = optimizer.FindAllUnmovingTransforms();
+                var moving = optimizer.FindAllMovingTransforms();
                 optimizer.GetUsedComponentsInChildren<SkinnedMeshRenderer>().ToList().ForEach(
-                    r => bones.UnionWith(r.bones.Where(b => unmoving.Contains(b))));
+                    r => bones.UnionWith(r.bones.Where(b => !moving.Contains(b))));
                 unmovingBonesCache = bones.ToArray();
             }
             return unmovingBonesCache;
