@@ -161,7 +161,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             pathsToDeleteGameObjectTogglesOn.Clear();
             texArrayPropertiesToSet.Clear();
             keepTransforms.Clear();
-            convertedMeshRendererPaths.Clear();
             constantAnimatedValuesToAdd.Clear();
             animatedMaterialPropertyDefaultValues.Clear();
             ClearCaches();
@@ -460,7 +459,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private HashSet<Transform> keepTransforms = new HashSet<Transform>();
-    private HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
     private Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
     private Dictionary<EditorCurveBinding, float> constantAnimatedValuesToAdd = new Dictionary<EditorCurveBinding, float>();
     private Dictionary<string, List<MaterialSlot>> materialSlotsToDisableWhenOriginalPathMeshIsDisabled = new();
@@ -1122,8 +1120,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private Dictionary<string, bool> cache_MeshUses4BoneSkinning = null;
     private bool MeshUses4BoneSkinning(string path)
     {
-        if (cache_MeshUses4BoneSkinning == null)
-            cache_MeshUses4BoneSkinning = new Dictionary<string, bool>();
+        cache_MeshUses4BoneSkinning ??= new();
         if (cache_MeshUses4BoneSkinning.TryGetValue(path, out var cachedResult))
             return cachedResult;
         var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
@@ -1146,8 +1143,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (!MergeSkinnedMeshesWithNaNimation)
             return false;
-        if (cache_CanUseNaNimationOnMesh == null)
-            cache_CanUseNaNimationOnMesh = new Dictionary<string, bool>();
+        cache_CanUseNaNimationOnMesh ??= new();
         if (cache_CanUseNaNimationOnMesh.TryGetValue(path, out var cachedResult))
             return cachedResult;
         if (!NaNimationAllow3BoneSkinning && MeshUses4BoneSkinning(path))
@@ -1227,17 +1223,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             cache_FindAllAnimationClipsAffectingRenderer = null;
             cache_RendererHaveSameAnimationCurves = null;
         }
-        if (cache_RendererHaveSameAnimationCurves == null)
-            cache_RendererHaveSameAnimationCurves = new Dictionary<(Renderer, Renderer), bool>();
+        cache_RendererHaveSameAnimationCurves ??= new();
         var aPath = GetPathToRoot(a);
         var bPath = GetPathToRoot(b);
         if (aPath.CompareTo(bPath) > 0) {
-            var temp = aPath;
-            aPath = bPath;
-            bPath = temp;
-            var temp2 = a;
-            a = b;
-            b = temp2;
+            (bPath, aPath) = (aPath, bPath);
+            (a, b) = (b, a);
         }
         if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
             return result;
@@ -1583,7 +1574,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (cache_TargetPathHasAnyMaterialSwap == null) {
             cache_TargetPathHasAnyMaterialSwap = new HashSet<string>();
-            foreach (var oldPath in FindAllMaterialSwapMaterials().Keys.Select(key => key.Item1).Distinct()) {
+            foreach (var oldPath in FindAllMaterialSwapMaterials().Keys.Select(key => key.path).Distinct()) {
                 var newPath = oldPath;
                 if (oldPathToMergedPath.TryGetValue(oldPath, out var mergedPath)) {
                     newPath = mergedPath;
@@ -1670,9 +1661,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     };
     Dictionary<string, Dictionary<Type, HashSet<string>>> cache_IsAnimatableBinding = null;
     public bool IsAnimatableBinding(EditorCurveBinding binding) {
-        if (cache_IsAnimatableBinding == null)
-            cache_IsAnimatableBinding = new Dictionary<string, Dictionary<Type, HashSet<string>>>();
-
+        cache_IsAnimatableBinding ??= new();
         if (!cache_IsAnimatableBinding.TryGetValue(binding.path, out var animatableBindings)) {
             animatableBindings = new Dictionary<Type, HashSet<string>>();
             GameObject targetObject = GetTransformFromPath(binding.path)?.gameObject;
@@ -1685,9 +1674,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         animatableBindings[type] = animatableProperties;
                     }
                     animatableProperties.Add(name);
-                    if (name.Length > 2 && name[name.Length - 2] == '.' && otherVectorOrColorComponent.TryGetValue(name[name.Length - 1], out var otherComponent)) {
+                    if (name.Length > 2 && name[^2] == '.' && otherVectorOrColorComponent.TryGetValue(name[^1], out var otherComponent)) {
                         // Color & Vector properties can both be animated by .xyzw or .rgba but only one of them gets returned by GetAnimatableBindings
-                        animatableProperties.Add(name.Substring(0, name.Length - 1) + otherComponent);
+                        animatableProperties.Add(name[..^1] + otherComponent);
                     }
                 }
                 if (!animatableBindings.ContainsKey(typeof(GameObject))) {
@@ -3097,14 +3086,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private bool IsMaterialSwapBinding(EditorCurveBinding binding)
     {
         return typeof(Renderer).IsAssignableFrom(binding.type)
-            && binding.propertyName.StartsWithSimple("m_Materials.Array.data[");
+            && binding.propertyName.StartsWithSimple("m_Materials.Array.data[")
+            && binding.propertyName.EndsWith("]");
     }
 
     private Dictionary<EditorCurveBinding, bool> cache_MaterialSwapBindingsToRemove = null;
     private bool ShouldRemoveMaterialSwapBinding(EditorCurveBinding binding)
     {
-        if (cache_MaterialSwapBindingsToRemove == null)
-            cache_MaterialSwapBindingsToRemove = new Dictionary<EditorCurveBinding, bool>();
+        cache_MaterialSwapBindingsToRemove ??= new Dictionary<EditorCurveBinding, bool>();
         if (cache_MaterialSwapBindingsToRemove.TryGetValue(binding, out var result))
             return result;
         int slot = int.Parse(binding.propertyName.Substring("m_Materials.Array.data[".Length, binding.propertyName.Length - "m_Materials.Array.data[]".Length));
@@ -3274,8 +3263,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     var t = GetTransformFromPath(binding.path);
                     if (t == null)
                         continue;
-                    var smr = t.GetComponent<SkinnedMeshRenderer>();
-                    if (smr == null)
+                    if (!t.TryGetComponent<SkinnedMeshRenderer>(out var smr))
                         continue;
                     var mesh = smr.sharedMesh;
                     if (mesh == null)
@@ -4185,8 +4173,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private Dictionary<string, Material> cache_GetFirstMaterialOnPath = null;
     public Material GetFirstMaterialOnPath(string path)
     {
-        if (cache_GetFirstMaterialOnPath == null)
-            cache_GetFirstMaterialOnPath = new Dictionary<string, Material>();
+        cache_GetFirstMaterialOnPath ??= new Dictionary<string, Material>();
         if (cache_GetFirstMaterialOnPath.TryGetValue(path, out var mat))
             return mat;
         var renderer = GetTransformFromPath(path)?.GetComponent<Renderer>();
@@ -6364,41 +6351,28 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (!UseRingFingerAsFootCollider)
             return;
-        var avDescriptor = GetAvatarDescriptor();
 
-        var collider = avDescriptor.collider_footL;
-        collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height -= collider.radius * 2f;
-        var parent = new GameObject("leftFootColliderRoot");
-        parent.transform.parent = collider.transform;
-        parent.transform.localRotation = collider.rotation;
-        parent.transform.localPosition = collider.position + collider.rotation * (-(collider.height * 0.5f) * Vector3.up);
-        parent.transform.localScale = Vector3.one;
-        var leaf = new GameObject("leftFootColliderLeaf");
-        leaf.transform.parent = parent.transform;
-        leaf.transform.localPosition = new Vector3(0, collider.height, 0);
-        leaf.transform.localRotation = Quaternion.identity;
-        leaf.transform.localScale = Vector3.one;
-        collider.transform = leaf.transform;
-        avDescriptor.collider_fingerRingL = collider;
-        LogToFile($"Moved left ring finger collider to '{GetPathToRoot(collider.transform)}'");
+        VRCAvatarDescriptor.ColliderConfig CreateColliderRoot(VRCAvatarDescriptor.ColliderConfig collider, string side)
+        {
+            collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
+            collider.height -= collider.radius * 2f;
+            var parent = new GameObject($"{side}FootColliderRoot");
+            parent.transform.parent = collider.transform;
+            parent.transform.SetLocalPositionAndRotation(collider.position + collider.rotation * (-(collider.height * 0.5f) * Vector3.up), collider.rotation);
+            parent.transform.localScale = Vector3.one;
+            var leaf = new GameObject($"{side}FootColliderLeaf");
+            leaf.transform.parent = parent.transform;
+            leaf.transform.SetLocalPositionAndRotation(new Vector3(0, collider.height, 0), Quaternion.identity);
+            leaf.transform.localScale = Vector3.one;
+            collider.transform = leaf.transform;
+            return collider;
+        }
 
-        collider = avDescriptor.collider_footR;
-        collider.state = VRCAvatarDescriptor.ColliderConfig.State.Custom;
-        collider.height -= collider.radius * 2f;
-        parent = new GameObject("rightFootColliderRoot");
-        parent.transform.parent = collider.transform;
-        parent.transform.localRotation = collider.rotation;
-        parent.transform.localPosition = collider.position + collider.rotation * (-(collider.height * 0.5f) * Vector3.up);
-        parent.transform.localScale = Vector3.one;
-        leaf = new GameObject("rightFootColliderLeaf");
-        leaf.transform.parent = parent.transform;
-        leaf.transform.localPosition = new Vector3(0, collider.height, 0);
-        leaf.transform.localRotation = Quaternion.identity;
-        leaf.transform.localScale = Vector3.one;
-        collider.transform = leaf.transform;
-        avDescriptor.collider_fingerRingR = collider;
-        LogToFile($"Moved right ring finger collider to '{GetPathToRoot(collider.transform)}'");
+        var av = GetAvatarDescriptor();
+        av.collider_fingerRingL = CreateColliderRoot(av.collider_footL, "left");
+        LogToFile($"Moved left ring finger collider to '{GetPathToRoot(av.collider_fingerRingL.transform)}'");
+        av.collider_fingerRingR = CreateColliderRoot(av.collider_footR, "right");
+        LogToFile($"Moved right ring finger collider to '{GetPathToRoot(av.collider_fingerRingR.transform)}'");
 
         // disable collider foldout in the inspector because it resets the collider transform
         EditorPrefs.SetBool("VRCSDK3_AvatarDescriptorEditor3_CollidersFoldout", false);
@@ -6429,7 +6403,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             skinnedMeshRenderer.sharedMesh = mesh;
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
-            convertedMeshRendererPaths.Add(GetPathToRoot(obj));
             LogToFile($"- {GetPathToRoot(obj)}", 1);
         }
     }
