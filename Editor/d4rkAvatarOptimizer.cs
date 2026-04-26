@@ -461,7 +461,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
     private HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private HashSet<string> convertedMeshRendererPaths = new HashSet<string>();
-    private Dictionary<Transform, Transform> movingParentMap = new Dictionary<Transform, Transform>();
     private Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
     private Dictionary<EditorCurveBinding, float> constantAnimatedValuesToAdd = new Dictionary<EditorCurveBinding, float>();
     private Dictionary<string, List<MaterialSlot>> materialSlotsToDisableWhenOriginalPathMeshIsDisabled = new();
@@ -5223,22 +5222,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    private Dictionary<Transform, Transform> FindMovingParent()
-    {
-        var nonMovingTransforms = FindAllUnmovingTransforms();
-        var result = new Dictionary<Transform, Transform>();
-        foreach (var transform in GetRootTransform().GetAllDescendants())
-        {
-            var movingParent = transform;
-            while (nonMovingTransforms.Contains(movingParent))
-            {
-                movingParent = movingParent.parent;
-            }
-            result[transform] = movingParent;
-        }
-        return result;
-    }
-
     private Dictionary<string, HashSet<string>> cache_SameAnimatedPropertiesOnMergedMesh = null;
     private HashSet<string> GetSameAnimatedPropertiesOnMergedMesh(string path)
     {
@@ -5260,7 +5243,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         oldPathToMergedPaths.Clear();
         oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
-        movingParentMap = FindMovingParent();
+        var movingTransforms = FindAllMovingTransforms();
         materialSlotRemap = new Dictionary<(string, int), (string, int)>();
         animatedMaterialProperties = FindAllAnimatedMaterialProperties();
         fusedAnimatedMaterialProperties = animatedMaterialProperties.ToDictionary(kvp => kvp.Key, kvp => new HashSet<string>(kvp.Value));
@@ -5617,35 +5600,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
 
                 var sourceBoneReparentMap = new Dictionary<int, int>();
-                bool canReparentSourceBones = DeleteUnusedGameObjects
-                    && mesh.HasVertexAttribute(VertexAttribute.BlendWeight)
-                    && mesh.GetVertexAttributeDimension(VertexAttribute.BlendWeight) > 1;
-                if (canReparentSourceBones)
+                var sourceBoneIndices = new Dictionary<Transform, int>();
+                for (int i = 0; i < bindPoseCount; i++)
                 {
-                    var sourceBoneIndices = new Dictionary<Transform, int>();
-                    for (int i = 0; i < bindPoseCount; i++)
+                    if (!sourceBoneIndices.ContainsKey(sourceBones[i]))
                     {
-                        if (!sourceBoneIndices.ContainsKey(sourceBones[i]))
-                        {
-                            sourceBoneIndices[sourceBones[i]] = i;
-                        }
+                        sourceBoneIndices[sourceBones[i]] = i;
                     }
-
-                    for (int i = 0; i < bindPoseCount; i++)
-                    {
-                        var sourceBone = sourceBones[i];
-                        if (sourceBone == null)
-                            continue;
-                        if (!movingParentMap.TryGetValue(sourceBone, out var movingParent))
-                            continue;
-                        if (movingParent == null || movingParent == sourceBone)
-                            continue;
-                        if (!sourceBoneIndices.TryGetValue(movingParent, out int movingParentIndex))
-                            continue;
-
-                        sourceBoneReparentMap[i] = movingParentIndex;
-                        reparentedBoneReferences.Add((sourceBone, movingParent));
-                    }
+                }
+                int ParentBoneRemap(int boneIndex)
+                {
+                    if (!DeleteUnusedGameObjects)
+                        return boneIndex;
+                    if (sourceBoneReparentMap.TryGetValue(boneIndex, out int remappedBoneIndex))
+                        return remappedBoneIndex;
+                    if (boneIndex >= bindPoseCount || boneIndex < 0)
+                        return 0;
+                    var sourceBone = sourceBones[boneIndex];
+                    if (sourceBone == null || movingTransforms.Contains(sourceBone))
+                        return sourceBoneReparentMap[boneIndex] = boneIndex;
+                    var parent = sourceBone.parent;
+                    if (parent == null || !sourceBoneIndices.TryGetValue(parent, out int parentBoneIndex))
+                        return sourceBoneReparentMap[boneIndex] = boneIndex;
+                    var remappedIndex = ParentBoneRemap(parentBoneIndex);
+                    reparentedBoneReferences.Add((sourceBone, sourceBones[remappedIndex]));
+                    return sourceBoneReparentMap[boneIndex] = remappedIndex;
                 }
 
                 var currentHasUvSet = new bool[8] {
@@ -5736,10 +5715,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     int GetNewBoneIndexForCurrentMesh(int oldIndex)
                     {
                         oldIndex = oldIndex >= bindPoseCount ? 0 : Math.Max(0, oldIndex);
-                        if (sourceBoneReparentMap.TryGetValue(oldIndex, out int reparentedBoneIndex))
-                        {
-                            oldIndex = reparentedBoneIndex;
-                        }
+                        oldIndex = ParentBoneRemap(oldIndex);
                         if (!bindPoseIDMap.TryGetValue(oldIndex, out int newIndex))
                         {
                             newIndex = GetNewBoneIndex(oldIndex, bindPoseMeshID, sourceBones[oldIndex], sourceBindPoses[oldIndex]);
