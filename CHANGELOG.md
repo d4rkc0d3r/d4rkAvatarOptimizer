@@ -1,3 +1,8 @@
+## v4.3.6
+### Bug Fixes
+* Clear material property block after merging meshes.
+  * This fixes inconsistencies between editor and in game.
+
 ## v4.3.5
 ### Changes
 * Log file:

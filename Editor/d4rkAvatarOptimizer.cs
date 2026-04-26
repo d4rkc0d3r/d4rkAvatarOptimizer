@@ -5198,6 +5198,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
 
             meshRenderer.sharedMaterials = optimizedMaterials;
+            // clear property block to make editor testing match game behavior
+            meshRenderer.SetPropertyBlock(null);
 
             foreach (var ps in GetParticleSystemsUsingRenderer(meshRenderer))
             {
