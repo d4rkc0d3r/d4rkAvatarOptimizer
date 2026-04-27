@@ -4,6 +4,7 @@
   * This fixes inconsistencies between editor and in game.
 * Reorder material slot in merged meshes so that a compatible shader is in slot 0 when using `Shader Toggles`.
   * This fixes a bug with wd on affecting the shader toggle material property animation.
+* Fix crash when a vrc animator layer control specifies a negative layer index or one that is equal to the amount of layers.
 
 ## v4.3.5
 ### Changes

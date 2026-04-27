@@ -2330,7 +2330,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     if (behaviour is VRCAnimatorLayerControl layerControl)
                     {
-                        if (layerControl.layer <= errorMessages.Count && layerControl.playable == BlendableLayer.FX)
+                        if (layerControl.layer >= 0 && layerControl.layer < errorMessages.Count && layerControl.playable == BlendableLayer.FX)
                         {
                             errorMessages[layerControl.layer].Add($"layer control from {controller.name} {i} {layer.name}");
                         }
