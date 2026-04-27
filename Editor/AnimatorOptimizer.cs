@@ -27,6 +27,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<string> intsToChangeToFloat = new HashSet<string>();
         private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
         private bool isFxLayer = false;
+        private string mergedLayersParameter = "d4rkAvatarOptimizer_MergedLayers_Weight";
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source, string path)
         {
@@ -99,7 +100,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (layersToMerge.Count > 0 || constantCurvesToAdd.Count > 0)
                 {
                     var blendTreeDummyWeight = new AnimatorControllerParameter {
-                        name = "d4rkAvatarOptimizer_MergedLayers_Weight",
+                        name = mergedLayersParameter = target.MakeUniqueParameterName(mergedLayersParameter),
                         type = AnimatorControllerParameterType.Float,
                         defaultFloat = 1f,
                         defaultBool = true,
@@ -120,7 +121,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     AnimatorControllerLayer newL = CloneLayer(sourceLayers[i], i == 0);
                     newL.name = target.MakeUniqueLayerName(newL.name);
                     newL.stateMachine.name = newL.name;
-                    target.AddLayer(newL);
+                    using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
+                    {
+                        target.AddLayer(newL);
+                    }
                     if (newL.syncedLayerIndex >= 0)
                         syncedLayers.Add((layerIndex, sourceLayers[i]));
                     layerIndex++;
@@ -320,7 +324,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 layerMotion.name = sourceLayers[i].name;
                 motions.Add(new ChildMotion() {
                     motion = layerMotion,
-                    directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
+                    directBlendParameter = mergedLayersParameter,
                     timeScale = 1f
                 });
             }
@@ -339,7 +343,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 AddToAsset(layerMotion);
                 motions.Add(new ChildMotion() {
                     motion = layerMotion,
-                    directBlendParameter = "d4rkAvatarOptimizer_MergedLayers_Weight",
+                    directBlendParameter = mergedLayersParameter,
                     timeScale = 1f
                 });
             }
@@ -363,15 +367,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             };
             AddToAsset(stateMachine);
-            target.AddLayer(new AnimatorControllerLayer {
-                avatarMask = null,
-                blendingMode = AnimatorLayerBlendingMode.Override,
-                defaultWeight = 1f,
-                iKPass = false,
-                name = target.MakeUniqueLayerName("d4rkAvatarOptimizer_MergedLayers"),
-                syncedLayerAffectsTiming = false,
-                stateMachine = stateMachine
-            });
+            using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
+            {
+                target.AddLayer(new AnimatorControllerLayer {
+                    avatarMask = null,
+                    blendingMode = AnimatorLayerBlendingMode.Override,
+                    defaultWeight = 1f,
+                    iKPass = false,
+                    name = target.MakeUniqueLayerName("d4rkAvatarOptimizer_MergedLayers"),
+                    syncedLayerAffectsTiming = false,
+                    stateMachine = stateMachine
+                });
+            }
         }
 
         private AnimatorControllerLayer CloneLayer(AnimatorControllerLayer old, bool isFirstLayer = false)
