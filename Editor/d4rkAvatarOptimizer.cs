@@ -555,7 +555,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public static (string root, string name, string path) GetTrashBinLocation()
     {
         var assembly = typeof(d4rkAvatarOptimizer).Assembly;
-        var asmdefPath = CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(assembly.Location);
+        var asmdefPath = CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(assembly.GetName().FullName);
         var inPackageAsmdefPath = "/Editor/d4rkpl4y3r.d4rkavataroptimizer.Editor.asmdef";
         var packageInfo = PackageInfo.FindForAssembly(assembly);
         string trashBinRoot;
