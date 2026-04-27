@@ -1,4 +1,7 @@
 ## v4.3.6
+### Changes
+* Log file avatar stats now contain total unique animator parameters.
+
 ### Bug Fixes
 * Clear material property block after merging meshes.
   * This fixes inconsistencies between editor and in game.

@@ -727,16 +727,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         using var __ = log.IndentScope();
         var av = GetAvatarDescriptor();
         var components = av.GetComponentsInChildren<Component>(true).Where(c => c != null).GroupBy(c => c.GetType()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key.FullName).ToArray();
-        LogToFile($"- Total Component Types: {components.Length}");
+        LogToFile($"- Component Types: {components.Length}");
         foreach (var group in components)
         {
             LogToFile($"- {group.Key}: {group.Count()}", 1);
         }
         var renderers = components.Where(g => g.Key == typeof(MeshRenderer) || g.Key == typeof(SkinnedMeshRenderer)).SelectMany(g => g).Cast<Renderer>().ToArray();
         var skinnedMeshRenderers = components.Where(g => g.Key == typeof(SkinnedMeshRenderer)).SelectMany(g => g).Cast<SkinnedMeshRenderer>().ToArray();
-        LogToFile($"- Total Poly Count: {renderers.Sum(r => GetRendererPolyCount(r))}");
-        LogToFile($"- Total BlendShapes: {skinnedMeshRenderers.Sum(r => r.sharedMesh == null ? 0 : r.sharedMesh.blendShapeCount)}");
-        LogToFile($"- Total Unique Bones: {skinnedMeshRenderers.SelectMany(r => r.bones).Where(b => b != null).Distinct().Count()}");
+        LogToFile($"- Poly Count: {renderers.Sum(r => GetRendererPolyCount(r))}");
+        LogToFile($"- BlendShapes: {skinnedMeshRenderers.Sum(r => r.sharedMesh == null ? 0 : r.sharedMesh.blendShapeCount)}");
+        LogToFile($"- Unique Bones: {skinnedMeshRenderers.SelectMany(r => r.bones).Where(b => b != null).Distinct().Count()}");
         LogToFile($"- Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
 
         using (new Profiler.Section("LogAvatarStats() - Animator Analysis"))
@@ -744,6 +744,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var animatorControllers = GetAvDescriptorControllers();
             var animatorLayers = animatorControllers.SelectMany(c => c.layers).ToArray();
             LogToFile($"- Animator Layers: {animatorLayers.Length}");
+            var animatorParameters = animatorControllers.SelectMany(c => c.parameters)
+                .Select(p => p.name).Distinct().ToArray();
+            LogToFile($"- Unique Animator Parameters: {animatorParameters.Length}");
             static int CalculateBlendTreePerfRank(BlendTree tree)
             {
                 if (tree == null)
