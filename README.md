@@ -197,6 +197,7 @@ You can exclude certain parts of the model from all optimizations. Any Transform
 ## Create Optimized Copy
 Creates a copy of the avatar and performs the selected optimizations on the copy.
 Disables the original avatar so only the copy is active.  
+If the original avatar has no avatar id assigned it will get a new one assigned to it. This ensures that subsequent uploads all point to the same id.  
 None of the original assets will be changed so even if the optimizer fails your avatar is still safe!  
 It also deletes the assets from the previous optimized copy. You should never change the optimized copy, it is only intended to be tested/uploaded and then get deleted again.
 
