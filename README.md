@@ -2,10 +2,11 @@
 d4rkpl4y3r's VRChat avatar 3.0 optimizer that aims to reduce skinned mesh & material count.
 
 ## How to Use
-1. Add the d4rkAvatarOptimizer component to your avatar.
+1. Add the d4rkAvatarOptimizer component to your avatar. This can be on any transform.
 2. Upload the avatar to VRChat. The optimizations will be applied before upload automatically with the default settings.
 
-Alternatively you can click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes. That way you can test the optimized version in editor to validate it works properly before uploading it. If everything works correctly you can then upload that optimized copy.
+Alternatively you can click the "Create Optimized Copy" button to create a new avatar with optimized materials and meshes. That way you can test the optimized version in editor to validate it works properly before uploading it. If everything works correctly you can then upload that optimized copy.  
+This button is the old workflow and I recommend against using it as it can't work properly with nondestructive tooling such as VRCFury or ModularAvatar.
 
 ## Installation
 To install the optimizer with VCC you need to add the url `https://d4rkc0d3r.github.io/vpm-repos/main.json` as a custom repository.
@@ -28,6 +29,9 @@ After that you can add and update the optimizer like any other packages in your 
     * Check if your avatar doesn't show anything unwanted with shaders blocked  
 In-game, open the action menu (the round one) -> Options -> Avatar -> Fallback Shaders
   * If anything in-game looks off, fall back to the "Basic" preset
+
+If you want to look into more detail there is an extra document here: [For Advanced Users](./Documentation~/ForAdvancedUsers.md)  
+Also read the preset & individual option documentation below.
 
 ## Presets
 ### Basic
