@@ -31,7 +31,7 @@ In-game, open the action menu (the round one) -> Options -> Avatar -> Fallback S
 
 ## Presets
 ### Basic
-This preset only uses optimizations that don't affect the behavior of the avatar.
+This preset only uses optimizations that don't affect the behavior of the avatar [(some exceptions apply)](./Documentation~/ForAdvancedUsers.md#tradeoffs-of-the-basic-preset)
 * Removes unused components, blend shapes & bones from skinned meshes
 * Bakes non animated blend shapes into the mesh
 * Merges all skinned meshes that are always animated in the same way
