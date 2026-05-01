@@ -2073,8 +2073,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (OptimizeFXLayer && GetFXLayer() != null)
         {
             var nonErrors = new HashSet<string>() {"toggle", "motion time", "blend tree", "multi toggle"};
-            var errors = AnalyzeFXLayerMergeAbility();
+            var analysisResult = AnalyzeFXLayerMergeAbility();
             var uselessLayers = FindUselessFXLayers();
+            List<(int layerIndex, List<string> errors)> layersWithErrors = new();
             int currentLayer = 0;
             for (int i = 0; i < GetFXLayerLayers().Length; i++)
             {
@@ -2084,11 +2085,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     fxLayersToDestroy.Add(i);
                     continue;
                 }
-                if (errors[i].All(e => nonErrors.Contains(e)))
+                if (analysisResult[i].All(e => nonErrors.Contains(e)))
                 {
                     fxLayersToMerge.Add(i);
                     continue;
                 }
+                layersWithErrors.Add((i, analysisResult[i]));
                 currentLayer++;
             }
             if (fxLayersToMerge.Count < 2 && fxLayersToDestroy.Count == 0)
@@ -2097,20 +2099,33 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 fxLayerMap.Clear();
             }
             LogToFile($"Optimizing FX Layer with {GetFXLayerLayers().Length} original layers");
-            if (fxLayersToMerge.Count > 0)
-            {
-                LogToFile($"- Merging {fxLayersToMerge.Count} layers:", 1);
-                for (int i = 0; i < fxLayersToMerge.Count; i++)
-                {
-                    LogToFile($"- ({fxLayersToMerge[i]}) {GetFXLayerLayers()[fxLayersToMerge[i]].name}", 2);
-                }
-            }
+            using var _ = log.IndentScope();
             if (fxLayersToDestroy.Count > 0)
             {
-                LogToFile($"- Removing {fxLayersToDestroy.Count} layers:", 1);
-                for (int i = 0; i < fxLayersToDestroy.Count; i++)
+                LogToFile($"- Removing {fxLayersToDestroy.Count} layers:");
+                foreach (var layerIndex in fxLayersToDestroy)
                 {
-                    LogToFile($"- ({fxLayersToDestroy[i]}) {GetFXLayerLayers()[fxLayersToDestroy[i]].name}", 2);
+                    LogToFile($"- ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
+                }
+            }
+            if (fxLayersToMerge.Count > 0)
+            {
+                LogToFile($"- Merging {fxLayersToMerge.Count} layers:");
+                foreach (var layerIndex in fxLayersToMerge)
+                {
+                    LogToFile($"- ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
+                }
+            }
+            if (layersWithErrors.Count > 0)
+            {
+                LogToFile($"- Cannot optimize {layersWithErrors.Count} layers:");
+                foreach (var (layerIndex, errors) in layersWithErrors)
+                {
+                    LogToFile($"- {errors.Count} reasons in ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
+                    foreach (var error in errors)
+                    {
+                        LogToFile($"- {error}", 2);
+                    }
                 }
             }
         }

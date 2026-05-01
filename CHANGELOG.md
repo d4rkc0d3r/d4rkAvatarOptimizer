@@ -1,6 +1,8 @@
 ## v4.3.6
 ### Changes
-* Log file avatar stats now contain total unique animator parameters.
+* Log file:
+  * Avatar stats now contain total unique animator parameters.
+  * Fx layer optimization now also prints out the reasons for unmerged layers.
 
 ### Bug Fixes
 * Clear material property block after merging meshes.
