@@ -3,6 +3,7 @@
 * Log file:
   * Avatar stats now contain total unique animator parameters.
   * Fx layer optimization now also prints out the reasons for unmerged layers.
+  * Fx layer merged layers now also print their type of layer.
 
 ### Bug Fixes
 * Clear material property block after merging meshes.

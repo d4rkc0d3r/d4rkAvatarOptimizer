@@ -2113,7 +2113,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogToFile($"- Merging {fxLayersToMerge.Count} layers:");
                 foreach (var layerIndex in fxLayersToMerge)
                 {
-                    LogToFile($"- ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
+                    LogToFile($"- {analysisResult[layerIndex][0],-12} ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
                 }
             }
             if (layersWithErrors.Count > 0)
@@ -2121,7 +2121,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogToFile($"- Cannot optimize {layersWithErrors.Count} layers:");
                 foreach (var (layerIndex, errors) in layersWithErrors)
                 {
-                    LogToFile($"- {errors.Count} reasons in ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
+                    LogToFile($"- {errors.Count,-3} reasons in ({layerIndex}) {GetFXLayerLayers()[layerIndex].name}", 1);
                     foreach (var error in errors)
                     {
                         LogToFile($"- {error}", 2);
