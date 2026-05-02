@@ -2330,7 +2330,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var fxLayer = GetFXLayer();
         if (fxLayer == null)
             return new List<List<string>>();
-        var avDescriptor = GetAvatarDescriptor();
 
         var fxLayerLayers = GetFXLayerLayers();
         var errorMessages = fxLayerLayers.Select(layer => new List<string>()).ToList();
