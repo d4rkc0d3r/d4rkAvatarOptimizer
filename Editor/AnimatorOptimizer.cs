@@ -54,6 +54,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return optimizer.Run();
         }
 
+        public class Transition
+        {
+            public AnimatorState destinationState;
+            public AnimatorCondition[] conditions;
+            public bool mute;
+            public bool solo;
+            public float duration;
+            public bool hasExitTime;
+            public float exitTime;
+        }
+
+        public static List<Transition> GetNonEntryTransitions(AnimatorStateMachine sm)
+        {
+            List<Transition> transitions = new();
+            foreach (var t in sm.anyStateTransitions.Concat(sm.states.SelectMany(s => s.state.transitions)))
+            {
+                transitions.Add(new() {
+                    destinationState = t.isExit ? sm.defaultState : t.destinationState,
+                    conditions = t.conditions,
+                    mute = t.mute,
+                    solo = t.solo,
+                    duration = t.duration,
+                    hasExitTime = t.hasExitTime,
+                    exitTime = t.exitTime
+                });
+            }
+            return transitions;
+        }
+
         private void AddToAsset(Object o)
         {
             using var _ = new Profiler.Section("AnimatorOptimizer.AddToAsset()");
@@ -279,15 +308,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (IsNullOrEmpty(layerMotions[1]))
                         layerMotions[1] = CloneAndFlipCurves(layerMotions[0] as AnimationClip);
 
-                    var transitions = layer.anyStateTransitions.Concat(layerStates.SelectMany(x => x.state.transitions)).ToArray();
+                    var transitions = GetNonEntryTransitions(layer);
                     var singleIndex = transitions.Count(x => x.destinationState == layerStates[0].state) == 1 ? 0 : 1;
                     var andMotion = layerMotions[singleIndex];
                     var orMotion = layerMotions[1 - singleIndex];
                     foreach (var condition in transitions.First(c => c.destinationState == layerStates[singleIndex].state).conditions)
                     {
                         var innerTreeMotions = new ChildMotion[2] {
-                            new ChildMotion() { motion = orMotion },
-                            new ChildMotion() { motion = andMotion },
+                            new() { motion = orMotion },
+                            new() { motion = andMotion },
                         };
                         var param = source.parameters.FirstOrDefault(x => x.name == condition.parameter);
                         if (condition.mode == AnimatorConditionMode.IfNot)

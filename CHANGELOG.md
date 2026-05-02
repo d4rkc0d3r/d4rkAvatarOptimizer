@@ -1,6 +1,7 @@
 ## v4.4.0
 ### Features
 * Add support for negative speed toggles in the animator optimizer.
+* Add support for entry -> A -> B -> exit type toggles in the animator optimizer.
 
 ### Changes
 * Log file:

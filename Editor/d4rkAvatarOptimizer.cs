@@ -2411,6 +2411,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 errorMessages[i].Add($"has state machine behaviours");
                 continue;
             }
+            if (stateMachine.entryTransitions.Length > 0)
+            {
+                errorMessages[i].Add($"has extra entry transitions");
+                continue;
+            }
             if (layer.defaultWeight != 1)
             {
                 errorMessages[i].Add($"default weight {layer.defaultWeight}");
@@ -2509,59 +2514,43 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
 
             if (states.Length == 2) {
-                int singleTransitionStateIndex = Array.FindIndex(states, s => s.state.transitions.Length == 1);
-                bool usesAnyStateTransitions = false;
-                if (singleTransitionStateIndex == -1)
+                var allTransitions = AnimatorOptimizer.GetNonEntryTransitions(stateMachine);
+                var transitionDestinationIndices = allTransitions.Select(t => Array.FindIndex(states, s => s.state == t.destinationState)).ToList();
+                if (transitionDestinationIndices.Any(i => i < 0 || i >= states.Length))
                 {
-                    if (states.Sum(s => s.state.transitions.Length) > 0)
-                    {
-                        errorMessages[i].Add($"no single transition state");
-                        continue;
-                    }
-                    var anyStateTransitionDestinationIndices = stateMachine.anyStateTransitions.Select(t => Array.FindIndex(states, s => s.state == t.destinationState)).ToList();
-                    if (anyStateTransitionDestinationIndices.Any(i => i < 0 || i >= states.Length))
-                    {
-                        errorMessages[i].Add($"any state transition destination state is not in the states array");
-                        continue;
-                    }
-                    var state0transitions = anyStateTransitionDestinationIndices.Count(i => i == 0);
-                    var state1transitions = anyStateTransitionDestinationIndices.Count(i => i == 1);
-                    if (state0transitions != 1 && state1transitions != 1)
-                    {
-                        errorMessages[i].Add($"no single transition state");
-                        continue;
-                    }
-                    singleTransitionStateIndex = state0transitions == 1 ? 1 : 0;
-                    usesAnyStateTransitions = true;
-                }
-                else if (stateMachine.anyStateTransitions.Length != 0)
-                {
-                    errorMessages[i].Add($"has any state transitions");
+                    errorMessages[i].Add($"a transition destination state is not in the states array");
                     continue;
                 }
+                var state0transitions = transitionDestinationIndices.Count(i => i == 0);
+                var state1transitions = transitionDestinationIndices.Count(i => i == 1);
+                if (state0transitions != 1 && state1transitions != 1)
+                {
+                    errorMessages[i].Add($"no single transition state");
+                    continue;
+                }
+                var singleTransitionStateIndex = state0transitions == 1 ? 1 : 0;
                 var orState = states[singleTransitionStateIndex].state;
                 var andState = states[1 - singleTransitionStateIndex].state;
-                AnimatorStateTransition[] orStateTransitions = orState.transitions;
-                AnimatorStateTransition[] andStateTransitions = andState.transitions;
-                if (usesAnyStateTransitions)
-                {
-                    orStateTransitions = stateMachine.anyStateTransitions.Where(t => t.destinationState == andState).ToArray();
-                    andStateTransitions = stateMachine.anyStateTransitions.Where(t => t.destinationState == orState).ToArray();
-                }
+                var orStateTransitions = allTransitions.Where(t => t.destinationState == andState).ToArray();
+                var andStateTransitions = allTransitions.Where(t => t.destinationState == orState).ToArray();
                 var stateTransitions = singleTransitionStateIndex == 0
-                    ? new AnimatorStateTransition[][] { orStateTransitions, andStateTransitions }
-                    : new AnimatorStateTransition[][] { andStateTransitions, orStateTransitions };
+                    ? new [] { orStateTransitions, andStateTransitions }
+                    : new [] { andStateTransitions, orStateTransitions };
                 if (orStateTransitions[0].conditions.Length != andStateTransitions.Length)
                 {
-                    errorMessages[i].Add($"or state has {orStateTransitions[0].conditions.Length} conditions but and state has {andStateTransitions.Length} transitions");
+                    errorMessages[i].Add($"OR state has {orStateTransitions[0].conditions.Length} conditions but AND state has {andStateTransitions.Length} transitions");
                     continue;
                 }
                 if (andStateTransitions.Length == 0) {
-                    errorMessages[i].Add($"and state has no transitions");
+                    errorMessages[i].Add($"AND state has no transitions");
                     continue;
                 }
                 if (andStateTransitions.Any(t => t.conditions.Length != 1)) {
-                    errorMessages[i].Add($"a and state transition has multiple conditions");
+                    errorMessages[i].Add($"a AND state transition has multiple conditions");
+                    continue;
+                }
+                if (allTransitions.Any(t => t.mute || t.solo)) {
+                    errorMessages[i].Add($"has a mute or solo transition");
                     continue;
                 }
                 bool conditionError = false;
