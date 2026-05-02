@@ -2,6 +2,13 @@
 ### Features
 * Add support for negative speed toggles in the animator optimizer.
 
+### Changes
+* Log file:
+  * Show all phys bone dependencies when using `Disable Phys Bones When Unused`.
+
+### Bug Fixes
+* Fix `Disable Phys Bones When Unused` not working properly because it counted `VRC.Dynamics.ParentChangeDetector` as dependencies.
+
 ## v4.3.6
 ### Changes
 * Log file:

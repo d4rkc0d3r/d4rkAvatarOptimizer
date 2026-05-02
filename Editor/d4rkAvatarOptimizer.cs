@@ -3082,6 +3082,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             "UnityEngine.Transform",
             "nadena.dev.ndmf.multiplatform.components.PortableDynamicBone",
             "nadena.dev.ndmf.multiplatform.components.PortableDynamicBoneCollider",
+            "VRC.Dynamics.ParentChangeDetector",
         };
 
         foreach (var physBone in physBones)
@@ -3111,9 +3112,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             dependencies.RemoveWhere(o => o == null);
         }
+        if (physBoneDependencies.Count > 0)
+        {
+            LogToFile($"PhysBone dependencies:");
+        }
         foreach ((var physBone, var dependencies) in physBoneDependencies)
         {
-            if (physBone != null && dependencies.Count(o => !(o is AnimatorController)) == 1 && dependencies.First(o => !(o is AnimatorController)) is SkinnedMeshRenderer target)
+            if (physBone == null)
+                continue;
+            if (dependencies.Count(o => !(o is AnimatorController)) == 1 && dependencies.First(o => !(o is AnimatorController)) is SkinnedMeshRenderer target)
             {
                 var targetPath = GetPathToRoot(target);
                 if (!result.TryGetValue(targetPath, out var physBonePaths))
@@ -3121,6 +3128,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     result[targetPath] = physBonePaths = new List<string>();
                 }
                 physBonePaths.Add(GetPathToRoot(physBone));
+                continue;
+            }
+            LogToFile($"- '{GetPathToRoot(physBone)}' has {dependencies.Count} dependencies:", 1);
+            foreach (var dependency in dependencies)
+            {
+                LogToFile($"- {dependency.GetType().Name}: '{dependency.name}'", 2);
             }
         }
         if (result.Count > 0)
