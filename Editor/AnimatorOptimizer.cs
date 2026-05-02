@@ -214,7 +214,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             var motionTimeSampleCount = AvatarOptimizerSettings.MotionTimeApproximationSampleCount;
             var motionTimeSamplePoints = Enumerable.Range(0, motionTimeSampleCount).Select(x => (float)x / (motionTimeSampleCount - 1)).ToArray();
-            Motion ConvertStateToMotion(AnimatorState s) {
+            Motion ConvertStateToMotion(AnimatorState s, bool negativeSpeedToggle) {
                 if (s.motion is BlendTree tree) {
                     return CloneBlendTree(null, tree);
                 } else if (s.motion is AnimationClip clip) {
@@ -222,6 +222,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         .Select(binding => (AnimationUtility.GetEditorCurve(clip, binding), binding.propertyName.Contains("localEulerAngles"))).ToArray();
                     var keys = curves.SelectMany(x => x.curve.keys.Select(k => k.time)).Distinct().ToArray();
                     float maxKeyframeTime = keys.Length > 0 ? keys.Max() : 0;
+                    if (negativeSpeedToggle) {
+                        return CloneFromTime(clip, s.speed > 0 ? maxKeyframeTime : 0, clip.name);
+                    }
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
                         return CloneFromTime(clip, 0, clip.name);
                     }
@@ -268,8 +271,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var layer = sourceLayers[i].stateMachine;
                 var layerStates = layer.states;
                 Motion layerMotion = null;
+                bool negativeSpeedToggle = layerStates.Length == 2 && layerStates.Any(s => s.state.speed < 0);
                 if (layerStates.Length == 2) {
-                    var layerMotions = layerStates.Select(x => ConvertStateToMotion(x.state)).ToArray();
+                    var layerMotions = layerStates.Select(x => ConvertStateToMotion(x.state, negativeSpeedToggle)).ToArray();
                     if (IsNullOrEmpty(layerMotions[0]))
                         layerMotions[0] = CloneAndFlipCurves(layerMotions[1] as AnimationClip);
                     if (IsNullOrEmpty(layerMotions[1]))
@@ -315,10 +319,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     layerMotion = andMotion;
                 } else if (layerStates.Length == 1) {
-                    layerMotion = ConvertStateToMotion(layerStates[0].state);
+                    layerMotion = ConvertStateToMotion(layerStates[0].state, negativeSpeedToggle);
                 } else {
                     var transitions = layer.anyStateTransitions.OrderBy(x => x.conditions[0].threshold).ToArray();
-                    var layerMotions = transitions.Select(x => ConvertStateToMotion(x.destinationState)).ToArray();
+                    var layerMotions = transitions.Select(x => ConvertStateToMotion(x.destinationState, negativeSpeedToggle)).ToArray();
                     layerMotion = CreateBlendTree(transitions[0].conditions[0].parameter, layerMotions.Select((x, index) => new ChildMotion() { motion = x, threshold = index}).ToArray());
                 }
                 layerMotion.name = sourceLayers[i].name;

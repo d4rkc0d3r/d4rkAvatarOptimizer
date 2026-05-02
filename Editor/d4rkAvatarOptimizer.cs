@@ -2470,6 +2470,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 errorMessages[i].Add($"{state.name} is not null, animation clip or blend tree ???");
                 return false;
             }
+            bool DoesClipHaveExactlyTwoKeyframes(AnimatorState state) {
+                if (state.motion is AnimationClip clip) {
+                    var bindings = AnimationUtility.GetCurveBindings(clip);
+                    float secondKeyframeTime = 0;
+                    foreach (var binding in bindings) {
+                        var keys = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                        foreach (var key in keys) {
+                            if (key.time == 0)
+                                continue;
+                            if (secondKeyframeTime == 0) {
+                                secondKeyframeTime = key.time;
+                            } else if (key.time != secondKeyframeTime) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
 
             HashSet<EditorCurveBinding> GetAllMotionBindings(AnimatorState state) {
                 return new HashSet<EditorCurveBinding>(state.motion.EnumerateAllClips().SelectMany(c => AnimationUtility.GetCurveBindings(c)));
@@ -2612,6 +2632,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                             reliesOnWriteDefaults = true;
                         }
                         continue;
+                    } else if (state.motion == otherState.motion) {
+                        if (state.motion is AnimationClip clip) {
+                            if (!DoesClipHaveExactlyTwoKeyframes(state)) {
+                                errorMessages[i].Add($"both states use the same motion but it doesn't have exactly 2 keyframes");
+                                break;
+                            }
+                            if (states.Any(s => s.state.speedParameterActive || s.state.timeParameterActive)) {
+                                errorMessages[i].Add($"both states use the same motion but at least one state has speed or time parameter active");
+                                break;
+                            }
+                            if (!((state.speed > 0 && otherState.speed < 0) || (state.speed < 0 && otherState.speed > 0))) {
+                                errorMessages[i].Add($"both states use the same motion but neither has negative speed");
+                                break;
+                            }
+                        } else {
+                            errorMessages[i].Add($"both states use the same motion but it's not an animation clip");
+                            break;
+                        }
                     } else if (!IsStateConvertableToAnimationOrBlendTree(state)) {
                         break;
                     }

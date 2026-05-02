@@ -1,3 +1,7 @@
+## v4.4.0
+### Features
+* Add support for negative speed toggles in the animator optimizer.
+
 ## v4.3.6
 ### Changes
 * Log file:
