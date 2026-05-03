@@ -11,6 +11,7 @@
 * Fix `Disable Phys Bones When Unused` not working properly because it counted `VRC.Dynamics.ParentChangeDetector` as dependencies.
 * Fix Shader Toggle default values not getting set correctly.
   * This was caused by last version's material property block clear being to early in the optimization process.
+* Fix renderers getting combined when their component and game object get animated separately.
 
 ## v4.3.6
 ### Changes

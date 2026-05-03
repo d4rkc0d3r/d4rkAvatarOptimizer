@@ -1007,6 +1007,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (candidate.TryGetComponent(out Cloth cloth))
             return false;
+        if (FindAllPathsWithUnsafeRendererAndGameObjectToggles().Contains(GetPathToRoot(candidate)))
+            return false;
         if (candidate is MeshRenderer && (candidate.gameObject.layer == 12 || !MergeStaticMeshesAsSkinned))
             return false;
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
@@ -1215,6 +1217,73 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation;
     }
 
+    private static bool AnimationCurvesHaveSameKeys(AnimationCurve a, AnimationCurve b)
+    {
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a == null || b == null)
+            return false;
+        var aKeys = a.keys;
+        var bKeys = b.keys;
+        if (aKeys.Length != bKeys.Length)
+            return false;
+        for (int i = 0; i < aKeys.Length; ++i)
+        {
+            if (aKeys[i].value != bKeys[i].value || aKeys[i].time != bKeys[i].time)
+                return false;
+        }
+        return true;
+    }
+
+    private HashSet<string> cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles = null;
+    private HashSet<string> FindAllPathsWithUnsafeRendererAndGameObjectToggles()
+    {
+        if (cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles != null)
+            return cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles;
+        var unsafePaths = new HashSet<string>();
+        var pathsWithGameObjectToggle = new HashSet<string>();
+        var pathsWithRendererToggle = new HashSet<string>();
+        foreach (var clip in GetAllUsedAnimationClips())
+        {
+            var gameObjectBindings = new Dictionary<string, EditorCurveBinding>();
+            var rendererBindings = new Dictionary<string, EditorCurveBinding>();
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive")
+                {
+                    gameObjectBindings[binding.path] = binding;
+                    pathsWithGameObjectToggle.Add(binding.path);
+                }
+                else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled")
+                {
+                    rendererBindings[binding.path] = binding;
+                    pathsWithRendererToggle.Add(binding.path);
+                }
+            }
+            foreach (var path in gameObjectBindings.Keys)
+            {
+                if (!rendererBindings.ContainsKey(path))
+                    unsafePaths.Add(path);
+            }
+            foreach (var path in rendererBindings.Keys)
+            {
+                if (!gameObjectBindings.ContainsKey(path))
+                    unsafePaths.Add(path);
+            }
+            foreach (var path in gameObjectBindings.Keys)
+            {
+                if (!rendererBindings.TryGetValue(path, out var rendererBinding))
+                    continue;
+                var gameObjectCurve = AnimationUtility.GetEditorCurve(clip, gameObjectBindings[path]);
+                var rendererCurve = AnimationUtility.GetEditorCurve(clip, rendererBinding);
+                if (!AnimationCurvesHaveSameKeys(gameObjectCurve, rendererCurve))
+                    unsafePaths.Add(path);
+            }
+        }
+        unsafePaths.RemoveWhere(path => !pathsWithGameObjectToggle.Contains(path) || !pathsWithRendererToggle.Contains(path));
+        return cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles = unsafePaths;
+    }
+
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
     private bool? cache_withNaNimation = null;
     private Dictionary<(Renderer, Renderer), bool> cache_RendererHaveSameAnimationCurves = null;
@@ -1338,13 +1407,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
                 var curve = AnimationUtility.GetEditorCurve(clip, binding);
                 var otherCurve = AnimationUtility.GetEditorCurve(clip, otherBinding);
-                if (curve.keys.Length != otherCurve.keys.Length)
+                if (!AnimationCurvesHaveSameKeys(curve, otherCurve))
                     return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
-                for (int i = 0; i < curve.keys.Length; ++i)
-                {
-                    if (curve.keys[i].value != otherCurve.keys[i].value || curve.keys[i].time != otherCurve.keys[i].time)
-                        return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
-                }
             }
         }
         return cache_RendererHaveSameAnimationCurves[(a, b)] = true;
