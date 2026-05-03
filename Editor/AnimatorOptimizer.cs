@@ -300,7 +300,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var layer = sourceLayers[i].stateMachine;
                 var layerStates = layer.states;
                 Motion layerMotion = null;
-                bool negativeSpeedToggle = layerStates.Length == 2 && layerStates.Any(s => s.state.speed < 0);
+                bool negativeSpeedToggle = layerStates.Length == 2
+                    && layerStates.Any(s => s.state.speed < 0)
+                    && layerStates[0].state.motion == layerStates[1].state.motion;
                 if (layerStates.Length == 2) {
                     var layerMotions = layerStates.Select(x => ConvertStateToMotion(x.state, negativeSpeedToggle)).ToArray();
                     if (IsNullOrEmpty(layerMotions[0]))

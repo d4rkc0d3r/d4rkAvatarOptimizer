@@ -2538,25 +2538,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 errorMessages[i].Add($"{state.name} is not null, animation clip or blend tree ???");
                 return false;
             }
-            bool DoesClipHaveExactlyTwoKeyframes(AnimatorState state) {
-                if (state.motion is AnimationClip clip) {
-                    var bindings = AnimationUtility.GetCurveBindings(clip);
-                    float secondKeyframeTime = 0;
-                    foreach (var binding in bindings) {
-                        var keys = AnimationUtility.GetEditorCurve(clip, binding).keys;
-                        foreach (var key in keys) {
-                            if (key.time == 0)
-                                continue;
-                            if (secondKeyframeTime == 0) {
-                                secondKeyframeTime = key.time;
-                            } else if (key.time != secondKeyframeTime) {
-                                return false;
-                            }
+            bool DoesClipHaveExactlyTwoKeyframes(AnimationClip clip) {
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                float secondKeyframeTime = 0;
+                foreach (var binding in bindings) {
+                    var keys = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                    foreach (var key in keys) {
+                        if (key.time == 0)
+                            continue;
+                        if (secondKeyframeTime == 0) {
+                            secondKeyframeTime = key.time;
+                        } else if (key.time != secondKeyframeTime) {
+                            return false;
                         }
                     }
-                    return true;
                 }
-                return false;
+                return true;
             }
 
             HashSet<EditorCurveBinding> GetAllMotionBindings(AnimatorState state) {
@@ -2686,7 +2683,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         continue;
                     } else if (state.motion == otherState.motion) {
                         if (state.motion is AnimationClip clip) {
-                            if (!DoesClipHaveExactlyTwoKeyframes(state)) {
+                            if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Any()) {
+                                errorMessages[i].Add($"both states use the same motion but it has object reference curves");
+                                break;
+                            }
+                            if (!DoesClipHaveExactlyTwoKeyframes(clip)) {
                                 errorMessages[i].Add($"both states use the same motion but it doesn't have exactly 2 keyframes");
                                 break;
                             }
