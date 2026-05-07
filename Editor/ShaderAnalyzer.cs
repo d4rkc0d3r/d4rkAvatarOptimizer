@@ -1981,8 +1981,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             output.Add("struct " + name + "Wrapper");
             output.Add("{");
-            if (addMeshMaterialID)
-                output.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
             foreach (var line in funcParams)
             {
                 if (line.StartsWithSimple("#"))
@@ -2005,6 +2003,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add($"// raw line: {line}");
                 }
             }
+            if (addMeshMaterialID)
+                output.Add("uint d4rkAvatarOptimizer_MeshMaterialID : d4rkAvatarOptimizer_MeshMaterialID;");
             output.Add("};");
         }
         
