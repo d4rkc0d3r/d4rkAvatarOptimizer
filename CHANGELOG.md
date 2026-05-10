@@ -2,6 +2,8 @@
 ### Changes
 * Shader Analyzer Debugger:
   * Error and unmergable shaders now get grouped by their message.
+  * Each warning/error message group is now a foldout.
+  * Remove mismatched curly brace section as this is a regular parse error anyways.
 
 ## v4.4.0
 ### Features

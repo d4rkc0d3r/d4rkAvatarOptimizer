@@ -25,7 +25,6 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
     private DefaultAsset folder = null;
     private List<Shader> shaders = null;
-    private bool showMismatchedCurlyBraces = true;
     private bool showParseErrors = true;
     private bool groupParseErrorsByError = true;
     private bool showUnmergable = true;
@@ -161,16 +160,6 @@ public class ShaderAnalyzerDebugger : EditorWindow
             if (lastTime == 0)
                 lastTime = timer.ElapsedMilliseconds;
             EditorGUILayout.LabelField("Last Parse Time: " + lastTime + "ms");
-            var mismatchedCurlyBraces = parsedShaders.Where(s => s.mismatchedCurlyBraces).ToList();
-            if (Foldout(ref showMismatchedCurlyBraces, $"Mismatched Curly Braces ({mismatchedCurlyBraces.Count})"))
-            {
-                EditorGUI.indentLevel++;
-                foreach (var shader in mismatchedCurlyBraces)
-                {
-                    EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
-                }
-                EditorGUI.indentLevel--;
-            }
             var parseErrors = parsedShaders.Where(s => !s.parsedCorrectly).ToList();
             void ShowShaderWithLabel(ParsedShader s, string label)
             {
