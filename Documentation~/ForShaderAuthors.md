@@ -156,3 +156,24 @@ In this example, the entire outline pass will be excluded from the optimized sha
 Unlike in Poiyomi ifex, here it automatically also checks whether the value is animated or comes from `Merge Different Property Materials`. In those cases, all comparisons to values will return false, because the value could differ at runtime.
 
 So for the example above, we need to tell the optimizer that the property must be constant.
+
+## Negative examples from real shaders
+Here I'll list some extra examples on what not to do for optimizer compatibility.
+
+```c
+// issue is that the function declaration is broken up by macros
+// optimizer failed to see the Fragment function and couldn't handle passing along the mesh/material ID
+// fix was to just always do float4 Fragment(...) : SV_Target and simply return 0 in the shadow caster pass
+#ifdef UNITY_PASS_SHADOWCASTER
+    void
+#else
+    float4
+#endif
+Fragment(FragmentData i, bool facing: SV_IsFrontFace)
+#ifndef UNITY_PASS_SHADOWCASTER
+    : SV_TARGET
+#endif
+{
+    // [...]
+}
+```
