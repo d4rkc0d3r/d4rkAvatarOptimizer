@@ -27,7 +27,9 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private List<Shader> shaders = null;
     private bool showMismatchedCurlyBraces = true;
     private bool showParseErrors = true;
+    private bool groupParseErrorsByError = true;
     private bool showUnmergable = true;
+    private bool groupUnmergableByReason = true;
     private bool showCustomTextureDeclarations = true;
     private bool showMultiIncludeFiles = true;
     private bool showWarningShaders = true;
@@ -35,6 +37,7 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool showErrorLess = true;
     private Vector2 scrollPos;
     private string propertyFilter = "";
+    private readonly Dictionary<string, bool> groupFoldoutStates = new Dictionary<string, bool>();
 
     [MenuItem("Tools/d4rkpl4y3r/Shader Analyzer Debugger")]
     static void Init()
@@ -45,6 +48,16 @@ public class ShaderAnalyzerDebugger : EditorWindow
     private bool Foldout(ref bool property, string name)
     {
         return property = EditorGUILayout.Foldout(property, name, true);
+    }
+
+    private bool GroupFoldout(string key, string name, bool defaultValue = true)
+    {
+        if (!groupFoldoutStates.TryGetValue(key, out var isOpen))
+            isOpen = defaultValue;
+
+        isOpen = EditorGUILayout.Foldout(isOpen, name, true);
+        groupFoldoutStates[key] = isOpen;
+        return isOpen;
     }
 
     private bool ObjectField<T>(ref T obj, string label, bool allowSceneObjects = false) where T : Object
@@ -173,9 +186,33 @@ public class ShaderAnalyzerDebugger : EditorWindow
             if (Foldout(ref showParseErrors, $"Parse Errors ({parseErrors.Count})"))
             {
                 EditorGUI.indentLevel++;
-                foreach (var shader in parseErrors)
+                groupParseErrorsByError = EditorGUILayout.ToggleLeft("Group by error", groupParseErrorsByError);
+
+                if (groupParseErrorsByError)
                 {
-                    ShowShaderWithLabel(shader, shader.errorMessage);
+                    var shadersByError = parseErrors
+                        .GroupBy(shader => shader.errorMessage)
+                        .OrderBy(group => group.Key);
+
+                    foreach (var errorGroup in shadersByError)
+                    {
+                        if (GroupFoldout($"parse-error:{errorGroup.Key}", $"{errorGroup.Key} ({errorGroup.Count()})"))
+                        {
+                            EditorGUI.indentLevel++;
+                            foreach (var shader in errorGroup)
+                            {
+                                EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                            }
+                            EditorGUI.indentLevel--;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var shader in parseErrors)
+                    {
+                        ShowShaderWithLabel(shader, shader.errorMessage);
+                    }
                 }
                 EditorGUI.indentLevel--;
             }
@@ -183,9 +220,33 @@ public class ShaderAnalyzerDebugger : EditorWindow
             if (Foldout(ref showUnmergable, $"Unmergable ({unmergable.Count})"))
             {
                 EditorGUI.indentLevel++;
-                foreach (var shader in unmergable)
+                groupUnmergableByReason = EditorGUILayout.ToggleLeft("Group by reason", groupUnmergableByReason);
+
+                if (groupUnmergableByReason)
                 {
-                    ShowShaderWithLabel(shader, shader.CantMergeReason());
+                    var shadersByReason = unmergable
+                        .GroupBy(shader => shader.CantMergeReason())
+                        .OrderBy(group => group.Key);
+
+                    foreach (var reasonGroup in shadersByReason)
+                    {
+                        if (GroupFoldout($"unmergable:{reasonGroup.Key}", $"{reasonGroup.Key} ({reasonGroup.Count()})"))
+                        {
+                            EditorGUI.indentLevel++;
+                            foreach (var shader in reasonGroup)
+                            {
+                                EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                            }
+                            EditorGUI.indentLevel--;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var shader in unmergable)
+                    {
+                        ShowShaderWithLabel(shader, shader.CantMergeReason());
+                    }
                 }
                 EditorGUI.indentLevel--;
             }
@@ -237,13 +298,15 @@ public class ShaderAnalyzerDebugger : EditorWindow
 
                     foreach (var warningGroup in shadersByWarning)
                     {
-                        EditorGUILayout.LabelField($"{warningGroup.Key} ({warningGroup.Count()})");
-                        EditorGUI.indentLevel++;
-                        foreach (var shader in warningGroup.Select(x => x.shader).Distinct())
+                        if (GroupFoldout($"warning:{warningGroup.Key}", $"{warningGroup.Key} ({warningGroup.Count()})"))
                         {
-                            EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                            EditorGUI.indentLevel++;
+                            foreach (var shader in warningGroup.Select(x => x.shader).Distinct())
+                            {
+                                EditorGUILayout.ObjectField(Shader.Find(shader.name), typeof(Shader), false);
+                            }
+                            EditorGUI.indentLevel--;
                         }
-                        EditorGUI.indentLevel--;
                     }
                 }
                 else

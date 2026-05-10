@@ -1,3 +1,8 @@
+## v4.4.1
+### Changes
+* Shader Analyzer Debugger:
+  * Error and unmergable shaders now get grouped by their message.
+
 ## v4.4.0
 ### Features
 * Add support for negative speed toggles in the animator optimizer.
