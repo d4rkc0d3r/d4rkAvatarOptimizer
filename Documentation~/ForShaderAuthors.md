@@ -1,6 +1,6 @@
 # Guidelines for Shader Authors
 
-This document outlines a few things shader authors should consider if they want their shaders to be compatible with **d4rkAvatarOptimizer**.
+This document outlines a few things shader authors should consider if they want their shaders to be compatible with d4rkAvatarOptimizer.
 
 ## Generally unsupported features (detected)
 These features are unsupported and are detected by the analyzer, which will mark the shader as incompatible:
@@ -18,8 +18,8 @@ Items in this section may not get caught by the shader analyzer. This can result
 In general, try to avoid using preprocessor macros as much as possible. They can hide critical code structure from the parser.
 
 ### Property declarations
-In particular, avoid hiding property declarations behind macros—this *will* break when writing properties as static values.  
-For example, do **not** do this:
+In particular, avoid hiding property declarations behind macros. This will break when writing properties as static values.  
+For example, do not do this:
 
 ```c
 // VERY BAD, DO NOT DO THIS
@@ -63,7 +63,7 @@ Other critical places include the structs for vertex data and the vertex/geometr
 
 As with property declarations, do not hide vertex data struct member declarations behind macros. Also do not hide vertex or fragment function parameters behind macros. Using `#ifdef` blocks inside the struct/parameter list is fine.
 
-For example, do **not** do this:
+For example, do not do this:
 
 ```c
 // VERY BAD, DO NOT DO THIS
@@ -111,7 +111,7 @@ float4 frag(VS_OUT input
 ## Marking shaders as incompatible
 If your shader is not compatible with d4rkAvatarOptimizer, you can explicitly mark it as incompatible by adding the comment `//d4rkAO:incompatible_shader` anywhere in the shader code. This prevents d4rkAvatarOptimizer from attempting to optimize materials using this shader.
 
-As with other incompatible shaders, this means **Write Properties as Static Values** will not run for those shaders, and therefore the features **Shader Toggles** and **Merge Different Property Materials** will not work either. All other optimizations will still apply.
+As with other incompatible shaders, this means `Write Properties as Static Values` will not run for those shaders, and therefore the features `Shader Toggles` and `Merge Different Property Materials` will not work either. All other optimizations will still apply.
 
 ## Requiring constant properties
 If your shader has properties that must remain constant for it to function correctly, you can mark these properties as required constants by adding the comment `//d4rkAO:require_constant(_PropertyName)`.
@@ -153,6 +153,6 @@ Pass
 
 In this example, the entire outline pass will be excluded from the optimized shader if the property `_EnableOutlines` is not set to `1` (true) on the material.
 
-Unlike in Poiyomi ifex, **Ifex** here automatically also checks whether the value is animated or comes from **Merge Different Property Materials**. In those cases, all comparisons to values will return false, because the value could differ at runtime.
+Unlike in Poiyomi ifex, here it automatically also checks whether the value is animated or comes from `Merge Different Property Materials`. In those cases, all comparisons to values will return false, because the value could differ at runtime.
 
 So for the example above, we need to tell the optimizer that the property must be constant.
