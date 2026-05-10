@@ -1,5 +1,4 @@
 ﻿#if UNITY_EDITOR
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -13,7 +12,6 @@ using System.Threading.Tasks;
 using d4rkpl4y3r.AvatarOptimizer.Util;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using System.Security.Cryptography;
-using System.Configuration;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
@@ -106,6 +104,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public string name;
         public string filePath;
         public bool parsedCorrectly = false;
+        public bool couldFindAllVertexGeomFragmentFunctions = true;
         public string errorMessage = "";
         public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new();
@@ -134,6 +133,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return false;
             if (hasDisableBatchingTag)
                 return false;
+            if (!couldFindAllVertexGeomFragmentFunctions)
+                return false;
             return true;
         }
 
@@ -145,6 +146,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return "Shader has a pass with tessellation.";
             if (hasDisableBatchingTag)
                 return "Shader has DisableBatching set to true.";
+            if (!couldFindAllVertexGeomFragmentFunctions)
+                return "Optimizer could not find all vertex/geometry/fragment functions.";
             return "";
         }
 
@@ -153,8 +156,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (!CanMerge())
                 return false;
             if (customTextureDeclarations.Count > 0)
-                return false;
-            if (mismatchedCurlyBraces)
                 return false;
             return true;
         }
@@ -165,8 +166,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return CantMergeReason();
             if (customTextureDeclarations.Count > 0)
                 return "Shader has custom texture declaration macros.";
-            if (mismatchedCurlyBraces)
-                return "Shader has mismatched curly braces.";
             return "";
         }
     }
@@ -1158,22 +1157,32 @@ namespace d4rkpl4y3r.AvatarOptimizer
             ParsedShader.Function func;
             switch (pragmaName) {
                 case "vertex":
+                    if (pass.vertex != null && pass.vertex.name != nextIdentifier)
+                        throw new ParserException($"Multiple vertex pragmas in the same pass with different function names: '{pass.vertex.name}' and '{nextIdentifier}'.");
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.vertex = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
                 case "hull":
+                    if (pass.hull != null && pass.hull.name != nextIdentifier)
+                        throw new ParserException($"Multiple hull pragmas in the same pass with different function names: '{pass.hull.name}' and '{nextIdentifier}'.");
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.hull = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
                 case "domain":
+                    if (pass.domain != null && pass.domain.name != nextIdentifier)
+                        throw new ParserException($"Multiple domain pragmas in the same pass with different function names: '{pass.domain.name}' and '{nextIdentifier}'.");
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.domain = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
                 case "geometry":
+                    if (pass.geometry != null && pass.geometry.name != nextIdentifier)
+                        throw new ParserException($"Multiple geometry pragmas in the same pass with different function names: '{pass.geometry.name}' and '{nextIdentifier}'.");
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.geometry = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
                 case "fragment":
+                    if (pass.fragment != null && pass.fragment.name != nextIdentifier)
+                        throw new ParserException($"Multiple fragment pragmas in the same pass with different function names: '{pass.fragment.name}' and '{nextIdentifier}'.");
                     parsedShader.functions.TryGetValue(nextIdentifier, out func);
                     pass.fragment = func ?? new ParsedShader.Function() { name = nextIdentifier };
                     break;
@@ -1620,13 +1629,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 throw new ParserException("Mismatched curly braces.");
             }
-            if (parsedShader.passes.Any(p => p.vertex == null || p.fragment == null))
-            {
-                throw new ParserException("A pass is missing a vertex or fragment shader.");
-            }
             if (parsedShader.passes.Count == 0)
             {
                 throw new ParserException("No passes found.");
+            }
+            foreach ((var pass, int index) in parsedShader.passes.Select((p, i) => (p, i)))
+            {
+                if (pass.tags.TryGetValue("LightMode", out var lightMode) && lightMode == "Meta")
+                    continue;
+                if (pass.vertex == null)
+                    throw new ParserException($"Could not find vertex pragma in pass {index}.");
+                if (pass.fragment == null)
+                    throw new ParserException($"Could not find fragment pragma in pass {index}.");
+                foreach (var func in new[] { pass.vertex, pass.geometry, pass.fragment })
+                {
+                    if (func == null || func.parameters.Count > 0)
+                        continue;
+                    parsedShader.parserWarnings.Add($"The {func.name} function in pass {index} could not be found but is declared by a pragma.");
+                    parsedShader.couldFindAllVertexGeomFragmentFunctions = false;
+                }
             }
         }
     }

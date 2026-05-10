@@ -1,9 +1,13 @@
 ## v4.4.1
 ### Changes
+* Shader Analyzer:
+  * More strictly validates pass pragmas and now reports which pass is missing a vertex or fragment pragma.
+  * Shaders where a pragma references a vertex/geometry/fragment function that could not be found are now treated as unmergable instead of silently continuing.
+  * Multiple pragmas of the same type in a pass now throw a parse error if they reference different functions.
 * Shader Analyzer Debugger:
-  * Error and unmergable shaders now get grouped by their message.
-  * Each warning/error message group is now a foldout.
-  * Remove mismatched curly brace section as this is a regular parse error anyways.
+  * Parse errors and unmergable shaders can now be grouped by their message.
+  * Each warning/error message group is now shown in a foldout.
+  * Remove mismatched curly brace section as this is now handled as a regular parse error.
 
 ## v4.4.0
 ### Features
