@@ -6162,8 +6162,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             targetRenderer.probeAnchor = targetProbeAnchor;
             targetRenderer.sharedMesh = combinedMesh;
             targetRenderer.sharedMaterials = materials;
-            targetRenderer.bones = targetBones.ToArray();
-            targetRenderer.localBounds = targetBounds;
 
             foreach (var blendShape in blendShapeWeights)
             {
@@ -6188,8 +6186,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     subContainer.transform.parent = go.transform;
                     subContainer.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
                     subContainer.transform.localScale = Vector3.one;
-                    subContainer.SetActive(targetRenderer.gameObject.activeSelf);
+                    subContainer.SetActive(go.activeSelf);
                     transformFromOldPath[GetPathToRoot(go)] = subContainer.transform;
+
+                    for (int i = 0; i < targetBones.Count; i++)
+                    {
+                        if (targetBones[i] == go.transform)
+                            targetBones[i] = subContainer.transform;
+                    }
 
                     foreach (Transform child in children)
                     {
@@ -6223,6 +6227,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     targetRenderer.enabled = true;
                 }
             }
+            targetRenderer.bones = targetBones.ToArray();
+            targetRenderer.localBounds = targetBounds;
 
             List<string> destroyedGameObjects = new();
             for (int meshID = 1; meshID < combinableSkinnedMeshes.Count; meshID++)
