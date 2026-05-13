@@ -12,6 +12,7 @@
 ### Bug Fixes
 * Fix crash when a renderer is on the avatar root.
   * That renderer is now also disallowed from being merged with other renderers.
+* Fix optimizer incorrectly assuming that avatar with no animator has 3 base layers like a generic rig when it does have 5.
 
 ## v4.4.0
 ### Features

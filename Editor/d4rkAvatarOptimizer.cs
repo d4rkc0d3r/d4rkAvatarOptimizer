@@ -3314,17 +3314,22 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    public bool IsHumanoid()
+    public int GetBaseLayerCount()
     {
-        var avDescriptor = GetAvatarDescriptor();
-        var rootAnimator = avDescriptor != null ? avDescriptor.GetComponent<Animator>() : null;
-        return rootAnimator != null && rootAnimator.avatar != null && rootAnimator.avatar.isHuman;
+        var av = GetAvatarDescriptor();
+        if (av == null)
+            return 0;
+        if (!av.TryGetComponent<Animator>(out var animator) || animator == null)
+            return 5;
+        if (animator.avatar == null || !animator.avatar.isHuman)
+            return 3;
+        return 5;
     }
 
     public AnimatorController GetFXLayer()
     {
         var avDescriptor = GetAvatarDescriptor();
-        var baseLayerCount = IsHumanoid() ? 5 : 3;
+        var baseLayerCount = GetBaseLayerCount();
         if (avDescriptor == null || avDescriptor.baseAnimationLayers.Length != baseLayerCount)
             return null;
         return avDescriptor.baseAnimationLayers[baseLayerCount - 1].animatorController as AnimatorController;
@@ -5370,9 +5375,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return;
         HashSet<Transform> humanoidBones = new();
         HashSet<Transform> childrenOfHumanoidBones = new();
-        if (IsHumanoid())
+        if (avDescriptor.TryGetComponent<Animator>(out var animator) && animator != null && animator.isHuman)
         {
-            var animator = avDescriptor.GetComponent<Animator>();
             foreach (var humanBone in System.Enum.GetValues(typeof(HumanBodyBones)).Cast<HumanBodyBones>())
             {
                 if (humanBone == HumanBodyBones.LastBone)
@@ -5510,7 +5514,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             // without this fix the merged mesh would disappear locally
             if (MergeSkinnedMeshesWithNaNimation && basicMergedMeshes.Count > 1)
             {
-                var animator = avDescriptor.GetComponent<Animator>();
                 if (animator != null && animator.isHuman)
                 {
                     var headBone = animator.GetBoneTransform(HumanBodyBones.Head);
