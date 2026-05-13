@@ -1087,6 +1087,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return false;
         if (list[0].receiveShadows != candidate.receiveShadows)
             return false;
+        if (list[0].transform == GetRootTransform() || candidate.transform == GetRootTransform())
+            return false;
         if (!RenderersHaveSameRootBoneScaleSign(list[0], candidate))
             return false;
         bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)

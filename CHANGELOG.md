@@ -9,6 +9,10 @@
   * Each warning/error message group is now shown in a foldout.
   * Remove mismatched curly brace section as this is now handled as a regular parse error.
 
+### Bug Fixes
+* Fix crash when a renderer is on the avatar root.
+  * That renderer is now also disallowed from being merged with other renderers.
+
 ## v4.4.0
 ### Features
 * Add support for negative speed toggles in the animator optimizer.
