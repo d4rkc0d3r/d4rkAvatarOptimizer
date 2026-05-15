@@ -533,15 +533,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (trimmedLine.Length == 0)
                     continue;
                 bool isPreprocessor = trimmedLine[0] == '#';
-                while (trimmedLine[trimmedLine.Length - 1] == '\\')
+                while (trimmedLine[^1] == '\\')
                 {
-                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 1).TrimEnd(trimWhiteSpaceChars) + " " + rawLines[++lineIndex].Trim(trimWhiteSpaceChars);
+                    trimmedLine = trimmedLine[..^1].TrimEnd(trimWhiteSpaceChars) + " " + rawLines[++lineIndex].Trim(trimWhiteSpaceChars);
                 }
                 if (trimmedLine.StartsWithSimple("//"))
                 {
                     if (trimmedLine.StartsWithSimple("ifex", 2))
                     {
-                        string ifexLine = $"#{trimmedLine.Substring(2)}";
+                        string ifexLine = $"#{trimmedLine[2..]}";
                         processedLines.Add(ifexLine);
                         var conditions = ParseIfexConditions(ifexLine);
                         if (conditions != null) {
@@ -556,7 +556,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else if (trimmedLine.StartsWithSimple("d4rkAO:", 2))
                     {
-                        ParseOptimizerComment(trimmedLine.Substring("//d4rkAO:".Length));
+                        ParseOptimizerComment(trimmedLine["//d4rkAO:".Length..]);
                     }
                     continue;
                 }
@@ -564,17 +564,17 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (!isPreprocessor && trimmedLine[i] == ';')
                     {
-                        processedLines.Add(trimmedLine.Substring(0, i + 1));
-                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart(trimWhiteSpaceChars);
+                        processedLines.Add(trimmedLine[..(i + 1)]);
+                        trimmedLine = trimmedLine[(i + 1)..].TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
                     }
                     else if (!isPreprocessor && (trimmedLine[i] == '{' || trimmedLine[i] == '}'))
                     {
                         if (i != 0)
-                            processedLines.Add(trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars));
+                            processedLines.Add(trimmedLine[..i].TrimEnd(trimWhiteSpaceChars));
                         processedLines.Add(trimmedLine[i].ToString());
-                        trimmedLine = trimmedLine.Substring(i + 1).TrimStart(trimWhiteSpaceChars);
+                        trimmedLine = trimmedLine[(i + 1)..].TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
                     }
@@ -597,9 +597,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         if (trimmedLine.StartsWithSimple("d4rkAO:", i + 2))
                         {
-                            ParseOptimizerComment(trimmedLine.Substring(i + 2 + "d4rkAO:".Length));
+                            ParseOptimizerComment(trimmedLine[(i + 2 + "d4rkAO:".Length)..]);
                         }
-                        trimmedLine = trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars);
+                        trimmedLine = trimmedLine[..i].TrimEnd(trimWhiteSpaceChars);
                         break;
                     }
                     else if (trimmedLine[i + 1] == '*')
@@ -613,21 +613,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                             if (endCommentBlock != -1)
                             {
-                                trimmedLine = trimmedLine.Substring(0, i)
-                                    + rawLines[lineIndex].Substring(endCommentBlock + 2);
-                                i -= 1;
+                                trimmedLine = trimmedLine[..i] + " "
+                                    + rawLines[lineIndex][(endCommentBlock + 2)..].Trim(trimWhiteSpaceChars);
                             }
                             else
                             {
-                                trimmedLine = trimmedLine.Substring(0, i).TrimEnd(trimWhiteSpaceChars);
+                                trimmedLine = trimmedLine[..i].TrimEnd(trimWhiteSpaceChars);
                                 break;
                             }
                         }
                         else
                         {
-                            trimmedLine = trimmedLine.Substring(0, i)
-                                + trimmedLine.Substring(endCommentBlock + 2);
-                            i -= 1;
+                            trimmedLine = trimmedLine[..i] + " " + trimmedLine[(endCommentBlock + 2)..];
                         }
                     }
                 }

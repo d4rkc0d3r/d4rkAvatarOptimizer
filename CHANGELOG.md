@@ -14,6 +14,7 @@
   * That renderer is now also disallowed from being merged with other renderers.
 * Fix optimizer incorrectly assuming that avatar with no animator has 3 base layers like a generic rig when it does have 5.
 * Fix renderer not moving when using shader or NaNimation toggles with `Merge Static Meshes as Skinned` and the renderer moving via a constraint on the same game object while other meshes get merged into it.
+* Fix shader analyzer not treating `/*...*/` comment blocks as white space.
 
 ## v4.4.0
 ### Features
