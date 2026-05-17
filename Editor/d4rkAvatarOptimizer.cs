@@ -5165,7 +5165,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     var indexMap = new Dictionary<int, int>();
                     int internalMaterialID = uniqueMatchedSlots[i].Select((slot, index) => (slot, index)).First(t => t.slot.material == matchedSlots[i][k].material).index;
-                    int materialSubMeshId = Math.Min(mesh.subMeshCount - 1, matchedSlots[i][k].index);
+                    int requestedSubMeshId = matchedSlots[i][k].index;
+                    if (requestedSubMeshId >= mesh.subMeshCount)
+                        continue;
+                    int materialSubMeshId = requestedSubMeshId;
                     var sourceIndices = mesh.GetIndices(materialSubMeshId);
                     for (int j = 0; j < sourceIndices.Length; j++)
                     {
@@ -5894,15 +5897,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
                 for (var matID = 0; matID < skinnedMesh.sharedMaterials.Length; matID++)
                 {
-                    int clampedSubMeshID = Math.Min(matID, mesh.subMeshCount - 1);
-                    int[] indices = mesh.GetIndices(clampedSubMeshID);
+                    if (matID >= mesh.subMeshCount)
+                        continue;
+                    int[] indices = mesh.GetIndices(matID);
                     for (uint i = 0; i < indices.Length; i++)
                     {
                         indices[i] += indexOffset;
                     }
                     materialSlotRemap[(newPath, targetIndices.Count)] = (GetPathToRoot(skinnedMesh), matID);
                     targetIndices.Add(indices);
-                    targetTopology.Add(mesh.GetTopology(clampedSubMeshID));
+                    targetTopology.Add(mesh.GetTopology(matID));
                 }
             }
             Profiler.EndSection();
