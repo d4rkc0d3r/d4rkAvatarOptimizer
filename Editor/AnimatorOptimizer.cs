@@ -255,7 +255,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         return CloneFromTime(clip, s.speed > 0 ? maxKeyframeTime : 0, clip.name);
                     }
                     if (!s.timeParameterActive || maxKeyframeTime == 0) {
-                        return CloneFromTime(clip, 0, clip.name);
+                        return clip;
                     }
                     var interpolationPoints = motionTimeSamplePoints
                         .Concat(keys.Select(t => t / maxKeyframeTime))
