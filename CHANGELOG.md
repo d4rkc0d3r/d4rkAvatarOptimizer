@@ -6,6 +6,7 @@
   * Multiple pragmas of the same type in a pass now throw a parse error if they reference different functions.
 * Shader Optimizer:
   * Preprocessor macros now also indent the generated shader code.
+  * Strip out `POI_PASS == POI_URP` blocks from the generated shaders.
 * Shader Analyzer Debugger:
   * Parse errors and unmergable shaders can now be grouped by their message.
   * Each warning/error message group is now shown in a foldout.

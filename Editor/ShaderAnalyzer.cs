@@ -2925,6 +2925,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         return ConditionResult.Unknown;
                     }
                 }
+                // hardcoded parse of POI_PIPE == POI_XXX guard
+                if (index == 0 && expr.StartsWithSimple("POI_PIPE == POI_"))
+                {
+                    return expr["POI_PIPE == ".Length..].Trim() switch
+                    {
+                        "POI_BIRP" => ConditionResult.True,
+                        "POI_URP" => ConditionResult.False,
+                        _ => ConditionResult.Unknown,
+                    };
+                }
                 // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
                 var values = new List<ConditionResult>();
                 bool allAnd = false;
