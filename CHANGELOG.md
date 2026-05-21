@@ -4,6 +4,8 @@
   * More strictly validates pass pragmas and now reports which pass is missing a vertex or fragment pragma.
   * Shaders where a pragma references a vertex/geometry/fragment function that could not be found are now treated as unmergable instead of silently continuing.
   * Multiple pragmas of the same type in a pass now throw a parse error if they reference different functions.
+* Shader Optimizer:
+  * Preprocessor macros now also indent the generated shader code.
 * Shader Analyzer Debugger:
   * Parse errors and unmergable shaders can now be grouped by their message.
   * Each warning/error message group is now shown in a foldout.

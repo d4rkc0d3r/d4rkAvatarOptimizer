@@ -3799,15 +3799,26 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizedShader.SetName($"{sanitizedShaderName}_{shaderHash[..4]}_{shaderHash[4..12]}");
             static List<string> IndentContent(List<string> content)
             {
+                static bool StartsPreprocessorBlock(string line)
+                {
+                    return line.StartsWithSimple("#if")
+                        || line.StartsWithSimple("#ifdef")
+                        || line.StartsWithSimple("#ifndef");
+                }
+                static bool ContinuesPreprocessorBlock(string line)
+                {
+                    return line.StartsWithSimple("#elif")
+                        || line.StartsWithSimple("#else");
+                }
                 int indentLevel = 0;
                 for (int i = 0; i < content.Count; i++)
                 {
                     var line = content[i];
-                    if (line.StartsWithSimple("}"))
+                    if (line.StartsWithSimple("}") || line.StartsWithSimple("#endif") || ContinuesPreprocessorBlock(line))
                         indentLevel--;
                     indentLevel = System.Math.Max(indentLevel, 0);
                     content[i] = new string(' ', indentLevel * 4) + line;
-                    if (line.StartsWithSimple("{"))
+                    if (line.StartsWithSimple("{") || StartsPreprocessorBlock(line) || ContinuesPreprocessorBlock(line))
                         indentLevel++;
                 }
                 return content;
