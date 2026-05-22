@@ -1758,16 +1758,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (source == null || !source.parsedCorrectly)
                 return null;
-            mergedMeshIndices = mergedMeshIndices ?? new List<int>();
+            using var invariantCulture = new InvariantCultureScope();
+            mergedMeshIndices ??= new();
             if (mergedMeshIndices.Count == 0)
                 mergedMeshIndices.Add(0);
             mergedMeshIndices = mergedMeshIndices.Distinct().OrderBy(i => i).ToList();
-            if (mergedMeshNames == null)
-                mergedMeshNames = Enumerable.Range(0, mergedMeshCount).Select(i => "").ToList();
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            var oldUICulture = Thread.CurrentThread.CurrentUICulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            mergedMeshNames ??= Enumerable.Range(0, mergedMeshCount).Select(i => "").ToList();
             var optimizer = new ShaderOptimizer
             {
                 mergedMeshCount = mergedMeshCount,
@@ -1798,11 +1794,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (optimizer.arrayPropertyValues.ContainsKey(staticValues.Key))
                     continue;
-                if (source.propertyTable.TryGetValue(staticValues.Key, out var prop))
-                {
-                    if (prop.doNotLock)
-                        continue;
-                }
+                if (source.propertyTable.TryGetValue(staticValues.Key, out var prop) && prop.doNotLock)
+                    continue;
                 optimizer.constantPropertyValues[staticValues.Key] = staticValues.Value;
             }
             try
@@ -1813,11 +1806,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 Debug.LogError($"Error optimizing shader {source.name}: {e.Message}\n{e.StackTrace}");
                 throw e;
-            }
-            finally
-            {
-                Thread.CurrentThread.CurrentCulture = oldCulture;
-                Thread.CurrentThread.CurrentUICulture = oldUICulture;
             }
             return optimizer.optimizedShader;
         }
