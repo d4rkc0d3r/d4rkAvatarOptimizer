@@ -12,6 +12,7 @@
   * Preprocessor macros now also indent the generated shader code.
   * Strip out `POI_PASS == POI_URP` blocks from the generated shaders.
   * `OPTIMIZER_ENABLED` define is now also added when using any `//ifex` statements in the shader.
+  * Removed some poi specific preprocessor handling that is handled more generically now.
 * Shader Analyzer Debugger:
   * Parse errors and unmergable shaders can now be grouped by their message.
   * Each warning/error message group is now shown in a foldout.

@@ -2597,7 +2597,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var prop in poiUsedPropertyDefines)
             {
                 if (!prop.Value)
+                {
+                    currentKnownDefines[prop.Key] = (false, null);
                     continue;
+                }
                 output.Add($"#define {prop.Key} 1");
                 currentKnownDefines[prop.Key] = (true, 1);
             }
@@ -2905,15 +2908,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
             ConditionResult EvalPreprocessorCondition(string expr, ref int index)
             {
-                // hardcoded parse of poiyomi texture prop guards as OPTIMIZER_ENABLED is also rarely used for other cases which could break when properties are not inline replaced
-                if (index == 0 && expr.Length > 44 && expr[0] == 'd' && expr[8] == 'P') {
-                    var match = Regex.Match(expr, @"defined\((PROP\w+)\) || !defined\(OPTIMIZER_ENABLED\)");
-                    if (match.Success) {
-                        if (poiUsedPropertyDefines.TryGetValue(match.Groups[1].Value, out var used))
-                            return used ? ConditionResult.True : ConditionResult.False;
-                        return ConditionResult.Unknown;
-                    }
-                }
                 // hardcoded parse of POI_PIPE == POI_XXX guard
                 if (index == 0 && expr.StartsWithSimple("POI_PIPE == POI_"))
                 {
