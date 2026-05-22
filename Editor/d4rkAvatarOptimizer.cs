@@ -998,22 +998,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_ParticleSystemsUsingRenderer[candidate] = new List<ParticleSystem>();
     }
 
-    private static bool IsMaterialReadyToCombineWithOtherMeshes(Material material)
+    private static string CanCombineMaterialWithOtherMeshesError(Material material)
     {
-        return material != null && ShaderAnalyzer.Parse(material.shader).CanMerge();
+        if (material == null)
+            return "Material is null";
+        var parsedShader = ShaderAnalyzer.Parse(material.shader);
+        return parsedShader.CanMerge() ? null : parsedShader.CantMergeReason();
     }
 
-    private bool IsBasicCombinableRenderer(Renderer candidate)
+    private string IsBasicCombinableRendererError(Renderer candidate)
     {
+        if (!MergeSkinnedMeshes)
+            return "Merging skinned meshes is disabled";
         if (candidate.TryGetComponent(out Cloth cloth))
-            return false;
-        if (FindAllPathsWithUnsafeRendererAndGameObjectToggles().Contains(GetPathToRoot(candidate)))
-            return false;
-        if (candidate is MeshRenderer && (candidate.gameObject.layer == 12 || !MergeStaticMeshesAsSkinned))
-            return false;
+            return "Has Cloth component";
+        if (candidate.transform == GetRootTransform())
+            return "Is on the root transform";
+        if (FindAllPathsWithIndependentRendererAndGameObjectToggles().Contains(GetPathToRoot(candidate)))
+            return "Affected by independent renderer component and game object toggles";
+        if (candidate is MeshRenderer && !MergeStaticMeshesAsSkinned)
+            return "Renderer is a MeshRenderer and merging static meshes as skinned is disabled";
+        if (candidate is MeshRenderer && candidate.gameObject.layer == 12)
+            return "MeshRenderer is on layer 12";
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
-            return false;
-        return true;
+            return "Affected by particle system using this renderer";
+        return null;
     }
 
     private Dictionary<Renderer, bool> cache_UsesUV0ZW = null;
@@ -1036,36 +1045,47 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_UsesUV0ZW[renderer] = false;
     }
 
-    private bool IsShaderToggleCombinableRenderer(Renderer candidate)
+    private string IsShaderToggleCombinableRendererError(Renderer candidate)
     {
-        if (!IsBasicCombinableRenderer(candidate))
-            return false;
+        var basicError = IsBasicCombinableRendererError(candidate);
+        if (basicError != null)
+            return basicError;
         if (UsesUV0ZW(candidate))
-            return false;
+            return $"Renderer uses uv0.zw";
         foreach (var slot in MaterialSlot.GetAllSlotsFrom(candidate))
         {
-            if (!IsMaterialReadyToCombineWithOtherMeshes(slot.material))
-                return false;
+            var materialError = CanCombineMaterialWithOtherMeshesError(slot.material);
+            if (materialError != null)
+                return $"Material slot {slot.index} cannot be merged: {materialError}";
             if (slotSwapMaterials.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var materials))
             {
-                if (!materials.Any(material => IsMaterialReadyToCombineWithOtherMeshes(material)))
-                    return false;
+                var slotSwapError = materials.Select(CanCombineMaterialWithOtherMeshesError).FirstOrDefault(err => err != null);
+                if (!materials.Any(material => CanCombineMaterialWithOtherMeshesError(material) == null))
+                    return slotSwapError == null
+                        ? $"Material swap slot {slot.index} has no mergeable materials"
+                        : $"Material swap slot {slot.index} cannot be merged: {slotSwapError}";
             }
         }
-        return true;
+        return null;
     }
 
     public bool GetRendererDefaultEnabledState(Renderer r) => r.enabled && r.gameObject.activeSelf;
 
-    private bool CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate, bool withNaNimation)
+    private string CanCombineRendererWithBasicMerge(List<Renderer> list, Renderer candidate, bool withNaNimation)
     {
-        if (!IsBasicCombinableRenderer(candidate))
-            return false;
-        if (list.Any(r => !IsBasicCombinableRenderer(r)))
-            return false;
-        if (list.Count == 1 || list.Skip(1).All(r => RenderersHaveSameAnimationCurves(list[0], r, withNaNimation)))
-            return RenderersHaveSameAnimationCurves(list[0], candidate, withNaNimation);
-        return false;
+        var candidateError = IsBasicCombinableRendererError(candidate);
+        if (candidateError != null)
+            return candidateError;
+        var existingRendererError = list.Select(IsBasicCombinableRendererError).FirstOrDefault(err => err != null);
+        if (existingRendererError != null)
+            return existingRendererError;
+        foreach (var renderer in list.Skip(1))
+        {
+            var existingAnimationError = RenderersHaveSameAnimationCurves(renderer, list[0], withNaNimation);
+            if (existingAnimationError != null)
+                return existingAnimationError;
+        }
+        return RenderersHaveSameAnimationCurves(list[0], candidate, withNaNimation);
     }
 
     private bool RenderersHaveSameRootBoneScaleSign(Renderer a, Renderer b)
@@ -1077,51 +1097,54 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return Mathf.Sign(scaleA.x) == Mathf.Sign(scaleB.x) && Mathf.Sign(scaleA.y) == Mathf.Sign(scaleB.y) && Mathf.Sign(scaleA.z) == Mathf.Sign(scaleB.z);
     }
 
-    private bool CanCombineRendererWith(List<Renderer> list, Renderer candidate)
+    private string CanCombineRendererWith(List<Renderer> list, Renderer candidate)
     {
         if (!MergeSkinnedMeshes)
-            return false;
+            return "Merging skinned meshes is disabled";
         if (list[0].gameObject.layer != candidate.gameObject.layer)
-            return false;
+            return "Layers do not match";
         if (list[0].shadowCastingMode != candidate.shadowCastingMode)
-            return false;
+            return "Shadow casting modes do not match";
         if (list[0].receiveShadows != candidate.receiveShadows)
-            return false;
-        if (list[0].transform == GetRootTransform() || candidate.transform == GetRootTransform())
-            return false;
+            return "Receive shadows settings do not match";
         if (!RenderersHaveSameRootBoneScaleSign(list[0], candidate))
-            return false;
-        bool OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
+            return "Root bone scale signs do not match";
+        string OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(Transform t, string[] otherPaths)
         {
             while ((t = t.parent) != GetRootTransform())
             {
                 var path = GetPathToRoot(t);
                 if (FindAllGameObjectTogglePaths().Contains(path) && otherPaths.All(p => !p.StartsWith(path)))
-                    return true;
+                    return path;
             }
-            return false;
+            return null;
         }
-        if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(list[0].transform, new string[] { GetPathToRoot(candidate.transform.parent) }))
-            return false;
-        if (OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(candidate.transform, list.Select(r => GetPathToRoot(r.transform.parent)).ToArray()))
-            return false;
+        var listParentTogglePath = OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(list[0].transform, new string[] { GetPathToRoot(candidate.transform.parent) });
+        if (listParentTogglePath != null)
+            return $"Parent GameObject toggle '{listParentTogglePath}' would affect only part of the merged renderer";
+        var candidateParentTogglePath = OneOfParentsHasGameObjectToggleThatTheOthersArentChildrenOf(candidate.transform, list.Select(r => GetPathToRoot(r.transform.parent)).ToArray());
+        if (candidateParentTogglePath != null)
+            return $"Parent GameObject toggle '{candidateParentTogglePath}' would affect only part of the merged renderer";
         if (MergeSkinnedMeshesSeparatedByDefaultEnabledState)
         {
             bool candidateDefaultEnabledState = GetRendererDefaultEnabledState(candidate);
             if (list.Any(r => GetRendererDefaultEnabledState(r) != candidateDefaultEnabledState))
-                return false;
+                return "Default enabled states do not match";
         }
         if (!list.All(r => UsesUV0ZW(r) == UsesUV0ZW(candidate)))
-            return false;
-        if (CanCombineRendererWithBasicMerge(list, candidate, true))
-            return true;
+            return "UV0.zw usage does not match";
+        var basicMergeError = CanCombineRendererWithBasicMerge(list, candidate, true);
+        if (basicMergeError == null)
+            return null;
         if (!MergeSkinnedMeshesWithShaderToggle)
-            return false;
-        if (!IsShaderToggleCombinableRenderer(candidate))
-            return false;
-        if (list.Any(r => !IsShaderToggleCombinableRenderer(r)))
-            return false;
-        return true;
+            return basicMergeError;
+        var candidateShaderToggleError = IsShaderToggleCombinableRendererError(candidate);
+        if (candidateShaderToggleError != null)
+            return candidateShaderToggleError;
+        var existingShaderToggleError = list.Select(IsShaderToggleCombinableRendererError).FirstOrDefault(err => err != null);
+        if (existingShaderToggleError != null)
+            return existingShaderToggleError;
+        return null;
     }
 
     private Dictionary<string, bool> cache_MeshUses4BoneSkinning = null;
@@ -1237,12 +1260,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return true;
     }
 
-    private HashSet<string> cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles = null;
-    private HashSet<string> FindAllPathsWithUnsafeRendererAndGameObjectToggles()
+    private HashSet<string> cache_FindAllPathsWithIndependentRendererAndGameObjectToggles = null;
+    private HashSet<string> FindAllPathsWithIndependentRendererAndGameObjectToggles()
     {
-        if (cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles != null)
-            return cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles;
-        var unsafePaths = new HashSet<string>();
+        if (cache_FindAllPathsWithIndependentRendererAndGameObjectToggles != null)
+            return cache_FindAllPathsWithIndependentRendererAndGameObjectToggles;
+        var independentPaths = new HashSet<string>();
         var pathsWithGameObjectToggle = new HashSet<string>();
         var pathsWithRendererToggle = new HashSet<string>();
         foreach (var clip in GetAllUsedAnimationClips())
@@ -1265,12 +1288,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             foreach (var path in gameObjectBindings.Keys)
             {
                 if (!rendererBindings.ContainsKey(path))
-                    unsafePaths.Add(path);
+                    independentPaths.Add(path);
             }
             foreach (var path in rendererBindings.Keys)
             {
                 if (!gameObjectBindings.ContainsKey(path))
-                    unsafePaths.Add(path);
+                    independentPaths.Add(path);
             }
             foreach (var path in gameObjectBindings.Keys)
             {
@@ -1279,17 +1302,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var gameObjectCurve = AnimationUtility.GetEditorCurve(clip, gameObjectBindings[path]);
                 var rendererCurve = AnimationUtility.GetEditorCurve(clip, rendererBinding);
                 if (!AnimationCurvesHaveSameKeys(gameObjectCurve, rendererCurve))
-                    unsafePaths.Add(path);
+                    independentPaths.Add(path);
             }
         }
-        unsafePaths.RemoveWhere(path => !pathsWithGameObjectToggle.Contains(path) || !pathsWithRendererToggle.Contains(path));
-        return cache_FindAllPathsWithUnsafeRendererAndGameObjectToggles = unsafePaths;
+        independentPaths.RemoveWhere(path => !pathsWithGameObjectToggle.Contains(path) || !pathsWithRendererToggle.Contains(path));
+        return cache_FindAllPathsWithIndependentRendererAndGameObjectToggles = independentPaths;
     }
 
     private Dictionary<string, HashSet<AnimationClip>> cache_FindAllAnimationClipsAffectingRenderer = null;
     private bool? cache_withNaNimation = null;
-    private Dictionary<(Renderer, Renderer), bool> cache_RendererHaveSameAnimationCurves = null;
-    private bool RenderersHaveSameAnimationCurves(Renderer a, Renderer b, bool withNaNimation)
+    private Dictionary<(Renderer, Renderer), string> cache_RendererHaveSameAnimationCurves = null;
+    private string RenderersHaveSameAnimationCurves(Renderer a, Renderer b, bool withNaNimation)
     {
         if (cache_withNaNimation == null || cache_withNaNimation != withNaNimation)
         {
@@ -1304,8 +1327,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             (bPath, aPath) = (aPath, bPath);
             (a, b) = (b, a);
         }
-        if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var result))
-            return result;
+        if (cache_RendererHaveSameAnimationCurves.TryGetValue((a, b), out var cachedResult))
+            return cachedResult;
+        string FormatBinding(EditorCurveBinding binding)
+        {
+            return $"{binding.path}:{binding.propertyName}";
+        }
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
             if(typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.")) {
                 // ignore bindings for material properties that do not exist for any materials or material swaps on this renderer
@@ -1377,13 +1404,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         var aHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(aPath, out var aClips);
         var bHasClips = FindAllAnimationClipsAffectingRenderer().TryGetValue(bPath, out var bClips);
-        if (aHasClips != bHasClips)
-            return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
-        if (!aHasClips)
-            return cache_RendererHaveSameAnimationCurves[(a, b)] = true;
-        if (!aClips.SetEquals(bClips))
-            return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
-        foreach (var clip in aClips)
+        if (!aHasClips && !bHasClips)
+            return cache_RendererHaveSameAnimationCurves[(a, b)] = null;
+        var allClips = new HashSet<AnimationClip>();
+        if (aHasClips)
+            allClips.UnionWith(aClips);
+        if (bHasClips)
+            allClips.UnionWith(bClips);
+        foreach (var clip in allClips.OrderBy(c => c.name))
         {
             var bindings = AnimationUtility.GetCurveBindings(clip);
             foreach (var binding in bindings)
@@ -1395,13 +1423,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     otherBinding.path = bPath;
                     if (!bindings.Contains(otherBinding))
-                        return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
+                        return cache_RendererHaveSameAnimationCurves[(a, b)] = $"Animation clip '{clip.name}' binding '{FormatBinding(binding)}' does not match";
                 }
                 else if (binding.path == bPath)
                 {
                     otherBinding.path = aPath;
                     if (!bindings.Contains(otherBinding))
-                        return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
+                        return cache_RendererHaveSameAnimationCurves[(a, b)] = $"Animation clip '{clip.name}' binding '{FormatBinding(binding)}' does not match";
                 }
                 else
                 {
@@ -1410,10 +1438,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var curve = AnimationUtility.GetEditorCurve(clip, binding);
                 var otherCurve = AnimationUtility.GetEditorCurve(clip, otherBinding);
                 if (!AnimationCurvesHaveSameKeys(curve, otherCurve))
-                    return cache_RendererHaveSameAnimationCurves[(a, b)] = false;
+                    return cache_RendererHaveSameAnimationCurves[(a, b)] = $"Animation clip '{clip.name}' binding '{FormatBinding(binding)}' does not match";
             }
         }
-        return cache_RendererHaveSameAnimationCurves[(a, b)] = true;
+        return cache_RendererHaveSameAnimationCurves[(a, b)] = null;
     }
 
     private static List<string> ColorPropertyComponents = new List<string> { ".r", ".g", ".b", ".a" };
@@ -1565,10 +1593,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    public List<List<Renderer>> FindPossibleSkinnedMeshMerges()
+    public List<List<Renderer>> FindPossibleSkinnedMeshMerges(bool logMergeErrors = false)
     {
+        using var perfScope = new Profiler.Section("FindPossibleSkinnedMeshMerges");
+        var av = GetAvatarDescriptor();
+        List<(string group, string path, string message)> mergeErrors = logMergeErrors ? new() : null;
         slotSwapMaterials = FindAllMaterialSwapMaterials();
-        var renderers = GetUsedComponentsInChildren<Renderer>();
+        var renderers = GetUsedComponentsInChildren<Renderer>()
+            .Select(r => (r, slashCount: GetPathToRoot(r).Count(c => c == '/'), path: GetPathToRoot(r)))
+            .OrderBy(t => t.path == "Body" ? 0 : 1)
+            .ThenBy(t => t.r == av.VisemeSkinnedMesh ? 0 : 1)
+            .ThenBy(t => t.slashCount)
+            .ThenBy(t => t.path)
+            .Select(t => t.r).ToList();
         var matchedSkinnedMeshes = new List<List<Renderer>>();
         var unmergableRenderers = new List<Renderer>();
         var exclusions = GetAllExcludedTransforms();
@@ -1582,16 +1619,27 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     renderer.GetSharedMesh() == null ||
                     penetrators.Contains(renderer)) {
                 unmergableRenderers.Add(renderer);
+                mergeErrors?.Add(("Unmergable renderers", GetPathToRoot(renderer), "Is excluded, not a MeshRenderer or SkinnedMeshRenderer, has no mesh, or is a penetrator"));
+                continue;
+            }
+
+            string basicMergeError = IsBasicCombinableRendererError(renderer);
+            if (basicMergeError != null) {
+                unmergableRenderers.Add(renderer);
+                mergeErrors?.Add(("Unmergable renderers", GetPathToRoot(renderer), basicMergeError));
                 continue;
             }
 
             bool foundMatch = false;
-            foreach (var subList in matchedSkinnedMeshes) {
-                if (CanCombineRendererWith(subList, renderer)) {
+            for (int index = 0; index < matchedSkinnedMeshes.Count; index++) {
+                var subList = matchedSkinnedMeshes[index];
+                string error = CanCombineRendererWith(subList, renderer);
+                if (error == null) {
                     subList.Add(renderer);
                     foundMatch = true;
                     break;
                 }
+                mergeErrors?.Add(($"Group {index} '{GetPathToRoot(subList[0])}'", GetPathToRoot(renderer), error));
             }
             if (!foundMatch) {
                 matchedSkinnedMeshes.Add(new List<Renderer> { renderer });
@@ -1617,20 +1665,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var newSubList = new List<Renderer> { meshRenderer };
                 matchedSkinnedMeshes.Add(newSubList);
                 mergedMeshes.Remove(meshRenderer);
+                mergeErrors?.Add(("Unhelpfully merged MeshRenderers", GetPathToRoot(meshRenderer), "No material merge found"));
             }
         }
-        var avDescriptor = GetAvatarDescriptor();
-        foreach (var subList in matchedSkinnedMeshes)
+        if (logMergeErrors && mergeErrors.Count > 0)
         {
-            if (subList.Count == 1)
-                continue;
-            var obj = subList.OrderByDescending(smr => GetPathToRoot(smr) == "Body" ? 1 : 0)
-                .ThenByDescending(smr => smr == avDescriptor.VisemeSkinnedMesh)
-                .ThenBy(smr => GetPathToRoot(smr).Count(c => c == '/')).First();
-            int index = subList.IndexOf(obj);
-            var oldFirst = subList[0];
-            subList[0] = subList[index];
-            subList[index] = oldFirst;
+            var errorGroups = mergeErrors.GroupBy(e => e.group)
+                .OrderBy(g => g.Key == "Unmergable renderers" ? 0 : 1)
+                .ThenBy(g => g.Key.StartsWithSimple("Group ") ? int.Parse(g.Key.Split(' ')[1]) : int.MaxValue)
+                .ToList();
+            LogToFile($"Skinned mesh merge errors:");
+            foreach (var errorGroup in errorGroups)
+            {
+                LogToFile($"- {errorGroup.Key}:", 1);
+                var innerGroups = errorGroup.GroupBy(e => e.message).ToList();
+                foreach (var innerGroup in innerGroups)
+                {
+                    if (innerGroup.Count() == 1)
+                    {
+                        LogToFile($"- '{innerGroup.First().path}': {innerGroup.Key}", 2);
+                    }
+                    else
+                    {
+                        LogToFile($"- {innerGroup.Key}:", 2);
+                        foreach (var error in innerGroup)
+                        {
+                            LogToFile($"- '{error.path}'", 3);
+                        }
+                    }
+                }
+            }
         }
         matchedSkinnedMeshes = matchedSkinnedMeshes
             .OrderBy(subList => subList[0] is SkinnedMeshRenderer || subList[0] is MeshRenderer ? 0 : 1)
@@ -5357,7 +5421,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             transformFromOldPath[GetPathToRoot(t)] = t;
         }
         var avDescriptor = GetAvatarDescriptor();
-        var combinableMeshList = FindPossibleSkinnedMeshMerges();
+        var combinableMeshList = FindPossibleSkinnedMeshMerges(logMergeErrors: true);
         oldPathToMergedPaths.Clear();
         oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
@@ -5409,7 +5473,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 bool foundMatch = false;
                 foreach (var subList in basicMergedMeshes)
                 {
-                    if (CanCombineRendererWithBasicMerge(subList, renderer, false))
+                    if (CanCombineRendererWithBasicMerge(subList, renderer, false) == null)
                     {
                         subList.Add(renderer);
                         foundMatch = true;

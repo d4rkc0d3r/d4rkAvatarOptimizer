@@ -1,4 +1,8 @@
-## v4.4.1
+## v4.5.0
+### Features
+* Log file:
+  * Detailed errors on why skinned meshes can't be merged when using `Merge Skinned Meshes`.
+
 ### Changes
 * Shader Analyzer:
   * More strictly validates pass pragmas and now reports which pass is missing a vertex or fragment pragma.
