@@ -613,8 +613,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                             if (endCommentBlock != -1)
                             {
-                                trimmedLine = trimmedLine[..i] + " "
-                                    + rawLines[lineIndex][(endCommentBlock + 2)..].Trim(trimWhiteSpaceChars);
+                                trimmedLine = (trimmedLine[..i] + " " + rawLines[lineIndex][(endCommentBlock + 2)..])
+                                    .Trim(trimWhiteSpaceChars);
                             }
                             else
                             {
@@ -624,7 +624,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         else
                         {
-                            trimmedLine = trimmedLine[..i] + " " + trimmedLine[(endCommentBlock + 2)..];
+                            trimmedLine = (trimmedLine[..i] + " " + trimmedLine[(endCommentBlock + 2)..])
+                                .Trim(trimWhiteSpaceChars);
                         }
                     }
                 }
