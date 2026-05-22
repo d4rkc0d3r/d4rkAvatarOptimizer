@@ -116,7 +116,7 @@ As with other incompatible shaders, this means `Write Properties as Static Value
 ## Requiring constant properties
 If your shader has properties that must remain constant for it to function correctly, you can mark these properties as required constants by adding the comment `//d4rkAO:require_constant(_PropertyName)`.
 
-The preprocessor symbol `OPTIMIZER_ENABLED` will be defined in the generated shader if any required constant properties are declared.
+The preprocessor symbol `OPTIMIZER_ENABLED` will be defined in the generated shader if any required constant properties are declared or any `//ifex` statement is used.
 
 This is useful in cases where inline replacement of the value is necessary, such as a geometry shader instance count:
 

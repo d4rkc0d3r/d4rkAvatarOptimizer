@@ -2589,7 +2589,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void InjectOptimizerDefines()
         {
-            if (parsedShader.requiredConstantProperties.Count == 0)
+            if (!inlineReplaceConstants)
                 return;
             var currentKnownDefines = knownDefines.Peek();
             output.Add("#define OPTIMIZER_ENABLED 1");
