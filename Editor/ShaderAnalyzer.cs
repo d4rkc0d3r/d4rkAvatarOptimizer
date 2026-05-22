@@ -3080,41 +3080,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 return lineIndex - startLineIndex;
             }
-            string TryPoiFurInstanceCountOptimization(ref int lineIndex)
+            if (line.StartsWithSimple("if", 1))
             {
-                if (source[lineIndex] != "#if !defined(OPTIMIZER_ENABLED)")
-                    return null;
-                if (source[lineIndex + 1] != "[instance(32)]")
-                    return null;
-                if (source[lineIndex + 2] != "#else")
-                    return null;
-                if (!source[lineIndex + 3].StartsWithSimple("[instance("))
-                    return null;
-                if (source[lineIndex + 4] != "#endif")
-                    return null;
-                int charIndex = 10;
-                var instanceCountLine = source[lineIndex + 3];
-                SkipWhitespace(instanceCountLine, ref charIndex);
-                string instanceParameter = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(instanceCountLine, ref charIndex);
-                if (animatedPropertyValues.ContainsKey(instanceParameter) || arrayPropertyValues.ContainsKey(instanceParameter))
-                    return null;
-                if (!staticPropertyValues.TryGetValue(instanceParameter, out var instanceValue))
-                    return null;
-                lineIndex += 4;
-                return instanceCountLine.Replace(instanceParameter, instanceValue);
-            }
-            if (line.Length > 3 && line[1] == 'i' && line[2] == 'f')
-            {
-                var poiFurInstanceOptimizedLine = TryPoiFurInstanceCountOptimization(ref sourceLineIndex);
-                if (poiFurInstanceOptimizedLine != null)
-                    return poiFurInstanceOptimizedLine;
                 string expr = "";
-                if (line.Length > 6 && line[3] == 'd' && line[4] == 'e' && line[5] == 'f')
-                    expr = $"defined({line.Substring(6).TrimStart()})";
-                else if (line.Length > 7 && line[3] == 'n' && line[4] == 'd' && line[5] == 'e' && line[6] == 'f')
-                    expr = $"!defined({line.Substring(7).TrimStart()})";
+                if (line.StartsWithSimple("def", 3))
+                    expr = $"defined({line[6..].TrimStart()})";
+                else if (line.StartsWithSimple("ndef", 3))
+                    expr = $"!defined({line[7..].TrimStart()})";
                 else
-                    expr = line.Substring(4).TrimStart();
+                    expr = line[4..].TrimStart();
                 var exprIndex = 0;
                 var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                 lastIfEvalResultStack.Push(evalResult);
