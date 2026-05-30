@@ -743,6 +743,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"- Unique Bones: {skinnedMeshRenderers.SelectMany(r => r.bones).Where(b => b != null).Distinct().Count()}");
         LogToFile($"- Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
 
+        var extraMaterialSlotMeshes = renderers.Select(r => (renderer: r, mesh: r.GetSharedMesh()))
+            .Where(x => x.mesh != null && x.renderer.sharedMaterials.Length > x.mesh.subMeshCount)
+            .Select(x => (
+                path: GetPathToRoot(x.renderer),
+                extraMaterialSlots: x.renderer.sharedMaterials.Length - x.mesh.subMeshCount,
+                extraPolygons: GetRendererExtraMaterialSlotPolyCount(x.renderer)))
+            .OrderBy(x => x.path)
+            .ToList();
+        if (extraMaterialSlotMeshes.Count > 0)
+        {
+            LogToFile($"- Meshes with extra material slots: {extraMaterialSlotMeshes.Count}");
+            foreach (var entry in extraMaterialSlotMeshes)
+            {
+                LogToFile($"- '{entry.path}': +{entry.extraMaterialSlots} material slots, +{entry.extraPolygons} polygons", 1);
+            }
+        }
+
         using (new Profiler.Section("LogAvatarStats() - Animator Analysis"))
         {
             var animatorControllers = GetAvDescriptorControllers();
@@ -969,6 +986,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (mesh == null)
             return 0;
         return Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / (mesh.GetTopology(i) == MeshTopology.Quads ? 2 : 3));
+    }
+
+    public long GetRendererExtraMaterialSlotPolyCount(Renderer renderer)
+    {
+        if (renderer == null || !(renderer is SkinnedMeshRenderer || renderer is MeshRenderer))
+            return 0;
+        var mesh = renderer.GetSharedMesh();
+        if (mesh == null || mesh.subMeshCount == 0 || renderer.sharedMaterials.Length <= mesh.subMeshCount)
+            return 0;
+        int extraMaterialSlotCount = renderer.sharedMaterials.Length - mesh.subMeshCount;
+        int lastSubMeshIndex = mesh.subMeshCount - 1;
+        long polygonsPerExtraSlot = mesh.GetIndexCount(lastSubMeshIndex) / (mesh.GetTopology(lastSubMeshIndex) == MeshTopology.Quads ? 2 : 3);
+        return polygonsPerExtraSlot * extraMaterialSlotCount;
     }
 
     public long GetPolyCount()

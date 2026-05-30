@@ -18,6 +18,8 @@
   * Parse errors and unmergable shaders can now be grouped by their message.
   * Each warning/error message group is now shown in a foldout.
   * Remove mismatched curly brace section as this is now handled as a regular parse error.
+* Log file:
+  * List all meshes with extra material slots in the avatar stats.
 
 ### Bug Fixes
 * Fix crash when a renderer is on the avatar root.
