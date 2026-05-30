@@ -89,6 +89,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
             AssetDatabase.AddObjectToAsset(o, assetPath);
         }
 
+        private readonly List<AnimatorControllerLayer> layersToAdd = new();
+        private readonly HashSet<string> layerNames = new();
+        private void AddLayer(AnimatorControllerLayer layer)
+        {
+            using var _ = new Profiler.Section($"AnimatorOptimizer.AddLayer");
+            var candidateName = layer.name;
+            int suffix = 1;
+            while (layerNames.Contains(candidateName))
+            {
+                candidateName = $"{layer.name}_{suffix++}";
+            }
+            layer.name = candidateName;
+            layerNames.Add(layer.name);
+            layersToAdd.Add(layer);
+        }
+
         private AnimatorController Run() {
             var sourceLayers = source.layers;
             var sourceParameters = source.parameters;
@@ -150,10 +166,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     AnimatorControllerLayer newL = CloneLayer(sourceLayers[i], i == 0);
                     newL.name = target.MakeUniqueLayerName(newL.name);
                     newL.stateMachine.name = newL.name;
-                    using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
-                    {
-                        target.AddLayer(newL);
-                    }
+                    AddLayer(newL);
                     if (newL.syncedLayerIndex >= 0)
                         syncedLayers.Add((layerIndex, sourceLayers[i]));
                     layerIndex++;
@@ -174,6 +187,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             using (new Profiler.Section($"AnimatorOptimizer.MergeLayers"))
             {
                 MergeLayers();
+            }
+
+            using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
+            {
+                target.layers = target.layers.Concat(layersToAdd).ToArray();
             }
 
             EditorUtility.SetDirty(target);
@@ -395,25 +413,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 name = "d4rkAvatarOptimizer_MergedLayers",
                 hideFlags = HideFlags.HideInHierarchy,
                 states = new ChildAnimatorState[1] {
-                    new ChildAnimatorState() {
+                    new() {
                         state = state,
                         position = new Vector3(250, 0, 0)
                     }
                 }
             };
             AddToAsset(stateMachine);
-            using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
-            {
-                target.AddLayer(new AnimatorControllerLayer {
-                    avatarMask = null,
-                    blendingMode = AnimatorLayerBlendingMode.Override,
-                    defaultWeight = 1f,
-                    iKPass = false,
-                    name = target.MakeUniqueLayerName("d4rkAvatarOptimizer_MergedLayers"),
-                    syncedLayerAffectsTiming = false,
-                    stateMachine = stateMachine
-                });
-            }
+            AddLayer(new AnimatorControllerLayer {
+                avatarMask = null,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+                defaultWeight = 1f,
+                iKPass = false,
+                name = "d4rkAvatarOptimizer_MergedLayers",
+                syncedLayerAffectsTiming = false,
+                stateMachine = stateMachine
+            });
         }
 
         private AnimatorControllerLayer CloneLayer(AnimatorControllerLayer old, bool isFirstLayer = false)

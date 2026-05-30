@@ -743,7 +743,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"- Unique Bones: {skinnedMeshRenderers.SelectMany(r => r.bones).Where(b => b != null).Distinct().Count()}");
         LogToFile($"- Renderer Material Slots: {renderers.Sum(r => r.sharedMaterials.Length)}");
 
-        var extraMaterialSlotMeshes = renderers.Select(r => (renderer: r, mesh: r.GetSharedMesh()))
+        var extraMaterialSlotRenderers = renderers.Select(r => (renderer: r, mesh: r.GetSharedMesh()))
             .Where(x => x.mesh != null && x.renderer.sharedMaterials.Length > x.mesh.subMeshCount)
             .Select(x => (
                 path: GetPathToRoot(x.renderer),
@@ -751,10 +751,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 extraPolygons: GetRendererExtraMaterialSlotPolyCount(x.renderer)))
             .OrderBy(x => x.path)
             .ToList();
-        if (extraMaterialSlotMeshes.Count > 0)
+        if (extraMaterialSlotRenderers.Count > 0)
         {
-            LogToFile($"- Meshes with extra material slots: {extraMaterialSlotMeshes.Count}");
-            foreach (var entry in extraMaterialSlotMeshes)
+            LogToFile($"- Renderers with extra material slots: {extraMaterialSlotRenderers.Count}");
+            foreach (var entry in extraMaterialSlotRenderers)
             {
                 LogToFile($"- '{entry.path}': +{entry.extraMaterialSlots} material slots, +{entry.extraPolygons} polygons", 1);
             }
