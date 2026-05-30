@@ -6613,7 +6613,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         var av = GetAvatarDescriptor();
         av.collider_fingerRingL = CreateColliderRoot(av.collider_footL, "left");
-        LogToFile($"Moved left ring finger collider to '{GetPathToRoot(av.collider_fingerRingL.transform)}'");
+        LogToFile($"Moved  left ring finger collider to '{GetPathToRoot(av.collider_fingerRingL.transform)}'");
         av.collider_fingerRingR = CreateColliderRoot(av.collider_footR, "right");
         LogToFile($"Moved right ring finger collider to '{GetPathToRoot(av.collider_fingerRingR.transform)}'");
 

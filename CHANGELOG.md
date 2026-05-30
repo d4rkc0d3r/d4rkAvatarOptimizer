@@ -11,7 +11,7 @@
   * Multiple pragmas of the same type in a pass now throw a parse error if they reference different functions.
 * Shader Optimizer:
   * Preprocessor macros now also indent the generated shader code.
-  * Strip out `POI_PASS == POI_URP` blocks from the generated shaders.
+  * Strip out `POI_PIPE == POI_URP` blocks from the generated shaders.
   * `OPTIMIZER_ENABLED` define is now also added when using any `//ifex` statements in the shader.
   * Removed some poi specific preprocessor handling that is handled more generically now.
 * Shader Analyzer Debugger:
