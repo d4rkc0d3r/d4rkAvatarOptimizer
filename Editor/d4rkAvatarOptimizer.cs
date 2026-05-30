@@ -719,7 +719,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private AnimatorController[] GetAvDescriptorControllers()
     {
         var av = GetAvatarDescriptor();
-        return av.baseAnimationLayers.Concat(av.specialAnimationLayers).Select(l => l.animatorController).Where(c => c != null).Distinct().Cast<AnimatorController>().ToArray();
+        return av.baseAnimationLayers.Concat(av.specialAnimationLayers)
+            .Select(l => l.animatorController as AnimatorController)
+            .Where(c => c != null).Distinct().ToArray();
     }
 
     private void LogAvatarStats(string header)

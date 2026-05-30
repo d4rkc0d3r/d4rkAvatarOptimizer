@@ -26,6 +26,8 @@
 * Fix renderer not moving when using shader or NaNimation toggles with `Merge Static Meshes as Skinned` and the renderer moving via a constraint on the same game object while other meshes get merged into it.
 * Fix shader analyzer not treating `/*...*/` comment blocks as white space.
 * Fix animator optimizer unnecessarily duplicating animation clips when dealing with complex toggle creation.
+* Fix error spam when having an animator override controller in the avatar. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/195)
+  * This is not support for them, just removing the log spam during UI rendering!
 
 ## v4.4.0
 ### Features
