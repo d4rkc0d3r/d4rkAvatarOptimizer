@@ -439,6 +439,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
+    private static readonly FieldInfo PhysBoneColliderGlobalCollisionFlagsField = typeof(VRCPhysBoneColliderBase).GetField("globalCollisionFlags");
+
     private string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
@@ -3844,7 +3846,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Select(t => (t, "Real Kiss System Mesh")));
         baseAutomaticExclusions.AddRange(FindAllPenetrators().Select(p => (p.transform, "Penetrator Mesh")));
 
-        HashSet <Transform> CalculateAlwaysDisabledGameObjects(HashSet<Transform> exclusions)
+        HashSet<Transform> CalculateAlwaysDisabledGameObjects(HashSet<Transform> exclusions)
         {
             var disabledGameObjects = new HashSet<Transform>();
             var queue = new Queue<Transform>();
@@ -3902,9 +3904,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
+            static bool HasGlobalCollisionFlags(VRCPhysBoneColliderBase collider)
+            {
+                if (collider == null || PhysBoneColliderGlobalCollisionFlagsField == null)
+                    return false;
+                var value = PhysBoneColliderGlobalCollisionFlagsField.GetValue(collider);
+                return value != null && System.Convert.ToInt32(value) != 0;
+            }
+
             var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
                 .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
-                .SelectMany(pb => pb.colliders);
+                .SelectMany(pb => pb.colliders)
+                .Concat(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
+                    .Where(HasGlobalCollisionFlags))
+                .ToHashSet();
 
             alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
                 .Where(c => !usedPhysBoneColliders.Contains(c)));

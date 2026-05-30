@@ -2,6 +2,7 @@
 ### Features
 * Log file:
   * Detailed errors on why skinned meshes can't be merged when using `Merge Skinned Meshes`.
+* Add support for global phys bone colliders when using `Delete Unused Components`.
 
 ### Changes
 * Shader Analyzer:
