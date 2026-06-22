@@ -2307,6 +2307,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return sanitized;
             }
             AssetDatabase.StartAssetEditing();
+            List<string> messages = new();
+            void LogMessages(string controllerName)
+            {
+                if (messages.Count == 0)
+                    return;
+                LogToFile($"Processing animator controller '{controllerName}':");
+                foreach (var message in messages)
+                {
+                    LogToFile($"- {message}", 1);
+                }
+                messages.Clear();
+            }
             for (int i = 0; i < avDescriptor.baseAnimationLayers.Length; i++)
             {
                 var controller = avDescriptor.baseAnimationLayers[i].animatorController as AnimatorController;
@@ -2314,10 +2326,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     continue;
                 layerCopyPaths[i] = $"{trashBinPath}c{i}_{GetControllerFileName(controller)}.controller";
                 optimizedControllers[i] = controller == GetFXLayer()
-                    ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
-                    : AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap);
+                    ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
+                    : AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages);
                 optimizedControllers[i].name = $"Base{i}_{GetControllerFileName(controller)}";
                 avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
+                LogMessages(controller.name);
             }
             for (int i = 0; i < avDescriptor.specialAnimationLayers.Length; i++)
             {
@@ -2326,9 +2339,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     continue;
                 var index = i + avDescriptor.baseAnimationLayers.Length;
                 layerCopyPaths[index] = $"{trashBinPath}c{index}_{GetControllerFileName(controller)}.controller";
-                optimizedControllers[index] = AnimatorOptimizer.Run(controller, layerCopyPaths[index], fxLayerMap);
+                optimizedControllers[index] = AnimatorOptimizer.Run(controller, layerCopyPaths[index], fxLayerMap, messages);
                 optimizedControllers[index].name = $"Special{index}_{GetControllerFileName(controller)}";
                 avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
+                LogMessages(controller.name);
             }
         }
         finally

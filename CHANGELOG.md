@@ -1,6 +1,8 @@
 ## v4.5.1
 ### Bug Fixes
 * Fix crash with `Merge Same Dimension Textures` when one material has a non Texture2D assigned and the other material doesn't have any texture assigned in the same slot when they get compared for merging.
+* Fix crash when animator state behaviours fail to clone. [more](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/199)
+  * Also logs the type of the behaviour that failed to clone.
 
 ## v4.5.0
 ### Features
