@@ -1,3 +1,7 @@
+## v4.5.1
+### Bug Fixes
+* Fix crash with `Merge Same Dimension Textures` when one material has a non Texture2D assigned and the other material doesn't have any texture assigned in the same slot when they get compared for merging.
+
 ## v4.5.0
 ### Features
 * Log file:

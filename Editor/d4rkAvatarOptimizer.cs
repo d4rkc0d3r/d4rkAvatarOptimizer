@@ -4936,6 +4936,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return null;
         if (a is Texture2D && b == null)
             return null;
+        if (a == null || b == null)
+            return "Textures are not of type Texture2D and not the same";
         if (!(a is Texture2D) || !(b is Texture2D))
             return a is Texture2D ? $"{b.name} is not a Texture2D" : $"{a.name} is not a Texture2D";
         if (a.texelSize != b.texelSize)
