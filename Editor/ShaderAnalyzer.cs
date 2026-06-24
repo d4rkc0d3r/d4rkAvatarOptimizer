@@ -235,7 +235,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             filePath = Path.GetFullPath(shaderPath);
             parsedShader.filePath = filePath;
             maxIncludes = 1000;
-            if (shaderPath.EndsWith(".orlshader"))
+            if (shaderPath.EndsWith(".orlshader") || shaderPath.EndsWith(".orlconfshader"))
             {
                 #if ORLSHADER_EXISTS
                 Profiler.StartSection("ORL.ShaderGenerator");
