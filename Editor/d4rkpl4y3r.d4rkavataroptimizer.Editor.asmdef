@@ -6,6 +6,7 @@
         "VRC.SDKBase",
         "VRC.SDKBase.Editor",
         "ORL.ShaderGenerator",
+        "nadena.dev.ndmf",
         "nadena.dev.modular-avatar.core",
         "nadena.dev.modular-avatar.core.editor"
     ],
@@ -26,6 +27,11 @@
             "name": "nadena.dev.modular-avatar",
             "expression": "1.6",
             "define": "MODULAR_AVATAR_EXISTS"
+        },
+        {
+            "name": "nadena.dev.ndmf",
+            "expression": "",
+            "define": "NDMF_EXISTS"
         }
     ],
     "noEngineReferences": false
