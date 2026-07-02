@@ -1,6 +1,7 @@
 ## v4.5.2
 ### Bug Fixes
 * Fix `.orlconfshader` not being treated as orlshader by the shader analyzer.
+* Fix SPS detection not working for SPS2 penetrators. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/200)
 
 ## v4.5.1
 ### Bug Fixes
