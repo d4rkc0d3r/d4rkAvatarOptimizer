@@ -4246,7 +4246,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 		var material = renderers[0].sharedMaterials[0];
 		if(material == null)
 			return false;
-		return material.HasProperty("_SPS_Length");
+		return material.HasProperty("_SPS_Length") || material.HasProperty("_SPS_BakedLength");
 	}
 
     private HashSet<Renderer> cache_FindAllPenetrators = null;
