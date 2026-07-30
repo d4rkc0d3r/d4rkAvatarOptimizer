@@ -4236,17 +4236,17 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
 
     private bool IsSPSPenetratorRoot(Transform t) {
-		if(t == null)
+		if (t == null)
 			return false;
         var renderers = t.GetComponentsInChildren<Renderer>(true);
-		if (renderers.Length != 1)
-            return false;
-		if(renderers[0].sharedMaterials.Length == 0)
-			return false;
-		var material = renderers[0].sharedMaterials[0];
-		if(material == null)
-			return false;
-		return material.HasProperty("_SPS_Length") || material.HasProperty("_SPS_BakedLength");
+        return renderers.Any(r => {
+            if (r.sharedMaterials.Length == 0)
+                return false;
+            var material = r.sharedMaterials[0];
+            if (material == null)
+                return false;
+            return material.HasProperty("_SPS_Length") || material.HasProperty("_SPS_BakedLength") || material.HasProperty("_SPS_Configured");
+        });
 	}
 
     private HashSet<Renderer> cache_FindAllPenetrators = null;
