@@ -5396,15 +5396,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     }
                 }
 
-                Profiler.StartSection("Mesh.Optimize()");
-
-                if(!IsSPSPenetratorRoot(meshRenderer.transform)) {
-					// this breaks sps...
-                    newMesh.Optimize();
-                }
-                
-                Profiler.EndSection();
-
                 CreateUniqueAsset(newMesh, newMesh.name + ".asset");
 
                 meshRenderer.sharedMesh = newMesh;

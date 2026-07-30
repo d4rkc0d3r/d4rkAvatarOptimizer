@@ -1,4 +1,7 @@
 ## v4.5.4
+### Changes
+* No longer call `.Optimize()` on created meshes.
+
 ### Bug Fixes
 * Replace colormask and cull shader lab dynamic properties with hard coded values when using `Write Properties as Static Values`.
   * This fixes post processing SAO not working. (WTF unity???)
