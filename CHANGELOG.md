@@ -1,7 +1,12 @@
+## v4.5.4
+### Bug Fixes
+* Replace colormask and cull shader lab dynamic properties with hard coded values when using `Write Properties as Static Values`.
+  * This fixes post processing SAO not working. (WTF unity???)
+
 ## v4.5.3
 ### Bug Fixes
-* Fix ifex parser not handling `||` and nesting with `()`
-  * This caused Poi 10.0.15 materials with no outlines to be black
+* Fix ifex parser not handling `||` and nesting with `()`.
+  * This caused Poi 10.0.15 materials with no outlines to be black.
 
 ## v4.5.2
 ### Bug Fixes

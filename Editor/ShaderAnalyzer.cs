@@ -3589,6 +3589,42 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                     }
                 }
+                static string GetColorMaskString(int colorMask)
+                {
+                    if (colorMask == 0) return "0";
+                    string mask = "";
+                    if ((colorMask & 8) != 0) mask += "R";
+                    if ((colorMask & 4) != 0) mask += "G";
+                    if ((colorMask & 2) != 0) mask += "B";
+                    if ((colorMask & 1) != 0) mask += "A";
+                    return mask;
+                }
+                if (lowerLine.StartsWithSimple("colormask"))
+                {
+                    // Having ColorMask [_ColorMask] will break post processing SAO
+                    // The hardcoded mask doesn't break it so we have to replace it with the value of the property
+                    var propertyMatch = Regex.Match(line, @"\s*\[\s*(\w+)\s*\]");
+                    if (propertyMatch.Success
+                        && staticPropertyValues.TryGetValue(propertyMatch.Groups[1].Value, out var colorMaskValue)
+                        && float.TryParse(colorMaskValue, out var colorMaskFloat))
+                    {
+                        line = line[..propertyMatch.Index]
+                            + $" {GetColorMaskString(Mathf.Clamp((int)colorMaskFloat, 0, 15))}"
+                            + line[(propertyMatch.Index + propertyMatch.Length)..];
+                    }
+                }
+                if (lowerLine.StartsWithSimple("cull"))
+                {
+                    var propertyMatch = Regex.Match(line, @"\s*\[\s*(\w+)\s*\]");
+                    if (propertyMatch.Success
+                        && staticPropertyValues.TryGetValue(propertyMatch.Groups[1].Value, out var cullValue)
+                        && float.TryParse(cullValue, out var cullFloat))
+                    {
+                        line = line[..propertyMatch.Index]
+                            + $" {(UnityEngine.Rendering.CullMode)(int)cullFloat}"
+                            + line[(propertyMatch.Index + propertyMatch.Length)..];
+                    }
+                }
                 output.Add(line);
                 if (line == "CGPROGRAM" || line == "HLSLPROGRAM")
                 {
