@@ -318,66 +318,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return -1;
         }
 
-        public enum IfexConditionType
-        {
-            Equals,
-            NotEquals,
-            IsNotAnimated,
-            IsAnimated
-        }
-        public static List<(string propertyName, IfexConditionType conditionType, float value)> ParseIfexConditions(string line)
-        {
-            var conditions = new List<(string propertyName, IfexConditionType conditionType, float value)>();
-            int index = 5;
-            void SkipWhitespace() { while (index < line.Length && char.IsWhiteSpace(line[index])) index++; }
-            while (index < line.Length)
-            {
-                SkipWhitespace();
-                if (index == line.Length)
-                    break;
-                if (line[index] == '&' && line[index + 1] == '&')
-                    index += 2;
-                SkipWhitespace();
-                var name = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-                if (name == null)
-                    return null;
-                if (name == "isNotAnimated" || name == "isAnimated")
-                {
-                    var conditionType = name == "isNotAnimated" ? IfexConditionType.IsNotAnimated : IfexConditionType.IsAnimated;
-                    if (line[index++] != '(')
-                        return null;
-                    SkipWhitespace();
-                    name = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-                    if (name == null)
-                        return null;
-                    if (line[index++] != ')')
-                        return null;
-                    conditions.Add((name, conditionType, 0f));
-                    continue;
-                }
-                SkipWhitespace();
-                if (index == line.Length)
-                    return null;
-                bool notEquals = line[index] == '!';
-                if ((line[index] != '!' && line[index] != '=') || line[index + 1] != '=')
-                    return null;
-                index += 2;
-                SkipWhitespace();
-                if (index == line.Length)
-                    return null;
-                int valueStart = index;
-                int valueEnd = index;
-                while (valueEnd < line.Length && char.IsDigit(line[valueEnd]))
-                    valueEnd++;
-                if (valueStart == valueEnd)
-                    return null;
-                index = valueEnd;
-                var value = float.Parse(line.Substring(valueStart, valueEnd - valueStart));
-                conditions.Add((name, notEquals ? IfexConditionType.NotEquals : IfexConditionType.Equals, value));
-            }
-            return conditions;
-        }
-
         private static string FormatWarningPath(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -543,9 +483,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         string ifexLine = $"#{trimmedLine[2..]}";
                         processedLines.Add(ifexLine);
-                        var conditions = ParseIfexConditions(ifexLine);
-                        if (conditions != null) {
-                            conditions.ForEach(p => parsedShader.ifexParameters.Add(p.propertyName));
+                        var ifexStatement = IfexStatement.Parse(ifexLine);
+                        if (ifexStatement != null) {
+                            ifexStatement.CollectPropertyNames(parsedShader.ifexParameters);
                         } else {
                             parsedShader.unableToParseIfexStatements.Add(trimmedLine);
                         }
@@ -3410,58 +3350,24 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (!line.StartsWithSimple("#ifex"))
                 return;
-            var conditions = ShaderAnalyzer.ParseIfexConditions(line);
-            if (conditions == null) {
+            var ifexStatement = IfexStatement.Parse(line);
+            if (ifexStatement == null) {
                 lineIndex++;
                 debugOutput?.Add($"// {line} failed to parse conditions, just skip statement");
                 ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
                 return;
             }
-            var outputString = $"// #ifex ";
-            var firstCondition = true;
-            foreach (var condition in conditions) {
-                var propertyName = condition.propertyName;
-                bool isStaticValue = staticPropertyValues.TryGetValue(propertyName, out var staticValue);
-                bool isAnimated = animatedPropertyValues.ContainsKey(propertyName);
-                bool isArrayProperty = arrayPropertyValues.ContainsKey(propertyName);
-                bool isValueConstant = isStaticValue && !isAnimated && !isArrayProperty;
-                outputString += $"{(firstCondition ? "" : " && ")}";
-                switch (condition.conditionType)
-                {
-                    case ShaderAnalyzer.IfexConditionType.IsAnimated:
-                    case ShaderAnalyzer.IfexConditionType.IsNotAnimated:
-                        bool isAnimatedCheck = condition.conditionType == ShaderAnalyzer.IfexConditionType.IsAnimated;
-                        outputString += $"{(isAnimatedCheck ? "isAnimated" : "isNotAnimated")}({propertyName})({isStaticValue},{isAnimated},{isArrayProperty})";
-                        if (isValueConstant == isAnimatedCheck)
-                        {
-                            lineIndex++;
-                            debugOutput?.Add(outputString + ", FALSE");
-                            ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                            return;
-                        }
-                        break;
-                    case ShaderAnalyzer.IfexConditionType.Equals:
-                    case ShaderAnalyzer.IfexConditionType.NotEquals:
-                        if (!isValueConstant)
-                        {
-                            lineIndex++;
-                            debugOutput?.Add($"// #ifex {propertyName} not a constant value");
-                            ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                            return;
-                        }
-                        var value = float.Parse(staticValue);
-                        var notEquals = condition.conditionType == ShaderAnalyzer.IfexConditionType.NotEquals;
-                        outputString += $"{propertyName}({value}) {(notEquals ? '!' : '=')}= {condition.value}";
-                        if ((condition.value == value) == notEquals)
-                        {
-                            lineIndex++;
-                            debugOutput?.Add(outputString + ", FALSE");
-                            ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                            return;
-                        }
-                        break;
-                }
-                firstCondition = false;
+            var evaluation = ifexStatement.Evaluate(new IfexStatement.EvaluationContext(
+                staticPropertyValues,
+                animatedPropertyValues,
+                arrayPropertyValues));
+            var outputString = $"// #ifex {evaluation.DebugText}";
+            if (evaluation.Result != IfexStatement.EvaluationResult.True)
+            {
+                lineIndex++;
+                debugOutput?.Add(outputString + $", {evaluation.Result.ToString().ToUpperInvariant()}");
+                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
+                return;
             }
 
             // skip all code until matching #endex

@@ -1,3 +1,8 @@
+## v4.5.3
+### Bug Fixes
+* Fix ifex parser not handling `||` and nesting with `()`
+  * This caused Poi 10.0.15 materials with no outlines to be black
+
 ## v4.5.2
 ### Bug Fixes
 * Fix `.orlconfshader` not being treated as orlshader by the shader analyzer.
