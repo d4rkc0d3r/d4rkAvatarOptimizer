@@ -812,6 +812,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || c == '_';
         }
 
+        public static bool LineStartsWithReturnStatement(string line)
+        {
+            return line.StartsWithSimple("return")
+                && (line.Length == "return".Length || !IsIdentifierLetter(line["return".Length]));
+        }
+
         public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
         {
             int startIndex = index;
@@ -1219,13 +1225,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 else if (line[0] != '#')
                 {
                     int startIndex = lineIndex;
-                    while (lines[lineIndex][lines[lineIndex].Length - 1] != ';'
-                        && lines[lineIndex][lines[lineIndex].Length - 1] != ']'
+                    while (lines[lineIndex][^1] != ';'
+                        && lines[lineIndex][^1] != ']'
                         && lineIndex < lines.Count - 1
                         && lines[lineIndex + 1][0] != '{'
                         && lines[lineIndex + 1][0] != '}'
                         && lines[lineIndex + 1][0] != '#'
-                        && !lines[lineIndex + 1].StartsWithSimple("return"))
+                        && !LineStartsWithReturnStatement(lines[lineIndex + 1]))
                     {
                         lineIndex++;
                     }
@@ -2137,11 +2143,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add(line);
                     curlyBraceDepth++;
                 }
-                else if (needToPassOnMeshOrMaterialID && line.StartsWithSimple("return"))
+                else if (needToPassOnMeshOrMaterialID && ShaderAnalyzer.LineStartsWithReturnStatement(line))
                 {
                     output.Add("{");
                     if (!isVoidReturn)
-                        output.Add("returnWrappedStruct = " + line.Substring("return ".Length));
+                        output.Add($"returnWrappedStruct = {line["return".Length..].TrimStart()}");
                     InitializeParameterFromWrapper(funcParams, output, "d4rkAvatarOptimizer_vertexOutput", false);
                     output.Add("return d4rkAvatarOptimizer_vertexOutput;");
                     output.Add("}");
@@ -2317,9 +2323,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             shouldInjectDummyTextureUsage = false;
             string returnStatement = null;
             output.RemoveAt(output.Count - 1);
-            if (output[output.Count - 1].StartsWithSimple("return"))
+            if (ShaderAnalyzer.LineStartsWithReturnStatement(output[^1]))
             {
-                returnStatement = output[output.Count - 1];
+                returnStatement = output[^1];
                 output.RemoveAt(output.Count - 1);
             }
             output.Add("if (d4rkAvatarOptimizer_Zero)");

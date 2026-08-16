@@ -1,3 +1,9 @@
+## v4.5.5
+### Bug Fixes
+* Shader Optimizer:
+  * Fixed vertex shader return statement detection matching any line starting with `return` (e.g. `returnValue = 0;`) instead of only actual return statements.
+  * Fixed `return(expr);` without a space after `return` not being handled correctly.
+
 ## v4.5.4
 ### Changes
 * No longer call `.Optimize()` on created meshes.
