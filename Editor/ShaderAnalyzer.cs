@@ -812,6 +812,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || c == '_';
         }
 
+        public static bool IsIdentifierFirstLetter(char c)
+        {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        }
+
         public static bool LineStartsWithReturnStatement(string line)
         {
             return line.StartsWithSimple("return")
@@ -820,27 +825,25 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
         {
+            if (index >= str.Length || !IsIdentifierFirstLetter(str[index]))
+                return null;
             int startIndex = index;
             while (index < str.Length && IsIdentifierLetter(str[index]))
                 index++;
-            if (index == startIndex)
-                return null;
             int endIndex = index;
-            while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
-                index++;
-            return str.Substring(startIndex, endIndex - startIndex);
+            SkipWhitespace(str, ref index);
+            return str[startIndex..endIndex];
         }
 
         public static string ParseTypeAndTrailingWhitespace(string str, ref int index)
         {
+            if (index >= str.Length || !IsIdentifierFirstLetter(str[index]))
+                return null;
             int startIndex = index;
             while (index < str.Length && IsIdentifierLetter(str[index]))
                 index++;
-            if (index == startIndex)
-                return null;
             int endIndex = index;
-            while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
-                index++;
+            SkipWhitespace(str, ref index);
             if (index < str.Length && str[index] == '<')
             {
                 for (int depth = 1; depth > 0;)
@@ -853,10 +856,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         depth--;
                 }
                 endIndex = ++index;
-                while (index < str.Length && (str[index] == ' ' || str[index] == '\t'))
-                    index++;
+                SkipWhitespace(str, ref index);
             }
-            return str.Substring(startIndex, endIndex - startIndex);
+            return str[startIndex..endIndex];
         }
 
         public static (string name, string returnType) ParseFunctionDefinition(string line)

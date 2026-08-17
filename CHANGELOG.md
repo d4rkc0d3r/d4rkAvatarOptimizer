@@ -1,8 +1,9 @@
 ## v4.5.5
 ### Bug Fixes
 * Shader Optimizer:
-  * Fixed vertex shader return statement detection matching any line starting with `return` (e.g. `returnValue = 0;`) instead of only actual return statements.
-  * Fixed `return(expr);` without a space after `return` not being handled correctly.
+  * Fix vertex shader return statement detection matching any line starting with `return` (e.g. `returnValue = 0;`) instead of only actual return statements.
+  * Fix `return(expr);` without a space after `return` not being handled correctly.
+  * Fix identifier parser allowing digits as the first character.
 
 ## v4.5.4
 ### Changes
