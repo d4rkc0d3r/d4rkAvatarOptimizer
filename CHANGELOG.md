@@ -1,4 +1,7 @@
-## v4.5.5
+## v4.6.0
+### Features
+* Add new option `Delete Unused Animator Parameters`.
+
 ### Bug Fixes
 * Shader Optimizer:
   * Fix vertex shader return statement detection matching any line starting with `return` (e.g. `returnValue = 0;`) instead of only actual return statements.

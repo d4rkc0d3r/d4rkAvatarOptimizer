@@ -140,6 +140,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             ToggleOptimizerProperty(nameof(optimizer.CombineApproximateMotionTimeAnimations));
         }
+        ToggleOptimizerProperty(nameof(optimizer.DeleteUnusedAnimatorParameters));
         ToggleOptimizerProperty(nameof(optimizer.DisablePhysBonesWhenUnused));
         ToggleOptimizerProperty(nameof(optimizer.MergeSameRatioBlendShapes));
         ToggleOptimizerProperty(nameof(optimizer.MMDCompatibility));

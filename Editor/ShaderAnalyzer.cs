@@ -823,6 +823,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 && (line.Length == "return".Length || !IsIdentifierLetter(line["return".Length]));
         }
 
+        public static void SkipWhitespace(string str, ref int index)
+        {
+            while (index < str.Length && char.IsWhiteSpace(str[index]))
+                index++;
+        }
+
         public static string ParseIdentifierAndTrailingWhitespace(string str, ref int index)
         {
             if (index >= str.Length || !IsIdentifierFirstLetter(str[index]))
@@ -887,12 +893,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             "precise", "const", "uniform",
             "centroid", "linear", "sample", "noperspective", "nointerpolation"
         };
-
-        public static void SkipWhitespace(string str, ref int index)
-        {
-            while (index < str.Length && char.IsWhiteSpace(str[index]))
-                index++;
-        }
 
         public static ParsedShader.Function.Parameter ParseNextFunctionParameter(string line, ref int index)
         {

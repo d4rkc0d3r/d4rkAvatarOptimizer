@@ -49,6 +49,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         public bool MergeSameDimensionTextures = false;
         public bool MergeMainTex = false;
         public bool OptimizeFXLayer = true;
+        public bool DeleteUnusedAnimatorParameters = false;
         public bool CombineApproximateMotionTimeAnimations = false;
         public bool DisablePhysBonesWhenUnused = true;
         public bool MergeSameRatioBlendShapes = true;
@@ -267,6 +268,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DeleteUnusedComponents { get { return settings.DeleteUnusedComponents; } set { settings.DeleteUnusedComponents = value; } }
     public bool DeleteUnusedGameObjects { get { return settings.DeleteUnusedGameObjects; } set { settings.DeleteUnusedGameObjects = value; } }
     public bool OptimizeFXLayer { get { return settings.OptimizeFXLayer; } set { settings.OptimizeFXLayer = value; } }
+    public bool DeleteUnusedAnimatorParameters { get { return settings.DeleteUnusedAnimatorParameters; } set { settings.DeleteUnusedAnimatorParameters = value; } }
     public bool CombineApproximateMotionTimeAnimations {
         get { return settings.OptimizeFXLayer && settings.CombineApproximateMotionTimeAnimations; }
         set { settings.CombineApproximateMotionTimeAnimations = value; } }
@@ -315,6 +317,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {nameof(DeleteUnusedGameObjects), "Delete Unused GameObjects"},
         {nameof(OptimizeFXLayer), "Optimize FX Layer"},
         {nameof(CombineApproximateMotionTimeAnimations), "Combine Motion Time Approximation"},
+        {nameof(DeleteUnusedAnimatorParameters), "Delete Unused Animator Parameters"},
         {nameof(DisablePhysBonesWhenUnused), "Disable Phys Bones When Unused"},
         {nameof(MergeSameRatioBlendShapes), "Merge Same Ratio Blend Shapes"},
         {nameof(UseRingFingerAsFootCollider), "Use Ring Finger as Foot Collider"},
@@ -346,6 +349,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeMainTex), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
+            {nameof(Settings.DeleteUnusedAnimatorParameters), false},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), true},
@@ -366,6 +370,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeMainTex), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
+            {nameof(Settings.DeleteUnusedAnimatorParameters), true},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), true},
@@ -386,6 +391,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeMainTex), true},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), true},
+            {nameof(Settings.DeleteUnusedAnimatorParameters), true},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), false},
@@ -2307,15 +2313,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 return sanitized;
             }
             AssetDatabase.StartAssetEditing();
-            List<string> messages = new();
+            List<(string msg, int indent)> messages = new();
             void LogMessages(string controllerName)
             {
                 if (messages.Count == 0)
                     return;
                 LogToFile($"Processing animator controller '{controllerName}':");
-                foreach (var message in messages)
+                foreach ((var message, int indent) in messages)
                 {
-                    LogToFile($"- {message}", 1);
+                    LogToFile($"- {message}", 1 + indent);
                 }
                 messages.Clear();
             }
@@ -2326,8 +2332,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     continue;
                 layerCopyPaths[i] = $"{trashBinPath}c{i}_{GetControllerFileName(controller)}.controller";
                 optimizedControllers[i] = controller == GetFXLayer()
-                    ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
-                    : AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages);
+                    ? AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages, DeleteUnusedAnimatorParameters, fxLayersToMerge, fxLayersToDestroy, constantAnimatedValuesToAdd.Select(kvp => (kvp.Key, kvp.Value)).ToList())
+                    : AnimatorOptimizer.Run(controller, layerCopyPaths[i], fxLayerMap, messages, DeleteUnusedAnimatorParameters);
                 optimizedControllers[i].name = $"Base{i}_{GetControllerFileName(controller)}";
                 avDescriptor.baseAnimationLayers[i].animatorController = optimizedControllers[i];
                 LogMessages(controller.name);
@@ -2339,7 +2345,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     continue;
                 var index = i + avDescriptor.baseAnimationLayers.Length;
                 layerCopyPaths[index] = $"{trashBinPath}c{index}_{GetControllerFileName(controller)}.controller";
-                optimizedControllers[index] = AnimatorOptimizer.Run(controller, layerCopyPaths[index], fxLayerMap, messages);
+                optimizedControllers[index] = AnimatorOptimizer.Run(controller, layerCopyPaths[index], fxLayerMap, messages, DeleteUnusedAnimatorParameters);
                 optimizedControllers[index].name = $"Special{index}_{GetControllerFileName(controller)}";
                 avDescriptor.specialAnimationLayers[i].animatorController = optimizedControllers[index];
                 LogMessages(controller.name);

@@ -27,8 +27,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private HashSet<string> intsToChangeToFloat = new HashSet<string>();
         private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
         private bool isFxLayer = false;
-        private List<string> logMessages;
+        private List<(string msg, int indent)> logMessages;
         private string mergedLayersParameter = "d4rkAvatarOptimizer_MergedLayers_Weight";
+        private bool deleteUnusedParameters = true;
+        private HashSet<string> usedParameters = new HashSet<string>();
 
         private AnimatorOptimizer(AnimatorController target, AnimatorController source, string path)
         {
@@ -37,7 +39,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             assetPath = path;
         }
 
-        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<string> logMessages, List<int> layersToMerge = null, List<int> layersToDestroy = null, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
+        public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<(string msg, int indent)> logMessages, bool deleteUnusedParameters = true, List<int> layersToMerge = null, List<int> layersToDestroy = null, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
         {
             var target = new AnimatorController();
             target.name = $"{source.name}(Optimized)";
@@ -53,6 +55,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             optimizer.isFxLayer = constantCurvesToAdd != null;
             optimizer.constantCurvesToAdd = constantCurvesToAdd ?? new();
             optimizer.logMessages = logMessages;
+            optimizer.deleteUnusedParameters = deleteUnusedParameters;
             return optimizer.Run();
         }
 
@@ -91,6 +94,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             AssetDatabase.AddObjectToAsset(o, assetPath);
         }
 
+        private void MarkParameterUsed(string paramName)
+        {
+            if (!string.IsNullOrEmpty(paramName))
+                usedParameters.Add(paramName);
+        }
+
         private readonly List<AnimatorControllerLayer> layersToAdd = new();
         private readonly HashSet<string> layerNames = new();
         private void AddLayer(AnimatorControllerLayer layer)
@@ -126,35 +135,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
 
-            using (new Profiler.Section($"AnimatorOptimizer.AddParameter"))
+            if (layersToMerge.Count > 0 || constantCurvesToAdd.Count > 0)
             {
-                var existingTargetParameters = new HashSet<string>(target.parameters.Select(x => x.name));
-                foreach (var p in sourceParameters)
-                {
-                    bool boolToFloat = boolsToChangeToFloat.Contains(p.name);
-                    bool intToFloat = intsToChangeToFloat.Contains(p.name);
-                    var newP = new AnimatorControllerParameter {
-                        name = p.name,
-                        type = (boolToFloat || intToFloat) ? AnimatorControllerParameterType.Float : p.type,
-                        defaultBool = p.defaultBool,
-                        defaultFloat = boolToFloat ? (p.defaultBool ? 1f : 0f) : intToFloat ? (float)p.defaultInt : p.defaultFloat,
-                        defaultInt = p.defaultInt
-                    };
-                    if (existingTargetParameters.Add(newP.name))
-                        target.AddParameter(newP);
-                }
-
-                if (layersToMerge.Count > 0 || constantCurvesToAdd.Count > 0)
-                {
-                    var blendTreeDummyWeight = new AnimatorControllerParameter {
-                        name = mergedLayersParameter = target.MakeUniqueParameterName(mergedLayersParameter),
-                        type = AnimatorControllerParameterType.Float,
-                        defaultFloat = 1f,
-                        defaultBool = true,
-                        defaultInt = 1
-                    };
-                    target.AddParameter(blendTreeDummyWeight);
-                }
+                mergedLayersParameter = source.MakeUniqueParameterName(mergedLayersParameter);
             }
 
             var syncedLayers = new List<(int layerIndex, AnimatorControllerLayer old)>();
@@ -166,7 +149,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (layersToMerge.Contains(i) || layersToDestroy.Contains(i))
                         continue;
                     AnimatorControllerLayer newL = CloneLayer(sourceLayers[i], i == 0);
-                    newL.name = target.MakeUniqueLayerName(newL.name);
+                    newL.name = newL.name;
                     newL.stateMachine.name = newL.name;
                     AddLayer(newL);
                     if (newL.syncedLayerIndex >= 0)
@@ -194,6 +177,54 @@ namespace d4rkpl4y3r.AvatarOptimizer
             using (new Profiler.Section($"AnimatorOptimizer.AddLayer"))
             {
                 target.layers = target.layers.Concat(layersToAdd).ToArray();
+            }
+
+            using (new Profiler.Section($"AnimatorOptimizer.AddParameter"))
+            {
+                var parameters = new List<AnimatorControllerParameter>(target.parameters);
+                var existingTargetParameters = new HashSet<string>(parameters.Select(x => x.name));
+                IEnumerable<string> parameterNames = deleteUnusedParameters ? (IEnumerable<string>)usedParameters : sourceParameters.Select(x => x.name);
+                foreach (var paramName in parameterNames)
+                {
+                    var p = sourceParameters.FirstOrDefault(x => x.name == paramName);
+                    if (p == null) continue;
+                    bool boolToFloat = boolsToChangeToFloat.Contains(p.name);
+                    bool intToFloat = intsToChangeToFloat.Contains(p.name);
+                    var newP = new AnimatorControllerParameter {
+                        name = p.name,
+                        type = (boolToFloat || intToFloat) ? AnimatorControllerParameterType.Float : p.type,
+                        defaultBool = p.defaultBool,
+                        defaultFloat = boolToFloat ? (p.defaultBool ? 1f : 0f) : intToFloat ? (float)p.defaultInt : p.defaultFloat,
+                        defaultInt = p.defaultInt
+                    };
+                    if (existingTargetParameters.Add(newP.name))
+                        parameters.Add(newP);
+                }
+
+                if (layersToMerge.Count > 0 || constantCurvesToAdd.Count > 0)
+                {
+                    parameters.Add(new AnimatorControllerParameter {
+                        name = mergedLayersParameter,
+                        type = AnimatorControllerParameterType.Float,
+                        defaultFloat = 1f,
+                        defaultBool = true,
+                        defaultInt = 1
+                    });
+                }
+                target.parameters = parameters.ToArray();
+            }
+
+            if (deleteUnusedParameters)
+            {
+                var deletedParameters = sourceParameters.Select(x => x.name).Where(x => !usedParameters.Contains(x)).ToList();
+                if (deletedParameters.Count > 0)
+                {
+                    logMessages.Add(($"Deleted unused parameters ({deletedParameters.Count}):", 0));
+                    foreach (var param in deletedParameters)
+                    {
+                        logMessages.Add(($"{param}", 1));
+                    }
+                }
             }
 
             EditorUtility.SetDirty(target);
@@ -241,6 +272,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (layersToMerge.Count == 0 && constantCurvesToAdd.Count == 0) {
                 return;
             }
+            MarkParameterUsed(mergedLayersParameter);
             var directBlendTree = new BlendTree() {
                 hideFlags = HideFlags.HideInHierarchy,
                 name = "MergedToggles",
@@ -248,6 +280,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             };
             var motions = new List<ChildMotion>();
             BlendTree CreateBlendTree(string param, ChildMotion[] children, string name = null) {
+                MarkParameterUsed(param);
                 var tree = new BlendTree() {
                     hideFlags = HideFlags.HideInHierarchy,
                     name = name ?? param,
@@ -487,7 +520,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (behaviour == null)
                     {
                         Debug.LogWarning($"Failed to clone state machine behaviour of type '{oldb.GetType()}' in layer '{layerName}' on state '{old.state.name}'");
-                        logMessages.Add($"Warning: Failed to clone state machine behaviour of type '{oldb.GetType().FullName}' in layer '{layerName}' on state '{old.state.name}'");
+                        logMessages.Add(($"Warning: Failed to clone state machine behaviour of type '{oldb.GetType().FullName}' in layer '{layerName}' on state '{old.state.name}'", 1));
                         continue;
                     }
                     CloneBehaviourParameters(oldb, behaviour);
@@ -517,7 +550,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (behaviour == null)
                 {
                     Debug.LogWarning($"Failed to clone state machine behaviour of type '{oldb.GetType()}' in layer '{layerName}' on state machine '{old.name}'");
-                    logMessages.Add($"Warning: Failed to clone state machine behaviour of type '{oldb.GetType().FullName}' in layer '{layerName}' on state machine '{old.name}'");
+                    logMessages.Add(($"Warning: Failed to clone state machine behaviour of type '{oldb.GetType().FullName}' in layer '{layerName}' on state machine '{old.name}'", 1));
                     continue;
                 }
                 CloneBehaviourParameters(oldb, behaviour);
@@ -558,6 +591,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 timeParameterActive = old.timeParameterActive,
                 writeDefaultValues = old.writeDefaultValues
             };
+            if (old.cycleOffsetParameterActive) MarkParameterUsed(old.cycleOffsetParameter);
+            if (old.mirrorParameterActive) MarkParameterUsed(old.mirrorParameter);
+            if (old.speedParameterActive) MarkParameterUsed(old.speedParameter);
+            if (old.timeParameterActive) MarkParameterUsed(old.timeParameter);
             stateMap[old] = n;
             AddToAsset(n);
             return n;
@@ -576,6 +613,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             pastedTree.minThreshold = oldTree.minThreshold;
             pastedTree.maxThreshold = oldTree.maxThreshold;
             pastedTree.useAutomaticThresholds = oldTree.useAutomaticThresholds;
+            MarkParameterUsed(oldTree.blendParameter);
+            if (oldTree.blendType != BlendTreeType.Direct && oldTree.blendType != BlendTreeType.Simple1D)
+                MarkParameterUsed(oldTree.blendParameterY);
 
             // Recursively duplicate the tree structure
             // Motions can be directly added as references while trees must be recursively to avoid accidental sharing
@@ -594,6 +634,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     threshold = child.threshold,
                     directBlendParameter = child.directBlendParameter
                 };
+                if (oldTree.blendType == BlendTreeType.Direct)
+                    MarkParameterUsed(child.directBlendParameter);
 
                 if (child.motion is BlendTree tree)
                 {
@@ -641,25 +683,45 @@ namespace d4rkpl4y3r.AvatarOptimizer
             switch (n)
             {
                 case VRCAnimatorLayerControl l:
+                {
+                    var o = old as VRCAnimatorLayerControl;
+                    l.ApplySettings = o.ApplySettings;
+                    l.blendDuration = o.blendDuration;
+                    l.debugString = o.debugString;
+                    l.goalWeight = o.goalWeight;
+                    l.layer = o.layer;
+                    l.playable = o.playable;
+                    if (l.playable == BlendableLayer.FX && fxLayerMap.TryGetValue(o.layer, out int newLayer))
                     {
-                        var o = old as VRCAnimatorLayerControl;
-                        l.ApplySettings = o.ApplySettings;
-                        l.blendDuration = o.blendDuration;
-                        l.debugString = o.debugString;
-                        l.goalWeight = o.goalWeight;
-                        l.layer = o.layer;
-                        l.playable = o.playable;
-                        if (l.playable == BlendableLayer.FX && fxLayerMap.TryGetValue(o.layer, out int newLayer))
-                        {
-                            l.layer = newLayer;
-                        }
-                        break;
+                        l.layer = newLayer;
                     }
+                    break;
+                }
+                case VRCAnimatorPlayAudio:
+                {
+                    var o = old as VRCAnimatorPlayAudio;
+                    EditorUtility.CopySerialized(old, n);
+                    if (o.PlaybackOrder == VRCAnimatorPlayAudio.Order.Parameter)
+                        MarkParameterUsed(o.ParameterName);
+                    break;
+                }
+                case VRCAvatarParameterDriver:
+                {
+                    var o = old as VRCAvatarParameterDriver;
+                    EditorUtility.CopySerialized(old, n);
+                    foreach (var p in o.parameters)
+                    {
+                        MarkParameterUsed(p.name);
+                        if (p.type == VRCAvatarParameterDriver.ChangeType.Copy)
+                            MarkParameterUsed(p.source);
+                    }
+                    break;
+                }
                 default:
-                    {
-                        EditorUtility.CopySerialized(old, n);
-                        break;
-                    }
+                {
+                    EditorUtility.CopySerialized(old, n);
+                    break;
+                }
             }
         }
 
@@ -813,6 +875,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         }
 
         private void AddCondition(AnimatorTransitionBase transition, AnimatorCondition condition) {
+            MarkParameterUsed(condition.parameter);
             if (boolsToChangeToFloat.Contains(condition.parameter)) {
                 var mode = condition.mode == AnimatorConditionMode.If ? AnimatorConditionMode.Greater : AnimatorConditionMode.Less;
                 transition.AddCondition(mode, 0.5f, condition.parameter);
