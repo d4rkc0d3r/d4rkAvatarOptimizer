@@ -68,18 +68,18 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         GUI.DrawTexture(settingsRect, EditorGUIUtility.IconContent("Settings@2x").image);
 
-        var koFiRect = settingsRect;
-        koFiRect.x += settingsRect.width + 2;
-        if (GUI.Button(koFiRect, new GUIContent("", "Support me on Ko-fi!")))
+        var logFileRect = settingsRect;
+        logFileRect.x += settingsRect.width + 2;
+        if (GUI.Button(logFileRect, new GUIContent("", "Open log file of last optimization")))
         {
-            Application.OpenURL("https://ko-fi.com/d4rkpl4y3r");
+            AvatarOptimizerSettings.OpenLogFile();
         }
         const float pad = 2;
-        koFiRect.x += pad;
-        koFiRect.y += pad;
-        koFiRect.width -= pad * 2;
-        koFiRect.height -= pad * 2;
-        GUI.DrawTexture(koFiRect, KoFiIcon);
+        logFileRect.x += pad;
+        logFileRect.y += pad;
+        logFileRect.width -= pad * 2;
+        logFileRect.height -= pad * 2;
+        GUI.DrawTexture(logFileRect, EditorGUIUtility.IconContent("d_TextAsset Icon").image);
 
         if (Application.isPlaying)
         {
@@ -1498,9 +1498,6 @@ public class d4rkAvatarOptimizerEditor : Editor
             serializedObject.ApplyModifiedProperties();
         }
     }
-
-    static Texture _kofiIcon = null;
-    static Texture KoFiIcon { get => _kofiIcon == null ? _kofiIcon = Resources.Load<Texture>("d4rkAO_ko-fi_64") : _kofiIcon; }
 
     static GUIContent _perfIcon_Excellent;
     static GUIContent _perfIcon_Good;

@@ -2,6 +2,11 @@
 ### Features
 * Add new option `Delete Unused Animator Parameters`.
 
+### Changes
+* Optimizer inspector:
+  * Replace the Ko-fi button with an open log file button.
+  * Add a Ko-fi button to the settings window.
+
 ### Bug Fixes
 * Shader Optimizer:
   * Fix vertex shader return statement detection matching any line starting with `return` (e.g. `returnValue = 0;`) instead of only actual return statements.
