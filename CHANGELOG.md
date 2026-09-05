@@ -12,6 +12,7 @@
 * Optimizer inspector:
   * Replace the Ko-fi button with an open log file button.
   * Add a Ko-fi button to the settings window.
+  * Increase the font size of the validation info boxes by 2 points.
 * Sub animator auto exclusions no longer exclude children of the animated game objects. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/191)
 * A mesh merge group can contain only one renderer with more material slots than sub meshes.
   * It is placed last so Unity's repeated-last-sub-mesh behavior is preserved.

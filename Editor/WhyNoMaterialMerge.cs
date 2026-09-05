@@ -75,7 +75,7 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
             return slot;
         }
 
-        private void HelpBox(string message, int fontSize, MessageType type)
+        public static void HelpBox(string message, int fontSize, MessageType type)
         {
             var style = new GUIStyle(EditorStyles.helpBox) { fontSize = fontSize };
             Texture icon = type switch
