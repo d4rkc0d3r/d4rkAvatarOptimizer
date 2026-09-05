@@ -610,6 +610,31 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
+    readonly HashSet<string> knownVRCComponentTypeNames = new()
+    {
+        "VRC.SDK3.Avatars.Components.VRCAvatarDescriptor",
+        "VRC.SDK3.Avatars.Components.VRCHeadChop",
+        "VRC.SDK3.Avatars.Components.VRCImpostorEnvironment",
+        "VRC.SDK3.Avatars.Components.VRCImpostorSettings",
+        "VRC.SDK3.Avatars.Components.VRCPerPlatformOverrides",
+        "VRC.SDK3.Avatars.Components.VRCRaycast",
+        "VRC.SDK3.Avatars.Components.VRCSpatialAudioSource",
+        "VRC.SDK3.Avatars.Components.VRCStation",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCAimConstraint",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCLookAtConstraint",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCParentConstraint",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCPositionConstraint",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCRotationConstraint",
+        "VRC.SDK3.Dynamics.Constraint.Components.VRCScaleConstraint",
+        "VRC.SDK3.Dynamics.Contact.Components.VRCContactReceiver",
+        "VRC.SDK3.Dynamics.Contact.Components.VRCContactSender",
+        "VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone",
+        "VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider",
+        "VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneRoot",
+        "VRC.SDK3.Dynamics.PhysBone.PhysBoneGrabHelper",
+        "VRC.SDK3.VRCTestMarker"
+    };
+
     private bool Validate()
     {
         var avDescriptor = optimizer.GetAvatarDescriptor();
@@ -643,6 +668,16 @@ public class d4rkAvatarOptimizerEditor : Editor
         {
             EditorGUILayout.HelpBox("Put the optimizer on the original avatar, not the optimized copy.", MessageType.Error);
             return false;
+        }
+
+        var allComponentTypes = optimizer.GetAllComponentTypesInAvatar().Select(t => t.FullName).ToList();
+        var unknownVRCComponentTypes = allComponentTypes.Where(t => t.StartsWith("VRC.SDK3.") && !knownVRCComponentTypeNames.Contains(t)).ToList();
+        if (unknownVRCComponentTypes.Count > 0)
+        {
+            EditorGUILayout.HelpBox("Unknown VRC component types found on the avatar:\n - " +
+                string.Join("\n - ", unknownVRCComponentTypes) + 
+                "\nYou need to update the optimizer or not use it if there is no new version available.\n" +
+                "Not doing so will most likely break things on your avatar.", MessageType.Error);
         }
 
         if (optimizer.UseRingFingerAsFootCollider)

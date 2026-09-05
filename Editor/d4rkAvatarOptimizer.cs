@@ -913,6 +913,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_avatarDescriptor;
     }
 
+    private HashSet<Type> cache_GetAllComponentTypesInAvatar = null;
+    public HashSet<Type> GetAllComponentTypesInAvatar()
+    {
+        if (cache_GetAllComponentTypesInAvatar != null)
+            return cache_GetAllComponentTypesInAvatar;
+        var descriptor = GetAvatarDescriptor();
+        if (descriptor == null)
+            return new HashSet<Type>();
+        var allComponentTypes = new HashSet<Type>(descriptor.GetComponentsInChildren<Component>(true).Where(c => c != null).Select(c => c.GetType()));
+        return cache_GetAllComponentTypesInAvatar = allComponentTypes;
+    }
+
     private HashSet<string> cache_toolsUsedOnAvatar = null;
     private long lastToolsCheckTime = 0;
     public HashSet<string> GetNonDestructiveToolsUsedOnAvatar()
@@ -920,15 +932,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (System.DateTime.Now.Ticks - lastToolsCheckTime > System.TimeSpan.TicksPerMinute * 2)
         {
             cache_toolsUsedOnAvatar = null;
+            cache_GetAllComponentTypesInAvatar = null;
             lastToolsCheckTime = System.DateTime.Now.Ticks;
         }
         if (cache_toolsUsedOnAvatar != null)
             return cache_toolsUsedOnAvatar;
         var tools = new HashSet<string>();
-        var descriptor = GetAvatarDescriptor();
-        if (descriptor == null)
-            return tools;
-        var allComponentTypes = new HashSet<Type>(descriptor.GetComponentsInChildren<Component>(true).Where(c => c != null).Select(c => c.GetType()));
+        var allComponentTypes = GetAllComponentTypesInAvatar();
         if (allComponentTypes.Any(t => t.FullName.StartsWithSimple("nadena.dev.modular_avatar.core.")))
         {
             tools.Add("Modular Avatar");

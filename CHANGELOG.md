@@ -6,6 +6,7 @@
 * Add `Allow Mesh Data Duplication` and automatically exclude Skinned Mesh Renderers sharing a mesh above a configurable vertex-count threshold when it is disabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/119)
   * The global threshold defaults to 1024 vertices.
   * Shared mesh groups and their renderer paths are listed in the avatar stats log.
+* Add error validation box when unknown component types in namespace `VRC.SDK3.` are used on the avatar.
 
 ### Changes
 * Optimizer inspector:
