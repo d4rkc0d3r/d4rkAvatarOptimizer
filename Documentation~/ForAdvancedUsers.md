@@ -1,8 +1,8 @@
 # Tips and info for advanced users
 Here I will note down more specific details on how the optimizer works and changes in workflow to use it to its fullest extent.
 
-## Tradeoffs of the Basic preset
-The Basic preset is designed to be conservative and not change behavior of your avatar.  
+## Tradeoffs of the Standard preset
+The Standard preset is designed to be conservative and not change behavior of your avatar.  
 However there are a couple things it does not consider breakage as otherwise almost no optimizations would be possible.
 1. SkinnedMeshRenderer root bone & probe anchor are ignored when merging.  
    When merging meshes it will try to pick the "best" root bone and probe anchor from the source meshes:

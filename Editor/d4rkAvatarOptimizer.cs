@@ -339,7 +339,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
     private static List<(string name, Dictionary<string, object>)> SettingsPresets = new List<(string name, Dictionary<string, object>)>()
     {
-        ("Basic", new Dictionary<string, object>() {
+        ("Standard", new Dictionary<string, object>() {
             {nameof(Settings.ApplyOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), false},
             {nameof(Settings.MergeSkinnedMeshes), true},
@@ -383,7 +383,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.DeleteUnusedGameObjects), false},
             {nameof(Settings.AllowMeshDataDuplication), false},
         }),
-        ("Full", new Dictionary<string, object>() {
+        ("Aggressive", new Dictionary<string, object>() {
             {nameof(Settings.ApplyOnUpload), true},
             {nameof(Settings.WritePropertiesAsStaticValues), true},
             {nameof(Settings.MergeSkinnedMeshes), true},

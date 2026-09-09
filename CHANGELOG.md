@@ -9,6 +9,7 @@
 * Add error validation box when unknown component types in namespace `VRC.SDK3.` are used on the avatar.
 
 ### Changes
+* Rename `Basic` preset to `Standard` and `Full` preset to `Aggressive`.
 * Optimizer inspector:
   * Replace the Ko-fi button with an open log file button.
   * Add a Ko-fi button to the settings window.

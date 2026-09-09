@@ -20,7 +20,7 @@ After that you can add and update the optimizer like any other packages in your 
 
 ## Settings Recommendation
 * Your avatar is over 150k triangles or a lot of materials
-  * Use the "Basic" preset
+  * Use the "Standard" preset
   * Shader and NaNimation toggles should be avoided as merging too many meshes could cause performance regressions
 * Your avatar is under 150k triangles and a moderate amount of materials
   * Use the "Shader Toggles" preset
@@ -28,14 +28,14 @@ After that you can add and update the optimizer like any other packages in your 
     * Disable NaNimation toggles
     * Check if your avatar doesn't show anything unwanted with shaders blocked  
 In-game, open the action menu (the round one) -> Options -> Avatar -> Fallback Shaders
-  * If anything in-game looks off, fall back to the "Basic" preset
+  * If anything in-game looks off, fall back to the "Standard" preset
 
 If you want to look into more detail there is an extra document here: [For Advanced Users](./Documentation~/ForAdvancedUsers.md)  
 Also read the preset & individual option documentation below.
 
 ## Presets
-### Basic
-This preset only uses optimizations that don't affect the behavior of the avatar [(some exceptions apply)](./Documentation~/ForAdvancedUsers.md#tradeoffs-of-the-basic-preset)
+### Standard
+This preset only uses optimizations that don't affect the behavior of the avatar [(some exceptions apply)](./Documentation~/ForAdvancedUsers.md#tradeoffs-of-the-standard-preset)
 * Removes unused components, blend shapes & bones from skinned meshes
 * Bakes non animated blend shapes into the mesh
 * Merges all skinned meshes that are always animated in the same way
@@ -56,9 +56,9 @@ Expect the following behavior changes (reduced due to NaNimation toggles):
   * Some examples of this are wire frame shaders and screen space ambient occlusion
 * With blocked shaders all merged meshes that now rely on shader toggles are always visible
   * Make sure DPS/TPS penetrators don't show up! The optimizer tries to detect and exclude them from shader toggles. If it fails you need to exclude them manually
-### Full
+### Aggressive
 Some of the settings used here compromise quality of the avatar heavily when animations/shaders are blocked.  
-It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't switch to a lower optimization preset.
+It has some more experimental & some behavior changing ones. Testing that your avatar still works as intended is very needed in this mode. If it doesn't work correctly switch to a lower optimization preset.
 
 ## Why my Shader Pink?
 Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail on some of them. Here is a couple things you could try:
@@ -66,7 +66,7 @@ Shaders can do a lot of *weird* things, therefore the optimizer is bound to fail
   * [Poiyomi Toon](https://github.com/poiyomi/PoiyomiToonShader)
   * [Silent Crosstone](https://gitlab.com/s-ilent/SCSS)
   * [ACLS](https://booth.pm/ja/items/1779615)
-* Use the "Basic" preset which causes the optimizer to not touch the shaders at all.
+* Use the "Standard" preset which causes the optimizer to not touch the shaders at all.
 * Use the "Exclusions" foldout to manually only exclude meshes from optimization that are broken.
 
 If you are a shader author you can read the [Guidelines for Shader Authors](./Documentation~/ForShaderAuthors.md) document to make your shaders compatible with the optimizer.
