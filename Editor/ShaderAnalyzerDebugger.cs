@@ -429,6 +429,19 @@ public class ShaderAnalyzerDebugger : EditorWindow
             EditorGUI.indentLevel--;
         }
 
+        if (parsedShader.noConstantFoldingProperties.Count > 0)
+        {
+            GUILayout.Space(15);
+            var distinctNoConstantFoldingProperties = parsedShader.noConstantFoldingProperties.Distinct().ToList();
+            GUILayout.Label($"Has {distinctNoConstantFoldingProperties.Count} no_constant_folding properties:");
+            EditorGUI.indentLevel++;
+            foreach (var noConstantFoldingProperty in distinctNoConstantFoldingProperties)
+            {
+                EditorGUILayout.LabelField(noConstantFoldingProperty);
+            }
+            EditorGUI.indentLevel--;
+        }
+
         GUILayout.Space(15);
 
         bool IsShownProperty(ParsedShader.Property prop)

@@ -1,6 +1,8 @@
 ## v4.6.0
 ### Features
 * Add new option `Delete Unused Animator Parameters`.
+* Add new shader author optimizer comment `no_constant_folding(param)` to opt properties out of constant folding.
+  * Listed params are neither inline replaced nor emitted as static property declarations.
 * Manual exclusions can now specify if they want to exclude all their children or not.
   * Old way was always exclude all children and is still the default.
 * Add `Allow Mesh Data Duplication` and automatically exclude Skinned Mesh Renderers sharing a mesh above a configurable vertex-count threshold when it is disabled. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/119)

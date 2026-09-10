@@ -123,6 +123,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public HashSet<string> unableToParseIfexStatements = new();
         public List<string> unknownOptimizerComments = new();
         public HashSet<string> requiredConstantProperties = new();
+        public HashSet<string> noConstantFoldingProperties = new();
         public List<string> parserWarnings = new();
 
         public bool CanMerge()
@@ -460,6 +461,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         var paramName = cmd.Substring("require_constant(".Length, cmd.Length - "require_constant(".Length - 1).Trim(trimWhiteSpaceChars);
                         parsedShader.requiredConstantProperties.Add(paramName);
+                        continue;
+                    }
+                    if (cmd.StartsWithSimple("no_constant_folding(") && cmd.EndsWith(")"))
+                    {
+                        var paramName = cmd.Substring("no_constant_folding(".Length, cmd.Length - "no_constant_folding(".Length - 1).Trim(trimWhiteSpaceChars);
+                        parsedShader.noConstantFoldingProperties.Add(paramName);
                         continue;
                     }
                     parsedShader.unknownOptimizerComments.Add(cmd);
@@ -1551,6 +1558,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     prop.shaderLabParams.Add("require_constant");
                 }
             }
+            foreach (var noConstantFoldingProperty in parsedShader.noConstantFoldingProperties)
+            {
+                if (parsedShader.propertyTable.TryGetValue(noConstantFoldingProperty, out var prop))
+                {
+                    prop.shaderLabParams.Add("no_constant_folding");
+                }
+            }
             foreach (var prop in parsedShader.properties)
             {
                 switch (prop.type)
@@ -1741,6 +1755,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (optimizer.animatedPropertyValues.ContainsKey(staticValues.Key))
                     continue;
                 if (optimizer.arrayPropertyValues.ContainsKey(staticValues.Key))
+                    continue;
+                if (source.noConstantFoldingProperties.Contains(staticValues.Key))
                     continue;
                 if (source.propertyTable.TryGetValue(staticValues.Key, out var prop) && prop.doNotLock)
                     continue;
@@ -3300,7 +3316,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                             }
                             else if (staticPropertyValues.TryGetValue(name, out string value)
                                 && !animatedPropertyValues.ContainsKey(name)
-                                && !arrayPropertyValues.ContainsKey(name))
+                                && !arrayPropertyValues.ContainsKey(name)
+                                && !parsedShader.noConstantFoldingProperties.Contains(name))
                             {
                                 output.Add("static " + type + " " + name + " = " + value + ";");
                             }
@@ -3690,6 +3707,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if ((staticPropertyValues.ContainsKey(prop.name) || arrayPropertyValues.ContainsKey(prop.name))
                     && !animatedPropertyValues.ContainsKey(prop.name)
+                    && !parsedShader.noConstantFoldingProperties.Contains(prop.name)
                     && parsedShader.propertyTable[prop.name].shaderLabParams.Count == 0
                     && !shaderPropertiesToKeep.Contains(prop.name))
                     continue;
