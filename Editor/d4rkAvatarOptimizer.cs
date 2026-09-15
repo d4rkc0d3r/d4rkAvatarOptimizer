@@ -124,7 +124,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 #if UNITY_EDITOR
         public MeshTopology GetTopology()
         {
-            return renderer.GetSharedMesh()?.GetTopology(Math.Min(index, renderer.GetSharedMesh().subMeshCount - 1)) ?? MeshTopology.Triangles;
+            var mesh = renderer.GetSharedMesh();
+            if (mesh == null || mesh.subMeshCount == 0)
+                return MeshTopology.Triangles;
+            return mesh.GetTopology(Math.Min(index, mesh.subMeshCount - 1));
         }
 #endif
         public override bool Equals(object obj)
@@ -1032,6 +1035,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var mesh = renderer.GetSharedMesh();
         if (mesh == null)
             return 0;
+        // yes this only counts triangles & quads properly but we match vrchat's triangle performance stat way of counting here
         return Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / (mesh.GetTopology(i) == MeshTopology.Quads ? 2 : 3));
     }
 

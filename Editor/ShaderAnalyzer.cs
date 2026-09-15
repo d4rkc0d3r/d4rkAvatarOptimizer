@@ -1769,7 +1769,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             catch (System.Exception e)
             {
                 Debug.LogError($"Error optimizing shader {source.name}: {e.Message}\n{e.StackTrace}");
-                throw e;
+                throw;
             }
             return optimizer.optimizedShader;
         }
