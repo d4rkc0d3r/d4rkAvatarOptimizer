@@ -51,7 +51,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         public bool MergeMainTex = false;
         public bool OptimizeFXLayer = true;
         public bool CombineApproximateMotionTimeAnimations = false;
-        public bool DeleteUnusedAnimatorParameters = false;
+        public bool DeleteUnusedAnimatorParameters = true;
         public bool DisablePhysBonesWhenUnused = true;
         public bool MergeSameRatioBlendShapes = true;
         public bool MMDCompatibility = true;
@@ -356,7 +356,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {nameof(Settings.MergeMainTex), false},
             {nameof(Settings.OptimizeFXLayer), true},
             {nameof(Settings.CombineApproximateMotionTimeAnimations), false},
-            {nameof(Settings.DeleteUnusedAnimatorParameters), false},
+            {nameof(Settings.DeleteUnusedAnimatorParameters), true},
             {nameof(Settings.DisablePhysBonesWhenUnused), true},
             {nameof(Settings.MergeSameRatioBlendShapes), true},
             {nameof(Settings.MMDCompatibility), true},
@@ -1035,7 +1035,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var mesh = renderer.GetSharedMesh();
         if (mesh == null)
             return 0;
-        // yes this only counts triangles & quads properly but we match vrchat's triangle performance stat way of counting here
+        // this only counts triangles & quads properly to match vrchat's triangle performance stat way of counting
         return Enumerable.Range(0, mesh.subMeshCount).Sum(i => mesh.GetIndexCount(i) / (mesh.GetTopology(i) == MeshTopology.Quads ? 2 : 3));
     }
 
