@@ -1250,11 +1250,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     var returnIndex = line.IndexOf("return");
                     if (returnIndex > 0 && line.Length > returnIndex + 6)
-                    if ((line[returnIndex - 1] == ' ' || line[returnIndex - 1] == '\t' || line[returnIndex - 1] == ';' || line[returnIndex - 1] == ')')
-                        && (line[returnIndex + 6] == ' ' || line[returnIndex + 6] == '\t' || line[returnIndex + 6] == ';') || line[returnIndex + 6] == '(')
                     {
-                        output.Add(line.Substring(0, returnIndex).TrimEnd());
-                        line = line.Substring(returnIndex);   
+                        char prev = line[returnIndex - 1];
+                        char next = line[returnIndex + 6];
+                        if ((prev == ' ' || prev == '\t' || prev == ';' || prev == ')')
+                            && (next == ' ' || next == '\t' || next == ';') || next == '(')
+                        {
+                            output.Add(line[..returnIndex].TrimEnd());
+                            line = line[returnIndex..];   
+                        }
                     }
                 }
                 output.Add(line);
