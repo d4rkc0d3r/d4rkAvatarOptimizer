@@ -3,6 +3,7 @@ using System;
 using UnityEngine;
 using UnityEditor;
 using VRC.SDKBase.Editor.BuildPipeline;
+using System.Linq;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
@@ -29,7 +30,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var optimizers = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(includeInactive: false);
             if (optimizers.Length > 1)
             {
-                Debug.LogError($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because multiple optimizer components found on avatar. Remove duplicates before uploading.");
+                Debug.LogError($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because multiple active optimizer components found on avatar. Remove duplicates before uploading.");
                 return false;
             }
             var optimizer = optimizers.Length == 1 ? optimizers[0] : null;
@@ -43,7 +44,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             if (optimizer == null)
             {
-                Debug.Log($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because no optimizer component found.");
+                var hasDisabledOptimizerComponent = avatarGameObject.GetComponentsInChildren<d4rkAvatarOptimizer>(includeInactive: true).Any();
+                Debug.Log($"d4rkAvatarOptimizer skipping avatar {avatarGameObject.name} because "
+                    + (hasDisabledOptimizerComponent ? "optimizer component is disabled." : "no optimizer component found."));
                 return true;
             }
             if (!optimizer.ApplyOnUpload)
