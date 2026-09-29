@@ -637,8 +637,23 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Validate()
     {
-        static void HelpBox(string message, MessageType type)
-            => WhyNoMaterialMerge.HelpBox(message, EditorStyles.helpBox.fontSize + 2, type);
+        static void HelpBox(string message, MessageType type, string tooltip = null)
+            => WhyNoMaterialMerge.HelpBox(message, EditorStyles.helpBox.fontSize + 2, type, tooltip);
+
+        static string MaterialsTooltip(Material[] materials)
+            => string.Join("\n", MaterialsTooltipLines(materials));
+
+        static IEnumerable<string> MaterialsTooltipLines(IEnumerable<Material> materials)
+        {
+            var names = materials.Select(m => m == null ? "null" : m.name).Distinct().ToList();
+            var extraCount = names.Count - 15;
+            foreach (var name in names.Take(15))
+                yield return $"- {name}";
+            if (extraCount == 1)
+                yield return $"- {names[15]}";
+            else if (extraCount > 1)
+                yield return $"+{extraCount} more materials";
+        }
 
         var avDescriptor = optimizer.GetAvatarDescriptor();
 
@@ -748,34 +763,55 @@ public class d4rkAvatarOptimizerEditor : Editor
                 .Where(r => !exclusions.Contains(r.transform))
                 .SelectMany(r => r.sharedMaterials).Distinct().ToArray();
 
-            var correctlyParsedMaterials = allMaterials
-                .Select(m => ShaderAnalyzer.Parse(m?.shader))
-                .Where(p => p?.parsedCorrectly ?? false).ToArray();
+            var allParsedMaterials = allMaterials
+                .Select(m => (material: m, parsed: ShaderAnalyzer.Parse(m?.shader))).ToArray();
 
-            if (allMaterials.Any(m => !IsLockedIn(m) && HasPropertyMarkedAsRenameAnimated(m)))
+            var correctlyParsedMaterials = allParsedMaterials
+                .Where(t => t.parsed?.parsedCorrectly ?? false)
+                .Select(t => t.parsed).ToArray();
+
+            var renameAnimatedMaterials = allMaterials
+                .Where(m => !IsLockedIn(m) && HasPropertyMarkedAsRenameAnimated(m)).ToArray();
+            if (renameAnimatedMaterials.Length > 0)
             {
                 HelpBox(
                     "Some materials have properties marked as Rename Animated without being locked in.\n" +
                     "Write Properties as Static Values does not support this option.\n" +
                     "If you rely on Rename Animated, lock in these materials with their native method.\n" +
-                    "Check the Debug Info foldout for a list of these materials.", MessageType.Warning);
+                    "Check the Debug Info foldout for a list of these materials.",
+                    MessageType.Warning,
+                    MaterialsTooltip(renameAnimatedMaterials));
             }
 
             var mergeInfoList = new List<string>();
+            var mergeTooltipList = new List<string>();
 
             if (correctlyParsedMaterials.Length != allMaterials.Length)
             {
                 mergeInfoList.Add("Some materials could not be parsed.\n");
+                mergeTooltipList.Add("Could not be parsed:");
+                mergeTooltipList.AddRange(MaterialsTooltipLines(
+                    allParsedMaterials.Where(t => !(t.parsed?.parsedCorrectly ?? false)).Select(t => t.material)));
             }
 
             if (optimizer.MergeDifferentPropertyMaterials && correctlyParsedMaterials.Any(p => !p.CanMerge()))
             {
                 mergeInfoList.Add("Some materials do not support merging.\n");
+                if (mergeTooltipList.Count > 0)
+                    mergeTooltipList.Add("");
+                mergeTooltipList.Add("Do not support merging:");
+                mergeTooltipList.AddRange(MaterialsTooltipLines(
+                    allParsedMaterials.Where(t => t.parsed.parsedCorrectly && !t.parsed.CanMerge()).Select(t => t.material)));
             }
 
             if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
             {
                 mergeInfoList.Add("Some materials do not support merging textures.\n");
+                if (mergeTooltipList.Count > 0)
+                    mergeTooltipList.Add("");
+                mergeTooltipList.Add("Do not support merging textures:");
+                mergeTooltipList.AddRange(MaterialsTooltipLines(
+                    allParsedMaterials.Where(t => t.parsed.parsedCorrectly && t.parsed.CanMerge() && !t.parsed.CanMergeTextures()).Select(t => t.material)));
             }
 
             if (mergeInfoList.Count > 0)
@@ -783,15 +819,21 @@ public class d4rkAvatarOptimizerEditor : Editor
                 HelpBox(
                     string.Join("", mergeInfoList) +
                     "Swapping their shaders to compatible ones might help reduce material count further.\n" +
-                    "Check the Debug Info foldout for more info.", MessageType.Info);
+                    "Check the Debug Info foldout for more info.",
+                    MessageType.Info,
+                    string.Join("\n", mergeTooltipList));
             }
 
-            if (optimizer.MergeDifferentPropertyMaterials && allMaterials.Any(m => IsLockedIn(m) && !HasPropertyMarkedAsRenameAnimated(m)))
+            var lockedInMaterials = allMaterials
+                .Where(m => IsLockedIn(m) && !HasPropertyMarkedAsRenameAnimated(m)).ToArray();
+            if (optimizer.MergeDifferentPropertyMaterials && lockedInMaterials.Length > 0)
             {
                 HelpBox(
                     "Some materials are locked in.\n" +
                     "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
-                    "Check the Debug Info foldout for a full list.", MessageType.Info);
+                    "Check the Debug Info foldout for a full list.",
+                    MessageType.Info,
+                    MaterialsTooltip(lockedInMaterials));
             }
 
             if (optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)

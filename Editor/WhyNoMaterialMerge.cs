@@ -75,7 +75,7 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
             return slot;
         }
 
-        public static void HelpBox(string message, int fontSize, MessageType type)
+        public static void HelpBox(string message, int fontSize, MessageType type, string tooltip = null)
         {
             var style = new GUIStyle(EditorStyles.helpBox) { fontSize = fontSize };
             Texture icon = type switch
@@ -85,7 +85,7 @@ namespace d4rkpl4y3r.d4rkavataroptimizer
                 MessageType.Error => EditorGUIUtility.IconContent("console.erroricon").image,
                 _ => null
             };
-            EditorGUILayout.LabelField(new GUIContent(message, icon), style);
+            EditorGUILayout.LabelField(new GUIContent(message, icon, tooltip ?? ""), style);
         }
 
         public void OnGUI()

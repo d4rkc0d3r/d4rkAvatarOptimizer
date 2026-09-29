@@ -1,3 +1,8 @@
+## v4.6.1
+### Changes
+* Optimizer inspector:
+  * Add the names of the affected materials (up to 15, one per line) as tooltips to the `Write Properties as Static Values` validation info boxes.
+
 ## v4.6.0
 ### Features
 * Add new option `Delete Unused Animator Parameters`.
