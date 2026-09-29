@@ -192,3 +192,20 @@ Fragment(FragmentData i, bool facing: SV_IsFrontFace)
     // [...]
 }
 ```
+
+```c
+// issue is that there are two opening curly braces and only one close
+// optimizer relies on counting opening and closing curly braces to determine scope like end of function
+// fix here was to just pull the opening curly brace out of the #ifdef sections
+#ifdef VRCLV_DISABLE_SMOOTH_BOUNDS
+[branch] if (mask == 1 || isNoB) {
+#else
+[branch] if (mask == 1 || (isNoB && _UdonLightVolumeSharpBounds)) {
+#endif
+    L0  += L0_A;
+    L1r += L1r_A;
+    L1g += L1g_A;
+    L1b += L1b_A;
+    return;
+}
+```
