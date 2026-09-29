@@ -637,22 +637,24 @@ public class d4rkAvatarOptimizerEditor : Editor
 
     private bool Validate()
     {
-        int fontSize = EditorStyles.helpBox.fontSize + 2;
+        static void HelpBox(string message, MessageType type)
+            => WhyNoMaterialMerge.HelpBox(message, EditorStyles.helpBox.fontSize + 2, type);
+
         var avDescriptor = optimizer.GetAvatarDescriptor();
 
         if (avDescriptor == null)
         {
-            WhyNoMaterialMerge.HelpBox("No VRCAvatarDescriptor found.", fontSize, MessageType.Error);
+            HelpBox("No VRCAvatarDescriptor found.", MessageType.Error);
             return false;
         }
 
         var allOptimizerComponents = avDescriptor.GetComponentsInChildren<d4rkAvatarOptimizer>(true);
         if (allOptimizerComponents.Length > 1)
         {
-            WhyNoMaterialMerge.HelpBox("Multiple d4rkAvatarOptimizer components found on the avatar.\n" +
+            HelpBox("Multiple d4rkAvatarOptimizer components found on the avatar.\n" +
                 "Remove the duplicates. Components are at paths:\n - " +
                 string.Join("\n - ", allOptimizerComponents.Select(c => avDescriptor.name + (c.transform == avDescriptor.transform ? "" : "/" + c.GetPathToRoot(c)))),
-                fontSize, MessageType.Error);
+                MessageType.Error);
             return false;
         }
 
@@ -660,14 +662,14 @@ public class d4rkAvatarOptimizerEditor : Editor
         int actualBaseLayerCount = avDescriptor.baseAnimationLayers == null ? 0 : avDescriptor.baseAnimationLayers.Length;
         if (actualBaseLayerCount != expectedBaseLayerCount)
         {
-            WhyNoMaterialMerge.HelpBox($"Expected base layer count: {expectedBaseLayerCount}, but found: {actualBaseLayerCount}.\n" +
-                "Try to reimport the avatar fbx.", fontSize, MessageType.Error);
+            HelpBox($"Expected base layer count: {expectedBaseLayerCount}, but found: {actualBaseLayerCount}.\n" +
+                "Try to reimport the avatar fbx.", MessageType.Error);
             return false;
         }
 
         if (avDescriptor.name.EndsWith("(OptimizedCopy)"))
         {
-            WhyNoMaterialMerge.HelpBox("Put the optimizer on the original avatar, not the optimized copy.", fontSize, MessageType.Error);
+            HelpBox("Put the optimizer on the original avatar, not the optimized copy.", MessageType.Error);
             return false;
         }
 
@@ -675,10 +677,10 @@ public class d4rkAvatarOptimizerEditor : Editor
         var unknownVRCComponentTypes = allComponentTypes.Where(t => t.StartsWith("VRC.SDK3.") && !knownVRCComponentTypeNames.Contains(t)).ToList();
         if (unknownVRCComponentTypes.Count > 0)
         {
-            WhyNoMaterialMerge.HelpBox("Unknown VRC component types found on the avatar:\n - " +
+            HelpBox("Unknown VRC component types found on the avatar:\n - " +
                 string.Join("\n - ", unknownVRCComponentTypes) + 
                 "\nYou need to update the optimizer or not use it if there is no new version available.\n" +
-                "Not doing so will most likely break things on your avatar.", fontSize, MessageType.Error);
+                "Not doing so will most likely break things on your avatar.", MessageType.Error);
         }
 
         if (optimizer.UseRingFingerAsFootCollider)
@@ -687,9 +689,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 || !avDescriptor.collider_footL.transform.IsDescendantOf(avDescriptor.transform)
                 || !avDescriptor.collider_footR.transform.IsDescendantOf(avDescriptor.transform))
             {
-                WhyNoMaterialMerge.HelpBox(
+                HelpBox(
                     "Foot collider transform not set to this avatar.\n" +
-                    "Open the collider foldout in the VRC Avatar Descriptor.", fontSize, MessageType.Error);
+                    "Open the collider foldout in the VRC Avatar Descriptor.", MessageType.Error);
             }
         }
 
@@ -699,7 +701,7 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = avDescriptor.VisemeSkinnedMesh;
             if (avDescriptor.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
             {
-                WhyNoMaterialMerge.HelpBox("Viseme SkinnedMeshRenderer is not a child of the avatar root.", fontSize, MessageType.Error);
+                HelpBox("Viseme SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
         }
 
@@ -709,23 +711,23 @@ public class d4rkAvatarOptimizerEditor : Editor
             var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
             if (avDescriptor.GetComponentsInChildren<SkinnedMeshRenderer>(true).All(r => r != meshRenderer))
             {
-                WhyNoMaterialMerge.HelpBox("Eyelid SkinnedMeshRenderer is not a child of the avatar root.", fontSize, MessageType.Error);
+                HelpBox("Eyelid SkinnedMeshRenderer is not a child of the avatar root.", MessageType.Error);
             }
         }
 
         if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "Optimized copy of some avatar is present in the scene.\n" +
-                "Its assets will be deleted when creating a new optimized copy.", fontSize, MessageType.Error);
+                "Its assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
         if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "Seems like the last optimization attempt failed.\n" +
                 "You can try to delete the broken copy and try again with different settings or adding parts to the exclusion list.\n" +
-                "Click this message to find or create a bug report on github.", fontSize, MessageType.Error);
+                "Click this message to find or create a bug report on github.", MessageType.Error);
             if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
                 Application.OpenURL("https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues");
         }
@@ -735,9 +737,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         if ((optimizer.MergeSkinnedMeshesWithNaNimation || optimizer.MergeSkinnedMeshesWithShaderToggle)
             && optimizer.GetPolyCount() > d4rkAvatarOptimizer.MaxPolyCountForAutoShaderToggle)
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 $"For avatars with a high poly count ({(int)(d4rkAvatarOptimizer.MaxPolyCountForAutoShaderToggle / 1000)}k or more)" +
-                " it might be disadvantageous to merge meshes with NaNimation or Shader toggles.", fontSize, MessageType.Warning);
+                " it might be disadvantageous to merge meshes with NaNimation or Shader toggles.", MessageType.Warning);
         }
 
         if (optimizer.WritePropertiesAsStaticValues)
@@ -752,11 +754,11 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             if (allMaterials.Any(m => !IsLockedIn(m) && HasPropertyMarkedAsRenameAnimated(m)))
             {
-                WhyNoMaterialMerge.HelpBox(
+                HelpBox(
                     "Some materials have properties marked as Rename Animated without being locked in.\n" +
                     "Write Properties as Static Values does not support this option.\n" +
                     "If you rely on Rename Animated, lock in these materials with their native method.\n" +
-                    "Check the Debug Info foldout for a list of these materials.", fontSize, MessageType.Warning);
+                    "Check the Debug Info foldout for a list of these materials.", MessageType.Warning);
             }
 
             var mergeInfoList = new List<string>();
@@ -778,35 +780,35 @@ public class d4rkAvatarOptimizerEditor : Editor
 
             if (mergeInfoList.Count > 0)
             {
-                WhyNoMaterialMerge.HelpBox(
+                HelpBox(
                     string.Join("", mergeInfoList) +
                     "Swapping their shaders to compatible ones might help reduce material count further.\n" +
-                    "Check the Debug Info foldout for more info.", fontSize, MessageType.Info);
+                    "Check the Debug Info foldout for more info.", MessageType.Info);
             }
 
             if (optimizer.MergeDifferentPropertyMaterials && allMaterials.Any(m => IsLockedIn(m) && !HasPropertyMarkedAsRenameAnimated(m)))
             {
-                WhyNoMaterialMerge.HelpBox(
+                HelpBox(
                     "Some materials are locked in.\n" +
                     "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
-                    "Check the Debug Info foldout for a full list.", fontSize, MessageType.Info);
+                    "Check the Debug Info foldout for a full list.", MessageType.Info);
             }
 
             if (optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)
             {
-                WhyNoMaterialMerge.HelpBox(
+                HelpBox(
                     "Some textures are crunch compressed.\n" +
                     "Crunch compressed textures cannot be merged.\n" +
-                    "Check the Debug Info foldout for a full list.", fontSize, MessageType.Info);
+                    "Check the Debug Info foldout for a full list.", MessageType.Info);
             }
         }
 
         if (NonBC5NormalMaps.Length > 0)
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "Some normal maps are not BC5 compressed.\n" +
                 "BC5 compressed normal maps are highest quality for the same VRAM size as the other compression options.\n" +
-                "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.", fontSize, MessageType.Info);
+                "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.", MessageType.Info);
             if (GUILayout.Button($"Convert all ({NonBC5NormalMaps.Length}) normal maps to BC5"))
             {
                 foreach (var tex in NonBC5NormalMaps)
@@ -827,29 +829,29 @@ public class d4rkAvatarOptimizerEditor : Editor
 
         if (optimizer.MergeSkinnedMeshesWithNaNimation && CantMergeNaNimationBecauseOfWDONAnimations.Length > 0)
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "Some meshes are missing the corresponding on or off toggle animation. This is likely due to a WD ON workflow.\n" +
                 "This means they can't be merged with NaNimation and switching to a WD OFF workflow would help reduce mesh count further.\n" +
-                "Check the Debug Info foldout for a full list at:\n\"Unmergable NaNimation by Animations\"", fontSize, MessageType.Info);
+                "Check the Debug Info foldout for a full list at:\n\"Unmergable NaNimation by Animations\"", MessageType.Info);
         }
 
         var tools = optimizer.GetNonDestructiveToolsUsedOnAvatar();
         if (tools.Contains("VRCFury"))
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "VRCFury is used on the avatar. This means the perf rank change and merge result previews can be inaccurate as the optimizer does not take VRCFury into account for those.\n" +
                 "To test in editor built a VRCFury test avatar and use the optimizer on that.\n" +
-                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures fury and the optimizer get used in the correct order.", fontSize, MessageType.Warning);
+                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures fury and the optimizer get used in the correct order.", MessageType.Warning);
             return false;
         }
 
         if (tools.Contains("Modular Avatar"))
         {
-            WhyNoMaterialMerge.HelpBox(
+            HelpBox(
                 "Modular Avatar is used on the avatar. This means the perf rank change and merge result previews " + 
                 "can be inaccurate as the optimizer does not take Modular Avatar into account for those.\n" +
                 "To test in editor use \"Manual bake avatar\" before clicking the optimize button.\n" +
-                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures Modular Avatar and the optimizer get used in the correct order.", fontSize, MessageType.Warning);
+                $"For uploading use the {d4rkAvatarOptimizer.GetDisplayName(nameof(d4rkAvatarOptimizer.ApplyOnUpload))} feature as that ensures Modular Avatar and the optimizer get used in the correct order.", MessageType.Warning);
             return false;
         }
 
