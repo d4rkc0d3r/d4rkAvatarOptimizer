@@ -640,14 +640,20 @@ public class d4rkAvatarOptimizerEditor : Editor
         static void HelpBox(string message, MessageType type, string tooltip = null)
             => WhyNoMaterialMerge.HelpBox(message, EditorStyles.helpBox.fontSize + 2, type, tooltip);
 
-        static string MaterialsTooltip(Material[] materials)
-            => string.Join("\n", MaterialsTooltipLines(materials));
+        static string MaterialsTooltip(Material[] materials, string header = null)
+        {
+            var lines = MaterialsTooltipLines(materials);
+            return header == null ? string.Join("\n", lines) : $"{header}\n{string.Join("\n", lines)}";
+        }
 
         static IEnumerable<string> MaterialsTooltipLines(IEnumerable<Material> materials)
             => TooltipLines(materials.Select(m => m == null ? "null" : m.name), "materials");
 
-        static string TexturesTooltip(Texture[] textures)
-            => string.Join("\n", TooltipLines(textures.Select(t => t == null ? "null" : t.name), "textures"));
+        static string TexturesTooltip(Texture[] textures, string header = null)
+        {
+            var lines = TooltipLines(textures.Select(t => t == null ? "null" : t.name), "textures");
+            return header == null ? string.Join("\n", lines) : $"{header}\n{string.Join("\n", lines)}";
+        }
 
         var avDescriptor = optimizer.GetAvatarDescriptor();
 
@@ -774,7 +780,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     "If you rely on Rename Animated, lock in these materials with their native method.\n" +
                     "Check the Debug Info foldout for a list of these materials.",
                     MessageType.Warning,
-                    MaterialsTooltip(renameAnimatedMaterials));
+                    MaterialsTooltip(renameAnimatedMaterials, "Rename Animated (not locked in):"));
             }
 
             var mergeInfoList = new List<string>();
@@ -827,7 +833,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     "Write Properties as Static Values will do effectively the same as locking in while also having more potential to reduce material count.\n" +
                     "Check the Debug Info foldout for a full list.",
                     MessageType.Info,
-                    MaterialsTooltip(lockedInMaterials));
+                    MaterialsTooltip(lockedInMaterials, "Locked in:"));
             }
 
             if (optimizer.MergeSameDimensionTextures && CrunchedTextures.Length > 1)
@@ -837,7 +843,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     "Crunch compressed textures cannot be merged.\n" +
                     "Check the Debug Info foldout for a full list.",
                     MessageType.Info,
-                    TexturesTooltip(CrunchedTextures));
+                    TexturesTooltip(CrunchedTextures, "Crunched Textures:"));
             }
         }
 
@@ -848,7 +854,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 "BC5 compressed normal maps are highest quality for the same VRAM size as the other compression options.\n" +
                 "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.",
                 MessageType.Info,
-                TexturesTooltip(NonBC5NormalMaps));
+                TexturesTooltip(NonBC5NormalMaps, "Non BC5 normal maps:"));
             if (GUILayout.Button($"Convert all ({NonBC5NormalMaps.Length}) normal maps to BC5"))
             {
                 foreach (var tex in NonBC5NormalMaps)
@@ -1245,8 +1251,8 @@ public class d4rkAvatarOptimizerEditor : Editor
         return false;
     }
 
-    private string PropertiesTooltip(Material material)
-        => string.Join("\n", TooltipLines(FindPropertiesMarkedAsRenameAnimated(material), "properties"));
+    private string PropertiesTooltip(Material material, string header = "Properties marked RA:")
+        => $"{header}\n{string.Join("\n", TooltipLines(FindPropertiesMarkedAsRenameAnimated(material), "properties"))}";
 
     private static IEnumerable<string> TooltipLines(IEnumerable<string> names, string extraNoun)
     {
