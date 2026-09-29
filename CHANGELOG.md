@@ -1,8 +1,10 @@
 ## v4.6.1
 ### Changes
 * Optimizer inspector:
-  * Add the names of the affected materials (up to 15, one per line) as tooltips to the `Write Properties as Static Values` validation info boxes.
-  * Add the names of the affected textures (up to 15, one per line) as tooltips to the crunch compressed textures and non BC5 normal maps validation info boxes.
+  * Add tooltips listing the affected assets (up to 15, one per line) to some validation info boxes and debug lists:
+    * Several of the material related validation info boxes.
+    * Crunch compressed textures and non BC5 normal maps validation.
+    * Debug foldout section for `Unlocked materials with Rename Animated` shows the marked properties.
 
 ## v4.6.0
 ### Features

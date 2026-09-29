@@ -432,7 +432,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     var list = optimizer.GetUsedComponentsInChildren<Renderer>()
                         .SelectMany(r => r.sharedMaterials).Distinct()
                         .Where(mat => CanLockIn(mat) && !IsLockedIn(mat) && HasPropertyMarkedAsRenameAnimated(mat)).ToArray();
-                    DrawDebugList(list);
+                    DrawDebugList(list, mat => PropertiesTooltip(mat));
                     Profiler.EndSection();
                 }
             }
@@ -644,22 +644,10 @@ public class d4rkAvatarOptimizerEditor : Editor
             => string.Join("\n", MaterialsTooltipLines(materials));
 
         static IEnumerable<string> MaterialsTooltipLines(IEnumerable<Material> materials)
-            => TooltipLines(materials, m => m == null ? "null" : m.name, "materials");
+            => TooltipLines(materials.Select(m => m == null ? "null" : m.name), "materials");
 
         static string TexturesTooltip(Texture[] textures)
-            => string.Join("\n", TooltipLines(textures, t => t == null ? "null" : t.name, "textures"));
-
-        static IEnumerable<string> TooltipLines<T>(IEnumerable<T> assets, System.Func<T, string> nameSelector, string extraNoun)
-        {
-            var names = assets.Select(nameSelector).Distinct().ToList();
-            var extraCount = names.Count - 15;
-            foreach (var name in names.Take(15))
-                yield return $"- {name}";
-            if (extraCount == 1)
-                yield return $"- {names[15]}";
-            else if (extraCount > 1)
-                yield return $"+{extraCount} more {extraNoun}";
-        }
+            => string.Join("\n", TooltipLines(textures.Select(t => t == null ? "null" : t.name), "textures"));
 
         var avDescriptor = optimizer.GetAvatarDescriptor();
 
@@ -957,7 +945,7 @@ public class d4rkAvatarOptimizerEditor : Editor
     private HashSet<string> keptBlendShapePathsCache = null;
     private List<List<(string blendshape, float value)>> mergeableBlendShapesCache = null;
     private Dictionary<Mesh, (int count, float maxValue, float medianValue)[]> meshBoneWeightStatsCache = null;
-    private Dictionary<Material, bool> hasPropertiesMarkedAsRenameAnimatedCache = null;
+    private Dictionary<Material, string[]> propertiesMarkedAsRenameAnimatedCache = null;
 
     private void ClearUICaches(bool force = false)
     {
@@ -972,7 +960,7 @@ public class d4rkAvatarOptimizerEditor : Editor
         animatedMaterialPropertyPathsCache = null;
         keptBlendShapePathsCache = null;
         mergeableBlendShapesCache = null;
-        hasPropertiesMarkedAsRenameAnimatedCache = null;
+        propertiesMarkedAsRenameAnimatedCache = null;
         optimizer.ClearCaches();
     }
 
@@ -1257,14 +1245,32 @@ public class d4rkAvatarOptimizerEditor : Editor
         return false;
     }
 
+    private string PropertiesTooltip(Material material)
+        => string.Join("\n", TooltipLines(FindPropertiesMarkedAsRenameAnimated(material), "properties"));
+
+    private static IEnumerable<string> TooltipLines(IEnumerable<string> names, string extraNoun)
+    {
+        var distinctNames = names.Distinct().ToList();
+        var extraCount = distinctNames.Count - 15;
+        foreach (var name in distinctNames.Take(15))
+            yield return $"- {name}";
+        if (extraCount == 1)
+            yield return $"- {distinctNames[15]}";
+        else if (extraCount > 1)
+            yield return $"+{extraCount} more {extraNoun}";
+    }
+
     public bool HasPropertyMarkedAsRenameAnimated(Material material)
+        => FindPropertiesMarkedAsRenameAnimated(material).Length > 0;
+
+    public string[] FindPropertiesMarkedAsRenameAnimated(Material material)
     {
         if (material == null)
-            return false;
-        hasPropertiesMarkedAsRenameAnimatedCache ??= new();
+            return System.Array.Empty<string>();
+        propertiesMarkedAsRenameAnimatedCache ??= new();
         if (!CanLockIn(material))
-            return false;
-        if (hasPropertiesMarkedAsRenameAnimatedCache.TryGetValue(material, out var cached))
+            return System.Array.Empty<string>();
+        if (propertiesMarkedAsRenameAnimatedCache.TryGetValue(material, out var cached))
             return cached;
 
         string CleanStringForPropertyNames(string s)
@@ -1289,8 +1295,9 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
         var raSuffix = CleanStringForPropertyNames(material.GetTag("thry_rename_suffix", false, material.name));
 
-        bool EntryHasRenameAnimatedTag(SerializedProperty entry)
+        bool EntryHasRenameAnimatedTag(SerializedProperty entry, out string propertyName)
         {
+            propertyName = null;
             if (entry == null)
                 return false;
             var keyProp = entry.FindPropertyRelative("first");
@@ -1309,10 +1316,20 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (valueProp.stringValue != "2")
                 return false;
             var propName = tag[..^"Animated".Length];
-            return material.HasProperty(propName) || material.HasProperty($"{propName}_{raSuffix}");
+            if (material.HasProperty(propName))
+            {
+                propertyName = propName;
+                return true;
+            }
+            if (material.HasProperty($"{propName}_{raSuffix}"))
+            {
+                propertyName = $"{propName}_{raSuffix}";
+                return true;
+            }
+            return false;
         }
 
-        bool result = false;
+        var result = new List<string>();
         using (var serializedMaterial = new SerializedObject(material))
         {
             var tagMap = serializedMaterial.FindProperty("stringTagMap");
@@ -1321,17 +1338,16 @@ public class d4rkAvatarOptimizerEditor : Editor
             {
                 for (int i = 0; i < tagMap.arraySize; i++)
                 {
-                    if (EntryHasRenameAnimatedTag(tagMap.GetArrayElementAtIndex(i)))
-                    {
-                        result = true;
-                        break;
-                    }
+                    if (EntryHasRenameAnimatedTag(tagMap.GetArrayElementAtIndex(i), out var propertyName))
+                        result.Add(propertyName);
                 }
             }
         }
 
-        hasPropertiesMarkedAsRenameAnimatedCache[material] = result;
-        return result;
+        result = result.Distinct().ToList();
+        var resultArray = result.ToArray();
+        propertiesMarkedAsRenameAnimatedCache[material] = resultArray;
+        return resultArray;
     }
 
     private static Dictionary<string, List<string>> tooltipCache = null;
@@ -1482,11 +1498,13 @@ public class d4rkAvatarOptimizerEditor : Editor
         }
     }
 
-    public void DrawDebugList<T>(T[] array) where T : Object
+    public void DrawDebugList<T>(T[] array, System.Func<T, string> tooltipSelector = null) where T : Object
     {
         foreach (var obj in array)
         {
             EditorGUILayout.ObjectField(obj, typeof(T), true);
+            if (tooltipSelector != null)
+                GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent("", tooltipSelector(obj)));
         }
         if (array.Length == 0)
         {
