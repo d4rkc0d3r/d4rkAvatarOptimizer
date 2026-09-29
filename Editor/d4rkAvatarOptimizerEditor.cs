@@ -18,7 +18,6 @@ using d4rkpl4y3r.d4rkavataroptimizer;
 public class d4rkAvatarOptimizerEditor : Editor
 {
     private static d4rkAvatarOptimizer optimizer;
-    private static Material nullMaterial = null;
     private static long longestTimeUsed = -2;
 
     public override void OnInspectorGUI()
@@ -28,11 +27,6 @@ public class d4rkAvatarOptimizerEditor : Editor
         // exclude OnSelectionChange from timing since it parses shaders which will stay cached after the first time
         var stopWatch = new System.Diagnostics.Stopwatch();
         stopWatch.Start();
-        if (nullMaterial == null)
-        {
-            nullMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
-            nullMaterial.name = "(null material slot)";
-        }
 
         using (new EditorGUILayout.HorizontalScope())
         {
