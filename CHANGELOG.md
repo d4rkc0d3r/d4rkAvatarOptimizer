@@ -2,6 +2,7 @@
 ### Changes
 * Optimizer inspector:
   * Add the names of the affected materials (up to 15, one per line) as tooltips to the `Write Properties as Static Values` validation info boxes.
+  * Add the names of the affected textures (up to 15, one per line) as tooltips to the crunch compressed textures and non BC5 normal maps validation info boxes.
 
 ## v4.6.0
 ### Features

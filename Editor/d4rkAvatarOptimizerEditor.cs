@@ -644,15 +644,21 @@ public class d4rkAvatarOptimizerEditor : Editor
             => string.Join("\n", MaterialsTooltipLines(materials));
 
         static IEnumerable<string> MaterialsTooltipLines(IEnumerable<Material> materials)
+            => TooltipLines(materials, m => m == null ? "null" : m.name, "materials");
+
+        static string TexturesTooltip(Texture[] textures)
+            => string.Join("\n", TooltipLines(textures, t => t == null ? "null" : t.name, "textures"));
+
+        static IEnumerable<string> TooltipLines<T>(IEnumerable<T> assets, System.Func<T, string> nameSelector, string extraNoun)
         {
-            var names = materials.Select(m => m == null ? "null" : m.name).Distinct().ToList();
+            var names = assets.Select(nameSelector).Distinct().ToList();
             var extraCount = names.Count - 15;
             foreach (var name in names.Take(15))
                 yield return $"- {name}";
             if (extraCount == 1)
                 yield return $"- {names[15]}";
             else if (extraCount > 1)
-                yield return $"+{extraCount} more materials";
+                yield return $"+{extraCount} more {extraNoun}";
         }
 
         var avDescriptor = optimizer.GetAvatarDescriptor();
@@ -801,7 +807,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     mergeTooltipList.Add("");
                 mergeTooltipList.Add("Do not support merging:");
                 mergeTooltipList.AddRange(MaterialsTooltipLines(
-                    allParsedMaterials.Where(t => t.parsed.parsedCorrectly && !t.parsed.CanMerge()).Select(t => t.material)));
+                    allParsedMaterials.Where(t => (t.parsed?.parsedCorrectly ?? false) && !t.parsed.CanMerge()).Select(t => t.material)));
             }
 
             if (optimizer.MergeSameDimensionTextures && correctlyParsedMaterials.Any(p => p.CanMerge() && !p.CanMergeTextures()))
@@ -811,7 +817,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                     mergeTooltipList.Add("");
                 mergeTooltipList.Add("Do not support merging textures:");
                 mergeTooltipList.AddRange(MaterialsTooltipLines(
-                    allParsedMaterials.Where(t => t.parsed.parsedCorrectly && t.parsed.CanMerge() && !t.parsed.CanMergeTextures()).Select(t => t.material)));
+                    allParsedMaterials.Where(t => (t.parsed?.parsedCorrectly ?? false) && t.parsed.CanMerge() && !t.parsed.CanMergeTextures()).Select(t => t.material)));
             }
 
             if (mergeInfoList.Count > 0)
@@ -841,7 +847,9 @@ public class d4rkAvatarOptimizerEditor : Editor
                 HelpBox(
                     "Some textures are crunch compressed.\n" +
                     "Crunch compressed textures cannot be merged.\n" +
-                    "Check the Debug Info foldout for a full list.", MessageType.Info);
+                    "Check the Debug Info foldout for a full list.",
+                    MessageType.Info,
+                    TexturesTooltip(CrunchedTextures));
             }
         }
 
@@ -850,7 +858,9 @@ public class d4rkAvatarOptimizerEditor : Editor
             HelpBox(
                 "Some normal maps are not BC5 compressed.\n" +
                 "BC5 compressed normal maps are highest quality for the same VRAM size as the other compression options.\n" +
-                "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.", MessageType.Info);
+                "Check the Debug Info foldout for a full list or click the button to automatically change them all to BC5.",
+                MessageType.Info,
+                TexturesTooltip(NonBC5NormalMaps));
             if (GUILayout.Button($"Convert all ({NonBC5NormalMaps.Length}) normal maps to BC5"))
             {
                 foreach (var tex in NonBC5NormalMaps)
