@@ -136,6 +136,15 @@ void geom(triangle VS_OUT input[3], inout TriangleStream<PS_IN> triStream, uint 
 }
 ```
 
+## Disabling renderer merging
+If your shader must never be merged into combined meshes by the optimizer, you can set the `DisableBatching` tag to `True` in the shader source:
+
+```
+Tags { "DisableBatching" = "True" }
+```
+
+This can be useful for billboard shaders or anything else that requires the shaders local space to not change.
+
 ## Disabling constant folding for properties
 If your shader has properties that must stay as runtime uniforms and must not be baked to their material values, you can mark them with the comment `//d4rkAO:no_constant_folding(_PropertyName)`.
 

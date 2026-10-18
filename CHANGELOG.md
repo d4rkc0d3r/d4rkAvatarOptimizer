@@ -1,10 +1,14 @@
 ## v4.6.1
 ### Changes
 * Optimizer inspector:
-  * Add tooltips listing the affected assets (up to 15, one per line) to some validation info boxes and debug lists:
+  * Add tooltips listing the affected assets to some validation info boxes and debug lists:
     * Several of the material related validation info boxes.
     * Crunch compressed textures and non BC5 normal maps validation.
     * Debug foldout section for `Unlocked materials with Rename Animated` shows the marked properties.
+
+### Bug Fixes
+* Fix materials with `DisableBatching` set to true not blocking basic renderer merging.
+  * Used to only block renderer merging with shader toggles.
 
 ## v4.6.0
 ### Features

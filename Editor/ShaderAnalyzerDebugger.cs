@@ -345,6 +345,11 @@ public class ShaderAnalyzerDebugger : EditorWindow
             EditorGUILayout.HelpBox(parsedShader.errorMessage, MessageType.Error);
         }
 
+        if (material != null && material.GetTag("DisableBatching", false, "false").ToLowerInvariant() == "true")
+        {
+            EditorGUILayout.HelpBox($"{material.name} has 'DisableBatching' set to 'True'.", MessageType.Warning);
+        }
+
         GUILayout.Space(5);
 
         for (int i = 0; i < parsedShader.passes.Count; i++)

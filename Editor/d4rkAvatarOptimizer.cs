@@ -1099,6 +1099,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return parsedShader.CanMerge() ? null : parsedShader.CantMergeReason();
     }
 
+    private static bool MaterialHasDisableBatching(Material material)
+    {
+        if (material == null)
+            return false;
+        return material.GetTag("DisableBatching", false, "false").ToLowerInvariant() == "true";
+    }
+
     private string IsBasicCombinableRendererError(Renderer candidate)
     {
         if (!MergeSkinnedMeshes)
@@ -1120,6 +1127,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return "MeshRenderer is on layer 12";
         if (GetParticleSystemsUsingRenderer(candidate).Any(ps => !ps.shape.useMeshMaterialIndex || candidate is MeshRenderer))
             return "Affected by particle system using this renderer";
+        foreach (var slot in MaterialSlot.GetAllSlotsFrom(candidate))
+        {
+            var material = slot.material;
+            if (MaterialHasDisableBatching(material))
+                return $"Material '{material.name}' slot {slot.index} has DisableBatching set to true";
+            if (slotSwapMaterials.TryGetValue((GetPathToRoot(slot.renderer), slot.index), out var materials))
+            {
+                var swapMaterialWithDisableBatching = materials.FirstOrDefault(MaterialHasDisableBatching);
+                if (swapMaterialWithDisableBatching != null)
+                    return $"Material swap '{swapMaterialWithDisableBatching.name}' slot {slot.index} has DisableBatching set to true";
+            }
+        }
         return null;
     }
 

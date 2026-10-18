@@ -106,7 +106,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public bool parsedCorrectly = false;
         public bool couldFindAllVertexGeomFragmentFunctions = true;
         public string errorMessage = "";
-        public bool hasDisableBatchingTag = false;
         public List<string> customTextureDeclarations = new();
         public Dictionary<string, int> multiIncludeFileCount = new();
         public bool mismatchedCurlyBraces = false;
@@ -132,8 +131,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return false;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return false;
-            if (hasDisableBatchingTag)
-                return false;
             if (!couldFindAllVertexGeomFragmentFunctions)
                 return false;
             return true;
@@ -145,8 +142,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return errorMessage == "" ? "Shader has not parsed correctly." : errorMessage;
             if (passes.Any(p => p.hull != null || p.domain != null))
                 return "Shader has a pass with tessellation.";
-            if (hasDisableBatchingTag)
-                return "Shader has DisableBatching set to true.";
             if (!couldFindAllVertexGeomFragmentFunctions)
                 return "Optimizer could not find all vertex/geometry/fragment functions.";
             return "";
@@ -1398,10 +1393,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var matches = Regex.Matches(line, @"""([^""]+)""\s*=\s*""([^""]+)""");
                         foreach (Match match in matches)
                         {
-                            if (match.Groups[1].Value == "DisableBatching" && match.Groups[2].Value == "True")
-                            {
-                                parsedShader.hasDisableBatchingTag = true;
-                            }
                             if (currentPass != null)
                             {
                                 currentPass.tags[match.Groups[1].Value] = match.Groups[2].Value;
