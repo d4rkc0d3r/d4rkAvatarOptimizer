@@ -469,6 +469,31 @@ public class d4rkAvatarOptimizerEditor : Editor
                 }
                 Profiler.EndSection();
             }
+            if (Foldout("Native Face Tracking", ref optimizer.DebugShowFaceTracking))
+            {
+                using var faceTrackingIndent = new EditorGUI.IndentLevelScope();
+                var (meshes, names) = optimizer.GetFaceTrackingSetup();
+                EditorGUILayout.LabelField($"Declared Blendshape Names ({names.Count})");
+                DrawDebugList(names.OrderBy(n => n, System.StringComparer.Ordinal).ToArray());
+                var descriptor = optimizer.GetAvatarDescriptor();
+                var field = descriptor?.GetType().GetField("faceTrackingMeshes");
+                if (field?.GetValue(descriptor) is IEnumerable<SkinnedMeshRenderer> configuredMeshes)
+                {
+                    int index = 0;
+                    foreach (var renderer in configuredMeshes)
+                    {
+                        bool tracked = renderer != null && meshes.Contains(renderer) && index < 16;
+                        EditorGUILayout.ObjectField($"Mesh {++index}{(tracked ? "" : " (ignored)")}", renderer, typeof(SkinnedMeshRenderer), true);
+                        if (!tracked)
+                            continue;
+                        var mesh = renderer.sharedMesh;
+                        var missing = names.Where(n => mesh == null || mesh.GetBlendShapeIndex(n) < 0)
+                            .OrderBy(n => n, System.StringComparer.Ordinal).ToArray();
+                        if (missing.Length > 0)
+                            EditorGUILayout.HelpBox("Declared names missing on this mesh (informational):\n" + string.Join("\n", missing), MessageType.Info);
+                    }
+                }
+            }
             if (Foldout("Mesh Bone Weight Stats", ref optimizer.DebugShowBoneWeightStats))
             {
                 Profiler.StartSection("Mesh Bone Weight Stats");

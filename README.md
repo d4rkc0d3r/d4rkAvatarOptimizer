@@ -272,6 +272,9 @@ With the `Write Properties as Static Values` option disabled you need to make su
 Shows all meshes that the optimizer detected as DPS, TPS or SPS penetrators. If you have some that are not listed here you should add them to the exclusion list. If you don't your penetrators might get merged with other meshes which would always show them to other players if they have your shaders blocked. They might also break into triangle soup when not excluded. All the ones in the list will automatically be excluded from optimizations.
 ### Same Ratio Blend Shapes
 Shows all blend shapes that are animated in the same ratio and will get merged together. The first number of each merged group should always be 100 as that is the base value the others get compared to. In the final mesh the first blend shape will be the one the others get merged into.
+### Native Face Tracking
+Shows the native face tracking setup of the avatar descriptor. Declared blendshape names are collected from the face tracking blendshape sets and parameter behaviors. The mesh list shows all entries of the descriptor's face tracking meshes.  
+These blendshapes will not get deleted and are kept with the same name.
 ### Mesh Bone Weight Stats
 Shows how many vertices have non-zero weight for each bone weight index. Also shows maximum and medium weight per bone weight index.
 ### Phys Bone Dependencies

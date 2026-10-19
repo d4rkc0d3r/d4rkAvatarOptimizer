@@ -81,6 +81,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DebugShowUnlockedMaterialsWithRenameAnimated = true;
     public bool DebugShowPenetrators = true;
     public bool DebugShowMergeableBlendShapes = true;
+    public bool DebugShowFaceTracking = true;
     public bool DebugShowBoneWeightStats = true;
     public bool DebugShowPhysBoneDependencies = true;
     public bool DebugShowUnusedComponents = true;
@@ -916,6 +917,117 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_avatarDescriptor;
     }
 
+    // Use reflection so the optimizer also works with SDK versions without native face tracking.
+    private static object GetFaceTrackingField(object instance, string name)
+    {
+        return instance?.GetType().GetField(name)?.GetValue(instance);
+    }
+
+    private bool HasFaceTrackingEnabled()
+    {
+        var descriptor = GetAvatarDescriptor();
+        if (descriptor == null)
+            return false;
+        return GetFaceTrackingField(descriptor, "enableFaceTracking") is true;
+    }
+
+    private (HashSet<SkinnedMeshRenderer> meshes, HashSet<string> names)? cache_FaceTrackingSetup;
+    public (HashSet<SkinnedMeshRenderer> meshes, HashSet<string> names) GetFaceTrackingSetup()
+    {
+        if (cache_FaceTrackingSetup.HasValue)
+            return cache_FaceTrackingSetup.Value;
+        if (!HasFaceTrackingEnabled())
+        {
+            cache_FaceTrackingSetup = (new HashSet<SkinnedMeshRenderer>(), new HashSet<string>());
+            return cache_FaceTrackingSetup.Value;
+        }
+        var meshes = new HashSet<SkinnedMeshRenderer>();
+        var names = new HashSet<string>(System.StringComparer.Ordinal);
+        var descriptor = GetAvatarDescriptor();
+        var root = GetRootTransform();
+        if (GetFaceTrackingField(descriptor, "faceTrackingMeshes") is IEnumerable<SkinnedMeshRenderer> configuredMeshes)
+        {
+            // The SDK only uses the first 16 list entries, including null entries.
+            meshes.UnionWith(configuredMeshes.Take(16).Where(r => r != null && r.transform.IsChildOf(root)));
+        }
+        void AddNames(object value)
+        {
+            if (value is IEnumerable<string> entries)
+                names.UnionWith(entries.Where(n => !string.IsNullOrEmpty(n)));
+        }
+        if (GetFaceTrackingField(descriptor, "faceTrackingBlendshapesSetList") is System.Collections.IEnumerable sets)
+        {
+            foreach (var set in sets)
+            {
+                AddNames(GetFaceTrackingField(set, "faceTrackingBlendshapeNames"));
+                AddNames(GetFaceTrackingField(set, "visemeBlendshapeNames"));
+            }
+        }
+        if (GetFaceTrackingField(descriptor, "faceTrackingParameterBehaviors") is System.Collections.IEnumerable behaviors)
+        {
+            foreach (var behavior in behaviors)
+            {
+                var mode = GetFaceTrackingField(behavior, "targetMode")?.ToString();
+                if (mode == "ApplyToBlendshape" || mode == "LimitBlendshapeMin" || mode == "LimitBlendshapeMax")
+                    AddNames(new[] { GetFaceTrackingField(behavior, "targetBlendshapeName") as string });
+            }
+        }
+        LogToFile($"Face tracking: {meshes.Count} meshes, {names.Count} declared blendshape names:");
+        foreach (var name in names.OrderBy(n => n, System.StringComparer.Ordinal))
+            LogToFile($"- Blendshape: '{name}'", 1);
+        foreach (var renderer in meshes.OrderBy(r => GetPathToRoot(r), System.StringComparer.Ordinal))
+            LogToFile($"- Mesh: '{GetPathToRoot(renderer)}'", 1);
+        cache_FaceTrackingSetup = (meshes, names);
+        return (meshes, names);
+    }
+
+    private Dictionary<(SkinnedMeshRenderer, SkinnedMeshRenderer, string), bool> cache_FaceTrackingCurvesMatch;
+    private bool FaceTrackingBlendShapeCurvesMatch(SkinnedMeshRenderer a, SkinnedMeshRenderer b, string name)
+    {
+        cache_FaceTrackingCurvesMatch ??= new();
+        if (cache_FaceTrackingCurvesMatch.TryGetValue((a, b, name), out var result))
+            return result;
+        bool CurvesMatch()
+        {
+            if (a.GetBlendShapeWeight(a.sharedMesh.GetBlendShapeIndex(name)) != b.GetBlendShapeWeight(b.sharedMesh.GetBlendShapeIndex(name)))
+                return false;
+            var aBinding = EditorCurveBinding.FloatCurve(GetPathToRoot(a), typeof(SkinnedMeshRenderer), "blendShape." + name);
+            var bBinding = EditorCurveBinding.FloatCurve(GetPathToRoot(b), typeof(SkinnedMeshRenderer), "blendShape." + name);
+            foreach (var clip in GetAllUsedAnimationClips())
+            {
+                var aCurve = AnimationUtility.GetEditorCurve(clip, aBinding);
+                var bCurve = AnimationUtility.GetEditorCurve(clip, bBinding);
+                if (!AnimationCurvesHaveSameKeys(aCurve, bCurve))
+                    return false;
+                // Shared output curves must also have the same interpolation and extrapolation.
+                if (aCurve != null && (aCurve.preWrapMode != bCurve.preWrapMode || aCurve.postWrapMode != bCurve.postWrapMode
+                    || !aCurve.keys.SequenceEqual(bCurve.keys)))
+                    return false;
+            }
+            return true;
+        }
+        return cache_FaceTrackingCurvesMatch[(a, b, name)] = CurvesMatch();
+    }
+
+    private string FaceTrackingMergeError(List<Renderer> list, Renderer candidate)
+    {
+        var (meshes, names) = GetFaceTrackingSetup();
+        if (!(candidate is SkinnedMeshRenderer b) || !meshes.Contains(b) || b.sharedMesh == null)
+            return null;
+        foreach (var a in list.OfType<SkinnedMeshRenderer>().Where(meshes.Contains))
+        {
+            if (a.sharedMesh == null)
+                continue;
+            foreach (var name in names)
+            {
+                if (a.sharedMesh.GetBlendShapeIndex(name) >= 0 && b.sharedMesh.GetBlendShapeIndex(name) >= 0
+                    && !FaceTrackingBlendShapeCurvesMatch(a, b, name))
+                    return $"Face tracking blendshape '{name}' has different animations or default weights on '{GetPathToRoot(a)}' and '{GetPathToRoot(b)}'";
+            }
+        }
+        return null;
+    }
+
     private HashSet<Type> cache_GetAllComponentTypesInAvatar = null;
     public HashSet<Type> GetAllComponentTypesInAvatar()
     {
@@ -1218,6 +1330,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (!MergeSkinnedMeshes)
             return "Merging skinned meshes is disabled";
+        var faceTrackingError = FaceTrackingMergeError(list, candidate);
+        if (faceTrackingError != null)
+            return faceTrackingError;
         bool candidateHasExtraMaterialSlots = HasExtraMaterialSlots(candidate);
         bool groupHasExtraMaterialSlots = list.Any(HasExtraMaterialSlots);
         if (candidateHasExtraMaterialSlots && groupHasExtraMaterialSlots)
@@ -3555,63 +3670,73 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         usedBlendShapes.Clear();
         blendShapesToBake.Clear();
         var avDescriptor = GetAvatarDescriptor();
-        if (avDescriptor != null)
+        var (faceTrackingMeshes, faceTrackingNames) = GetFaceTrackingSetup();
+        foreach (var renderer in faceTrackingMeshes)
         {
-            if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
-                && avDescriptor.VisemeSkinnedMesh != null)
+            var mesh = renderer.sharedMesh;
+            if (mesh == null)
+                continue;
+            string path = GetPathToRoot(renderer) + "/blendShape.";
+            foreach (var name in faceTrackingNames)
             {
-                var meshRenderer = avDescriptor.VisemeSkinnedMesh;
-                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+                if (mesh.GetBlendShapeIndex(name) >= 0)
+                    usedBlendShapes.Add(path + name);
+            }
+        }
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape
+            && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            foreach (var blendShapeName in avDescriptor.VisemeBlendShapes)
+            {
+                usedBlendShapes.Add(path + blendShapeName);
+            }
+        }
+        if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape
+            && avDescriptor.VisemeSkinnedMesh != null)
+        {
+            var meshRenderer = avDescriptor.VisemeSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            usedBlendShapes.Add(path + avDescriptor.MouthOpenBlendShapeName);
+        }
+        if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null
+            && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh.sharedMesh != null)
+        {
+            var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
+            string path = GetPathToRoot(meshRenderer) + "/blendShape.";
+            foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
+            {
+                if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
                 {
-                    usedBlendShapes.Add(path + blendShapeName);
+                    usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
                 }
             }
-            if (avDescriptor.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape
-                && avDescriptor.VisemeSkinnedMesh != null)
+        }
+        foreach (var clip in GetAllUsedAnimationClips())
+        {
+            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
-                var meshRenderer = avDescriptor.VisemeSkinnedMesh;
-                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                usedBlendShapes.Add(path + avDescriptor.MouthOpenBlendShapeName);
-            }
-            if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
-                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null
-                && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh.sharedMesh != null)
-            {
-                var meshRenderer = avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh;
-                string path = GetPathToRoot(meshRenderer) + "/blendShape.";
-                foreach (var blendShapeID in avDescriptor.customEyeLookSettings.eyelidsBlendshapes)
-                {
-                    if (blendShapeID >= 0 && blendShapeID < meshRenderer.sharedMesh.blendShapeCount)
-                    {
-                        usedBlendShapes.Add(path + meshRenderer.sharedMesh.GetBlendShapeName(blendShapeID));
-                    }
-                }
-            }
-            foreach (var clip in GetAllUsedAnimationClips())
-            {
-                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
-                {
-                    if (binding.type != typeof(SkinnedMeshRenderer)
-                        || !binding.propertyName.StartsWithSimple("blendShape."))
-                        continue;
-                    var t = GetTransformFromPath(binding.path);
-                    if (t == null)
-                        continue;
-                    if (!t.TryGetComponent<SkinnedMeshRenderer>(out var smr))
-                        continue;
-                    var mesh = smr.sharedMesh;
-                    if (mesh == null)
-                        continue;
-                    var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
-                    var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
-                    if (blendShapeID < 0)
-                        continue;
-                    var keyframes = AnimationUtility.GetEditorCurve(clip, binding).keys;
-                    if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
-                        continue;
-                    usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
-                }
+                if (binding.type != typeof(SkinnedMeshRenderer)
+                    || !binding.propertyName.StartsWithSimple("blendShape."))
+                    continue;
+                var t = GetTransformFromPath(binding.path);
+                if (t == null)
+                    continue;
+                if (!t.TryGetComponent<SkinnedMeshRenderer>(out var smr))
+                    continue;
+                var mesh = smr.sharedMesh;
+                if (mesh == null)
+                    continue;
+                var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
+                var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
+                if (blendShapeID < 0)
+                    continue;
+                var keyframes = AnimationUtility.GetEditorCurve(clip, binding).keys;
+                if (keyframes.All(k => k.value == 0) && smr.GetBlendShapeWeight(blendShapeID) == 0)
+                    continue;
+                usedBlendShapes.Add(binding.path + "/" + binding.propertyName);
             }
         }
         foreach (var skinnedMeshRenderer in avDescriptor.GetComponentsInChildren<SkinnedMeshRenderer>(true))
@@ -3653,6 +3778,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public List<List<(string blendshape, float value)>> FindMergeableBlendShapes(IEnumerable<Renderer> mergedMeshBlob)
     {
         var avDescriptor = GetAvatarDescriptor();
+        var (faceTrackingMeshes, faceTrackingNames) = GetFaceTrackingSetup();
         var exclusions = GetAllExcludedTransforms();
         var validPaths = new HashSet<string>();
         var blendShapeNameToID = new Dictionary<string, int>();
@@ -3678,6 +3804,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 var name = mesh.GetBlendShapeName(i);
                 if (MMDCompatibility && MMDBlendShapes.Contains(name))
+                    continue;
+                if (faceTrackingMeshes.Contains(skinnedMeshRenderer) && faceTrackingNames.Contains(name))
                     continue;
                 if (mesh.GetBlendShapeFrameCount(i) == 1)
                 {
@@ -5618,6 +5746,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         var avDescriptor = GetAvatarDescriptor();
         var combinableMeshList = FindPossibleSkinnedMeshMerges(logMergeErrors: true);
+        var (faceTrackingMeshes, faceTrackingNames) = GetFaceTrackingSetup();
         oldPathToMergedPaths.Clear();
         oldPathToMergedPath.Clear();
         var exclusions = GetAllExcludedTransforms();
@@ -6218,11 +6347,31 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
             Profiler.StartSection("CopyCombinedMeshBlendShapes");
             var usedBlendShapeNames = new HashSet<string>();
+            bool blobHasFaceTracking = basicMergedMeshesList.Any(faceTrackingMeshes.Contains);
+            if (blobHasFaceTracking)
+                usedBlendShapeNames.UnionWith(faceTrackingNames);
             var blendShapeMeshIDtoNewName = new Dictionary<(int meshID, int blendShapeID), string>();
             var combinableMeshPaths = new HashSet<string>(basicMergedMeshesList.Select(s => GetPathToRoot(s)));
             var meshPathToID = basicMergedMeshesList.Select((s, i) => (GetPathToRoot(s), i)).ToDictionary(s => s.Item1, s => s.Item2);
             var usedBlendShapesInCombinedMesh = new HashSet<string>(
                 usedBlendShapes.Where(s => combinableMeshPaths.Contains(s.Substring(0, s.IndexOf("/blendShape.")))));
+            var faceTrackingShapes = new Dictionary<string, List<int>>(System.StringComparer.Ordinal);
+            for (int meshID = 0; meshID < basicMergedMeshesList.Count; meshID++)
+            {
+                var renderer = basicMergedMeshesList[meshID];
+                if (!faceTrackingMeshes.Contains(renderer))
+                    continue;
+                foreach (var name in faceTrackingNames)
+                {
+                    if (renderer.sharedMesh.GetBlendShapeIndex(name) < 0)
+                        continue;
+                    if (!faceTrackingShapes.TryGetValue(name, out var meshIDs))
+                        faceTrackingShapes[name] = meshIDs = new List<int>();
+                    meshIDs.Add(meshID);
+                    // These paths are copied by name below, not by the generic ratio/name merging pass.
+                    usedBlendShapesInCombinedMesh.Remove(GetPathToRoot(renderer) + "/blendShape." + name);
+                }
+            }
             var allMergedBlendShapes = new List<List<(string blendshape, float weight)>>();
             if (MergeSameRatioBlendShapes)
             {
@@ -6240,6 +6389,94 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 vertexOffset.Add(vertexOffset[i] + basicMergedMeshesList[i].sharedMesh.vertexCount);
             }
             int combinedMeshVertexCount = combinedMesh.vertexCount;
+            foreach (var entry in faceTrackingShapes.OrderBy(e => e.Key, System.StringComparer.Ordinal))
+            {
+                string name = entry.Key;
+                var frameWeights = new SortedSet<float>();
+                var sources = new List<(int meshID, float[] weights, Vector3[][] vertices, Vector3[][] normals, Vector3[][] tangents)>();
+                foreach (int meshID in entry.Value)
+                {
+                    var renderer = basicMergedMeshesList[meshID];
+                    var mesh = renderer.sharedMesh;
+                    int shapeID = mesh.GetBlendShapeIndex(name);
+                    int frameCount = mesh.GetBlendShapeFrameCount(shapeID);
+                    var weights = new float[frameCount];
+                    var vertices = new Vector3[frameCount][];
+                    var normals = new Vector3[frameCount][];
+                    var tangents = new Vector3[frameCount][];
+                    for (int frame = 0; frame < frameCount; frame++)
+                    {
+                        weights[frame] = mesh.GetBlendShapeFrameWeight(shapeID, frame);
+                        frameWeights.Add(weights[frame]);
+                        vertices[frame] = new Vector3[mesh.vertexCount];
+                        normals[frame] = new Vector3[mesh.vertexCount];
+                        tangents[frame] = new Vector3[mesh.vertexCount];
+                        mesh.GetBlendShapeFrameVertices(shapeID, frame, vertices[frame], normals[frame], tangents[frame]);
+                    }
+                    sources.Add((meshID, weights, vertices, normals, tangents));
+                    blendShapeMeshIDtoNewName[(meshID, shapeID)] = name;
+                    if (!blendShapeWeights.ContainsKey(name))
+                        blendShapeWeights[name] = renderer.GetBlendShapeWeight(shapeID);
+                    AddAnimationPathChange(
+                        (GetPathToRoot(renderer), "blendShape." + name, typeof(SkinnedMeshRenderer)),
+                        (newPath, "blendShape." + name, typeof(SkinnedMeshRenderer)));
+                }
+                // Different source frame layouts need the union of their interpolation breakpoints.
+                // Unity supplies an implicit zero frame for shapes whose frames are all on one side of zero.
+                if (sources.Count > 1 && frameWeights.Count > 0 && frameWeights.Min < 0 && frameWeights.Max > 0
+                    && sources.Any(s => s.weights.Length > 0
+                    && (s.weights[0] > 0 || s.weights[^1] < 0)))
+                    frameWeights.Add(0);
+                foreach (float frameWeight in frameWeights)
+                {
+                    var vertices = new Vector3[combinedMeshVertexCount];
+                    var normals = new Vector3[combinedMeshVertexCount];
+                    var tangents = new Vector3[combinedMeshVertexCount];
+                    foreach (var source in sources)
+                    {
+                        if (source.weights.Length == 0)
+                            continue;
+                        var weights = source.weights.ToList();
+                        var frameIDs = Enumerable.Range(0, weights.Count).ToList();
+                        if (weights[0] > 0)
+                        {
+                            weights.Insert(0, 0);
+                            frameIDs.Insert(0, -1);
+                        }
+                        else if (weights[^1] < 0)
+                        {
+                            weights.Add(0);
+                            frameIDs.Add(-1);
+                        }
+                        int upper = 1;
+                        while (upper < weights.Count - 1 && frameWeight > weights[upper])
+                            upper++;
+                        int lower = weights.Count == 1 ? 0 : upper - 1;
+                        upper = Math.Min(upper, weights.Count - 1);
+                        float factor = lower == upper ? 0 : (frameWeight - weights[lower]) / (weights[upper] - weights[lower]);
+                        Vector3 Sample(Vector3[][] frames, int vertex)
+                        {
+                            var a = frameIDs[lower] < 0 ? Vector3.zero : frames[frameIDs[lower]][vertex];
+                            var b = frameIDs[upper] < 0 ? Vector3.zero : frames[frameIDs[upper]][vertex];
+                            if (frameWeight == weights[lower] || lower == upper)
+                                return a;
+                            if (frameWeight == weights[upper])
+                                return b;
+                            return Vector3.LerpUnclamped(a, b, factor);
+                        }
+                        int vertexCount = basicMergedMeshesList[source.meshID].sharedMesh.vertexCount;
+                        for (int vertex = 0; vertex < vertexCount; vertex++)
+                        {
+                            int targetVertex = vertexOffset[source.meshID] + vertex;
+                            vertices[targetVertex] = Sample(source.vertices, vertex);
+                            normals[targetVertex] = Sample(source.normals, vertex);
+                            tangents[targetVertex] = Sample(source.tangents, vertex);
+                        }
+                    }
+                    combinedMesh.AddBlendShapeFrame(name, frameWeight, vertices, normals, tangents);
+                }
+                LogToFile($"- Kept face tracking blendshape '{name}' on '{newPath}' from {sources.Count} meshes");
+            }
             foreach (var mergedBlendShapes in allMergedBlendShapes)
             {
                 if (mergedBlendShapes.Count == 1)
@@ -6328,6 +6565,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.EndSection();
             
             var targetRenderer = combinableSkinnedMeshes[0];
+
+            if (HasFaceTrackingEnabled()
+                && GetFaceTrackingField(avDescriptor, "faceTrackingMeshes") is IList<SkinnedMeshRenderer> configuredFaceTrackingMeshes
+                && configuredFaceTrackingMeshes.Any(r => r != null && basicMergedMeshesList.Contains(r)))
+            {
+                var originalEntries = configuredFaceTrackingMeshes.ToArray();
+                var rewrittenEntries = new List<SkinnedMeshRenderer>();
+                SkinnedMeshRenderer Remap(SkinnedMeshRenderer renderer) =>
+                    renderer != null && basicMergedMeshesList.Contains(renderer) ? targetRenderer : renderer;
+                foreach (var renderer in originalEntries.Take(16).Select(Remap))
+                {
+                    if (!rewrittenEntries.Contains(renderer))
+                        rewrittenEntries.Add(renderer);
+                }
+                configuredFaceTrackingMeshes.Clear();
+                foreach (var renderer in rewrittenEntries)
+                    configuredFaceTrackingMeshes.Add(renderer);
+            }
 
             if (avDescriptor.customEyeLookSettings.eyelidType == VRCAvatarDescriptor.EyelidType.Blendshapes
                 && avDescriptor.customEyeLookSettings.eyelidsSkinnedMesh != null)

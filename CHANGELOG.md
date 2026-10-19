@@ -1,4 +1,8 @@
-## v4.6.1
+## v4.7.0-beta.0
+### Features
+* Support VRChat native face tracking blendshapes.
+  * Add a `Native Face Tracking` debug foldout with declared names & configured meshes.
+
 ### Changes
 * Optimizer inspector:
   * Add tooltips listing the affected assets to some validation info boxes and debug lists:
