@@ -1,3 +1,7 @@
+## v4.7.0-beta.2
+### Changes
+* Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader & .cginc files to improve import times
+
 ## v4.7.0-beta.1
 ### Features
 * Add material contact support when merging skinned meshes.

@@ -2570,6 +2570,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", SkippedShaderVariants)}");
             InjectWarningDisables(pragmaOutput);
             InjectWarningDisables(output);
+            output.Add("//UNITY_SHADER_NO_UPGRADE");
             hasVectorCBufferAliasArray = false;
             CBufferAliasArray.Clear();
             if (mergedMeshCount > 1)
@@ -3479,6 +3480,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     break;
                 }
             }
+            output[^1] = output[^1] + " //UNITY_SHADER_NO_UPGRADE";
             while (lineIndex < lines.Count)
             {
                 ParseAndEvaluateIfex(lines, ref lineIndex, null);
