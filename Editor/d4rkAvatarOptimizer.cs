@@ -90,6 +90,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     public bool DebugShowAnimatedMaterialPropertyPaths = true;
     public bool DebugShowGameObjectsWithToggle = true;
     public bool DebugShowUnmovingBones = false;
+    public bool DebugShowMaterialContacts = true;
     #endregion
 
     public struct MaterialSlot
@@ -1203,6 +1204,74 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_ParticleSystemsUsingRenderer[candidate] = new List<ParticleSystem>();
     }
 
+    private List<VRCContactReceiver> cache_MaterialContactReceivers = null;
+    public List<VRCContactReceiver> FindAllMaterialContactReceivers()
+    {
+        if (cache_MaterialContactReceivers != null)
+            return cache_MaterialContactReceivers;
+        cache_MaterialContactReceivers = new List<VRCContactReceiver>();
+        foreach (var receiver in GetUsedComponentsInChildren<VRCContactReceiver>())
+        {
+            if (receiver != null &&
+                receiver.receiverType == ContactReceiver.ReceiverType.Proximity &&
+                receiver.writeToMaterials &&
+                receiver.shaderTargetRenderers != null)
+                cache_MaterialContactReceivers.Add(receiver);
+        }
+        return cache_MaterialContactReceivers;
+    }
+
+    private Dictionary<Renderer, HashSet<VRCContactReceiver>> cache_MaterialContactReceiversUsingRenderer = null;
+    private HashSet<VRCContactReceiver> GetMaterialContactReceiversUsingRenderer(Renderer candidate)
+    {
+        if (cache_MaterialContactReceiversUsingRenderer == null)
+        {
+            cache_MaterialContactReceiversUsingRenderer = new Dictionary<Renderer, HashSet<VRCContactReceiver>>();
+            foreach (var receiver in FindAllMaterialContactReceivers())
+            {
+                var targets = receiver.shaderTargetRenderers;
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    var renderer = targets[i];
+                    if (renderer == null)
+                        continue;
+                    if (!cache_MaterialContactReceiversUsingRenderer.TryGetValue(renderer, out var set))
+                    {
+                        set = new HashSet<VRCContactReceiver>();
+                        cache_MaterialContactReceiversUsingRenderer[renderer] = set;
+                    }
+                    set.Add(receiver);
+                }
+            }
+        }
+        if (cache_MaterialContactReceiversUsingRenderer.TryGetValue(candidate, out var result))
+            return result;
+        return cache_MaterialContactReceiversUsingRenderer[candidate] = new HashSet<VRCContactReceiver>();
+    }
+
+    public List<(VRCContactReceiver receiver, List<Renderer> targets)> FindMaterialContactReceiverGroups()
+    {
+        var result = new List<(VRCContactReceiver receiver, List<Renderer> targets)>();
+        foreach (var receiver in FindAllMaterialContactReceivers())
+        {
+            var targets = receiver.shaderTargetRenderers?.Where(r => r != null).Distinct().ToList() ?? new List<Renderer>();
+            result.Add((receiver, targets));
+        }
+        return result.OrderBy(g => GetPathToRoot(g.receiver)).ToList();
+    }
+
+    private string MaterialContactReceiversMergeError(Renderer groupHead, Renderer candidate)
+    {
+        var groupReceivers = GetMaterialContactReceiversUsingRenderer(groupHead);
+        var candidateReceivers = GetMaterialContactReceiversUsingRenderer(candidate);
+        if (groupReceivers.SetEquals(candidateReceivers))
+            return null;
+        var onlyInGroup = groupReceivers.FirstOrDefault(r => !candidateReceivers.Contains(r));
+        if (onlyInGroup != null)
+            return $"Group is bound to material contact receiver at '{GetPathToRoot(onlyInGroup)}' but mesh is not";
+        return $"Bound to material contact receiver at '{GetPathToRoot(candidateReceivers.First(r => !groupReceivers.Contains(r)))}' but group is not";
+    }
+
     private static string CanCombineMaterialWithOtherMeshesError(Material material)
     {
         if (material == null)
@@ -1375,6 +1444,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         if (!list.All(r => UsesUV0ZW(r) == UsesUV0ZW(candidate)))
             return "UV0.zw usage does not match";
+        var materialContactError = MaterialContactReceiversMergeError(list[0], candidate);
+        if (materialContactError != null)
+            return materialContactError;
         var basicMergeError = CanCombineRendererWithBasicMerge(list, candidate, true);
         if (basicMergeError == null)
             return null;
@@ -6780,6 +6852,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     LogToFile($"- {path}", 1);
                 }
             }
+            foreach (var receiver in GetMaterialContactReceiversUsingRenderer(targetRenderer))
+            {
+                var targets = receiver.shaderTargetRenderers;
+                var validTargets = targets.Where(r => r != null).ToArray();
+                if (validTargets.Length != targets.Length)
+                    receiver.shaderTargetRenderers = validTargets;
+            }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
             AssetDatabase.SaveAssets();
@@ -6812,8 +6891,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         GetRootTransform().SetPositionAndRotation(originalRootPosition, originalRootRotation);
 
-        // flush particle system cache since we merged meshes
+        // flush particle system & material contact receiver caches since we merged meshes
         cache_ParticleSystemsUsingRenderer = null;
+        cache_MaterialContactReceivers = null;
+        cache_MaterialContactReceiversUsingRenderer = null;
     }
 
     private HashSet<string> cache_GetAllExcludedTransformPaths;
@@ -7056,20 +7137,49 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (meshesToConvert.Count > 0)
             LogToFile($"Converting {meshesToConvert.Count} static meshes to skinned meshes for merging:");
 
+        var materialContactTargets = new Dictionary<Renderer, List<(VRCContactReceiver receiver, int index)>>();
+        foreach (var receiver in FindAllMaterialContactReceivers())
+        {
+            var targets = receiver.shaderTargetRenderers;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (targets[i] == null)
+                    continue;
+                if (!materialContactTargets.TryGetValue(targets[i], out var entries))
+                {
+                    entries = new List<(VRCContactReceiver, int)>();
+                    materialContactTargets[targets[i]] = entries;
+                }
+                entries.Add((receiver, i));
+            }
+        }
+
+        bool updatedContactTargets = false;
         foreach (var obj in meshesToConvert)
         {
-            bool isActive = obj.GetComponent<MeshRenderer>().enabled;
-            var mats = obj.GetComponent<MeshRenderer>().sharedMaterials;
-            var lightAnchor = obj.GetComponent<MeshRenderer>().probeAnchor;
-            var mesh = obj.GetComponent<MeshFilter>().sharedMesh;
-            DestroyImmediate(obj.GetComponent<MeshFilter>());
+            var meshFilter = obj.GetComponent<MeshFilter>();
+            var meshRenderer = obj.GetComponent<MeshRenderer>();
+            bool isActive = meshRenderer.enabled;
+            var mats = meshRenderer.sharedMaterials;
+            var lightAnchor = meshRenderer.probeAnchor;
+            var mesh = meshFilter.sharedMesh;
+            var contactTargetEntries = materialContactTargets.GetValueOrDefault(meshRenderer);
+            DestroyImmediate(meshFilter);
             var skinnedMeshRenderer = obj.AddComponent<SkinnedMeshRenderer>();
             skinnedMeshRenderer.enabled = isActive;
             skinnedMeshRenderer.sharedMesh = mesh;
             skinnedMeshRenderer.sharedMaterials = mats;
             skinnedMeshRenderer.probeAnchor = lightAnchor;
             LogToFile($"- {GetPathToRoot(obj)}", 1);
+            if (contactTargetEntries != null)
+            {
+                updatedContactTargets = true;
+                foreach (var (receiver, index) in contactTargetEntries)
+                    receiver.shaderTargetRenderers[index] = skinnedMeshRenderer;
+            }
         }
+        if (updatedContactTargets)
+            cache_MaterialContactReceiversUsingRenderer = null;
     }
 
     public class MaterialAssetComparer : IEqualityComparer<Material> {

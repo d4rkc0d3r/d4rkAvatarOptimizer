@@ -97,6 +97,7 @@ The optimizer tries to merge different skinned meshes together.
 This usually means meshes which always get animated in the same way will get merged.  
 Skinned meshes that are on different layers (eg UIMenu) from each other will not get merged.  
 Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
+Meshes that are targeted by a material contact receiver are only merged with other meshes that are targeted by the exact same set of material contact receivers.  
 ## Use Shader Toggles
 Merges meshes even if their material properties get animated differently or if they get toggled separately from each other.  
 This will add logic to the shaders to ensure everything works correctly. Some shaders might not work correctly with this option enabled.  
@@ -277,6 +278,10 @@ Shows the native face tracking setup of the avatar descriptor. Declared blendsha
 These blendshapes will not get deleted and are kept with the same name.
 ### Mesh Bone Weight Stats
 Shows how many vertices have non-zero weight for each bone weight index. Also shows maximum and medium weight per bone weight index.
+### Material Contacts
+Shows all material contact receivers with their target renderers.  
+A receiver is listed when it has its receiver type set to proximity and its write to materials flag enabled.  
+A mesh that is targeted by a material contact receiver can only merge with other meshes that are targeted by the exact same set of material contact receivers.  
 ### Phys Bone Dependencies
 For each phys bone component this shows all components that use the affected transforms of the phys bone. Also lists all animations that animate the m_Enabled property.  
 Any phys bones listed here that have exactly one skinned mesh renderer listed in its list will add an animation curve to the animations that animate the SkinnedMeshRenderer enabled or its game object active flag if the `Disable Phys Bones When Unused` option is enabled.

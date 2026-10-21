@@ -1,3 +1,9 @@
+## v4.7.0-beta.1
+### Features
+* Add material contact support when merging skinned meshes.
+  * Meshes that are in different sets of material contacts don't merge with each other.
+  * Add a `Material Contacts` debug foldout listing all material contact receivers with their target renderers.
+
 ## v4.7.0-beta.0
 ### Features
 * Support VRChat native face tracking blendshapes.

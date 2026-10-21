@@ -8,6 +8,7 @@ using d4rkpl4y3r.AvatarOptimizer;
 using d4rkpl4y3r.AvatarOptimizer.Util;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
 using VRC.SDK3.Avatars.Components;
+using VRC.SDK3.Dynamics.Contact.Components;
 using VRC.Dynamics;
 using VRC.SDKBase.Validation.Performance;
 
@@ -540,6 +541,35 @@ public class d4rkAvatarOptimizerEditor : Editor
                                         EditorGUILayout.LabelField($"{stats[i].maxValue:F2}", entryWidth);
                                         EditorGUILayout.LabelField($"{stats[i].medianValue:F2}", entryWidth);
                                     }
+                                }
+                            }
+                        }
+                    }
+                    EditorGUILayout.Separator();
+                }
+                Profiler.EndSection();
+            }
+            if (Foldout("Material Contacts", ref optimizer.DebugShowMaterialContacts))
+            {
+                Profiler.StartSection("Material Contacts");
+                var materialContactGroups = optimizer.FindMaterialContactReceiverGroups();
+                if (materialContactGroups.Count == 0)
+                {
+                    EditorGUILayout.LabelField("---");
+                }
+                foreach (var (receiver, targets) in materialContactGroups)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.Space(15, false);
+                        using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+                        {
+                            EditorGUILayout.ObjectField(receiver, typeof(VRCContactReceiver), true);
+                            using (new EditorGUI.IndentLevelScope())
+                            {
+                                foreach (var target in targets)
+                                {
+                                    EditorGUILayout.ObjectField(target, typeof(Renderer), true);
                                 }
                             }
                         }
