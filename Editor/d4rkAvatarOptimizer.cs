@@ -861,13 +861,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var missingComponentPaths = new List<string>();
         var gameObjectsWithSlashesInName = new List<string>();
         var ambiguousPaths = new List<string>();
+        var duplicateComponentTypePaths = new List<string>();
         while (stack.Count > 0)
         {
             var current = stack.Pop();
             var currentPath = GetPathToRoot(current);
-            if (current.GetComponents<Component>().Any(c => c == null))
+            var currentComponents = current.GetComponents<Component>();
+            if (currentComponents.Any(c => c == null))
             {
                 missingComponentPaths.Add($"- '{currentPath}'");
+            }
+            var duplicateComponentTypes = currentComponents.Where(c => c != null).GroupBy(c => c.GetType()).Where(g => g.Count() > 1).Select(g => $"{g.Key.Name} x{g.Count()}").OrderBy(s => s, System.StringComparer.Ordinal);
+            if (duplicateComponentTypes.Any())
+            {
+                duplicateComponentTypePaths.Add($"- '{currentPath}': {string.Join(", ", duplicateComponentTypes)}");
             }
             if (current != GetTransformFromPath(currentPath))
             {
@@ -897,6 +904,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogPathList("- GameObjects with missing components", missingComponentPaths);
         LogPathList("- GameObjects with '/' in name", gameObjectsWithSlashesInName);
         LogPathList("- Ambiguous Paths", ambiguousPaths);
+        LogPathList("- GameObjects with multiple components of the same type", duplicateComponentTypePaths);
 
         if (isPostOptimization)
         {

@@ -2,7 +2,8 @@
 ### Changes
 * Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader & .cginc files to improve import times
 * Log file:
-  * Add file size of generated shader assets to post optimization avatar stats
+  * List file size of generated shader assets to post optimization avatar stats
+  * List GameObjects with multiple components of the same type in the avatar stats
 
 ## v4.7.0-beta.1
 ### Features
