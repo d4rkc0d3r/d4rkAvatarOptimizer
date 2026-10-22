@@ -220,7 +220,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.StartNextSection("MoveRingFingerColliderToFeet()");
             DisplayProgressBar("Done", 1.0f);
             MoveRingFingerColliderToFeet();
-            LogAvatarStats("Avatar stats after optimization:");
+            LogAvatarStats("Avatar stats after optimization:", isPostOptimization: true);
             Profiler.StartNextSection("DestroyImmediate(this)");
             var t = transform;
             DestroyImmediate(this);
@@ -743,7 +743,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             .Where(c => c != null).Distinct().ToArray();
     }
 
-    private void LogAvatarStats(string header)
+    private void LogAvatarStats(string header, bool isPostOptimization = false)
     {
         using var _ = new Profiler.Section("LogAvatarStats()");
         LogToFile(header);
@@ -897,6 +897,51 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogPathList("- GameObjects with missing components", missingComponentPaths);
         LogPathList("- GameObjects with '/' in name", gameObjectsWithSlashesInName);
         LogPathList("- Ambiguous Paths", ambiguousPaths);
+
+        if (isPostOptimization)
+        {
+            LogGeneratedShaderStats();
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes >= 1024L * 1024)
+            return $"{bytes / (1024d * 1024):0.00} MB";
+        if (bytes >= 1024)
+            return $"{bytes / 1024d:0.00} KB";
+        return $"{bytes} B";
+    }
+
+    private void LogGeneratedShaderStats()
+    {
+        using var _ = new Profiler.Section("LogAvatarStats() - Generated Shader Stats");
+        var extensions = new[] { ".shader", ".cginc", ".hlsl" };
+        var stats = new Dictionary<string, (int count, long bytes)>();
+        int totalCount = 0;
+        long totalBytes = 0;
+        foreach (var file in Directory.GetFiles(trashBinPath))
+        {
+            var extension = Path.GetExtension(file);
+            if (!extensions.Contains(extension))
+                continue;
+            var size = new FileInfo(file).Length;
+            var entry = stats.GetValueOrDefault(extension);
+            entry = (entry.count + 1, entry.bytes + size);
+            stats[extension] = entry;
+            totalCount++;
+            totalBytes += size;
+        }
+        if (totalCount == 0)
+            return;
+        LogToFile($"- Generated Shader Files: {totalCount}, {FormatSize(totalBytes)}");
+        foreach (var extension in extensions)
+        {
+            var (count, bytes) = stats.GetValueOrDefault(extension);
+            if (count == 0)
+                continue;
+            LogToFile($"- {extension}: {count} files, {FormatSize(bytes)}", 1);
+        }
     }
 
     private VRCAvatarDescriptor cache_avatarDescriptor = null;
