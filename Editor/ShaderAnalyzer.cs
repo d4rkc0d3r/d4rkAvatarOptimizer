@@ -333,8 +333,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool RecursiveParseFile(string currentFileName, bool isTopLevelFile, string callerPath)
         {
             var processedLines = new List<string>();
-            if (alreadyIncludedThisPass == null)
-                alreadyIncludedThisPass = new HashSet<string>();
+            alreadyIncludedThisPass ??= new HashSet<string>();
             var fileID = currentFileName;
             var currentFilePath = currentFileName;
             string[] rawLines = null;
@@ -478,6 +477,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 while (trimmedLine[^1] == '\\')
                 {
                     trimmedLine = trimmedLine[..^1].TrimEnd(trimWhiteSpaceChars) + " " + rawLines[++lineIndex].Trim(trimWhiteSpaceChars);
+                }
+                if (isPreprocessor && trimmedLine.Length > 1 && char.IsWhiteSpace(trimmedLine[1]))
+                {
+                    trimmedLine = "#" + trimmedLine[1..].TrimStart(trimWhiteSpaceChars);
                 }
                 if (trimmedLine.StartsWithSimple("//"))
                 {

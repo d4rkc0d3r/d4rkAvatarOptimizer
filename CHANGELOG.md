@@ -1,9 +1,12 @@
 ## v4.7.0-beta.2
 ### Changes
-* Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader & .cginc files to improve import times
+* Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader & .cginc files to improve import times.
 * Log file:
-  * List file size of generated shader assets to post optimization avatar stats
-  * List GameObjects with multiple components of the same type in the avatar stats
+  * List file size of generated shader assets to post optimization avatar stats.
+  * List GameObjects with multiple components of the same type in the avatar stats.
+
+### Bug Fixes
+* Fix Shader Optimizer crash when preprocessor directive had whitespace after `#`.
 
 ## v4.7.0-beta.1
 ### Features
