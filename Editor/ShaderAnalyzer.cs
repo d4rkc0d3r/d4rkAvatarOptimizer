@@ -333,6 +333,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool RecursiveParseFile(string currentFileName, bool isTopLevelFile, string callerPath)
         {
             var processedLines = new List<string>();
+            var spaceAndTab = new[] { ' ', '\t' };
+            void AddLine(string l)
+            {
+                processedLines.Add(string.Join(' ', l.Split(spaceAndTab, System.StringSplitOptions.RemoveEmptyEntries)));
+            }
             alreadyIncludedThisPass ??= new HashSet<string>();
             var fileID = currentFileName;
             var currentFilePath = currentFileName;
@@ -487,7 +492,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (trimmedLine.StartsWithSimple("ifex", 2))
                     {
                         string ifexLine = $"#{trimmedLine[2..]}";
-                        processedLines.Add(ifexLine);
+                        AddLine(ifexLine);
                         var ifexStatement = IfexStatement.Parse(ifexLine);
                         if (ifexStatement != null) {
                             ifexStatement.CollectPropertyNames(parsedShader.ifexParameters);
@@ -497,7 +502,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     else if (trimmedLine.StartsWithSimple("endex", 2))
                     {
-                        processedLines.Add("#endex");
+                        AddLine("#endex");
                     }
                     else if (trimmedLine.StartsWithSimple("d4rkAO:", 2))
                     {
@@ -509,7 +514,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     if (!isPreprocessor && trimmedLine[i] == ';')
                     {
-                        processedLines.Add(trimmedLine[..(i + 1)]);
+                        AddLine(trimmedLine[..(i + 1)]);
                         trimmedLine = trimmedLine[(i + 1)..].TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
@@ -517,8 +522,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     else if (!isPreprocessor && (trimmedLine[i] == '{' || trimmedLine[i] == '}'))
                     {
                         if (i != 0)
-                            processedLines.Add(trimmedLine[..i].TrimEnd(trimWhiteSpaceChars));
-                        processedLines.Add(trimmedLine[i].ToString());
+                            AddLine(trimmedLine[..i].TrimEnd(trimWhiteSpaceChars));
+                        AddLine(trimmedLine[i].ToString());
                         trimmedLine = trimmedLine[(i + 1)..].TrimStart(trimWhiteSpaceChars);
                         i = -1;
                         continue;
@@ -578,22 +583,22 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (isTopLevelFile && (trimmedLine == "CGINCLUDE" || trimmedLine == "CGPROGRAM" || trimmedLine == "HLSLINCLUDE" || trimmedLine == "HLSLPROGRAM"))
                 {
-                    processedLines.Add(trimmedLine);
+                    AddLine(trimmedLine);
                     alreadyIncludedThisPass.Clear();
                     // include UnityLightingCommon.cginc at the start of each code block since that declares _SpecColor and we don't want to just include all unity cg includes
                     RecursiveParseFile("UnityLightingCommon.cginc", false, currentFilePath);
-                    processedLines.Add("#include \"UnityLightingCommon.cginc\"");
+                    AddLine("#include \"UnityLightingCommon.cginc\"");
                     continue;
                 }
                 if (isPreprocessor && trimmedLine.Length > 9 && trimmedLine[3] == 'c') {
                     var includeFile = ParseIncludeDirective(trimmedLine);
                     if (includeFile.Length > 0) {
                         RecursiveParseFile(includeFile, false, currentFilePath);
-                        processedLines.Add($"#include \"{includeFile}\"");
+                        AddLine($"#include \"{includeFile}\"");
                         continue;
                     }
                 }
-                processedLines.Add(trimmedLine);
+                AddLine(trimmedLine);
             }
             return true;
         }
