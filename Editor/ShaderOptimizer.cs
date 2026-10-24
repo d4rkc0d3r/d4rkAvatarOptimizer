@@ -1333,7 +1333,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         values.Add(res);
                         continue;
                     }
-                    if (expr.Length - index < 7 || expr[index] != 'd' || expr[index + 1] != 'e' || expr[index + 2] != 'f' || expr[index + 3] != 'i' || expr[index + 4] != 'n' || expr[index + 5] != 'e' || expr[index + 6] != 'd')
+                    if (expr[index] == '1' || expr[index] == '0')
+                    {
+                        bool value = expr[index] == '1';
+                        index++;
+                        if (index < expr.Length && char.IsDigit(expr[index]))
+                        {
+                            output.Add($"// Expected 1 or 0 at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
+                            return ConditionResult.Unknown;
+                        }
+                        values.Add(value ^ isNegated ? ConditionResult.True : ConditionResult.False);
+                        continue;
+                    }
+                    if (!expr.StartsWithSimple("defined", index))
                     {
                         output.Add($"// Expected defined at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
                         return ConditionResult.Unknown;

@@ -4,6 +4,8 @@
 * Log file:
   * List file size of generated shader assets to post optimization avatar stats.
   * List GameObjects with multiple components of the same type in the avatar stats.
+* Shader Optimizer:
+  * Partial preprocessor now skips `#if 0` or else blocks of `#if 1`.
 
 ### Bug Fixes
 * Fix Shader Optimizer crash when preprocessor directive had whitespace after `#`.
