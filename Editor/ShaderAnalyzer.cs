@@ -336,7 +336,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var spaceAndTab = new[] { ' ', '\t' };
             void AddLine(string l)
             {
-                processedLines.Add(string.Join(' ', l.Split(spaceAndTab, System.StringSplitOptions.RemoveEmptyEntries)));
+                // keep multi white space in strings, important for include directives
+                processedLines.Add(l.Contains('"') ? l :
+                    string.Join(' ', l.Split(spaceAndTab, System.StringSplitOptions.RemoveEmptyEntries)));
             }
             alreadyIncludedThisPass ??= new HashSet<string>();
             var fileID = currentFileName;
