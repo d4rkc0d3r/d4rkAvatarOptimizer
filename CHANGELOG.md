@@ -6,6 +6,7 @@
 * Shader Optimizer:
   * Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader, .cginc & .hlsl files to improve import times.
   * Partial preprocessor now skips `#if 0` or else blocks of `#if 1`.
+* Improve speed of fixing animation clips.
 
 ### Bug Fixes
 * Fix Shader Optimizer crash when preprocessor directive had whitespace after `#`.

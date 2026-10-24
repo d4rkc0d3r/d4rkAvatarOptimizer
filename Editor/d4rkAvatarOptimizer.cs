@@ -2274,17 +2274,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     {
         if (clip.name == "d4rkAvatarOptimizer_MergedLayers_Constants")
             return clip;
-        var newClip = CopyClipHeader(clip);
         bool changed = false;
         var removedBindings = new List<EditorCurveBinding>();
         var addedBindings = new List<EditorCurveBinding>();
         var changedBindings = new List<(EditorCurveBinding from, EditorCurveBinding to)>();
+        var floatCurvesToSet = new List<(EditorCurveBinding binding, AnimationCurve curve)>();
+        var objectCurvesToSet = new List<(EditorCurveBinding binding, ObjectReferenceKeyframe[] curve)>();
         float lastUsedKeyframeTime = -1;
         float lastUnusedKeyframeTime = -1;
         void SetFloatCurve(EditorCurveBinding bindingToSet, AnimationCurve curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
                 lastUsedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUsedKeyframeTime);
-                AnimationUtility.SetEditorCurve(newClip, bindingToSet, curveToSet);
+                floatCurvesToSet.Add((bindingToSet, curveToSet));
             } else {
                 lastUnusedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
@@ -2294,7 +2295,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         void SetObjectReferenceCurve(EditorCurveBinding bindingToSet, ObjectReferenceKeyframe[] curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
                 lastUsedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUsedKeyframeTime);
-                AnimationUtility.SetObjectReferenceCurve(newClip, bindingToSet, curveToSet);
+                objectCurvesToSet.Add((bindingToSet, curveToSet));
             } else {
                 lastUnusedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
@@ -2327,7 +2328,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 SetFloatCurve(FixAnimationBindingPath(binding, ref changed), curve);
             }
             if (fixedBinding.propertyName.StartsWithSimple("NaNimation")) {
-                var shaderToggleInfo = fixedBinding.propertyName.Substring("NaNimation".Length);
+                var shaderToggleInfo = fixedBinding.propertyName["NaNimation".Length..];
                 var propertyNames = new string[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z" };
                 var NaNCurve = ReplaceZeroWithNaN(curve);
                 for (int i = 0; i < propertyNames.Length; i++) {
@@ -2336,9 +2337,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     addedBindings.Add(fixedBinding);
                 }
                 if (shaderToggleInfo.Length > 0) {
-                    shaderToggleInfo = shaderToggleInfo.Substring(1);
+                    shaderToggleInfo = shaderToggleInfo[1..];
                     var semicolonIndex = shaderToggleInfo.IndexOf(';');
-                    fixedBinding.path = shaderToggleInfo.Substring(semicolonIndex + 1);
+                    fixedBinding.path = shaderToggleInfo[(semicolonIndex + 1)..];
                     fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
                     var b = FixAnimationBindingPath(fixedBinding, ref changed);
@@ -2387,7 +2388,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var oldMat = curve[i].value as Material;
                 if (oldMat == null)
                     continue;
-                if (!int.TryParse(binding.propertyName.Substring(binding.propertyName.LastIndexOf('[') + 1).TrimEnd(']'), out int index))
+                if (!int.TryParse(binding.propertyName[(binding.propertyName.LastIndexOf('[') + 1)..].TrimEnd(']'), out int index))
                     continue;
                 if (optimizedSlotSwapMaterials.TryGetValue((binding.path, index), out var newMats))
                 {
@@ -2401,65 +2402,74 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var newBinding = FixAnimationBinding(binding, ref changed);
             SetObjectReferenceCurve(newBinding, curve);
         }
+        if (lastUsedKeyframeTime == -1 && lastUnusedKeyframeTime > -1) {
+            var newDummyClip = CopyClipHeader(clip);
+            var dummyBinding = EditorCurveBinding.FloatCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
+            var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
+            AnimationUtility.SetEditorCurve(newDummyClip, dummyBinding, dummyCurve);
+            cache_DummyAnimationClipBySettings ??= new();
+            var clipSettings = AnimationUtility.GetAnimationClipSettings(clip);
+            var shouldCache = clipSettings.hasAdditiveReferencePose == false
+                && clipSettings.startTime == 0
+                && clipSettings.orientationOffsetY == 0
+                && clipSettings.level == 0
+                && clipSettings.cycleOffset == 0;
+            if (shouldCache) {
+                var dummyClipKey = (length: lastUnusedKeyframeTime, clip.frameRate, isLooping: clipSettings.loopTime);
+                LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip ({dummyClipKey.frameRate} fps, looping: {dummyClipKey.isLooping})");
+                if (!cache_DummyAnimationClipBySettings.TryGetValue(dummyClipKey, out var dummyClip)) {
+                    newDummyClip.name = GetDummyAnimationClipName(dummyClipKey);
+                    CreateUniqueAsset(newDummyClip, newDummyClip.name + ".anim");
+                    cache_DummyAnimationClipBySettings[dummyClipKey] = dummyClip = newDummyClip;
+                } else {
+                    DestroyImmediate(newDummyClip);
+                }
+                return dummyClip;
+            } else {
+                LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, not using dummy clip because of non-default clip settings");
+                CreateUniqueAsset(newDummyClip, newDummyClip.name + ".anim");
+                return newDummyClip;
+            }
+        }
         if (lastUnusedKeyframeTime > lastUsedKeyframeTime && lastUnusedKeyframeTime > -1) {
             // add dummy curve referencing nothing to make sure the clip still has the same length as before
             var dummyBinding = EditorCurveBinding.FloatCurve("ThisHopefullyDoesntExist", typeof(GameObject), "m_IsActive");
             var dummyCurve = AnimationCurve.Constant(0, lastUnusedKeyframeTime, 1);
-            AnimationUtility.SetEditorCurve(newClip, dummyBinding, dummyCurve);
+            floatCurvesToSet.Add((dummyBinding, dummyCurve));
             changed = true;
-            if (lastUsedKeyframeTime == -1) {
-                cache_DummyAnimationClipBySettings ??= new();
-                var clipSettings = AnimationUtility.GetAnimationClipSettings(clip);
-                var shouldCache = clipSettings.hasAdditiveReferencePose == false
-                    && clipSettings.startTime == 0
-                    && clipSettings.orientationOffsetY == 0
-                    && clipSettings.level == 0
-                    && clipSettings.cycleOffset == 0;
-                if (shouldCache) {
-                    var dummyClipKey = (length: lastUnusedKeyframeTime, clip.frameRate, isLooping: clipSettings.loopTime);
-                    LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, using dummy clip ({dummyClipKey.frameRate} fps, looping: {dummyClipKey.isLooping})");
-                    if (!cache_DummyAnimationClipBySettings.TryGetValue(dummyClipKey, out var dummyClip)) {
-                        newClip.name = GetDummyAnimationClipName(dummyClipKey);
-                        CreateUniqueAsset(newClip, newClip.name + ".anim");
-                        cache_DummyAnimationClipBySettings[dummyClipKey] = dummyClip = newClip;
-                    } else {
-                        DestroyImmediate(newClip);
-                    }
-                    return dummyClip;
-                } else {
-                    LogToFile($"- clip '{clip.name}' has no used keyframes but unused keyframes up to time {lastUnusedKeyframeTime}, not using dummy clip because of non-default clip settings");
-                    CreateUniqueAsset(newClip, newClip.name + ".anim");
-                    return newClip;
-                }
-            }
         }
-        if (changed)
+        if (!changed)
+            return clip;
+        
+        var newClip = CopyClipHeader(clip);
+        AnimationUtility.SetEditorCurves(newClip,
+            floatCurvesToSet.Select(t => t.binding).ToArray(),
+            floatCurvesToSet.Select(t => t.curve).ToArray());
+        AnimationUtility.SetObjectReferenceCurves(newClip,
+            objectCurvesToSet.Select(t => t.binding).ToArray(),
+            objectCurvesToSet.Select(t => t.curve).ToArray());
+        LogToFile($"- clip '{clip.name}' got modified");
+        foreach (var (from, to) in changedBindings)
         {
-            LogToFile($"- clip '{clip.name}' got modified");
-            foreach (var (from, to) in changedBindings)
+            if (from.type == to.type)
             {
-                if (from.type == to.type)
-                {
-                    LogToFile($"  * {from.path}.{from.propertyName} => {to.path}.{to.propertyName} ({from.type})");
-                }
-                else
-                {
-                    LogToFile($"  * {from.path}.{from.propertyName} ({from.type})  =>  {to.path}.{to.propertyName} ({to.type})");
-                }
+                LogToFile($"* {from.path}.{from.propertyName} => {to.path}.{to.propertyName} ({from.type})", 1);
             }
-            foreach (var binding in removedBindings)
+            else
             {
-                LogToFile($"  - {binding.path}.{binding.propertyName} ({binding.type})");
+                LogToFile($"* {from.path}.{from.propertyName} ({from.type})  =>  {to.path}.{to.propertyName} ({to.type})", 1);
             }
-            foreach (var binding in addedBindings)
-            {
-                LogToFile($"  + {binding.path}.{binding.propertyName} ({binding.type})");
-            }
-            CreateUniqueAsset(newClip, newClip.name + ".anim");
-            return newClip;
         }
-        DestroyImmediate(newClip);
-        return clip;
+        foreach (var binding in removedBindings)
+        {
+            LogToFile($"- {binding.path}.{binding.propertyName} ({binding.type})", 1);
+        }
+        foreach (var binding in addedBindings)
+        {
+            LogToFile($"+ {binding.path}.{binding.propertyName} ({binding.type})", 1);
+        }
+        CreateUniqueAsset(newClip, newClip.name + ".anim");
+        return newClip;
     }
 
     private Motion FixMotion(Motion motion, Dictionary<(Motion motion, bool stateUsesWriteDefaults), Motion> fixedMotions, string assetPath, bool stateUsesWriteDefaults)
