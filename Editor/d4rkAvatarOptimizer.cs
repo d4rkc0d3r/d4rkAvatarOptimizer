@@ -2257,33 +2257,44 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return true;
     }
 
+    private static AnimationClip CopyClipHeader(AnimationClip source)
+    {
+        var newClip = new AnimationClip();
+        newClip.name = source.name;
+        newClip.frameRate = source.frameRate;
+        newClip.wrapMode = source.wrapMode;
+        newClip.legacy = source.legacy;
+        newClip.localBounds = source.localBounds;
+        AnimationUtility.SetAnimationClipSettings(newClip, AnimationUtility.GetAnimationClipSettings(source));
+        AnimationUtility.SetAnimationEvents(newClip, AnimationUtility.GetAnimationEvents(source));
+        return newClip;
+    }
+
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
     {
         if (clip.name == "d4rkAvatarOptimizer_MergedLayers_Constants")
             return clip;
-        var newClip = Instantiate(clip);
-        newClip.ClearCurves();
-        newClip.name = clip.name;
+        var newClip = CopyClipHeader(clip);
         bool changed = false;
         var removedBindings = new List<EditorCurveBinding>();
         var addedBindings = new List<EditorCurveBinding>();
         var changedBindings = new List<(EditorCurveBinding from, EditorCurveBinding to)>();
         float lastUsedKeyframeTime = -1;
         float lastUnusedKeyframeTime = -1;
-        void SetFloatCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, AnimationCurve curveToSet) {
+        void SetFloatCurve(EditorCurveBinding bindingToSet, AnimationCurve curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
                 lastUsedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUsedKeyframeTime);
-                AnimationUtility.SetEditorCurve(clipToSet, bindingToSet, curveToSet);
+                AnimationUtility.SetEditorCurve(newClip, bindingToSet, curveToSet);
             } else {
                 lastUnusedKeyframeTime = Mathf.Max(curveToSet.length > 0 ? curveToSet.keys[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
                 removedBindings.Add(bindingToSet);
             }
         }
-        void SetObjectReferenceCurve(AnimationClip clipToSet, EditorCurveBinding bindingToSet, ObjectReferenceKeyframe[] curveToSet) {
+        void SetObjectReferenceCurve(EditorCurveBinding bindingToSet, ObjectReferenceKeyframe[] curveToSet) {
             if (IsAnimatableBinding(bindingToSet)) {
                 lastUsedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUsedKeyframeTime);
-                AnimationUtility.SetObjectReferenceCurve(clipToSet, bindingToSet, curveToSet);
+                AnimationUtility.SetObjectReferenceCurve(newClip, bindingToSet, curveToSet);
             } else {
                 lastUnusedKeyframeTime = Mathf.Max(curveToSet.Length > 0 ? curveToSet[^1].time : 0, lastUnusedKeyframeTime);
                 changed = true;
@@ -2306,14 +2317,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         time = key.time,
                         value = key.value == 0 ? GetDisabledMaterial() : slot.material
                     }).ToArray();
-                    SetObjectReferenceCurve(newClip, matSwapBinding, keyframes);
+                    SetObjectReferenceCurve(matSwapBinding, keyframes);
                     changed = true;
                     addedBindings.Add(matSwapBinding);
                 }
             }
             if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive" && !pathsToDeleteGameObjectTogglesOn.Contains(binding.path))
             {
-                SetFloatCurve(newClip, FixAnimationBindingPath(binding, ref changed), curve);
+                SetFloatCurve(FixAnimationBindingPath(binding, ref changed), curve);
             }
             if (fixedBinding.propertyName.StartsWithSimple("NaNimation")) {
                 var shaderToggleInfo = fixedBinding.propertyName.Substring("NaNimation".Length);
@@ -2321,7 +2332,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var NaNCurve = ReplaceZeroWithNaN(curve);
                 for (int i = 0; i < propertyNames.Length; i++) {
                     fixedBinding.propertyName = propertyNames[i];
-                    SetFloatCurve(newClip, fixedBinding, NaNCurve);
+                    SetFloatCurve(fixedBinding, NaNCurve);
                     addedBindings.Add(fixedBinding);
                 }
                 if (shaderToggleInfo.Length > 0) {
@@ -2331,18 +2342,18 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
                     var b = FixAnimationBindingPath(fixedBinding, ref changed);
-                    SetFloatCurve(newClip, b, curve);
+                    SetFloatCurve(b, curve);
                     addedBindings.Add(b);
                 }
             } else {
                 if (fixedBinding != binding)
                     changedBindings.Add((binding, fixedBinding));
-                SetFloatCurve(newClip, fixedBinding, curve);
+                SetFloatCurve(fixedBinding, curve);
                 if (fixedBinding.propertyName.StartsWithSimple($"material.d4rkAvatarOptimizer") && MergeSkinnedMeshesWithNaNimation) {
                     var otherBinding = fixedBinding;
                     var match = Regex.Match(fixedBinding.propertyName, @"material\.d4rkAvatarOptimizer(.+)_ArrayIndex\d+(\.[a-z])?");
                     otherBinding.propertyName = $"material.{match.Groups[1].Value}{match.Groups[2].Value}";
-                    SetFloatCurve(newClip, otherBinding, curve);
+                    SetFloatCurve(otherBinding, curve);
                     addedBindings.Add(otherBinding);
                 }
             }
@@ -2355,7 +2366,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 {
                     physBoneBinding.path = physBonePath;
                     var b = FixAnimationBindingPath(physBoneBinding, ref changed);
-                    SetFloatCurve(newClip, b, curve);
+                    SetFloatCurve(b, curve);
                     addedBindings.Add(b);
                     changed = true;
                 }
@@ -2388,7 +2399,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
             var newBinding = FixAnimationBinding(binding, ref changed);
-            SetObjectReferenceCurve(newClip, newBinding, curve);
+            SetObjectReferenceCurve(newBinding, curve);
         }
         if (lastUnusedKeyframeTime > lastUsedKeyframeTime && lastUnusedKeyframeTime > -1) {
             // add dummy curve referencing nothing to make sure the clip still has the same length as before
@@ -2411,6 +2422,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         newClip.name = GetDummyAnimationClipName(dummyClipKey);
                         CreateUniqueAsset(newClip, newClip.name + ".anim");
                         cache_DummyAnimationClipBySettings[dummyClipKey] = dummyClip = newClip;
+                    } else {
+                        DestroyImmediate(newClip);
                     }
                     return dummyClip;
                 } else {
@@ -2445,6 +2458,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             CreateUniqueAsset(newClip, newClip.name + ".anim");
             return newClip;
         }
+        DestroyImmediate(newClip);
         return clip;
     }
 
