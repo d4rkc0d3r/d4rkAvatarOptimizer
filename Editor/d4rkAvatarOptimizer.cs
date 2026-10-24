@@ -2241,20 +2241,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     }
     
     private static readonly string DummyAnimationClipPrefix = "d4rkAO_DummyClip_";
-        private Dictionary<(float length, float frameRate, bool isLooping), AnimationClip> cache_DummyAnimationClipBySettings = null;
-        private static string GetDummyAnimationClipName((float length, float frameRate, bool isLooping) dummyClipInfo)
-        {
-            return $"{DummyAnimationClipPrefix}{dummyClipInfo.length:G9}_fr{dummyClipInfo.frameRate:G9}_loop{(dummyClipInfo.isLooping ? 1 : 0)}";
-        }
+    private Dictionary<(float length, float frameRate, bool isLooping), AnimationClip> cache_DummyAnimationClipBySettings = null;
+    private static string GetDummyAnimationClipName((float length, float frameRate, bool isLooping) dummyClipInfo)
+    {
+        return $"{DummyAnimationClipPrefix}{dummyClipInfo.length:G9}_fr{dummyClipInfo.frameRate:G9}_loop{(dummyClipInfo.isLooping ? 1 : 0)}";
+    }
 
-        private static bool TryGetDummyAnimationClipInfo(Motion motion, out AnimationClip dummyClip, out (float length, float frameRate, bool isLooping) dummyClipInfo)
-        {
-            dummyClipInfo = default;
-            dummyClip = motion as AnimationClip;
-            if (dummyClip == null || string.IsNullOrEmpty(dummyClip.name) || !dummyClip.name.StartsWith(DummyAnimationClipPrefix))
-                return false;
-            dummyClipInfo = (dummyClip.length, dummyClip.frameRate, AnimationUtility.GetAnimationClipSettings(dummyClip).loopTime);
-            return true;
+    private static bool TryGetDummyAnimationClipInfo(Motion motion, out AnimationClip dummyClip, out (float length, float frameRate, bool isLooping) dummyClipInfo)
+    {
+        dummyClipInfo = default;
+        dummyClip = motion as AnimationClip;
+        if (dummyClip == null || string.IsNullOrEmpty(dummyClip.name) || !dummyClip.name.StartsWith(DummyAnimationClipPrefix))
+            return false;
+        dummyClipInfo = (dummyClip.length, dummyClip.frameRate, AnimationUtility.GetAnimationClipSettings(dummyClip).loopTime);
+        return true;
     }
 
     private AnimationClip FixAnimationClipPaths(AnimationClip clip)
