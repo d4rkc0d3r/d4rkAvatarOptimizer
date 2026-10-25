@@ -460,6 +460,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        private bool NeedVertexInputOutputWrappers()
+        {
+            return
+                arrayPropertyValues.Count > 0
+                || (currentPass.geometry != null && mergedMeshCount > 1)
+                || animatedPropertyValues.Count > 0;
+        }
+
         private void InjectVertexShaderCode(List<string> source, ref int sourceLineIndex)
         {
             var dummyLineIndex = sourceLineIndex;
@@ -472,11 +480,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             bool isEmptyPass = isVoidReturn && func.parameters.Count == 1;
             List<string> funcParams = null;
             List<string> originalVertexShader = null;
-            bool needToPassOnMeshOrMaterialID =
-                arrayPropertyValues.Count > 0
-                || (currentPass.geometry != null && mergedMeshCount > 1)
-                || animatedPropertyValues.Count > 0;
-            needToPassOnMeshOrMaterialID = needToPassOnMeshOrMaterialID && !isEmptyPass;
+            bool needToPassOnMeshOrMaterialID = NeedVertexInputOutputWrappers() && !isEmptyPass;
             if (needToPassOnMeshOrMaterialID)
             {
                 int startLineIndex = sourceLineIndex;
@@ -1568,7 +1572,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 switch (identifier) {
                     case "vertex":
-                        if ((currentPass.geometry != null && mergedMeshCount > 1) || arrayPropertyValues.Count > 0 || animatedPropertyValues.Count > 0) {
+                        if (NeedVertexInputOutputWrappers()) {
                             output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
                         } else {
                             output.Add(line);

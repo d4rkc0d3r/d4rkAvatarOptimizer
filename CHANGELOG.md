@@ -10,6 +10,7 @@
 
 ### Bug Fixes
 * Fix Shader Optimizer crash when preprocessor directive had whitespace after `#`.
+* Fix Shader Optimizer trying to merge materials with a shader that has an empty vertex like `void vertex() {}`.
 
 ## v4.7.0-beta.1
 ### Features

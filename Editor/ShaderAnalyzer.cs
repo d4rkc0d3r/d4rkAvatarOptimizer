@@ -102,6 +102,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public string filePath;
         public bool parsedCorrectly = false;
         public bool couldFindAllVertexGeomFragmentFunctions = true;
+        public bool hasEmptyVertexFunction = false;
         public string errorMessage = "";
         public List<string> customTextureDeclarations = new();
         public Dictionary<string, int> multiIncludeFileCount = new();
@@ -130,6 +131,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return false;
             if (!couldFindAllVertexGeomFragmentFunctions)
                 return false;
+            if (hasEmptyVertexFunction)
+                return false;
             return true;
         }
 
@@ -141,6 +144,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return "Shader has a pass with tessellation.";
             if (!couldFindAllVertexGeomFragmentFunctions)
                 return "Optimizer could not find all vertex/geometry/fragment functions.";
+            if (hasEmptyVertexFunction)
+                return "Shader has a vertex function with no input & output.";
             return "";
         }
 
@@ -1608,6 +1613,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         continue;
                     parsedShader.parserWarnings.Add($"The {func.name} function in pass {index} could not be found but is declared by a pragma.");
                     parsedShader.couldFindAllVertexGeomFragmentFunctions = false;
+                }
+                if (pass.vertex.parameters.Count == 1 && pass.vertex.parameters[0].type == "void")
+                {
+                    parsedShader.hasEmptyVertexFunction = true;
                 }
             }
         }
