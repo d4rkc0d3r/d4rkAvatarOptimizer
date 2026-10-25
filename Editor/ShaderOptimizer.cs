@@ -1423,7 +1423,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     {
                         depth++;
                     }
-                    else if (innerLine.Length > 5 && innerLine[1] == 'e' && innerLine[2] == 'n' && innerLine[3] == 'd' && innerLine[4] == 'i' && innerLine[5] == 'f')
+                    else if (innerLine.StartsWithSimple("endif", 1))
                     {
                         if (depth == 0)
                         {
@@ -1431,7 +1431,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         }
                         depth--;
                     }
-                    else if (depth == 0 && innerLine.Length > 4 && innerLine[1] == 'e' && innerLine[2] == 'l' && ((innerLine[3] == 's' && innerLine[4] == 'e') || (innerLine[3] == 'i' && innerLine[4] == 'f')))
+                    else if (depth == 0 && (innerLine.StartsWithSimple("else", 1) || innerLine.StartsWithSimple("elif", 1)))
                     {
                         return --lineIndex - startLineIndex;
                     }
@@ -1462,7 +1462,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 PushPreprocessorScope();
                 return line;
             }
-            else if (line.Length > 4 && line[1] == 'e' && line[2] == 'l' && ((line[3] == 's' && line[4] == 'e') || (line[3] == 'i' && line[4] == 'f')))
+            else if (line.StartsWithSimple("else", 1) || line.StartsWithSimple("elif", 1))
             {
                 var lastEval = lastIfEvalResultStack.Pop();
                 if (lastEval == ConditionResult.True)
@@ -1478,7 +1478,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 if (line[3] == 'i')
                 {
-                    string expr = line.Substring(6).TrimStart();
+                    string expr = line[6..].TrimStart();
                     var exprIndex = 0;
                     var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
                     if (evalResult == ConditionResult.Unknown)
@@ -1487,7 +1487,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         if (lastEval == ConditionResult.False)
                         {
                             PushPreprocessorScope();
-                            return $"#{line.Substring(3)}";
+                            return $"#{line[3..]}";
                         }
                         return line;
                     }
@@ -1521,7 +1521,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return null;
                 }
             }
-            else if (line.Length > 5 && line[1] == 'e' && line[2] == 'n' && line[3] == 'd' && line[4] == 'i' && line[5] == 'f')
+            else if (line.StartsWithSimple("endif", 1))
             {
                 if (lastIfEvalResultStack.Pop() == ConditionResult.Unknown)
                 {
@@ -1530,7 +1530,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 return null;
             }
-            else if (line.Length > 7 && line[1] == 'd' && line[2] == 'e' && line[3] == 'f' && line[4] == 'i' && line[5] == 'n' && line[6] == 'e')
+            else if (line.StartsWithSimple("define", 1))
             {
                 var index = 7;
                 SkipWhitespace(line, ref index);
@@ -1544,7 +1544,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 knownDefines.Peek()[identifier] = (true, null);
                 return line;
             }
-            else if (line.Length > 5 && line[1] == 'u' && line[2] == 'n' && line[3] == 'd' && line[4] == 'e' && line[5] == 'f')
+            else if (line.StartsWithSimple("undef", 1))
             {
                 var index = 6;
                 SkipWhitespace(line, ref index);
@@ -1558,7 +1558,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 knownDefines.Peek()[identifier] = (false, null);
                 return line;
             }
-            else if (line.Length > 6 && line[1] == 'p' && line[2] == 'r' && line[3] == 'a' && line[4] == 'g' && line[5] == 'm' && line[6] == 'a')
+            else if (line.StartsWithSimple("pragma", 1))
             {
                 var index = 7;
                 SkipWhitespace(line, ref index);
