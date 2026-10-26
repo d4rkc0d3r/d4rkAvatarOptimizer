@@ -1060,13 +1060,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 {
                     return new List<string>();
                 }
-                line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
                 if (line.StartsWithSimple("#"))
                 {
                     output.Add(line);
                 }
                 else
                 {
+                    if (line.Contains("UNITY_POSITION"))
+                    {
+                        line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
+                    }
                     for (int i = 0; i < line.Length; i++)
                     {
                         while (i < line.Length && (line[i] == ',' || line[i] == ' ' || line[i] == '\t'))
