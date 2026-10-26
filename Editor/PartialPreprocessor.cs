@@ -340,7 +340,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 else if (line.StartsWithSimple("ndef", 3))
                     expr = $"!defined({line[7..].TrimStart()})";
                 else
-                    expr = line[4..].TrimStart();
+                {
+                    int exprStart = 3;
+                    while (exprStart < line.Length && char.IsWhiteSpace(line[exprStart]))
+                        exprStart++;
+                    expr = line[exprStart..];
+                }
                 var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
                 if (evalDebug == null)
                     output.Add($"// {line} failed to parse conditions, keeping line verbatim");
@@ -352,7 +357,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (evalResult == IfConditionResult.False)
                 {
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    return $"// Skipped {skipped} lines | {line}{(evalDebug != null ? $" | {evalDebug}" : "")}";
+                    return $"// Skipped {skipped} lines | {evalDebug}";
                 }
                 PushPreprocessorScope();
                 return line;
@@ -373,7 +378,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 if (line[3] == 'i')
                 {
-                    string expr = line[6..].TrimStart();
+                    int elifExprStart = 5;
+                    while (elifExprStart < line.Length && char.IsWhiteSpace(line[elifExprStart]))
+                        elifExprStart++;
+                    string expr = line[elifExprStart..];
                     var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
                     if (evalDebug == null)
                         output.Add($"// {line} failed to parse conditions, keeping line verbatim");
@@ -404,7 +412,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         return line;
                     }
                     lastIfEvalResultStack.Push(IfConditionResult.False);
-                    return $"// Skipped {skipped} lines | {line}{(evalDebug != null ? $" | {evalDebug}" : "")}";
+                    return $"// Skipped {skipped} lines | {evalDebug}";
                 }
                 else
                 {
