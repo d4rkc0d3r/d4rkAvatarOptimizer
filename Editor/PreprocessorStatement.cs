@@ -106,6 +106,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 string opText = op == BoolOperator.And ? "&&" : "||";
                 return $"({left.GetDebugText(defines)} {opText} {right.GetDebugText(defines)})";
             }
+
+            public override (string macro, bool negated)? GetPureDefinedness() => null;
         }
 
         private sealed class NotNode : PreprocessorStatement
@@ -131,6 +133,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public override string GetDebugText(Dictionary<string, (bool isDefined, int? value)> defines)
             {
                 return $"!({operand.GetDebugText(defines)})";
+            }
+
+            public override (string macro, bool negated)? GetPureDefinedness()
+            {
+                var pure = operand.GetPureDefinedness();
+                return pure == null ? null : (pure.Value.macro, !pure.Value.negated);
             }
         }
 
@@ -184,6 +192,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 return $"({left.GetDebugText(defines)} {GetOpText(op)} {right.GetDebugText(defines)})";
             }
+
+            public override (string macro, bool negated)? GetPureDefinedness() => null;
         }
 
         private sealed class DefinedNode : PreprocessorStatement
@@ -210,6 +220,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 return defines.ContainsKey(name) ? $"defined({name})" : $"defined({name}?)";
             }
+
+            public override (string macro, bool negated)? GetPureDefinedness() => (name, false);
         }
 
         private sealed class IdentifierNode : PreprocessorStatement
@@ -240,6 +252,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return $"{name}(0)";
                 return $"{name}({define.value ?? 1})";
             }
+
+            public override (string macro, bool negated)? GetPureDefinedness() => null;
         }
 
         private sealed class IntLiteralNode : PreprocessorStatement
@@ -261,6 +275,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {
                 return this.value.ToString(CultureInfo.InvariantCulture);
             }
+
+            public override (string macro, bool negated)? GetPureDefinedness() => null;
         }
 
         public Evaluation Evaluate(Dictionary<string, (bool isDefined, int? value)> defines)
@@ -273,6 +289,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
         protected abstract bool TryGetValue(Dictionary<string, (bool isDefined, int? value)> defines, out int value);
 
         public abstract string GetDebugText(Dictionary<string, (bool isDefined, int? value)> defines);
+
+        /*
+            If the whole expression tree is just a plain `defined(NAME)` possibly wrapped in `!`,
+            returns (NAME, isNegated). Null for anything else (comparisons, ||, &&, literals, ...).
+            Used for header-guard tracking: a pure #ifndef M / #if !defined(M) that defines M in its
+            branch means M is defined regardless of which branch ran.
+        */
+        public abstract (string macro, bool negated)? GetPureDefinedness();
 
         public static PreprocessorStatement Parse(string expression)
         {

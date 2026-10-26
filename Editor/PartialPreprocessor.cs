@@ -43,6 +43,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public List<int> passEndLines = new();
         }
 
+        private sealed class IfLevel
+        {
+            public IfConditionResult result;
+            // set if the condition was a pure #ifndef M / #if !defined(M) and the branch is kept in
+            // place (Unknown). If a top-level `#define M` appears directly in that body, then M is
+            // defined after the matching #endif regardless of the unknown outcome, and the
+            // #endif handler leaks it into the enclosing scope. Any #else/#elif on this level
+            // replaces the level object and drops the guard.
+            public string guardMacro;
+            public bool hasQualifyingDefine;
+            public int? leakValue;
+        }
+
         public static readonly List<string> SkippedShaderVariants = new()
         {
             "DYNAMICLIGHTMAP_ON",
@@ -64,7 +77,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private readonly Options options;
         private readonly Result result;
         private readonly List<string> output;
-        private Stack<IfConditionResult> lastIfEvalResultStack;
+        private Stack<IfLevel> ifLevelStack;
         private Stack<Dictionary<string, (bool defined, int? value)>> knownDefines = new();
         private Stack<HashSet<string>> alreadyIncludedFiles = new();
         private int currentPassID = -1;
@@ -85,7 +98,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         public Result Preprocess()
         {
-            lastIfEvalResultStack = new Stack<IfConditionResult>();
+            ifLevelStack = new Stack<IfLevel>();
             knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
             alreadyIncludedFiles.Push(new HashSet<string>());
             int topLevelLineIndex = 0;
@@ -296,13 +309,20 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (line[0] != '#')
                 return line;
             void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
-            (IfConditionResult result, string debugText) EvalPreprocessorCondition(string expr)
+            (IfConditionResult result, string debugText, (string macro, bool negated)? guard) EvalPreprocessorCondition(string expr)
             {
                 var condition = PreprocessorStatement.Parse(expr);
                 if (condition == null)
-                    return (IfConditionResult.Unknown, null);
+                    return (IfConditionResult.Unknown, null, default);
                 var evaluation = condition.Evaluate(knownDefines.Peek());
-                return (evaluation.Result, evaluation.DebugText);
+                return (evaluation.Result, evaluation.DebugText, condition.GetPureDefinedness());
+            }
+            IfLevel MakeIfLevel(IfConditionResult result, (string macro, bool negated)? guard)
+            {
+                var level = new IfLevel { result = result };
+                if (guard != null && guard.Value.negated)
+                    level.guardMacro = guard.Value.macro;
+                return level;
             }
             int SkipUntilElseOrEndif(ref int lineIndex)
             {
@@ -346,10 +366,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         exprStart++;
                     expr = line[exprStart..];
                 }
-                var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
+                var (evalResult, evalDebug, guard) = EvalPreprocessorCondition(expr);
                 if (evalDebug == null)
                     output.Add($"// {line} failed to parse conditions, keeping line verbatim");
-                lastIfEvalResultStack.Push(evalResult);
+                ifLevelStack.Push(MakeIfLevel(evalResult, guard));
                 if (evalResult == IfConditionResult.True)
                 {
                     return null;
@@ -364,11 +384,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             else if (line.StartsWithSimple("else", 1) || line.StartsWithSimple("elif", 1))
             {
-                var lastEval = lastIfEvalResultStack.Pop();
+                var lastLevel = ifLevelStack.Pop();
+                var lastEval = lastLevel.result;
                 if (lastEval == IfConditionResult.True)
                 {
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    lastIfEvalResultStack.Push(IfConditionResult.True);
+                    ifLevelStack.Push(MakeIfLevel(IfConditionResult.True, default));
                     return $"// Skipped {skipped} lines";
                 }
                 if (lastEval == IfConditionResult.Unknown)
@@ -382,12 +403,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     while (elifExprStart < line.Length && char.IsWhiteSpace(line[elifExprStart]))
                         elifExprStart++;
                     string expr = line[elifExprStart..];
-                    var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
+                    var (evalResult, evalDebug, guard) = EvalPreprocessorCondition(expr);
                     if (evalDebug == null)
                         output.Add($"// {line} failed to parse conditions, keeping line verbatim");
                     if (evalResult == IfConditionResult.Unknown)
                     {
-                        lastIfEvalResultStack.Push(IfConditionResult.Unknown);
+                        // the elif guard only guarantees the leak if the earlier branch was
+                        // known-false, otherwise the earlier kept-in-place branch might not define the macro
+                        ifLevelStack.Push(MakeIfLevel(evalResult, lastEval == IfConditionResult.False ? guard : default));
                         if (lastEval == IfConditionResult.False)
                         {
                             PushPreprocessorScope();
@@ -397,39 +420,47 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     }
                     if (evalResult == IfConditionResult.True)
                     {
+                        // the earlier unknown branch is still kept in place, guard broken
                         if (lastEval == IfConditionResult.Unknown)
                         {
-                            lastIfEvalResultStack.Push(IfConditionResult.Unknown);
+                            ifLevelStack.Push(MakeIfLevel(IfConditionResult.Unknown, default));
                             return line;
                         }
-                        lastIfEvalResultStack.Push(IfConditionResult.True);
+                        ifLevelStack.Push(MakeIfLevel(IfConditionResult.True, default));
                         return null;
                     }
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
                     if (lastEval == IfConditionResult.Unknown)
                     {
-                        lastIfEvalResultStack.Push(IfConditionResult.Unknown);
+                        ifLevelStack.Push(MakeIfLevel(IfConditionResult.Unknown, default));
                         return line;
                     }
-                    lastIfEvalResultStack.Push(IfConditionResult.False);
+                    ifLevelStack.Push(MakeIfLevel(IfConditionResult.False, default));
                     return $"// Skipped {skipped} lines | {evalDebug}";
                 }
                 else
                 {
+                    // any #else drops the guard: the #define in the unknown branch may not have run
                     if (lastEval == IfConditionResult.Unknown)
                     {
-                        lastIfEvalResultStack.Push(IfConditionResult.Unknown);
+                        ifLevelStack.Push(MakeIfLevel(IfConditionResult.Unknown, default));
                         return line;
                     }
-                    lastIfEvalResultStack.Push(lastEval == IfConditionResult.False ? IfConditionResult.True : IfConditionResult.False);
+                    ifLevelStack.Push(MakeIfLevel(lastEval == IfConditionResult.False ? IfConditionResult.True : IfConditionResult.False, default));
                     return null;
                 }
             }
             else if (line.StartsWithSimple("endif", 1))
             {
-                if (lastIfEvalResultStack.Pop() == IfConditionResult.Unknown)
+                var level = ifLevelStack.Pop();
+                if (level.result == IfConditionResult.Unknown)
                 {
                     PopPreprocessorScope();
+                    // the unknown guard was a pure #ifndef M with a top-level `#define M` in its
+                    // body, so M is defined whichever outcome the unknown condition has: leak it
+                    // into the scope that is now on top so following lines can see it
+                    if (level.hasQualifyingDefine)
+                        knownDefines.Peek()[level.guardMacro] = (true, level.leakValue);
                     return line;
                 }
                 return null;
@@ -473,6 +504,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
                 knownDefines.Peek()[identifier] = (true, macroValue);
+                // credit the #define towards the innermost enclosing level that is a pure
+                // #ifndef-style guard. Any nested #if (or a #else, which replaces the level
+                // object) between the guard and this #define means we are not top-level,
+                // so only the stack top can qualify.
+                if (ifLevelStack.Count > 0)
+                {
+                    var topLevel = ifLevelStack.Peek();
+                    if (topLevel.guardMacro == identifier)
+                    {
+                        topLevel.hasQualifyingDefine = true;
+                        topLevel.leakValue = macroValue;
+                    }
+                }
                 return line;
             }
             else if (line.StartsWithSimple("undef", 1))
