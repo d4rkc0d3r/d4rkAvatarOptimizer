@@ -56,6 +56,19 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public int? leakValue;
         }
 
+        // Poiyomi pass markers: exactly one is #defined per pass
+        // so defining one means the rest are undefined within that pass
+        private static readonly string[] PoiPassDefines = new[]
+        {
+            "POI_PASS_BASE",
+            "POI_PASS_ADD",
+            "POI_PASS_SHADOW",
+            "POI_PASS_META",
+            "POI_PASS_OUTLINE",
+            "POI_PASS_EARLYZ",
+            "POI_PASS_DEPTH_ONLY",
+        };
+
         public static readonly List<string> SkippedShaderVariants = new()
         {
             "DYNAMICLIGHTMAP_ON",
@@ -504,6 +517,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
                 knownDefines.Peek()[identifier] = (true, macroValue);
+                if (System.Array.IndexOf(PoiPassDefines, identifier) >= 0)
+                {
+                    foreach (var other in PoiPassDefines)
+                        if (other != identifier)
+                            knownDefines.Peek()[other] = (false, null);
+                }
                 // credit the #define towards the innermost enclosing level that is a pure
                 // #ifndef-style guard. Any nested #if (or a #else, which replaces the level
                 // object) between the guard and this #define means we are not top-level,
