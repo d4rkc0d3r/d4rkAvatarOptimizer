@@ -991,7 +991,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             returnParam.name = "return";
             returnParam.type = match.returnType;
             func.parameters.Add(returnParam);
-            string line = source[lineIndex].Substring(source[lineIndex].IndexOf('(') + 1);
+            string line = source[lineIndex][(source[lineIndex].IndexOf('(') + 1)..];
             while (lineIndex < source.Count - 1)
             {
                 int charIndex = 0;
@@ -1039,10 +1039,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public static List<string> ParseFunctionParametersWithPreprocessorStatements(List<string> source, ref int sourceLineIndex)
         {
             var output = new List<string>();
-            string line = source[sourceLineIndex].Substring(source[sourceLineIndex].IndexOf('(') + 1);
+            string line = source[sourceLineIndex][(source[sourceLineIndex].IndexOf('(') + 1)..];
             while (line != "{" && sourceLineIndex < source.Count - 1)
             {
-                if (line.Length != 0 && line[line.Length - 1] == ';')
+                if (line.StartsWithSimple("//"))
+                {
+                    line = source[++sourceLineIndex];
+                    continue;
+                }
+                if (line.Length != 0 && line[^1] == ';')
                 {
                     return new List<string>();
                 }
@@ -1065,11 +1070,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var param = ParseNextFunctionParameter(line, ref i);
                         if (param != null)
                         {
-                            output.Add(line.Substring(previousCharIndex, i - previousCharIndex).Trim(' ', '\t'));
+                            output.Add(line[previousCharIndex..i].Trim(' ', '\t'));
                         }
-                        else if (line.Substring(previousCharIndex, i - previousCharIndex) != "void")
+                        else if (line[previousCharIndex..i] != "void")
                         {
-                            throw new ParserException($"Failed to parse function parameter : {line.Substring(previousCharIndex)} in:\n"
+                            throw new ParserException($"Failed to parse function parameter : {line[previousCharIndex..]} in:\n"
                                 + string.Join("\n", source.GetRange(sourceLineIndex-5, 6)));
                         }
                         if (i == line.Length || line[i] == ')')
