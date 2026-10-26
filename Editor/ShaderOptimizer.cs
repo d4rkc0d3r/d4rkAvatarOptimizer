@@ -97,6 +97,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
         private bool inlineReplaceConstants = false;
         private Dictionary<string, string> constantPropertyValues = new();
         private Dictionary<string, string> variableTypesThisPass = new();
+        private List<string> preprocessedLines;
+        private List<int> preprocessedPassEndLines;
+        // last file named by a `// Include X` marker in the preprocessed output (for the _LightColor0 / _SpecColor rule)
+        private string lastIncludedFile;
         private OptimizedShader optimizedShader = new();
 
         private ShaderOptimizer() {}
@@ -149,6 +153,26 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 optimizer.texturesToMerge.Union(optimizer.texturesToNullCheck.Keys));
             optimizer.optimizedShader.originalShader = source;
             optimizer.inlineReplaceConstants = source.ifexParameters.Count > 0 || source.requiredConstantProperties.Count > 0;
+            var preprocessorOptions = new PartialPreprocessor.Options
+            {
+                ifexContext = new IfexStatement.EvaluationContext(
+                    optimizer.staticPropertyValues,
+                    optimizer.animatedPropertyValues,
+                    optimizer.arrayPropertyValues),
+                stripShadowVariants = optimizer.stripShadowVariants,
+                setKeywords = optimizer.setKeywords,
+                poiUsedPropertyDefines = optimizer.poiUsedPropertyDefines,
+                inlineReplaceConstants = optimizer.inlineReplaceConstants,
+            };
+            // needVertexInputOutputWrappers is per-pass and only depends on config + pass metadata,
+            // so it can be computed before the preprocessor runs (needed for #pragma vertex rewriting)
+            preprocessorOptions.needVertexWrappers = source.passes.Select(pass =>
+                (optimizer.arrayPropertyValues.Count > 0
+                    || (pass.geometry != null && optimizer.mergedMeshCount > 1)
+                    || optimizer.animatedPropertyValues.Count > 0)).ToArray();
+            var preprocessed = new PartialPreprocessor(source, preprocessorOptions).Preprocess();
+            optimizer.preprocessedLines = preprocessed.lines;
+            optimizer.preprocessedPassEndLines = preprocessed.passEndLines;
             foreach (var staticValues in optimizer.staticPropertyValues)
             {
                 if (optimizer.animatedPropertyValues.ContainsKey(staticValues.Key))
@@ -175,7 +199,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private string ReplaceConstants(string line)
         {
-            if (!inlineReplaceConstants || line.Length == 0 || line[0] == '#')
+            if (!inlineReplaceConstants || line.Length == 0 || line[0] == '#' || line.StartsWithSimple("//"))
             {
                 return line;
             }
@@ -527,13 +551,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             curlyBraceDepth++;
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
-                string line = source[sourceLineIndex];
-                if (line[0] == '#')
+                var line = source[sourceLineIndex];
+                if (line[0] == '#' || line.StartsWithSimple("//"))
                 {
-                    line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
-                    if (line == null)
-                        continue;
                     output.Add(line);
                     originalVertexShader?.Add(line);
                     continue;
@@ -656,7 +676,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 line = source[sourceLineIndex];
                 line = ReplaceConstants(line);
                 if (line == "}")
@@ -827,16 +846,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int exitCurlyBraceDepth = curlyBraceDepth++;
             while (++sourceLineIndex < source.Count)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
-                string line = source[sourceLineIndex];
+                var line = source[sourceLineIndex];
                 line = ReplaceConstants(line);
-                if (line[0] == '#')
-                {
-                    line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
-                    if (line != null)
-                        functionBody.Add(line);
-                    continue;
-                }
                 functionBody.Add(line);
                 if (line == "}")
                 {
@@ -939,14 +950,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return index;
         }
 
-        private static readonly List<string> SkippedShaderVariants = new() {
-            "DYNAMICLIGHTMAP_ON",
-            "LIGHTMAP_ON",
-            "LIGHTMAP_SHADOW_MIXING",
-            "DIRLIGHTMAP_COMBINED",
-            "SHADOWS_SHADOWMASK"
-        };
-
         private void InjectWarningDisables(List<string> target)
         {
             target.Add($"#pragma warning (disable : 3557) // loop only executes for 1 iteration(s), forcing loop to unroll");
@@ -958,24 +961,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             if (!inlineReplaceConstants)
                 return;
-            var currentKnownDefines = knownDefines.Peek();
             output.Add("#define OPTIMIZER_ENABLED 1");
-            currentKnownDefines["OPTIMIZER_ENABLED"] = (true, 1);
             foreach (var prop in poiUsedPropertyDefines)
             {
                 if (!prop.Value)
-                {
-                    currentKnownDefines[prop.Key] = (false, null);
                     continue;
-                }
                 output.Add($"#define {prop.Key} 1");
-                currentKnownDefines[prop.Key] = (true, 1);
             }
         }
 
         private void InjectPropertyArrays()
         {
-            pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", SkippedShaderVariants)}");
+            pragmaOutput.Add($"#pragma skip_variants {string.Join(" ", PartialPreprocessor.SkippedShaderVariants)}");
             InjectWarningDisables(pragmaOutput);
             InjectWarningDisables(output);
             output.Add("//UNITY_SHADER_NO_UPGRADE");
@@ -1220,7 +1217,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private static (string type, List<string> names) ParseVariableDeclaration(string line)
         {
-            if (line[line.Length - 1] != ';')
+            if (line[^1] != ';')
                 return (null, null);
             int index = 0;
             string type = ShaderAnalyzer.ParseTypeAndTrailingWhitespace(line, ref index);
@@ -1249,397 +1246,24 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (type, names);
         }
         
-        enum ConditionResult
-        {
-            True,
-            False,
-            Unknown
-        }
-        private Stack<ConditionResult> lastIfEvalResultStack;
-        private Stack<Dictionary<string, (bool defined, int? value)>> knownDefines = new();
-        private Stack<HashSet<string>> alreadyIncludedFiles = new();
-        private void PushPreprocessorScope()
-        {
-            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>(knownDefines.Peek()));
-            alreadyIncludedFiles.Push(new HashSet<string>(alreadyIncludedFiles.Peek()));
-        }
-        private void PopPreprocessorScope()
-        {
-            knownDefines.Pop();
-            alreadyIncludedFiles.Pop();
-        }
-        string PartialEvalPreprocessorLine(List<string> source, ref int sourceLineIndex)
-        {
-            var line = source[sourceLineIndex];
-            if (line[0] != '#')
-                return line;
-            void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
-            ConditionResult EvalPreprocessorCondition(string expr, ref int index)
-            {
-                // hardcoded parse of POI_PIPE == POI_XXX guard
-                if (index == 0 && expr.StartsWithSimple("POI_PIPE == POI_"))
-                {
-                    return expr["POI_PIPE == ".Length..].Trim() switch
-                    {
-                        "POI_BIRP" => ConditionResult.True,
-                        "POI_URP" => ConditionResult.False,
-                        _ => ConditionResult.Unknown,
-                    };
-                }
-                // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
-                var values = new List<ConditionResult>();
-                bool allAnd = false;
-                bool allOr = false;
-                while (index < expr.Length)
-                {
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                        break;
-                    if (expr[index] == '|' && expr[index + 1] == '|')
-                    {
-                        if (allAnd)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return ConditionResult.Unknown;
-                        }
-                        allOr = true;
-                        index += 2;
-                    }
-                    else if (expr[index] == '&' && expr[index + 1] == '&')
-                    {
-                        if (allOr)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return ConditionResult.Unknown;
-                        }
-                        allAnd = true;
-                        index += 2;
-                    }
-                    SkipWhitespace(expr, ref index);
-                    bool isNegated = false;
-                    if (expr[index] == '!')
-                    {
-                        isNegated = true;
-                        index++;
-                    }
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                    {
-                        output.Add($"// Unexpected end of expression at {index}");
-                        return ConditionResult.Unknown;
-                    }
-                    if (expr[index] == '(')
-                    {
-                        index++;
-                        var res = EvalPreprocessorCondition(expr, ref index);
-                        if (isNegated && res != ConditionResult.Unknown)
-                            res = res == ConditionResult.True ? ConditionResult.False : ConditionResult.True;
-                        values.Add(res);
-                        continue;
-                    }
-                    if (expr[index] == '1' || expr[index] == '0')
-                    {
-                        bool value = expr[index] == '1';
-                        index++;
-                        if (index < expr.Length && char.IsDigit(expr[index]))
-                        {
-                            output.Add($"// Expected 1 or 0 at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                            return ConditionResult.Unknown;
-                        }
-                        values.Add(value ^ isNegated ? ConditionResult.True : ConditionResult.False);
-                        continue;
-                    }
-                    if (!expr.StartsWithSimple("defined", index))
-                    {
-                        output.Add($"// Expected defined at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return ConditionResult.Unknown;
-                    }
-                    index += 7;
-                    SkipWhitespace(expr, ref index);
-                    if (expr[index] != '(')
-                    {
-                        output.Add($"// Expected ( at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return ConditionResult.Unknown;
-                    }
-                    index++;
-                    SkipWhitespace(expr, ref index);
-                    string constantName = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(expr, ref index);
-                    if (constantName == null)
-                    {
-                        output.Add($"// Expected identifier at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return ConditionResult.Unknown;
-                    }
-                    if (expr[index] != ')')
-                    {
-                        output.Add($"// Expected ) at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return ConditionResult.Unknown;
-                    }
-                    index++;
-                    if (knownDefines.Peek().TryGetValue(constantName, out var constant))
-                    {
-                        values.Add(constant.defined ^ isNegated ? ConditionResult.True : ConditionResult.False);
-                    }
-                    else
-                    {
-                        values.Add(ConditionResult.Unknown);
-                    }
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                        break;
-                    if (expr[index] == ')')
-                    {
-                        index++;
-                        break;
-                    }
-                }
-                if (!allAnd && !allOr)
-                {
-                    return values[0];
-                }
-                if (allAnd)
-                {
-                    if (values.Contains(ConditionResult.False))
-                        return ConditionResult.False;
-                    if (values.Contains(ConditionResult.Unknown))
-                        return ConditionResult.Unknown;
-                    return ConditionResult.True;
-                }
-                if (allOr)
-                {
-                    if (values.Contains(ConditionResult.True))
-                        return ConditionResult.True;
-                    if (values.Contains(ConditionResult.Unknown))
-                        return ConditionResult.Unknown;
-                    return ConditionResult.False;
-                }
-                return ConditionResult.Unknown;
-            }
-            int SkipUntilElseOrEndif(ref int lineIndex)
-            {
-                int depth = 0;
-                int startLineIndex = lineIndex;
-                while (++lineIndex < source.Count)
-                {
-                    var innerLine = source[lineIndex];
-                    if (innerLine[0] != '#')
-                        continue;
-                    if (innerLine.Length > 3 && innerLine[1] == 'i' && innerLine[2] == 'f' && innerLine[3] != 'e')
-                    {
-                        depth++;
-                    }
-                    else if (innerLine.StartsWithSimple("endif", 1))
-                    {
-                        if (depth == 0)
-                        {
-                            return --lineIndex - startLineIndex;
-                        }
-                        depth--;
-                    }
-                    else if (depth == 0 && (innerLine.StartsWithSimple("else", 1) || innerLine.StartsWithSimple("elif", 1)))
-                    {
-                        return --lineIndex - startLineIndex;
-                    }
-                }
-                return lineIndex - startLineIndex;
-            }
-            if (line.StartsWithSimple("if", 1))
-            {
-                string expr = "";
-                if (line.StartsWithSimple("def", 3))
-                    expr = $"defined({line[6..].TrimStart()})";
-                else if (line.StartsWithSimple("ndef", 3))
-                    expr = $"!defined({line[7..].TrimStart()})";
-                else
-                    expr = line[4..].TrimStart();
-                var exprIndex = 0;
-                var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
-                lastIfEvalResultStack.Push(evalResult);
-                if (evalResult == ConditionResult.True)
-                {
-                    return null;
-                }
-                if (evalResult == ConditionResult.False)
-                {
-                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    return $"// Skipped {skipped} lines | {line}";
-                }
-                PushPreprocessorScope();
-                return line;
-            }
-            else if (line.StartsWithSimple("else", 1) || line.StartsWithSimple("elif", 1))
-            {
-                var lastEval = lastIfEvalResultStack.Pop();
-                if (lastEval == ConditionResult.True)
-                {
-                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    lastIfEvalResultStack.Push(ConditionResult.True);
-                    return $"// Skipped {skipped} lines";
-                }
-                if (lastEval == ConditionResult.Unknown)
-                {
-                    PopPreprocessorScope();
-                    PushPreprocessorScope();
-                }
-                if (line[3] == 'i')
-                {
-                    string expr = line[6..].TrimStart();
-                    var exprIndex = 0;
-                    var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
-                    if (evalResult == ConditionResult.Unknown)
-                    {
-                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
-                        if (lastEval == ConditionResult.False)
-                        {
-                            PushPreprocessorScope();
-                            return $"#{line[3..]}";
-                        }
-                        return line;
-                    }
-                    if (evalResult == ConditionResult.True)
-                    {
-                        if (lastEval == ConditionResult.Unknown)
-                        {
-                            lastIfEvalResultStack.Push(ConditionResult.Unknown);
-                            return line;
-                        }
-                        lastIfEvalResultStack.Push(ConditionResult.True);
-                        return null;
-                    }
-                    int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    if (lastEval == ConditionResult.Unknown)
-                    {
-                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
-                        return line;
-                    }
-                    lastIfEvalResultStack.Push(ConditionResult.False);
-                    return $"// Skipped {skipped} lines | {line}";
-                }
-                else
-                {
-                    if (lastEval == ConditionResult.Unknown)
-                    {
-                        lastIfEvalResultStack.Push(ConditionResult.Unknown);
-                        return line;
-                    }
-                    lastIfEvalResultStack.Push(lastEval == ConditionResult.False ? ConditionResult.True : ConditionResult.False);
-                    return null;
-                }
-            }
-            else if (line.StartsWithSimple("endif", 1))
-            {
-                if (lastIfEvalResultStack.Pop() == ConditionResult.Unknown)
-                {
-                    PopPreprocessorScope();
-                    return line;
-                }
-                return null;
-            }
-            else if (line.StartsWithSimple("define", 1))
-            {
-                var index = 7;
-                SkipWhitespace(line, ref index);
-                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-                if (identifier == null)
-                {
-                    output.Add($"// Expected identifier at {index}, got {line.Substring(index, System.Math.Min(10, line.Length - index))}");
-                    return line;
-                }
-                knownDefines.ToList().ForEach(d => d.Remove(identifier));
-                knownDefines.Peek()[identifier] = (true, null);
-                return line;
-            }
-            else if (line.StartsWithSimple("undef", 1))
-            {
-                var index = 6;
-                SkipWhitespace(line, ref index);
-                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-                if (identifier == null)
-                {
-                    output.Add($"// Expected identifier at {index}, got {line.Substring(index, System.Math.Min(10, line.Length - index))}");
-                    return line;
-                }
-                knownDefines.ToList().ForEach(d => d.Remove(identifier));
-                knownDefines.Peek()[identifier] = (false, null);
-                return line;
-            }
-            else if (line.StartsWithSimple("pragma", 1))
-            {
-                var index = 7;
-                SkipWhitespace(line, ref index);
-                var identifier = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(line, ref index);
-                if (identifier == null) {
-                    return null;
-                }
-                switch (identifier) {
-                    case "vertex":
-                        if (NeedVertexInputOutputWrappers()) {
-                            output.Add("#pragma vertex d4rkAvatarOptimizer_vertexWithWrapper");
-                        } else {
-                            output.Add(line);
-                        }
-                        break;
-                    case "skip_optimizations":
-                    case "enable_d3d11_debug_symbols":
-                        break;
-                    case "multi_compile_fwdbase":
-                        output.Add("#pragma multi_compile DIRECTIONAL");
-                        output.Add("#pragma multi_compile LIGHTPROBE_SH");
-                        if (!stripShadowVariants)
-                            output.Add("#pragma multi_compile _ SHADOWS_SCREEN");
-                        break;
-                    case "multi_compile_fwdadd_fullshadows":
-                        output.Add(stripShadowVariants ? "#pragma multi_compile_fwdadd" : "#pragma multi_compile_fwdadd_fullshadows");
-                        break;
-                    default:
-                        if (!identifier.StartsWithSimple("shader_feature")) {
-                            output.Add(line);
-                        }
-                        break;
-                }
-                return null;
-            }
-            else
-            {
-                return line;
-            }
-        }
 
-        private void ParseCodeLinesRecursive(List<string> source, ref int sourceLineIndex, string endSymbol)
+        private void ParseCodeLines(List<string> source, ref int sourceLineIndex, string endSymbol)
         {
             for (; sourceLineIndex < source.Count; sourceLineIndex++)
             {
-                ParseAndEvaluateIfex(source, ref sourceLineIndex, output);
                 var line = source[sourceLineIndex];
                 if (line == endSymbol)
                     return;
                 if (line[0] == '#')
                 {
-                    if (line.StartsWithSimple("#include "))
-                    {
-                        var includeName = ShaderAnalyzer.ParseIncludeDirective(line);
-                        if (parsedShader.text.TryGetValue(includeName, out var includeSource))
-                        {
-                            if (alreadyIncludedFiles.Peek().Contains(includeName))
-                            {
-                                output.Add($"// Already included {includeName}");
-                                continue;
-                            }
-                            int innerLineIndex = 0;
-                            output.Add($"// Include {includeName}");
-                            alreadyIncludedFiles.Peek().Add(includeName);
-                            ParseCodeLinesRecursive(includeSource, ref innerLineIndex, endSymbol);
-                        }
-                        else
-                        {
-                            output.Add(line);
-                        }
-                    }
-                    else
-                    {
-                        line = PartialEvalPreprocessorLine(source, ref sourceLineIndex);
-                        if (line != null)
-                            output.Add(line);
-                    }
+                    output.Add(line);
+                    continue;
+                }
+                if (line.StartsWithSimple("//"))
+                {
+                    if (line.StartsWithSimple("// Include "))
+                        lastIncludedFile = line["// Include ".Length..];
+                    output.Add(line);
                     continue;
                 }
                 if (line == "{")
@@ -1742,7 +1366,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                 && !texturesToReplaceCalls.Contains(name)
                                 && !(isTextureSamplerState && texturesToReplaceCalls.Contains(referencedTexture))
                                 && ((name != "_LightColor0" && name != "_SpecColor")
-                                    || alreadyIncludedFiles.Peek().LastOrDefault() == "UnityLightingCommon.cginc"))
+                                    || lastIncludedFile == "UnityLightingCommon.cginc"))
                             {
                                 output.Add(type + " " + name + ";");
                             }
@@ -1771,74 +1395,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private string GetMD5Hash(List<string> lines)
         {
-            using (var md5 = MD5.Create())
-            {
-                md5.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)));
-                return string.Join("", md5.Hash.Select(b => b.ToString("x2")));
-            }
+            using var md5 = MD5.Create();
+            md5.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)));
+            return string.Join("", md5.Hash.Select(b => b.ToString("x2")));
         }
 
-        private void ParseAndEvaluateIfex(List<string> lines, ref int lineIndex, List<string> debugOutput)
-        {
-            string line = lines[lineIndex];
-            if (line[0] != '#')
-                return;
-            if (line == "#endex")
-            {
-                lineIndex++;
-                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                return;
-            }
-            if (!line.StartsWithSimple("#ifex"))
-                return;
-            var ifexStatement = IfexStatement.Parse(line);
-            if (ifexStatement == null) {
-                lineIndex++;
-                debugOutput?.Add($"// {line} failed to parse conditions, just skip statement");
-                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                return;
-            }
-            var evaluation = ifexStatement.Evaluate(new IfexStatement.EvaluationContext(
-                staticPropertyValues,
-                animatedPropertyValues,
-                arrayPropertyValues));
-            var outputString = $"// #ifex {evaluation.DebugText}";
-            if (evaluation.Result != IfexStatement.EvaluationResult.True)
-            {
-                lineIndex++;
-                debugOutput?.Add(outputString + $", {evaluation.Result.ToString().ToUpperInvariant()}");
-                ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                return;
-            }
-
-            // skip all code until matching #endex
-            int depth = 0;
-            int linesSkipped = 0;
-            while (++lineIndex < lines.Count)
-            {
-                line = lines[lineIndex];
-                linesSkipped++;
-                if (line[0] != '#')
-                    continue;
-                if (line == "#endex")
-                {
-                    if (depth == 0)
-                    {
-                        lineIndex++;
-                        debugOutput?.Add($"{outputString}, TRUE skipped {linesSkipped} lines");
-                        ParseAndEvaluateIfex(lines, ref lineIndex, debugOutput);
-                        return;
-                    }
-                    depth--;
-                }
-                else if (line.Length >= 5 && line[4] == 'x' && line[1] == 'i' && line[2] == 'f' && line[3] == 'e')
-                {
-                    depth++;
-                }
-            }
-            debugOutput?.Add($"// didn't find matching #endex, skipped {linesSkipped} lines");
-        }
-        
         static readonly HashSet<string> shaderPropertiesToKeep = new()
         {
             // copied by vrchat shader fallback system
@@ -1880,19 +1441,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
 
         private void Run()
         {
-            lastIfEvalResultStack = new Stack<ConditionResult>();
-            alreadyIncludedFiles.Push(new HashSet<string>());
-            knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
             output = new List<string>();
             var tags = new List<string>();
-            var lines = parsedShader.text[".shader"];
+            var lines = preprocessedLines;
             var propertyBlock = new List<string>();
             int propertyBlockInsertionIndex = 0;
             int propertyBlockStartParseIndex = 0;
             int lineIndex = 0;
             while (lineIndex < lines.Count)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex, output);
                 string line = lines[lineIndex++];
                 output.Add(line);
                 if (line.ToLowerInvariant() == "properties")
@@ -1903,7 +1460,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             output[^1] = output[^1] + " //UNITY_SHADER_NO_UPGRADE";
             while (lineIndex < lines.Count)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex, null);
                 string line = lines[lineIndex++];
                 if (line == "}")
                 {
@@ -1992,16 +1548,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
             }
             int passID = -1;
-            var lightModeToDefine = new Dictionary<string, string>()
-            {
-                {"ForwardBase", "UNITY_PASS_FORWARDBASE"},
-                {"ForwardAdd", "UNITY_PASS_FORWARDADD"},
-                {"ShadowCaster", "UNITY_PASS_SHADOWCASTER"},
-                {"Meta", "UNITY_PASS_META"},
-            };
             for (; lineIndex < lines.Count; lineIndex++)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex, output);
                 string line = lines[lineIndex];
                 string lowerLine = line.ToLowerInvariant();
                 if (lowerLine.StartsWithSimple("customeditor"))
@@ -2011,22 +1559,12 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     passID = int.Parse(line.Substring(6));
                     currentPass = parsedShader.passes[passID];
                     variableTypesThisPass.Clear();
-                    alreadyIncludedFiles.Clear();
-                    alreadyIncludedFiles.Push(new HashSet<string>());
-                    knownDefines.Clear();
-                    knownDefines.Push(new Dictionary<string, (bool defined, int? value)>());
-                    knownDefines.Peek()["UNITY_COLORSPACE_GAMMA"] = (false, null);
-                    knownDefines.Peek()["SHADER_TARGET_SURFACE_ANALYSIS"] = (false, null);
                     if (currentPass.tags.TryGetValue("LightMode", out var lightMode))
                     {
-                        foreach (var lightModeDefine in lightModeToDefine)
-                        {
-                            knownDefines.Peek()[lightModeDefine.Value] = (lightMode == lightModeDefine.Key, null);
-                        }
                         if (lightMode == "Meta" && parsedShader.passes.Count > 1)
                         {
                             output.Add($"// {lightMode} pass removed, skipped {currentPass.lineCount} lines");
-                            lineIndex = currentPass.startLineIndex + currentPass.lineCount - 1;
+                            lineIndex = preprocessedPassEndLines[passID];
                             continue;
                         }
                     }
@@ -2076,18 +1614,10 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output = new List<string>();
                     InjectOptimizerDefines();
                     InjectPropertyArrays();
-                    foreach (var keyword in currentPass.shaderFeatureKeyWords)
-                    {
-                        knownDefines.Peek()[keyword] = (setKeywords.Contains(keyword), null);
-                    }
-                    foreach (var skippedShaderVariant in SkippedShaderVariants)
-                    {
-                        knownDefines.Peek()[skippedShaderVariant] = (false, null);
-                    }
                     string endSymbol = line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL";
                     lineIndex++;
                     curlyBraceDepth = 0;
-                    ParseCodeLinesRecursive(lines, ref lineIndex, endSymbol);
+                    ParseCodeLines(lines, ref lineIndex, endSymbol);
                     if (curlyBraceDepth != 0)
                     {
                         throw new ShaderAnalyzer.ParserException($"Unbalanced curly braces in {parsedShader.name} pass {passID}");
@@ -2102,10 +1632,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
             tags.Clear();
             for (lineIndex = propertyBlockStartParseIndex; lineIndex < lines.Count; lineIndex++)
             {
-                ParseAndEvaluateIfex(lines, ref lineIndex, propertyBlock);
                 string line = lines[lineIndex];
                 if (line == "}")
                     break;
+                if (line.StartsWithSimple("//"))
+                {
+                    propertyBlock.Add(line);
+                    continue;
+                }
                 var parsedProperty = ShaderAnalyzer.ParsePropertyRaw(line, tags);
                 if (parsedProperty == null)
                     continue;
