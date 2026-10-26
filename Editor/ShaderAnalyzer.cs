@@ -338,7 +338,16 @@ namespace d4rkpl4y3r.AvatarOptimizer
             var spaceAndTab = new[] { ' ', '\t' };
             void AddLine(string l)
             {
-                processedLines.Add(l.StartsWithSimple("#include") ? l :
+                bool keepAsIs = true;
+                for (int i = 1; i < l.Length - 1; i++)
+                {
+                    if (l[i] == '\t' || (l[i] == ' ' && l[i + 1] == ' '))
+                    {
+                        keepAsIs = false;
+                        break;
+                    }
+                }
+                processedLines.Add(keepAsIs || l.StartsWithSimple("#include") ? l :
                     string.Join(' ', l.Split(spaceAndTab, System.StringSplitOptions.RemoveEmptyEntries)));
             }
             alreadyIncludedThisPass ??= new HashSet<string>();
