@@ -4,8 +4,8 @@
   * List file size of generated shader assets to post optimization avatar stats.
   * List GameObjects with multiple components of the same type in the avatar stats.
 * Shader Optimizer:
+  * Partial preprocessor now parses most condition AST and evaluates with known values from previous `#define`.
   * Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader, .cginc & .hlsl files to improve import times.
-  * Partial preprocessor now skips `#if 0` or else blocks of `#if 1`.
 * Improve speed of fixing animation clips.
 
 ### Bug Fixes

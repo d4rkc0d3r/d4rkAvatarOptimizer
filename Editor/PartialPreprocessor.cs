@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using d4rkpl4y3r.AvatarOptimizer.Extensions;
+using IfConditionResult = d4rkpl4y3r.AvatarOptimizer.PreprocessorStatement.IfConditionResult;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
@@ -58,13 +59,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             {"ShadowCaster", "UNITY_PASS_SHADOWCASTER"},
             {"Meta", "UNITY_PASS_META"},
         };
-
-        private enum IfConditionResult
-        {
-            True,
-            False,
-            Unknown
-        }
 
         private readonly ParsedShader parsedShader;
         private readonly Options options;
@@ -302,145 +296,13 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (line[0] != '#')
                 return line;
             void SkipWhitespace(string s, ref int index) { while (index < s.Length && char.IsWhiteSpace(s[index])) index++; }
-            IfConditionResult EvalPreprocessorCondition(string expr, ref int index)
+            (IfConditionResult result, string debugText) EvalPreprocessorCondition(string expr)
             {
-                // hardcoded parse of POI_PIPE == POI_XXX guard
-                if (index == 0 && expr.StartsWithSimple("POI_PIPE == POI_"))
-                {
-                    return expr["POI_PIPE == ".Length..].Trim() switch
-                    {
-                        "POI_BIRP" => IfConditionResult.True,
-                        "POI_URP" => IfConditionResult.False,
-                        _ => IfConditionResult.Unknown,
-                    };
-                }
-                // parse flat lists of defined() and !defined() calls that are either all || or all && connected. no nesting.
-                var values = new List<IfConditionResult>();
-                bool allAnd = false;
-                bool allOr = false;
-                while (index < expr.Length)
-                {
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                        break;
-                    if (expr[index] == '|' && expr[index + 1] == '|')
-                    {
-                        if (allAnd)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return IfConditionResult.Unknown;
-                        }
-                        allOr = true;
-                        index += 2;
-                    }
-                    else if (expr[index] == '&' && expr[index + 1] == '&')
-                    {
-                        if (allOr)
-                        {
-                            output.Add($"// Mixed && and || at {index}");
-                            return IfConditionResult.Unknown;
-                        }
-                        allAnd = true;
-                        index += 2;
-                    }
-                    SkipWhitespace(expr, ref index);
-                    bool isNegated = false;
-                    if (expr[index] == '!')
-                    {
-                        isNegated = true;
-                        index++;
-                    }
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                    {
-                        output.Add($"// Unexpected end of expression at {index}");
-                        return IfConditionResult.Unknown;
-                    }
-                    if (expr[index] == '(')
-                    {
-                        index++;
-                        var res = EvalPreprocessorCondition(expr, ref index);
-                        if (isNegated && res != IfConditionResult.Unknown)
-                            res = res == IfConditionResult.True ? IfConditionResult.False : IfConditionResult.True;
-                        values.Add(res);
-                        continue;
-                    }
-                    if (expr[index] == '1' || expr[index] == '0')
-                    {
-                        bool value = expr[index] == '1';
-                        index++;
-                        if (index < expr.Length && char.IsDigit(expr[index]))
-                        {
-                            output.Add($"// Expected 1 or 0 at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                            return IfConditionResult.Unknown;
-                        }
-                        values.Add(value ^ isNegated ? IfConditionResult.True : IfConditionResult.False);
-                        continue;
-                    }
-                    if (!expr.StartsWithSimple("defined", index))
-                    {
-                        output.Add($"// Expected defined at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return IfConditionResult.Unknown;
-                    }
-                    index += 7;
-                    SkipWhitespace(expr, ref index);
-                    if (expr[index] != '(')
-                    {
-                        output.Add($"// Expected ( at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return IfConditionResult.Unknown;
-                    }
-                    index++;
-                    SkipWhitespace(expr, ref index);
-                    string constantName = ShaderAnalyzer.ParseIdentifierAndTrailingWhitespace(expr, ref index);
-                    if (constantName == null)
-                    {
-                        output.Add($"// Expected identifier at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return IfConditionResult.Unknown;
-                    }
-                    if (expr[index] != ')')
-                    {
-                        output.Add($"// Expected ) at {index}, got {expr.Substring(index, System.Math.Min(10, expr.Length - index))}");
-                        return IfConditionResult.Unknown;
-                    }
-                    index++;
-                    if (knownDefines.Peek().TryGetValue(constantName, out var constant))
-                    {
-                        values.Add(constant.defined ^ isNegated ? IfConditionResult.True : IfConditionResult.False);
-                    }
-                    else
-                    {
-                        values.Add(IfConditionResult.Unknown);
-                    }
-                    SkipWhitespace(expr, ref index);
-                    if (index == expr.Length)
-                        break;
-                    if (expr[index] == ')')
-                    {
-                        index++;
-                        break;
-                    }
-                }
-                if (!allAnd && !allOr)
-                {
-                    return values[0];
-                }
-                if (allAnd)
-                {
-                    if (values.Contains(IfConditionResult.False))
-                        return IfConditionResult.False;
-                    if (values.Contains(IfConditionResult.Unknown))
-                        return IfConditionResult.Unknown;
-                    return IfConditionResult.True;
-                }
-                if (allOr)
-                {
-                    if (values.Contains(IfConditionResult.True))
-                        return IfConditionResult.True;
-                    if (values.Contains(IfConditionResult.Unknown))
-                        return IfConditionResult.Unknown;
-                    return IfConditionResult.False;
-                }
-                return IfConditionResult.Unknown;
+                var condition = PreprocessorStatement.Parse(expr);
+                if (condition == null)
+                    return (IfConditionResult.Unknown, null);
+                var evaluation = condition.Evaluate(knownDefines.Peek());
+                return (evaluation.Result, evaluation.DebugText);
             }
             int SkipUntilElseOrEndif(ref int lineIndex)
             {
@@ -479,8 +341,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     expr = $"!defined({line[7..].TrimStart()})";
                 else
                     expr = line[4..].TrimStart();
-                var exprIndex = 0;
-                var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
+                var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
+                if (evalDebug == null)
+                    output.Add($"// {line} failed to parse conditions, keeping line verbatim");
                 lastIfEvalResultStack.Push(evalResult);
                 if (evalResult == IfConditionResult.True)
                 {
@@ -489,7 +352,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (evalResult == IfConditionResult.False)
                 {
                     int skipped = SkipUntilElseOrEndif(ref sourceLineIndex);
-                    return $"// Skipped {skipped} lines | {line}";
+                    return $"// Skipped {skipped} lines | {line}{(evalDebug != null ? $" | {evalDebug}" : "")}";
                 }
                 PushPreprocessorScope();
                 return line;
@@ -511,8 +374,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 if (line[3] == 'i')
                 {
                     string expr = line[6..].TrimStart();
-                    var exprIndex = 0;
-                    var evalResult = EvalPreprocessorCondition(expr, ref exprIndex);
+                    var (evalResult, evalDebug) = EvalPreprocessorCondition(expr);
+                    if (evalDebug == null)
+                        output.Add($"// {line} failed to parse conditions, keeping line verbatim");
                     if (evalResult == IfConditionResult.Unknown)
                     {
                         lastIfEvalResultStack.Push(IfConditionResult.Unknown);
@@ -540,7 +404,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         return line;
                     }
                     lastIfEvalResultStack.Push(IfConditionResult.False);
-                    return $"// Skipped {skipped} lines | {line}";
+                    return $"// Skipped {skipped} lines | {line}{(evalDebug != null ? $" | {evalDebug}" : "")}";
                 }
                 else
                 {
@@ -572,8 +436,35 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     output.Add($"// Expected identifier at {index}, got {line.Substring(index, System.Math.Min(10, line.Length - index))}");
                     return line;
                 }
+                int? macroValue = null;
+                if (index < line.Length)
+                {
+                    string macroBody = line[index..].TrimEnd();
+                    if (macroBody.Length > 0)
+                    {
+                        if (PreprocessorStatement.TryParseInt(macroBody, 0, out int intValue, out int consumed) && consumed == macroBody.Length)
+                        {
+                            macroValue = intValue;
+                        }
+                        else
+                        {
+                            bool isSingleIdentifier = true;
+                            for (int i = 0; i < macroBody.Length && isSingleIdentifier; i++)
+                                isSingleIdentifier = ShaderAnalyzer.IsIdentifierLetter(macroBody[i]);
+                            if (isSingleIdentifier)
+                                foreach (var scope in knownDefines.Reverse())
+                                {
+                                    if (scope.TryGetValue(macroBody, out var other) && other.defined && other.value != null)
+                                    {
+                                        macroValue = other.value;
+                                        break;
+                                    }
+                                }
+                        }
+                    }
+                }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
-                knownDefines.Peek()[identifier] = (true, null);
+                knownDefines.Peek()[identifier] = (true, macroValue);
                 return line;
             }
             else if (line.StartsWithSimple("undef", 1))
