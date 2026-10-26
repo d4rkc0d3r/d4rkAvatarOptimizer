@@ -1215,13 +1215,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
+        static readonly HashSet<string> externKeywords = new() { "uniform", "extern" };
+
         private static (string type, List<string> names) ParseVariableDeclaration(string line)
         {
             if (line[^1] != ';')
                 return (null, null);
             int index = 0;
             string type = ShaderAnalyzer.ParseTypeAndTrailingWhitespace(line, ref index);
-            if (type == "uniform")
+            while (type != null && externKeywords.Contains(type))
             {
                 type = ShaderAnalyzer.ParseTypeAndTrailingWhitespace(line, ref index);
             }

@@ -167,6 +167,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                 continue;
                             }
                             int innerLineIndex = 0;
+                            // This comment gets consumed by ShaderOptimizer down the line
                             output.Add($"// Include {includeName}");
                             alreadyIncludedFiles.Peek().Add(includeName);
                             WalkCodeBlock(includeSource, ref innerLineIndex, endSymbol);
