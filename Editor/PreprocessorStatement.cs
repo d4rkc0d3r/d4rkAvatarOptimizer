@@ -4,16 +4,14 @@ using System.Globalization;
 
 namespace d4rkpl4y3r.AvatarOptimizer
 {
-    /*
-        Parses and evaluates preprocessor condition expressions (what comes after #if / #elif; #ifdef /
-        #ifndef are synthesized into defined() / !defined() expressions by the caller). Supports: int
-        literals, identifiers (their value is the int tracked in the defines map, truthy if non 0,
-        value-less defines count as 1), defined(NAME), comparison operators (== != < > <= >=), unary !
-        and binary && / || with C precedence and free () nesting. Anything the evaluator can't decide
-        (e.g. an untracked macro) resolves to Unknown so the caller can keep the branch verbatim.
-        Mirrors IfexStatement's abstract AST + Parse/Evaluate structure, but the value here is an int
-        and evaluation is done against a define name -> (isDefined, value) map.
-    */
+    /// Parses and evaluates preprocessor condition expressions (what comes after #if / #elif; #ifdef /
+    /// #ifndef are synthesized into defined() / !defined() expressions by the caller). Supports: int
+    /// literals, identifiers (their value is the int tracked in the defines map, truthy if non 0,
+    /// value-less defines count as 1), defined(NAME), comparison operators (== != < > <= >=), unary !
+    /// and binary && / || with C precedence and free () nesting. Anything the evaluator can't decide
+    /// (e.g. an untracked macro) resolves to Unknown so the caller can keep the branch verbatim.
+    /// Mirrors IfexStatement's abstract AST + Parse/Evaluate structure, but the value here is an int
+    /// and evaluation is done against a define name -> (isDefined, value) map.
     public abstract class PreprocessorStatement
     {
         public enum IfConditionResult
