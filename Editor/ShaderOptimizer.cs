@@ -181,6 +181,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     continue;
                 if (source.noConstantFoldingProperties.Contains(staticValues.Key))
                     continue;
+                if (source.propertiesWithAssignmentOperator.Contains(staticValues.Key))
+                    continue;
                 if (source.propertyTable.TryGetValue(staticValues.Key, out var prop) && prop.doNotLock)
                     continue;
                 optimizer.constantPropertyValues[staticValues.Key] = staticValues.Value;
@@ -1354,14 +1356,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                     texturesToCallSoTheSamplerDoesntDisappear.Add(referencedTexture);
                                     output.Add("#define DUMMY_USE_TEXTURE_TO_PRESERVE_SAMPLER_" + referencedTexture);
                                 }
-                                output.Add(type + " " + name + ";");
+                                output.Add($"{type} {name};");
                             }
                             else if (staticPropertyValues.TryGetValue(name, out string value)
                                 && !animatedPropertyValues.ContainsKey(name)
                                 && !arrayPropertyValues.ContainsKey(name)
                                 && !parsedShader.noConstantFoldingProperties.Contains(name))
                             {
-                                output.Add("static " + type + " " + name + " = " + value + ";");
+                                output.Add($"static {type} {name} = {value};");
                             }
                             else if (!arrayPropertyValues.ContainsKey(name)
                                 && !animatedPropertyValues.ContainsKey(name)
@@ -1370,7 +1372,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                 && ((name != "_LightColor0" && name != "_SpecColor")
                                     || lastIncludedFile == "UnityLightingCommon.cginc"))
                             {
-                                output.Add(type + " " + name + ";");
+                                output.Add($"{type} {name};");
                             }
                         }
                     }
