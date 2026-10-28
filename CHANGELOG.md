@@ -13,6 +13,7 @@
   * Fix crash when preprocessor directive had whitespace after `#`.
   * Fix broken shader when properties were declared as `extern`.
   * Fix trying to merge materials with a shader that has an empty vertex like `void vertex() {}`.
+* Fix transform of skinned mesh renderer getting deleted after merge even though that transform was still used by the resulting skinned mesh as a bone. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/207)
 
 ## v4.7.0-beta.1
 ### Features
