@@ -168,7 +168,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             newAnimationPaths.Clear();
             pathsToDeleteGameObjectTogglesOn.Clear();
             texArrayPropertiesToSet.Clear();
-            keepTransforms.Clear();
             constantAnimatedValuesToAdd.Clear();
             animatedMaterialPropertyDefaultValues.Clear();
             ClearCaches();
@@ -478,7 +477,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private List<List<Texture2D>> textureArrayLists = new List<List<Texture2D>>();
     private List<Texture2DArray> textureArrays = new List<Texture2DArray>();
     private Dictionary<Material, List<(string name, Texture2DArray array)>> texArrayPropertiesToSet = new Dictionary<Material, List<(string name, Texture2DArray array)>>();
-    private HashSet<Transform> keepTransforms = new HashSet<Transform>();
     private Dictionary<string, Transform> transformFromOldPath = new Dictionary<string, Transform>();
     private Dictionary<EditorCurveBinding, float> constantAnimatedValuesToAdd = new Dictionary<EditorCurveBinding, float>();
     private Dictionary<string, List<MaterialSlot>> materialSlotsToDisableWhenOriginalPathMeshIsDisabled = new();
@@ -6078,9 +6076,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
-            keepTransforms.Add(targetProbeAnchor);
-            keepTransforms.Add(targetRootBone);
-
             var toLocal = targetRootBone.worldToLocalMatrix;
 
             AddNewBone(combinableSkinnedMeshes[0].transform, combinableSkinnedMeshes[0].transform.worldToLocalMatrix);
@@ -6263,7 +6258,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     sourceWeights = Enumerable.Repeat(defaultWeight, sourceVertices.Length).ToArray();
                     sourceBones = new Transform[1] { rootBone.transform };
                     sourceBindPoses = new Matrix4x4[1] { Matrix4x4.identity };
-                    keepTransforms.Add(rootBone.transform);
                     bindPoseCount = 1;
                 }
 
@@ -6910,13 +6904,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             targetRenderer.bones = targetBones.ToArray();
             targetRenderer.localBounds = targetBounds;
 
-            var usedBones = new HashSet<Transform>(targetBones);
+            var keepTransforms = new HashSet<Transform>(targetBones);
+            keepTransforms.Add(targetProbeAnchor);
+            keepTransforms.Add(targetRootBone);
             List<string> destroyedGameObjects = new();
             for (int meshID = 1; meshID < combinableSkinnedMeshes.Count; meshID++)
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
-                if (!keepTransforms.Contains(obj.transform) && !usedBones.Contains(obj.transform) && obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
+                if (!keepTransforms.Contains(obj.transform) && obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
                 {
                     destroyedGameObjects.Add(GetPathToRoot(obj.transform));
                     DestroyImmediate(obj);
