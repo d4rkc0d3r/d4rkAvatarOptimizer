@@ -6910,12 +6910,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             targetRenderer.bones = targetBones.ToArray();
             targetRenderer.localBounds = targetBounds;
 
+            // a source renderer can be skinned to its own transform, e.g. after MA Mesh Settings rigged a mesh without bone weights
+            var usedTargetBones = new HashSet<Transform>(targetBones);
             List<string> destroyedGameObjects = new();
             for (int meshID = 1; meshID < combinableSkinnedMeshes.Count; meshID++)
             {
                 var obj = combinableSkinnedMeshes[meshID].gameObject;
                 DestroyImmediate(combinableSkinnedMeshes[meshID]);
-                if (!keepTransforms.Contains(obj.transform) && obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
+                if (!keepTransforms.Contains(obj.transform) && !usedTargetBones.Contains(obj.transform) && obj.transform.childCount == 0 && obj.GetNonNullComponents().Length == 1)
                 {
                     destroyedGameObjects.Add(GetPathToRoot(obj.transform));
                     DestroyImmediate(obj);
