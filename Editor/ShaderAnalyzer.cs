@@ -121,6 +121,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         public List<string> unknownOptimizerComments = new();
         public HashSet<string> requiredConstantProperties = new();
         public HashSet<string> noConstantFoldingProperties = new();
+        public HashSet<string> propertiesWithAssignmentOperator = new();
         public List<string> parserWarnings = new();
 
         public bool CanMerge()
@@ -175,7 +176,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             public ParserException(string message) : base(message) { }
         }
 
-        private static Dictionary<string, ParsedShader> parsedShaderCache = new();
+        private static readonly Dictionary<string, ParsedShader> parsedShaderCache = new();
 
         public static void ClearParsedShaderCache()
         {
@@ -375,11 +376,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var rootPath = path;
                     if (path.IndexOf("Assets") != -1)
                     {
-                        rootPath = path.Substring(0, path.IndexOf("Assets") - 1);
+                        rootPath = path[..(path.IndexOf("Assets") - 1)];
                     }
                     else if (path.IndexOf("Packages") != -1)
                     {
-                        rootPath = path.Substring(0, path.IndexOf("Packages") - 1);
+                        rootPath = path[..(path.IndexOf("Packages") - 1)];
                     }
                     currentFilePath = Path.Combine(rootPath, currentFilePath.TrimStart('/'));
                 }
@@ -389,11 +390,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     var rootPath = path;
                     if (path.IndexOf("Packages") != -1)
                     {
-                        rootPath = path.Substring(0, path.IndexOf("Packages") - 1);
+                        rootPath = path[..(path.IndexOf("Packages") - 1)];
                     }
                     else if (path.IndexOf("Assets") != -1)
                     {
-                        rootPath = path.Substring(0, path.IndexOf("Assets") - 1);
+                        rootPath = path[..(path.IndexOf("Assets") - 1)];
                     }
                     currentFilePath = Path.Combine(rootPath, currentFilePath.TrimStart('/'));
                 }
@@ -621,14 +622,14 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 return "";
             int firstQuote = line.IndexOf('"');
             int lastQuote = line.LastIndexOf('"');
-            if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+            if (firstQuote == -1 || firstQuote == lastQuote)
             {
                 firstQuote = line.IndexOf('<');
                 lastQuote = line.LastIndexOf('>');
             }
-            if (firstQuote == -1 || lastQuote == -1 || firstQuote == lastQuote)
+            if (firstQuote == -1 || lastQuote == -1)
                 throw new ParserException("Invalid #include directive.");
-            return line.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
+            return line[(firstQuote + 1)..lastQuote];
         }
 
         public static (string name, string stringLiteral, string type, string defaultValue)?
@@ -656,7 +657,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         charIndex++;
                     endTagIndex = charIndex;
                 } else if (c == '(' || c == ' ' || c == '\t') {
-                    name = line.Substring(endTagIndex, charIndex - endTagIndex);
+                    name = line[endTagIndex..charIndex];
                     break;
                 } else {
                     charIndex++;
@@ -688,11 +689,11 @@ namespace d4rkpl4y3r.AvatarOptimizer
             int preParenthesesCloseIndex = parenthesesCloseIndex;
             while (preParenthesesCloseIndex > 0 && (line[preParenthesesCloseIndex - 1] == ' ' || line[preParenthesesCloseIndex - 1] == '\t'))
                 preParenthesesCloseIndex--;
-            string type = line.Substring(afterCommaIndex, preParenthesesCloseIndex - afterCommaIndex);
+            string type = line[afterCommaIndex..preParenthesesCloseIndex];
             int afterEqualsIndex = equalsIndex + 1;
             while (afterEqualsIndex < line.Length && (line[afterEqualsIndex] == ' ' || line[afterEqualsIndex] == '\t'))
                 afterEqualsIndex++;
-            string defaultValue = line.Substring(afterEqualsIndex);
+            string defaultValue = line[afterEqualsIndex..];
             string stringLiteral = line.Substring(quoteIndexStart, quoteIndexEnd - quoteIndexStart + 1);
             return (name, stringLiteral, type, defaultValue);
         }
@@ -909,7 +910,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             return (name, returnType);
         }
 
-        private static HashSet<string> FunctionParameterModifiers = new() {
+        private static readonly HashSet<string> FunctionParameterModifiers = new() {
             "in", "out", "inout",
             "point", "line", "triangle",
             "precise", "const", "uniform",
@@ -955,7 +956,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             if (index < line.Length && line[index] == '[') {
                 index++;
                 var endIndex = line.IndexOf(']', index);
-                if (!int.TryParse(line.Substring(index, endIndex - index).Trim(), out param.arraySize))
+                if (!int.TryParse(line[index..endIndex].Trim(), out param.arraySize))
                     return null;
                 index = endIndex + 1;
                 SkipWhitespace(line, ref index);
@@ -982,7 +983,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     break;
                 index++;
             }
-            param.defaultValue = line.Substring(defaultValueStart, index - defaultValueStart);
+            param.defaultValue = line[defaultValueStart..index];
             return param;
         }
 
@@ -1056,43 +1057,42 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     line = source[++sourceLineIndex];
                     continue;
                 }
+                if (line.StartsWithSimple("#"))
+                {
+                    output.Add(line);
+                    line = source[++sourceLineIndex];
+                    continue;
+                }
                 if (line.Length != 0 && line[^1] == ';')
                 {
                     return new List<string>();
                 }
-                if (line.StartsWithSimple("#"))
+                if (line.Contains("UNITY_POSITION"))
                 {
-                    output.Add(line);
+                    line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
                 }
-                else
+                for (int i = 0; i < line.Length; i++)
                 {
-                    if (line.Contains("UNITY_POSITION"))
+                    while (i < line.Length && (line[i] == ',' || line[i] == ' ' || line[i] == '\t'))
+                        i++;
+                    if (i == line.Length || line[i] == ')')
                     {
-                        line = Regex.Replace(line, @"UNITY_POSITION\s*\(\s*(\w+)\s*\)", "float4 $1 : SV_POSITION");
+                        break;
                     }
-                    for (int i = 0; i < line.Length; i++)
+                    int previousCharIndex = i;
+                    var param = ParseNextFunctionParameter(line, ref i);
+                    if (param != null)
                     {
-                        while (i < line.Length && (line[i] == ',' || line[i] == ' ' || line[i] == '\t'))
-                            i++;
-                        if (i == line.Length || line[i] == ')')
-                        {
-                            break;
-                        }
-                        int previousCharIndex = i;
-                        var param = ParseNextFunctionParameter(line, ref i);
-                        if (param != null)
-                        {
-                            output.Add(line[previousCharIndex..i].Trim(' ', '\t'));
-                        }
-                        else if (line[previousCharIndex..i] != "void")
-                        {
-                            throw new ParserException($"Failed to parse function parameter : {line[previousCharIndex..]} in:\n"
-                                + string.Join("\n", source.GetRange(sourceLineIndex-5, 6)));
-                        }
-                        if (i == line.Length || line[i] == ')')
-                        {
-                            break;
-                        }
+                        output.Add(line[previousCharIndex..i].Trim(' ', '\t'));
+                    }
+                    else if (line[previousCharIndex..i] != "void")
+                    {
+                        throw new ParserException($"Failed to parse function parameter : {line[previousCharIndex..]} in:\n"
+                            + string.Join("\n", source.GetRange(sourceLineIndex-5, 6)));
+                    }
+                    if (i == line.Length || line[i] == ')')
+                    {
+                        break;
                     }
                 }
                 line = source[++sourceLineIndex];
@@ -1117,7 +1117,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             UpdateFunctionDefinition(ref pass.fragment, func, "fragment");
         }
 
-        private void ParsePragma(string line, ParsedShader.Pass pass)
+        private void AnalyzePragma(string line, ParsedShader.Pass pass)
         {
             if (!line.StartsWithSimple("#pragma "))
                 return;
@@ -1178,7 +1178,27 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        private HashSet<string> unityTextureDeclarationMacros = new() {
+        private readonly HashSet<char> operatorChars = new() {
+            '=', '+', '-', '*', '/', '%', '<', '>', '^', '|', '&'
+        };
+
+        private readonly HashSet<string> assignmentOperators = new() {
+            "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "^=", "|=", "&="
+        };
+
+        private bool TryParseVariableWithAssignmentOperator(string line, out string name)
+        {
+            int startOp = 0;
+            name = ParseIdentifierAndTrailingWhitespace(line, ref startOp);
+            if (name == null)
+                return false;
+            int endOp = startOp;
+            while (line.Length > endOp && operatorChars.Contains(line[endOp]))
+                endOp++;
+            return assignmentOperators.Contains(line[startOp..endOp]);
+        }
+
+        private readonly HashSet<string> unityTextureDeclarationMacros = new() {
             "UNITY_DECLARE_TEX2D",
             "UNITY_DECLARE_TEX2D_NOSAMPLER",
             "UNITY_DECLARE_TEX2D_NOSAMPLER_INT",
@@ -1202,7 +1222,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             "TEXTURE2D", "TEXTURE2D_PARAM",
         };
 
-        private void ParseFunctionDeclarationsRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
+        private void AnalyzeCodeRecursive(List<string> lines, ParsedShader.Pass currentPass, int startIndex, HashSet<string> alreadyParsed = null)
         {
             alreadyParsed ??= new HashSet<string>();
             for (int lineIndex = startIndex; lineIndex < lines.Count; lineIndex++) {
@@ -1212,7 +1232,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         var includeName = ParseIncludeDirective(currentLine);
                         if (!alreadyParsed.Contains(includeName) && parsedShader.text.TryGetValue(includeName, out var includeLines)) {
                             alreadyParsed.Add(includeName);
-                            ParseFunctionDeclarationsRecursive(includeLines, currentPass, 0, alreadyParsed);
+                            AnalyzeCodeRecursive(includeLines, currentPass, startIndex: 0, alreadyParsed);
                         }
                     }
                     else if (currentLine.StartsWithSimple("#define ")) {
@@ -1228,14 +1248,18 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 int tempIndex = lineIndex;
                 var func = ParseFunctionDefinition(lines, ref tempIndex);
-                if (func != null) {
+                if (func != null)
+                {
                     parsedShader.functions[func.name] = func;
                     UpdateFunctionDefinition(func, currentPass);
-                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name) {
+                    if (func.name == currentPass.vertex?.name || func.name == currentPass.fragment?.name)
                         ParseFunctionParametersWithPreprocessorStatements(lines, ref lineIndex);
-                    }
+                    lineIndex = tempIndex;
                 }
-                lineIndex = tempIndex;
+                else if (TryParseVariableWithAssignmentOperator(currentLine, out var varName))
+                {
+                    parsedShader.propertiesWithAssignmentOperator.Add(varName);
+                }
             }
         }
 
@@ -1292,9 +1316,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
             }
         }
 
-        Regex tex2DDeclaration = new(@"(?:^|(?<!\w))TEXTURE2D(?:_FLOAT|_HALF)?\s*\(([\w\s]+)\)");
-        Regex tex2DParam = new(@"(?:^|(?<!\w))TEXTURE2D_PARAM\s*\(([\w\s]+),([\w\s]+)\)");
-        Regex samplerDeclaration = new(@"(?:^|(?<!\w))SAMPLER\s*\(([\w\s]+)\)");
+        private readonly Regex tex2DDeclaration = new(@"(?:^|(?<!\w))TEXTURE2D(?:_FLOAT|_HALF)?\s*\(([\w\s]+)\)");
+        private readonly Regex tex2DParam = new(@"(?:^|(?<!\w))TEXTURE2D_PARAM\s*\(([\w\s]+),([\w\s]+)\)");
+        private readonly Regex samplerDeclaration = new(@"(?:^|(?<!\w))SAMPLER\s*\(([\w\s]+)\)");
 
         private void ReplaceCoreTextureMacros(List<string> lines)
         {
@@ -1368,7 +1392,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         if (line == "{" && lines[lineIndex + 1] == "}")
                         {
                             lineIndex++;
-                            output[output.Count - 1] += " {}";
+                            output[^1] += " {}";
                             continue;
                         }
                         output.Add(line);
@@ -1453,9 +1477,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     PreprocessCodeLines(lines, ref lineIndex, output, ref curlyBraceDepth);
                     for (int programLineIndex = programLineIndexStart; programLineIndex < output.Count; programLineIndex++)
                     {
-                        ParsePragma(output[programLineIndex], currentPass);
+                        AnalyzePragma(output[programLineIndex], currentPass);
                     }
-                    ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
+                    AnalyzeCodeRecursive(output, currentPass, programLineIndexStart);
                     output.Add(line == "CGPROGRAM" ? "ENDCG" : "ENDHLSL");
                     currentPass.codeBlockLineCount = output.Count - currentPass.startLineIndex - currentPass.codeBlockStartIndex;
                 }
@@ -1470,6 +1494,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     currentPass.startLineIndex = output.Count;
                     passCurlyBraceDepth = 1;
                     lineIndex++;
+                    // ShaderOptimizer parses this exact formatting later
                     output.Add($"pass//{parsedShader.passes.Count-1}");
                     output.Add("{");
                 }
@@ -1514,9 +1539,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                                 });
                                 for (int programLineIndex = programLineIndexStart; programLineIndex < output.Count; programLineIndex++)
                                 {
-                                    ParsePragma(output[programLineIndex], currentPass);
+                                    AnalyzePragma(output[programLineIndex], currentPass);
                                 }
-                                ParseFunctionDeclarationsRecursive(output, currentPass, programLineIndexStart);
+                                AnalyzeCodeRecursive(output, currentPass, programLineIndexStart);
                                 currentPass.codeBlockLineCount = output.Count - currentPass.startLineIndex - currentPass.codeBlockStartIndex;
                             }
                         }
@@ -1531,7 +1556,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 }
                 else if (currentPass != null && lowerLine.StartsWithSimple("name"))
                 {
-                    currentPass.name = line.Substring(5).Trim('\t', ' ', '"').ToUpperInvariant();
+                    currentPass.name = line[5..].Trim('\t', ' ', '"').ToUpperInvariant();
                 }
                 else
                 {
@@ -1607,6 +1632,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         break;
                 }
             }
+            parsedShader.propertiesWithAssignmentOperator.RemoveWhere(varName =>
+                !parsedShader.propertyTable.ContainsKey(varName));
             parsedShader.mismatchedCurlyBraces |= curlyBraceDepth != 0;
             if (parsedShader.mismatchedCurlyBraces)
             {
