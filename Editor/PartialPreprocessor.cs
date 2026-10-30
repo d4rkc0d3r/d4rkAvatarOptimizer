@@ -53,7 +53,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
             // replaces the level object and drops the guard.
             public string guardMacro;
             public bool hasQualifyingDefine;
-            public int? leakValue;
         }
 
         // Poiyomi pass markers: exactly one is #defined per pass
@@ -468,12 +467,15 @@ namespace d4rkpl4y3r.AvatarOptimizer
                 var level = ifLevelStack.Pop();
                 if (level.result == IfConditionResult.Unknown)
                 {
+                    bool guardIsDefined = level.hasQualifyingDefine
+                        && knownDefines.Peek().TryGetValue(level.guardMacro, out var guardDefine)
+                        && guardDefine.defined;
                     PopPreprocessorScope();
                     // the unknown guard was a pure #ifndef M with a top-level `#define M` in its
-                    // body, so M is defined whichever outcome the unknown condition has: leak it
-                    // into the scope that is now on top so following lines can see it
-                    if (level.hasQualifyingDefine)
-                        knownDefines.Peek()[level.guardMacro] = (true, level.leakValue);
+                    // body, so M is defined whichever outcome the unknown condition has.
+                    // Its pre-existing replacement body is unknown, so only leak definedness.
+                    if (guardIsDefined)
+                        knownDefines.Peek()[level.guardMacro] = (true, null);
                     return line;
                 }
                 return null;
@@ -498,21 +500,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         {
                             macroValue = intValue;
                         }
-                        else
-                        {
-                            bool isSingleIdentifier = true;
-                            for (int i = 0; i < macroBody.Length && isSingleIdentifier; i++)
-                                isSingleIdentifier = ShaderAnalyzer.IsIdentifierLetter(macroBody[i]);
-                            if (isSingleIdentifier)
-                                foreach (var scope in knownDefines.Reverse())
-                                {
-                                    if (scope.TryGetValue(macroBody, out var other) && other.defined && other.value != null)
-                                    {
-                                        macroValue = other.value;
-                                        break;
-                                    }
-                                }
-                        }
+                        // Non-literal bodies remain unknown. In particular, aliases expand at
+                        // use time, so capturing their current value here would become stale
+                        // when their target is subsequently redefined or undefined.
                     }
                 }
                 knownDefines.ToList().ForEach(d => d.Remove(identifier));
@@ -533,7 +523,6 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     if (topLevel.guardMacro == identifier)
                     {
                         topLevel.hasQualifyingDefine = true;
-                        topLevel.leakValue = macroValue;
                     }
                 }
                 return line;

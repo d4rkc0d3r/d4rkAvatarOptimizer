@@ -7,7 +7,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
     /// Parses and evaluates preprocessor condition expressions (what comes after #if / #elif; #ifdef /
     /// #ifndef are synthesized into defined() / !defined() expressions by the caller). Supports: int
     /// literals, identifiers (their value is the int tracked in the defines map, truthy if non 0,
-    /// value-less defines count as 1), defined(NAME), comparison operators (== != < > <= >=), unary !
+    /// defines with unknown values stay unknown), defined(NAME), comparison operators (== != < > <= >=), unary !
     /// and binary && / || with C precedence and free () nesting. Anything the evaluator can't decide
     /// (e.g. an untracked macro) resolves to Unknown so the caller can keep the branch verbatim.
     /// Mirrors IfexStatement's abstract AST + Parse/Evaluate structure, but the value here is an int
@@ -80,7 +80,9 @@ namespace d4rkpl4y3r.AvatarOptimizer
                         value = 1;
                         return true;
                     }
-                    return right.TryGetValue(defines, out value);
+                    bool rightIsKnown = right.TryGetValue(defines, out value);
+                    value = value != 0 ? 1 : 0;
+                    return rightIsKnown;
                 }
                 if (right.TryGetValue(defines, out var rightValue))
                 {
@@ -238,8 +240,8 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     value = 0;
                     return false;
                 }
-                value = define.isDefined ? define.value ?? 1 : 0;
-                return true;
+                value = define.isDefined ? define.value.GetValueOrDefault() : 0;
+                return !define.isDefined || define.value.HasValue;
             }
 
             public override string GetDebugText(Dictionary<string, (bool isDefined, int? value)> defines)
@@ -248,7 +250,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
                     return $"{name}?";
                 if (!define.isDefined)
                     return $"{name}(0)";
-                return $"{name}({define.value ?? 1})";
+                return define.value.HasValue ? $"{name}({define.value.Value})" : $"{name}(?)";
             }
 
             public override (string macro, bool negated)? GetPureDefinedness() => null;
