@@ -456,8 +456,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    private static readonly FieldInfo PhysBoneColliderGlobalCollisionFlagsField = typeof(VRCPhysBoneColliderBase).GetField("globalCollisionFlags");
-
     private string trashBinPath = "Assets/d4rkAvatarOptimizer/TrashBin/";
     private HashSet<string> usedBlendShapes = new HashSet<string>();
     private Dictionary<SkinnedMeshRenderer, List<int>> blendShapesToBake = new Dictionary<SkinnedMeshRenderer, List<int>>();
@@ -969,18 +967,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_avatarDescriptor;
     }
 
-    // Use reflection so the optimizer also works with SDK versions without native face tracking.
-    private static object GetFaceTrackingField(object instance, string name)
-    {
-        return instance?.GetType().GetField(name)?.GetValue(instance);
-    }
-
     private bool HasFaceTrackingEnabled()
     {
         var descriptor = GetAvatarDescriptor();
-        if (descriptor == null)
-            return false;
-        return GetFaceTrackingField(descriptor, "enableFaceTracking") is true;
+        return descriptor != null && descriptor.enableFaceTracking;
     }
 
     private (HashSet<SkinnedMeshRenderer> meshes, HashSet<string> names)? cache_FaceTrackingSetup;
@@ -997,31 +987,36 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var names = new HashSet<string>(System.StringComparer.Ordinal);
         var descriptor = GetAvatarDescriptor();
         var root = GetRootTransform();
-        if (GetFaceTrackingField(descriptor, "faceTrackingMeshes") is IEnumerable<SkinnedMeshRenderer> configuredMeshes)
+        if (descriptor.faceTrackingMeshes != null)
         {
             // The SDK only uses the first 16 list entries, including null entries.
-            meshes.UnionWith(configuredMeshes.Take(16).Where(r => r != null && r.transform.IsChildOf(root)));
+            meshes.UnionWith(descriptor.faceTrackingMeshes.Take(16).Where(r => r != null && r.transform.IsChildOf(root)));
         }
-        void AddNames(object value)
+        void AddNames(IEnumerable<string> entries)
         {
-            if (value is IEnumerable<string> entries)
+            if (entries != null)
                 names.UnionWith(entries.Where(n => !string.IsNullOrEmpty(n)));
         }
-        if (GetFaceTrackingField(descriptor, "faceTrackingBlendshapesSetList") is System.Collections.IEnumerable sets)
+        if (descriptor.faceTrackingBlendshapesSetList != null)
         {
-            foreach (var set in sets)
+            foreach (var set in descriptor.faceTrackingBlendshapesSetList)
             {
-                AddNames(GetFaceTrackingField(set, "faceTrackingBlendshapeNames"));
-                AddNames(GetFaceTrackingField(set, "visemeBlendshapeNames"));
+                if (set == null)
+                    continue;
+                AddNames(set.faceTrackingBlendshapeNames);
+                AddNames(set.visemeBlendshapeNames);
             }
         }
-        if (GetFaceTrackingField(descriptor, "faceTrackingParameterBehaviors") is System.Collections.IEnumerable behaviors)
+        if (descriptor.faceTrackingParameterBehaviors != null)
         {
-            foreach (var behavior in behaviors)
+            foreach (var behavior in descriptor.faceTrackingParameterBehaviors)
             {
-                var mode = GetFaceTrackingField(behavior, "targetMode")?.ToString();
-                if (mode == "ApplyToBlendshape" || mode == "LimitBlendshapeMin" || mode == "LimitBlendshapeMax")
-                    AddNames(new[] { GetFaceTrackingField(behavior, "targetBlendshapeName") as string });
+                if (behavior == null)
+                    continue;
+                if (behavior.targetMode == VRCAvatarDescriptor.ParameterBehaviorTargetMode.ApplyToBlendshape
+                    || behavior.targetMode == VRCAvatarDescriptor.ParameterBehaviorTargetMode.LimitBlendshapeMin
+                    || behavior.targetMode == VRCAvatarDescriptor.ParameterBehaviorTargetMode.LimitBlendshapeMax)
+                    AddNames(new[] { behavior.targetBlendshapeName });
             }
         }
         LogToFile($"Face tracking: {meshes.Count} meshes, {names.Count} declared blendshape names:");
@@ -4339,19 +4334,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
             }
 
-            static bool HasGlobalCollisionFlags(VRCPhysBoneColliderBase collider)
-            {
-                if (collider == null || PhysBoneColliderGlobalCollisionFlagsField == null)
-                    return false;
-                var value = PhysBoneColliderGlobalCollisionFlagsField.GetValue(collider);
-                return value != null && System.Convert.ToInt32(value) != 0;
-            }
-
             var usedPhysBoneColliders = root.GetComponentsInChildren<VRCPhysBoneBase>(true)
                 .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
                 .SelectMany(pb => pb.colliders)
                 .Concat(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
-                    .Where(HasGlobalCollisionFlags))
+                    .Where(collider => collider != null && collider.globalCollisionFlags != 0))
                 .ToHashSet();
 
             alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
@@ -4491,7 +4478,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var animators = avDescriptor.GetComponentsInChildren<Animator>(true);
+        var animators = GetNonEditorOnlyComponentsInChildren<Animator>();
         foreach (var animator in animators)
         {
             if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
@@ -4505,27 +4492,15 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
 
         var alwaysDisabledComponents = FindAllUnusedComponents();
-        var raycastType = System.AppDomain.CurrentDomain.GetAssemblies()
-            .Select(assembly => assembly.GetType("VRC.SDK3.Avatars.Components.VRCRaycast", false))
-            .FirstOrDefault(type => type != null);
-        if (raycastType != null)
+        foreach (var raycast in GetNonEditorOnlyComponentsInChildren<VRCRaycast>()
+            .Where(rc => rc != null && !alwaysDisabledComponents.Contains(rc)))
         {
-            var resultTransformField = raycastType.GetField("resultTransform", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-            if (resultTransformField != null)
-            {
-                foreach (var raycast in GetNonEditorOnlyComponentsInChildren<MonoBehaviour>()
-                    .Where(component => component != null && raycastType == component.GetType())
-                    .Where(component => !alwaysDisabledComponents.Contains(component)))
-                {
-                    if (resultTransformField.GetValue(raycast) is Transform resultTransform)
-                    {
-                        transforms.Add(resultTransform);
-                    }
-                }
-            }
+            if (raycast.ResultTransform != null)
+                transforms.Add(raycast.ResultTransform);
         }
-        var physBones = avDescriptor.GetComponentsInChildren<VRCPhysBoneBase>(true)
-            .Where(pb => !alwaysDisabledComponents.Contains(pb)).ToList();
+
+        var physBones = GetNonEditorOnlyComponentsInChildren<VRCPhysBoneBase>()
+            .Where(pb => pb != null && !alwaysDisabledComponents.Contains(pb)).ToList();
         foreach (var physBone in physBones)
         {
             var root = physBone.GetRootTransform();
@@ -4545,9 +4520,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var constraints = avDescriptor.GetComponentsInChildren<Behaviour>(true)
-            .Where(b => b != null && !alwaysDisabledComponents.Contains(b))
-            .Where(b => b.GetType().Name.Contains("Constraint")).ToList();
+        var behaviours = GetNonEditorOnlyComponentsInChildren<Behaviour>()
+            .Where(b => b != null && !alwaysDisabledComponents.Contains(b)).ToList();
+        var constraints = behaviours.Where(b => b.GetType().Name.Contains("Constraint")).ToList();
         foreach (var constraint in constraints)
         {
             transforms.Add(constraint.transform);
@@ -4566,15 +4541,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var finalIKScripts = avDescriptor.GetComponentsInChildren<Behaviour>(true)
-            .Where(b => b != null && !alwaysDisabledComponents.Contains(b))
-            .Where(b => b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")).ToList();
+        var finalIKScripts = behaviours.Where(b => b.GetType().FullName.StartsWithSimple("RootMotion.FinalIK")).ToList();
         foreach (var finalIKScript in finalIKScripts)
         {
             transforms.UnionWith(FindReferencedTransforms(finalIKScript));
         }
 
-        foreach (var headChop in avDescriptor.GetComponentsInChildren<VRCHeadChop>(true))
+        foreach (var headChop in GetNonEditorOnlyComponentsInChildren<VRCHeadChop>())
         {
             foreach (var targetBone in headChop.targetBones)
             {
@@ -4587,8 +4560,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         transforms.UnionWith(avDescriptor.transform.GetAllDescendants().Where(t => t.localScale != Vector3.one));
 
-        transforms.UnionWith(avDescriptor.GetComponentsInChildren<Rigidbody>(true)
-            .Where(rb => !alwaysDisabledComponents.Contains(rb)).Select(rb => rb.transform));
+        transforms.UnionWith(GetNonEditorOnlyComponentsInChildren<Rigidbody>()
+            .Where(rb => rb != null && !alwaysDisabledComponents.Contains(rb)).Select(rb => rb.transform));
 
         return cache_FindAllMovingTransforms = transforms;
     }
@@ -6710,9 +6683,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var targetRenderer = combinableSkinnedMeshes[0];
 
             if (HasFaceTrackingEnabled()
-                && GetFaceTrackingField(avDescriptor, "faceTrackingMeshes") is IList<SkinnedMeshRenderer> configuredFaceTrackingMeshes
-                && configuredFaceTrackingMeshes.Any(r => r != null && basicMergedMeshesList.Contains(r)))
+                && avDescriptor.faceTrackingMeshes != null
+                && avDescriptor.faceTrackingMeshes.Any(r => r != null && basicMergedMeshesList.Contains(r)))
             {
+                var configuredFaceTrackingMeshes = avDescriptor.faceTrackingMeshes;
                 var originalEntries = configuredFaceTrackingMeshes.ToArray();
                 var rewrittenEntries = new List<SkinnedMeshRenderer>();
                 SkinnedMeshRenderer Remap(SkinnedMeshRenderer renderer) =>

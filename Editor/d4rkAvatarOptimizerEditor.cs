@@ -477,8 +477,7 @@ public class d4rkAvatarOptimizerEditor : Editor
                 EditorGUILayout.LabelField($"Declared Blendshape Names ({names.Count})");
                 DrawDebugList(names.OrderBy(n => n, System.StringComparer.Ordinal).ToArray());
                 var descriptor = optimizer.GetAvatarDescriptor();
-                var field = descriptor?.GetType().GetField("faceTrackingMeshes");
-                if (field?.GetValue(descriptor) is IEnumerable<SkinnedMeshRenderer> configuredMeshes)
+                if (descriptor?.faceTrackingMeshes is List<SkinnedMeshRenderer> configuredMeshes)
                 {
                     int index = 0;
                     foreach (var renderer in configuredMeshes)
