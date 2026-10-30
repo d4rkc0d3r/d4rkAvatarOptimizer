@@ -1,12 +1,24 @@
-## v4.7.0-beta.2
+## v4.7.0
+### Features
+* Add material contact support when merging skinned meshes.
+  * Meshes that are in different sets of material contacts don't merge with each other.
+  * Add a `Material Contacts` debug foldout listing all material contact receivers with their target renderers.
+* Support VRChat native face tracking blendshapes.
+  * Add a `Native Face Tracking` debug foldout with declared names & configured meshes.
+
 ### Changes
-* Log file:
-  * List file size of generated shader assets to post optimization avatar stats.
-  * List GameObjects with multiple components of the same type in the avatar stats.
+* Minimum supported VRChat SDK - Avatars version is now `3.10.6`
+* Improve speed of fixing animation clips.
 * Shader Optimizer:
   * Partial preprocessor now parses most condition AST and evaluates with known values from previous `#define`.
   * Add `//UNITY_SHADER_NO_UPGRADE` to generated .shader, .cginc & .hlsl files to improve import times.
-* Improve speed of fixing animation clips.
+* Log file:
+  * List file size of generated shader assets to post optimization avatar stats.
+  * List GameObjects with multiple components of the same type in the avatar stats.
+* Add tooltips in optimizer inspector listing the affected assets to some validation info boxes and debug lists:
+  * Several of the material related validation info boxes.
+  * Crunch compressed textures and non BC5 normal maps validation.
+  * Debug foldout section for `Unlocked materials with Rename Animated` shows the marked properties.
 
 ### Bug Fixes
 * Shader optimizer:
@@ -14,26 +26,6 @@
   * Fix broken shader when properties were declared as `extern`.
   * Fix trying to merge materials with a shader that has an empty vertex like `void vertex() {}`.
 * Fix transform of skinned mesh renderer getting deleted after merge even though that transform was still used by the resulting skinned mesh as a bone. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/207)
-
-## v4.7.0-beta.1
-### Features
-* Add material contact support when merging skinned meshes.
-  * Meshes that are in different sets of material contacts don't merge with each other.
-  * Add a `Material Contacts` debug foldout listing all material contact receivers with their target renderers.
-
-## v4.7.0-beta.0
-### Features
-* Support VRChat native face tracking blendshapes.
-  * Add a `Native Face Tracking` debug foldout with declared names & configured meshes.
-
-### Changes
-* Optimizer inspector:
-  * Add tooltips listing the affected assets to some validation info boxes and debug lists:
-    * Several of the material related validation info boxes.
-    * Crunch compressed textures and non BC5 normal maps validation.
-    * Debug foldout section for `Unlocked materials with Rename Animated` shows the marked properties.
-
-### Bug Fixes
 * Fix materials with `DisableBatching` set to true not blocking basic renderer merging.
   * Used to only block renderer merging with shader toggles.
 
