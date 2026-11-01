@@ -4478,8 +4478,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var animators = GetNonEditorOnlyComponentsInChildren<Animator>();
-        foreach (var animator in animators)
+        var unusedComponents = FindAllUnusedComponents();
+        var components = GetNonEditorOnlyComponentsInChildren<Component>()
+            .Where(c => c != null && c.GetType() != typeof(Transform) && !unusedComponents.Contains(c)).ToList();
+
+        foreach (var animator in components.OfType<Animator>())
         {
             if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
                 continue;
@@ -4491,17 +4494,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var alwaysDisabledComponents = FindAllUnusedComponents();
-        foreach (var raycast in GetNonEditorOnlyComponentsInChildren<VRCRaycast>()
-            .Where(rc => rc != null && !alwaysDisabledComponents.Contains(rc)))
+        foreach (var raycast in components.OfType<VRCRaycast>())
         {
             if (raycast.ResultTransform != null)
                 transforms.Add(raycast.ResultTransform);
         }
 
-        var physBones = GetNonEditorOnlyComponentsInChildren<VRCPhysBoneBase>()
-            .Where(pb => pb != null && !alwaysDisabledComponents.Contains(pb)).ToList();
-        foreach (var physBone in physBones)
+        foreach (var physBone in components.OfType<VRCPhysBoneBase>())
         {
             var root = physBone.GetRootTransform();
             var exclusions = new HashSet<Transform>(physBone.ignoreTransforms);
@@ -4520,8 +4519,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        var behaviours = GetNonEditorOnlyComponentsInChildren<Behaviour>()
-            .Where(b => b != null && !alwaysDisabledComponents.Contains(b)).ToList();
+        var behaviours = components.OfType<Behaviour>().ToList();
         var constraints = behaviours.Where(b => b.GetType().Name.Contains("Constraint")).ToList();
         foreach (var constraint in constraints)
         {
@@ -4547,7 +4545,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             transforms.UnionWith(FindReferencedTransforms(finalIKScript));
         }
 
-        foreach (var headChop in GetNonEditorOnlyComponentsInChildren<VRCHeadChop>())
+        foreach (var headChop in components.OfType<VRCHeadChop>())
         {
             foreach (var targetBone in headChop.targetBones)
             {
@@ -4560,8 +4558,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
 
         transforms.UnionWith(avDescriptor.transform.GetAllDescendants().Where(t => t.localScale != Vector3.one));
 
-        transforms.UnionWith(GetNonEditorOnlyComponentsInChildren<Rigidbody>()
-            .Where(rb => rb != null && !alwaysDisabledComponents.Contains(rb)).Select(rb => rb.transform));
+        transforms.UnionWith(components.OfType<Rigidbody>().Select(rb => rb.transform));
 
         return cache_FindAllMovingTransforms = transforms;
     }
