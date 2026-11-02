@@ -1440,6 +1440,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return Mathf.Sign(scaleA.x) == Mathf.Sign(scaleB.x) && Mathf.Sign(scaleA.y) == Mathf.Sign(scaleB.y) && Mathf.Sign(scaleA.z) == Mathf.Sign(scaleB.z);
     }
 
+    private Dictionary<Transform, bool> cache_HasRenderersAsChildren = null;
+    private bool HasRenderersAsChildren(Transform t)
+    {
+        cache_HasRenderersAsChildren ??= new Dictionary<Transform, bool>();
+        if (cache_HasRenderersAsChildren.TryGetValue(t, out var cachedResult))
+            return cachedResult;
+        foreach (Transform child in t)
+        {
+            if (child.TryGetComponent<Renderer>(out var r)
+                && (r is SkinnedMeshRenderer || (r is MeshRenderer && MergeStaticMeshesAsSkinned)))
+                return cache_HasRenderersAsChildren[t] = true;
+            if (HasRenderersAsChildren(child))
+                return cache_HasRenderersAsChildren[t] = true;
+        }
+        return cache_HasRenderersAsChildren[t] = false;
+    }
+
     private string CanCombineRendererWith(List<Renderer> list, Renderer candidate)
     {
         if (!MergeSkinnedMeshes)
@@ -1447,6 +1464,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var faceTrackingError = FaceTrackingMergeError(list, candidate);
         if (faceTrackingError != null)
             return faceTrackingError;
+        if (MergeSkinnedMeshesWithNaNimation && HasRenderersAsChildren(list[0].transform))
+            return "Merge root renderer has children with renderers";
         bool candidateHasExtraMaterialSlots = HasExtraMaterialSlots(candidate);
         bool groupHasExtraMaterialSlots = list.Any(HasExtraMaterialSlots);
         if (candidateHasExtraMaterialSlots && groupHasExtraMaterialSlots)
@@ -1497,6 +1516,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return null;
         if (!MergeSkinnedMeshesWithShaderToggle)
             return basicMergeError;
+        if (!MergeSkinnedMeshesWithNaNimation && HasRenderersAsChildren(list[0].transform))
+            return "Merge root renderer has children with renderers";
         var candidateShaderToggleError = IsShaderToggleCombinableRendererError(candidate);
         if (candidateShaderToggleError != null)
             return candidateShaderToggleError;
@@ -1954,9 +1975,14 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         List<(string group, string path, string message)> mergeErrors = logMergeErrors ? new() : null;
         slotSwapMaterials = FindAllMaterialSwapMaterials();
         var renderers = GetUsedComponentsInChildren<Renderer>()
-            .Select(r => (r, hasExtraMaterialSlots: HasExtraMaterialSlots(r), slashCount: GetPathToRoot(r).Count(c => c == '/'), path: GetPathToRoot(r)))
+            .Select(r => (r, 
+                hasExtraMaterialSlots: HasExtraMaterialSlots(r),
+                slashCount: GetPathToRoot(r).Count(c => c == '/'),
+                path: GetPathToRoot(r),
+                hasRendererChildren: HasRenderersAsChildren(r.transform)))
             .OrderBy(t => t.hasExtraMaterialSlots ? 1 : 0)
             .ThenBy(t => t.path == "Body" ? 0 : 1)
+            .ThenBy(t => t.hasRendererChildren ? 1 : 0)
             .ThenBy(t => t.r == av.VisemeSkinnedMesh ? 0 : 1)
             .ThenBy(t => t.slashCount)
             .ThenBy(t => t.path)
