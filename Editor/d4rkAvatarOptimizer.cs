@@ -1259,7 +1259,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         foreach (var receiver in GetUsedComponentsInChildren<VRCContactReceiver>())
         {
             if (receiver != null &&
-                receiver.receiverType == ContactReceiver.ReceiverType.Proximity &&
                 receiver.writeToMaterials &&
                 receiver.shaderTargetRenderers != null)
                 cache_MaterialContactReceivers.Add(receiver);

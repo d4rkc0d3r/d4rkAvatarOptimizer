@@ -1,6 +1,7 @@
 ## v4.7.1
 ### Bug Fixes
 * Fix crash when using cloth components. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/209)
+* Fix material contacts getting ignored when not set to Proximity.
 
 ## v4.7.0
 ### Features
