@@ -1697,23 +1697,20 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 // ignore bindings for material properties that do not exist for any materials or material swaps on this renderer
 
                 Renderer renderer = GetTransformFromPath(binding.path)?.GetComponent<Renderer>();
-                if(renderer) {
+                if (renderer != null) {
                     int materialSlotCount = renderer.sharedMaterials.Length;
 
                     var swaps = FindAllMaterialSwapMaterials();
-                    string materialProperty = binding.propertyName.Substring("material.".Length).Split('.', 2)[0];
+                    string materialProperty = binding.propertyName["material.".Length..].Split('.', 2)[0];
 
                     bool propertyExists = false;
 
-                    for(int i = 0; i < materialSlotCount && !propertyExists; ++i) {
-                        // check the default materials
-                        if(renderer.sharedMaterials[i] != null && renderer.sharedMaterials[i].HasProperty(materialProperty)) {
+                    for (int i = 0; i < materialSlotCount && !propertyExists; ++i) {
+                        if (renderer.sharedMaterials[i] != null && renderer.sharedMaterials[i].HasProperty(materialProperty)) {
                             propertyExists = true;
                             break;
                         }
-
-                        // check the material swaps
-                        if(swaps.TryGetValue((binding.path, i), out var mats)) {
+                        if (swaps.TryGetValue((binding.path, i), out var mats)) {
                             foreach(Material mat in mats) {
                                 if(mat != null && mat.HasProperty(materialProperty)) {
                                     propertyExists = true;
@@ -1722,9 +1719,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                             }
                         }
                     }
-
-                    // if the property does not exist, this binding is not relevant
-                    if(!propertyExists)
+                    if (!propertyExists)
                         return false;
                 }
             }
@@ -2084,27 +2079,24 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private EditorCurveBinding FixAnimationBindingPath(EditorCurveBinding binding, ref bool changed)
     {
         var newBinding = binding;
-        if (transformFromOldPath.TryGetValue(newBinding.path, out var transform))
+        if (transformFromOldPath.TryGetValue(newBinding.path, out var transform) && transform != null)
         {
-            if (transform != null)
+            var path = GetPathToRoot(transform);
+            // merged meshes move all their sibling components to a new child object
+            // the general remap in transformFromOldPath points to that new child object
+            // which means transform and renderer animations should still point to the original parent object
+            // while gameobject toggles as well as other component animations should not
+            if (path.EndsWith("/d4rkAO_mergeTargetRoot") &&
+                (binding.type == typeof(Transform) || typeof(Renderer).IsAssignableFrom(binding.type)))
             {
-                var path = GetPathToRoot(transform);
-                // merged meshes move all their sibling components to a new child object
-                // the general remap in transformFromOldPath points to that new child object
-                // which means transform and renderer animations should still point to the original parent object
-                // while gameobject toggles as well as other component animations should not
-                if (path.EndsWith("/d4rkAO_mergeTargetRoot") &&
-                    (binding.type == typeof(Transform) || typeof(Renderer).IsAssignableFrom(binding.type)))
-                {
-                    path = path.Substring(0, path.Length - "/d4rkAO_mergeTargetRoot".Length);
-                }
-                changed = changed || path != newBinding.path;
-                newBinding.path = path;
-                if (binding.type == typeof(MeshRenderer) && !transform.TryGetComponent(out MeshRenderer renderer))
-                {
-                    newBinding.type = typeof(SkinnedMeshRenderer);
-                    changed = true;
-                }
+                path = path[..^"/d4rkAO_mergeTargetRoot".Length];
+            }
+            changed = changed || path != newBinding.path;
+            newBinding.path = path;
+            if (binding.type == typeof(MeshRenderer) && !transform.TryGetComponent(out MeshRenderer renderer))
+            {
+                newBinding.type = typeof(SkinnedMeshRenderer);
+                changed = true;
             }
         }
         return newBinding;
