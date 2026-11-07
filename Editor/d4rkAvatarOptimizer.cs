@@ -1285,8 +1285,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         LogToFile($"Found {wrappers.Count} material contact receivers:");
         foreach (var wrapper in wrappers)
         {
-            LogToFile($"- {wrapper.receivers.Count} receivers with {wrapper.targetRenderers.Count} targets at '{GetPathToRoot(wrapper.transform)}':", 1);
-            foreach (var renderer in wrapper.targetRenderers)
+            var targets = wrapper.targetRenderers.Where(r => r != null).ToList();
+            LogToFile($"- {wrapper.receivers.Count} receivers with {targets.Count} targets at '{GetPathToRoot(wrapper.transform)}':", 1);
+            foreach (var renderer in targets)
             {
                 LogToFile($"- '{GetPathToRoot(renderer)}'", 2);
             }
@@ -1303,6 +1304,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 foreach (var renderer in wrapper.targetRenderers)
                 {
+                    if (renderer == null)
+                        continue;
                     if (!cache_MaterialContactReceiversUsingRenderer.TryGetValue(renderer, out var set))
                     {
                         cache_MaterialContactReceiversUsingRenderer[renderer] = set = new();
@@ -6868,10 +6871,26 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         child.parent = subContainer.transform;
                     }
 
+                    HashSet<VRCContactReceiver> existingReceivers = null;
                     foreach (Component comp in componentsToMove)
                     {
+                        var receiver = comp as VRCContactReceiver;
+                        var wrapper = receiver != null
+                            ? FindAllMaterialContactReceivers().FirstOrDefault(w => w.receivers.Contains(receiver))
+                            : null;
                         UnityEditorInternal.ComponentUtility.CopyComponent(comp);
-                        UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
+                        bool pasted = UnityEditorInternal.ComponentUtility.PasteComponentAsNew(subContainer);
+                        if (wrapper != null && pasted)
+                        {
+                            // update material contact wrappers to point to the copied components
+                            // cant just invalidate caches since recreation depends on animation binding paths
+                            // which are now invalid due to the merge target being a new transform
+                            existingReceivers ??= new();
+                            var copiedReceiver = subContainer.GetComponents<VRCContactReceiver>()
+                                .First(r => !existingReceivers.Contains(r));
+                            existingReceivers.Add(copiedReceiver);
+                            wrapper.receivers[wrapper.receivers.IndexOf(receiver)] = copiedReceiver;
+                        }
                         DestroyImmediate(comp);
                     }
 
@@ -6956,10 +6975,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
         GetRootTransform().SetPositionAndRotation(originalRootPosition, originalRootRotation);
 
-        // flush particle system & material contact receiver caches since we merged meshes
+        // flush particle system since we merged meshes
         cache_ParticleSystemsUsingRenderer = null;
-        cache_MaterialContactReceivers = null;
-        cache_MaterialContactReceiversUsingRenderer = null;
     }
 
     private HashSet<string> cache_GetAllExcludedTransformPaths;

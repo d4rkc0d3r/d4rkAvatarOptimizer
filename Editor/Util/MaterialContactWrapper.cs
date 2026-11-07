@@ -102,7 +102,7 @@ namespace d4rkpl4y3r.AvatarOptimizer.Util
 
         private static bool MatchSettings(VRCContactReceiver a, VRCContactReceiver b)
         {
-            if (a.GetRootTransform() != b.GetRootTransform())
+            if (a.enabled != b.enabled || a.GetRootTransform() != b.GetRootTransform())
                 return false;
             foreach (var field in _receiverSettingFields)
             {
