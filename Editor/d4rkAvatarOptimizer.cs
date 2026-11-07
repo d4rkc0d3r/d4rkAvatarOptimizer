@@ -559,7 +559,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private void DisplayProgressBar(string text)
     {
         var name = GetRootTransform().name;
-        var titleName = name.EndsWith("(BrokenCopy)") ? name.Substring(0, name.Length - "(BrokenCopy)".Length) : name;
+        var titleName = name.EndsWith("(BrokenCopy)") ? name[..^"(BrokenCopy)".Length] : name;
         EditorUtility.DisplayProgressBar("Optimizing " + titleName, text, progressBar);
     }
 
@@ -1578,59 +1578,59 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     private HashSet<string> cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = null;
     public HashSet<string> FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation()
     {
-        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation == null) {
-            cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = new HashSet<string>();
-            var goOffPaths = new HashSet<string>();
-            var goOnPaths = new HashSet<string>();
-            var meshOffPaths = new HashSet<string>();
-            var meshOnPaths = new HashSet<string>();
-            var fxLayer = GetFXLayer();
-            var uselessLayers = FindUselessFXLayers();
-            var fxLayerLayers = GetFXLayerLayers();
-            for (int i = 0; fxLayer != null && i < fxLayerLayers.Length; i++) {
-                if (fxLayerLayers[i] == null || fxLayerLayers[i].stateMachine == null)
+        if (cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation != null)
+            return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation;
+        HashSet<string> result = new();
+        HashSet<string> goOffPaths = new();
+        HashSet<string> goOnPaths = new();
+        HashSet<string> meshOffPaths = new();
+        HashSet<string> meshOnPaths = new();
+        var fxLayer = GetFXLayer();
+        var uselessLayers = FindUselessFXLayers();
+        var fxLayerLayers = GetFXLayerLayers();
+        for (int i = 0; fxLayer != null && i < fxLayerLayers.Length; i++) {
+            if (fxLayerLayers[i] == null || fxLayerLayers[i].stateMachine == null)
+                continue;
+            if (OptimizeFXLayer && (uselessLayers.Contains(i) || IsMergeableFXLayer(i)))
+                continue;
+            goOffPaths.Clear();
+            goOnPaths.Clear();
+            meshOffPaths.Clear();
+            meshOnPaths.Clear();
+            foreach (var state in fxLayerLayers[i].stateMachine.EnumerateAllStates()) {
+                if (state.motion == null)
                     continue;
-                if (OptimizeFXLayer && (uselessLayers.Contains(i) || IsMergeableFXLayer(i)))
-                    continue;
-                goOffPaths.Clear();
-                goOnPaths.Clear();
-                meshOffPaths.Clear();
-                meshOnPaths.Clear();
-                foreach (var state in fxLayerLayers[i].stateMachine.EnumerateAllStates()) {
-                    if (state.motion == null)
-                        continue;
-                    foreach (var clip in state.motion.EnumerateAllClips()) {
-                        foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
-                            if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive") {
-                                var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                                foreach (var key in curve.keys) {
-                                    if (key.value == 0)
-                                        goOffPaths.Add(binding.path);
-                                    else if (key.value == 1)
-                                        goOnPaths.Add(binding.path);
-                                }
-                            } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
-                                var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                                foreach (var key in curve.keys) {
-                                    if (key.value == 0)
-                                        meshOffPaths.Add(binding.path);
-                                    else if (key.value == 1)
-                                        meshOnPaths.Add(binding.path);
-                                }
+                foreach (var clip in state.motion.EnumerateAllClips()) {
+                    foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
+                        if (binding.type == typeof(GameObject) && binding.propertyName == "m_IsActive") {
+                            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                            foreach (var key in curve.keys) {
+                                if (key.value == 0)
+                                    goOffPaths.Add(binding.path);
+                                else if (key.value == 1)
+                                    goOnPaths.Add(binding.path);
+                            }
+                        } else if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName == "m_Enabled") {
+                            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                            foreach (var key in curve.keys) {
+                                if (key.value == 0)
+                                    meshOffPaths.Add(binding.path);
+                                else if (key.value == 1)
+                                    meshOnPaths.Add(binding.path);
                             }
                         }
                     }
                 }
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(goOnPaths.Except(goOffPaths));
-                cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.UnionWith(meshOnPaths.Except(meshOffPaths));
             }
-            foreach (var path in cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.ToList()) {
-                var t = GetTransformFromPath(path);
-                if (t == null || (t.GetComponent<MeshRenderer>() == null && t.GetComponent<SkinnedMeshRenderer>() == null))
-                    cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation.Remove(path);
-            }
+            result.UnionWith(goOnPaths.Except(goOffPaths));
+            result.UnionWith(meshOnPaths.Except(meshOffPaths));
         }
-        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation;
+        foreach (var path in result.ToList()) {
+            var t = GetTransformFromPath(path);
+            if (t == null || (t.GetComponent<MeshRenderer>() == null && t.GetComponent<SkinnedMeshRenderer>() == null))
+                result.Remove(path);
+        }
+        return cache_FindAllPathsWhereMeshOrGameObjectHasOnlyOnAnimation = result;
     }
 
     private static bool AnimationCurvesHaveSameKeys(AnimationCurve a, AnimationCurve b)
@@ -1725,7 +1725,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return $"{binding.path}:{binding.propertyName}";
         }
         bool IsRelevantBindingForSkinnedMeshMerge(EditorCurveBinding binding) {
-            if(typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.")) {
+            if (typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.")) {
                 // ignore bindings for material properties that do not exist for any materials or material swaps on this renderer
 
                 Renderer renderer = GetTransformFromPath(binding.path)?.GetComponent<Renderer>();
@@ -1830,26 +1830,23 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_RendererHaveSameAnimationCurves[(a, b)] = null;
     }
 
-    private static List<string> ColorPropertyComponents = new List<string> { ".r", ".g", ".b", ".a" };
-    private static List<string> VectorPropertyComponents = new List<string> { ".x", ".y", ".z", ".w" };
+    private static readonly List<string> ColorPropertyComponents = new() { ".r", ".g", ".b", ".a" };
+    private static readonly List<string> VectorPropertyComponents = new() { ".x", ".y", ".z", ".w" };
     private Dictionary<string, HashSet<AnimationClip>> cache_AllAnimationClipsAffectingRendererMaterialProperties = null;
     private Dictionary<(string a, string b), HashSet<string>> cache_FindSameAnimatedMaterialProperties = null;
     private HashSet<string> FindSameAnimatedMaterialProperties(string aPath, string bPath)
     {
-        if (cache_FindSameAnimatedMaterialProperties == null)
-            cache_FindSameAnimatedMaterialProperties = new Dictionary<(string a, string b), HashSet<string>>();
+        cache_FindSameAnimatedMaterialProperties ??= new();
         if (aPath.CompareTo(bPath) > 0) {
-            var temp = aPath;
-            aPath = bPath;
-            bPath = temp;
+            (bPath, aPath) = (aPath, bPath);
         }
         if (cache_FindSameAnimatedMaterialProperties.TryGetValue((aPath, bPath), out var cachedResult))
             return cachedResult;
-        bool IsRelevantBinding(EditorCurveBinding binding) {
+        static bool IsRelevantBinding(EditorCurveBinding binding) {
             return typeof(Renderer).IsAssignableFrom(binding.type) && binding.propertyName.StartsWithSimple("material.");
         }
         if (cache_AllAnimationClipsAffectingRendererMaterialProperties == null) {
-            cache_AllAnimationClipsAffectingRendererMaterialProperties = new Dictionary<string, HashSet<AnimationClip>>();
+            cache_AllAnimationClipsAffectingRendererMaterialProperties = new();
             foreach (var clip in GetAllUsedAnimationClips()) {
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip)) {
                     if (IsRelevantBinding(binding)) {
@@ -1904,9 +1901,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         var vectorProperties = new HashSet<string>();
         foreach (var property in result) {
             if (ColorPropertyComponents.Any(c => property.EndsWith(c)))
-                colorProperties.Add(property.Substring(0, property.Length - 2));
+                colorProperties.Add(property[..^2]);
             else if (VectorPropertyComponents.Any(c => property.EndsWith(c)))
-                vectorProperties.Add(property.Substring(0, property.Length - 2));
+                vectorProperties.Add(property[..^2]);
         }
         foreach (var colorProperty in colorProperties) {
             if (ColorPropertyComponents.All(c => result.Contains(colorProperty + c))) {
@@ -1920,7 +1917,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
             VectorPropertyComponents.ForEach(c => result.Remove(vectorProperty + c));
         }
-        return cache_FindSameAnimatedMaterialProperties[(aPath, bPath)] = new HashSet<string>(result.Select(p => p.Substring("material.".Length)));
+        return cache_FindSameAnimatedMaterialProperties[(aPath, bPath)] = new HashSet<string>(result.Select(p => p["material.".Length..]));
     }
 
     private void AddAnimationPathChange((string path, string name, Type type) source, (string path, string name, Type type) target)
@@ -2361,7 +2358,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     shaderToggleInfo = shaderToggleInfo[1..];
                     var semicolonIndex = shaderToggleInfo.IndexOf(';');
                     fixedBinding.path = shaderToggleInfo[(semicolonIndex + 1)..];
-                    fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo.Substring(0, semicolonIndex)}";
+                    fixedBinding.propertyName = $"material._IsActiveMesh{shaderToggleInfo[..semicolonIndex]}";
                     fixedBinding.type = typeof(SkinnedMeshRenderer);
                     var b = FixAnimationBindingPath(fixedBinding, ref changed);
                     SetFloatCurve(b, curve);
@@ -3899,7 +3896,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 var mesh = smr.sharedMesh;
                 if (mesh == null)
                     continue;
-                var blendShapeName = binding.propertyName.Substring("blendShape.".Length);
+                var blendShapeName = binding.propertyName["blendShape.".Length..];
                 var blendShapeID = mesh.GetBlendShapeIndex(blendShapeName);
                 if (blendShapeID < 0)
                     continue;
@@ -4161,13 +4158,13 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (!binding.propertyName.StartsWithSimple("material.") || !typeof(Renderer).IsAssignableFrom(binding.type))
                 continue;
             if (!map.TryGetValue(binding.path, out var props)) {
-                map[binding.path] = (props = new HashSet<string>());
+                map[binding.path] = props = new HashSet<string>();
             }
-            var propName = binding.propertyName.Substring(9);
+            var propName = binding.propertyName["material.".Length..];
             if (!Regex.IsMatch(propName, @"^[#_a-zA-Z][#_a-zA-Z0-9]*(\.[rgbaxyzw])?$"))
                 continue;
-            if (propName.Length > 2 && propName[propName.Length - 2] == '.') {
-                props.Add(propName.Substring(0, propName.Length - 2));
+            if (propName.Length > 2 && propName[^2] == '.') {
+                props.Add(propName[..^2]);
             }
             props.Add(propName);
         }
@@ -4495,14 +4492,11 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             transforms.Add(avDescriptor.lipSyncJawBone);
         }
 
-        foreach (var clip in GetAllUsedAnimationClips())
+        foreach (var binding in GetAllUsedCurveBindings())
         {
-            foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+            if (binding.type == typeof(Transform) && TryGetTransformFromPath(binding.path, out var t))
             {
-                if (binding.type == typeof(Transform))
-                {
-                    transforms.Add(GetTransformFromPath(binding.path));
-                }
+                transforms.Add(t);
             }
         }
 
@@ -4630,7 +4624,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return material.HasProperty("_TPSPenetratorEnabled") && material.GetFloat("_TPSPenetratorEnabled") > 0.5f;
     }
 
-    private bool IsSPSPenetratorRoot(Transform t) {
+    private bool IsSPSPenetratorRoot(Transform t)
+    {
 		if (t == null)
 			return false;
         var renderers = t.GetComponentsInChildren<Renderer>(true);
@@ -4863,8 +4858,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         string name = prop;
                         bool isVector = name.EndsWith(".x") || name.EndsWith(".r");
                         if (isVector) {
-                            name = name.Substring(0, name.Length - 2);
-                        } else if ((name.Length > 2 && name[name.Length - 2] == '.')
+                            name = name[..^2];
+                        } else if ((name.Length > 2 && name[^2] == '.')
                                 || (!isVector && (animatedProps.Contains($"{name}.x") || animatedProps.Contains($"{name}.r")))) {
                             continue;
                         }
@@ -5267,8 +5262,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         var propName = animPropName;
                         bool isVector = propName.EndsWith(".x") || propName.EndsWith(".r");
                         if (isVector) {
-                            propName = propName.Substring(0, propName.Length - 2);
-                        } else if (propName[propName.Length - 2] == '.') {
+                            propName = propName[..^2];
+                        } else if (propName[^2] == '.') {
                             continue;
                         } else if (animatedProperties.Contains($"{propName}.x") || animatedProperties.Contains($"{propName}.r")) {
                             isVector = true;
@@ -6495,7 +6490,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             var combinableMeshPaths = new HashSet<string>(basicMergedMeshesList.Select(s => GetPathToRoot(s)));
             var meshPathToID = basicMergedMeshesList.Select((s, i) => (GetPathToRoot(s), i)).ToDictionary(s => s.Item1, s => s.Item2);
             var usedBlendShapesInCombinedMesh = new HashSet<string>(
-                usedBlendShapes.Where(s => combinableMeshPaths.Contains(s.Substring(0, s.IndexOf("/blendShape.")))));
+                usedBlendShapes.Where(s => combinableMeshPaths.Contains(s[..s.IndexOf("/blendShape.")])));
             var faceTrackingShapes = new Dictionary<string, List<int>>(System.StringComparer.Ordinal);
             for (int meshID = 0; meshID < basicMergedMeshesList.Count; meshID++)
             {
@@ -6622,10 +6617,10 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             {
                 if (mergedBlendShapes.Count == 1)
                 {
-                    var path = mergedBlendShapes[0].blendshape.Substring(0, mergedBlendShapes[0].blendshape.IndexOf("/blendShape."));
+                    var path = mergedBlendShapes[0].blendshape[..mergedBlendShapes[0].blendshape.IndexOf("/blendShape.")];
                     var skinnedMesh = GetTransformFromPath(path).GetComponent<SkinnedMeshRenderer>();
                     var mesh = skinnedMesh.sharedMesh;
-                    var oldName = mergedBlendShapes[0].blendshape.Substring(path.Length + 12);
+                    var oldName = mergedBlendShapes[0].blendshape[(path.Length + 12)..];
                     var name = GenerateUniqueName(oldName, usedBlendShapeNames);
                     var meshID = meshPathToID[path];
                     var blendShapeID = mesh.GetBlendShapeIndex(oldName);
@@ -6659,8 +6654,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
                 else
                 {
-                    var oldPath = mergedBlendShapes[0].blendshape.Substring(0, mergedBlendShapes[0].blendshape.IndexOf("/blendShape."));
-                    var oldName = mergedBlendShapes[0].blendshape.Substring(mergedBlendShapes[0].blendshape.IndexOf("/blendShape.") + 12);
+                    var oldPath = mergedBlendShapes[0].blendshape[..mergedBlendShapes[0].blendshape.IndexOf("/blendShape.")];
+                    var oldName = mergedBlendShapes[0].blendshape[(mergedBlendShapes[0].blendshape.IndexOf("/blendShape.") + 12)..];
                     var name = GenerateUniqueName(oldName, usedBlendShapeNames);
                     AddAnimationPathChange(
                         (oldPath, "blendShape." + oldName, typeof(SkinnedMeshRenderer)),
@@ -6788,8 +6783,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                         bool isVector = propName.EndsWith(".x");
                         bool isColor = propName.EndsWith(".r");
                         if (isVector || isColor) {
-                            propName = propName.Substring(0, propName.Length - 2);
-                        } else if (propName[propName.Length - 2] == '.') {
+                            propName = propName[..^2];
+                        } else if (propName[^2] == '.') {
                             continue;
                         }
                         if (sameAnimatedProperties.Contains(animPropName)) {
@@ -6976,32 +6971,30 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
     
     HashSet<Transform> FindReferencedTransforms(Component component)
     {
-        using (var serializedObject = new SerializedObject(component))
+        using var serializedObject = new SerializedObject(component);
+        var visitedIds = new HashSet<long>();
+        var iterator = serializedObject.GetIterator();
+        var referencedTransforms = new HashSet<Transform>();
+        bool enterChildren = true;
+        while (iterator.Next(enterChildren))
         {
-            var visitedIds = new HashSet<long>();
-            var iterator = serializedObject.GetIterator();
-            var referencedTransforms = new HashSet<Transform>();
-            bool enterChildren = true;
-            while (iterator.Next(enterChildren))
+            enterChildren = true;
+            if (iterator.propertyType == SerializedPropertyType.ObjectReference && iterator.objectReferenceValue != null)
             {
-                enterChildren = true;
-                if (iterator.propertyType == SerializedPropertyType.ObjectReference && iterator.objectReferenceValue != null)
+                if (iterator.objectReferenceValue is Transform transform)
                 {
-                    if (iterator.objectReferenceValue is Transform transform)
-                    {
-                        referencedTransforms.Add(transform);
-                    }
-                }
-                else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
-                {
-                    if (!visitedIds.Add(iterator.managedReferenceId))
-                    {
-                        enterChildren = false;
-                    }
+                    referencedTransforms.Add(transform);
                 }
             }
-            return referencedTransforms;
+            else if (iterator.propertyType == SerializedPropertyType.ManagedReference)
+            {
+                if (!visitedIds.Add(iterator.managedReferenceId))
+                {
+                    enterChildren = false;
+                }
+            }
         }
+        return referencedTransforms;
     }
 
     private void DestroyEditorOnlyGameObjects()
