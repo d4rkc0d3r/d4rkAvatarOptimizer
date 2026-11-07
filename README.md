@@ -97,7 +97,7 @@ The optimizer tries to merge different skinned meshes together.
 This usually means meshes which always get animated in the same way will get merged.  
 Skinned meshes that are on different layers (eg UIMenu) from each other will not get merged.  
 Skinned meshes that are disabled and have no animation to turn them on will get deleted.  
-Meshes that are targeted by a material contact receiver are only merged with other meshes that are targeted by the exact same set of material contact receivers.  
+Meshes that are targeted by a material contact receiver are only merged with other meshes that are targeted by the exact same set of material contact receivers. Multiple receivers on the same game object are treated as onre receiver if they all have the same settings.  
 ## Use Shader Toggles
 Merges meshes even if their material properties get animated differently or if they get toggled separately from each other.  
 This will add logic to the shaders to ensure everything works correctly. Some shaders might not work correctly with this option enabled.  

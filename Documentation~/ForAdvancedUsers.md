@@ -39,6 +39,14 @@ You can quickly open it by pressing the gear wheel settings button in the top le
 
 The log is organized by indentation level so I highly recommend using a text editor that supports folding to view it.
 
+## Material Contacts
+[Material Contacts](https://creators.vrchat.com/common-components/contacts/#material-contacts) limit mesh merging to only allow meshes affected by the same set of contacts.  
+Since vrc contacts can only affect 4 meshes at once this would be very limiting. Because of that the optimizer treats multiple material contacts on a single game object as one if they share the same settings with each other. The contacts are not allowed to be animated except for toggling the game object they are on itself. If any animation binding points to a type ContactReceiver all receivers on that game object will be treated as individual contacts.
+
+This grouping can be seen both in the debug info foldout as well as in the log file after optimization.
+
+After mesh merging some of the vrc contacts inside of one contact group might no longer be necessary and they will get deleted.
+
 ## Switching from poiyomi lock in workflow to optimizer shader toggles
 Keep materials unlocked with shader toggles. The `Write Properties as Static Values` option is very similar to what poi lock in does and is forced when using shader toggles.
 

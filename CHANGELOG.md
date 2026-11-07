@@ -1,3 +1,8 @@
+## v4.7.2
+### Features
+* Material Contact Receivers are now treated as one receiver if they are on the same game object and have the same settings.
+  * Works well with Poi Receiver.
+
 ## v4.7.1
 ### Bug Fixes
 * Fix crash when using cloth components. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/209)

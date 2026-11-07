@@ -551,22 +551,22 @@ public class d4rkAvatarOptimizerEditor : Editor
             if (Foldout("Material Contacts", ref optimizer.DebugShowMaterialContacts))
             {
                 Profiler.StartSection("Material Contacts");
-                var materialContactGroups = optimizer.FindMaterialContactReceiverGroups();
-                if (materialContactGroups.Count == 0)
+                var wrappers = optimizer.FindAllMaterialContactReceivers();
+                if (wrappers.Count == 0)
                 {
                     EditorGUILayout.LabelField("---");
                 }
-                foreach (var (receiver, targets) in materialContactGroups)
+                foreach (var wrapper in wrappers)
                 {
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        EditorGUILayout.Space(15, false);
+                        EditorGUILayout.Space(15, expand: false);
                         using (new EditorGUILayout.VerticalScope(GUI.skin.box))
                         {
-                            EditorGUILayout.ObjectField(receiver, typeof(VRCContactReceiver), true);
+                            EditorGUILayout.ObjectField(wrapper.transform, typeof(Transform), true);
                             using (new EditorGUI.IndentLevelScope())
                             {
-                                foreach (var target in targets)
+                                foreach (var target in wrapper.targetRenderers)
                                 {
                                     EditorGUILayout.ObjectField(target, typeof(Renderer), true);
                                 }

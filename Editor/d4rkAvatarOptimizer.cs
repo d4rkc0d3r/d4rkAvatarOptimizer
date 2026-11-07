@@ -197,6 +197,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             DeleteAllUnusedSkinnedMeshRenderers();
             Profiler.StartNextSection("CombineSkinnedMeshes()");
             DisplayProgressBar("Combining meshes", 0.2f);
+            LogMaterialContactReceivers();
             CombineSkinnedMeshes();
             Profiler.StartNextSection("CreateTextureArrays()");
             CreateTextureArrays();
@@ -1164,6 +1165,12 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return null;
     }
 
+    public bool TryGetTransformFromPath(string path, out Transform result)
+    {
+        result = GetTransformFromPath(path);
+        return result != null;
+    }
+
     public string GetPathToRoot(GameObject obj)
     {
         return GetTransformPathToRoot(obj.transform);
@@ -1250,59 +1257,63 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         return cache_ParticleSystemsUsingRenderer[candidate] = new List<ParticleSystem>();
     }
 
-    private List<VRCContactReceiver> cache_MaterialContactReceivers = null;
-    public List<VRCContactReceiver> FindAllMaterialContactReceivers()
+    private List<MaterialContactWrapper> cache_MaterialContactReceivers = null;
+    public List<MaterialContactWrapper> FindAllMaterialContactReceivers()
     {
         if (cache_MaterialContactReceivers != null)
             return cache_MaterialContactReceivers;
-        cache_MaterialContactReceivers = new List<VRCContactReceiver>();
-        foreach (var receiver in GetUsedComponentsInChildren<VRCContactReceiver>())
+        cache_MaterialContactReceivers = new();
+        HashSet<Transform> animatedTransforms = new();
+        foreach (var b in GetAllUsedCurveBindings())
         {
-            if (receiver != null &&
-                receiver.writeToMaterials &&
-                receiver.shaderTargetRenderers != null)
-                cache_MaterialContactReceivers.Add(receiver);
+            if (typeof(ContactReceiver).IsAssignableFrom(b.type) && TryGetTransformFromPath(b.path, out var t))
+            {
+                animatedTransforms.Add(t);
+            }
         }
-        return cache_MaterialContactReceivers;
+        var contacts = GetUsedComponentsInChildren<VRCContactReceiver>();
+        var wrappers = MaterialContactWrapper.MergedWrappers(contacts.Where(c => !animatedTransforms.Contains(c.transform)));
+        wrappers.AddRange(MaterialContactWrapper.RawWrappers(contacts.Where(c => animatedTransforms.Contains(c.transform))));
+        return cache_MaterialContactReceivers = wrappers;
     }
 
-    private Dictionary<Renderer, HashSet<VRCContactReceiver>> cache_MaterialContactReceiversUsingRenderer = null;
-    private HashSet<VRCContactReceiver> GetMaterialContactReceiversUsingRenderer(Renderer candidate)
+    private void LogMaterialContactReceivers()
+    {
+        var wrappers = FindAllMaterialContactReceivers();
+        if (wrappers.Count == 0)
+            return;
+        LogToFile($"Found {wrappers.Count} material contact receivers:");
+        foreach (var wrapper in wrappers)
+        {
+            LogToFile($"- {wrapper.receivers.Count} receivers with {wrapper.targetRenderers.Count} targets at '{GetPathToRoot(wrapper.transform)}':", 1);
+            foreach (var renderer in wrapper.targetRenderers)
+            {
+                LogToFile($"- '{GetPathToRoot(renderer)}'", 2);
+            }
+        }
+    }
+
+    private Dictionary<Renderer, HashSet<MaterialContactWrapper>> cache_MaterialContactReceiversUsingRenderer = null;
+    private HashSet<MaterialContactWrapper> GetMaterialContactReceiversUsingRenderer(Renderer candidate)
     {
         if (cache_MaterialContactReceiversUsingRenderer == null)
         {
-            cache_MaterialContactReceiversUsingRenderer = new Dictionary<Renderer, HashSet<VRCContactReceiver>>();
-            foreach (var receiver in FindAllMaterialContactReceivers())
+            cache_MaterialContactReceiversUsingRenderer = new();
+            foreach (var wrapper in FindAllMaterialContactReceivers())
             {
-                var targets = receiver.shaderTargetRenderers;
-                for (int i = 0; i < targets.Length; i++)
+                foreach (var renderer in wrapper.targetRenderers)
                 {
-                    var renderer = targets[i];
-                    if (renderer == null)
-                        continue;
                     if (!cache_MaterialContactReceiversUsingRenderer.TryGetValue(renderer, out var set))
                     {
-                        set = new HashSet<VRCContactReceiver>();
-                        cache_MaterialContactReceiversUsingRenderer[renderer] = set;
+                        cache_MaterialContactReceiversUsingRenderer[renderer] = set = new();
                     }
-                    set.Add(receiver);
+                    set.Add(wrapper);
                 }
             }
         }
         if (cache_MaterialContactReceiversUsingRenderer.TryGetValue(candidate, out var result))
             return result;
-        return cache_MaterialContactReceiversUsingRenderer[candidate] = new HashSet<VRCContactReceiver>();
-    }
-
-    public List<(VRCContactReceiver receiver, List<Renderer> targets)> FindMaterialContactReceiverGroups()
-    {
-        var result = new List<(VRCContactReceiver receiver, List<Renderer> targets)>();
-        foreach (var receiver in FindAllMaterialContactReceivers())
-        {
-            var targets = receiver.shaderTargetRenderers?.Where(r => r != null).Distinct().ToList() ?? new List<Renderer>();
-            result.Add((receiver, targets));
-        }
-        return result.OrderBy(g => GetPathToRoot(g.receiver)).ToList();
+        return cache_MaterialContactReceiversUsingRenderer[candidate] = new();
     }
 
     private string MaterialContactReceiversMergeError(Renderer groupHead, Renderer candidate)
@@ -1313,8 +1324,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             return null;
         var onlyInGroup = groupReceivers.FirstOrDefault(r => !candidateReceivers.Contains(r));
         if (onlyInGroup != null)
-            return $"Group is bound to material contact receiver at '{GetPathToRoot(onlyInGroup)}' but mesh is not";
-        return $"Bound to material contact receiver at '{GetPathToRoot(candidateReceivers.First(r => !groupReceivers.Contains(r)))}' but group is not";
+            return $"Group is bound to material contact receiver at '{GetPathToRoot(onlyInGroup.transform)}' but mesh is not";
+        return $"Bound to material contact receiver at '{GetPathToRoot(candidateReceivers.First(r => !groupReceivers.Contains(r)).transform)}' but group is not";
     }
 
     private static string CanCombineMaterialWithOtherMeshesError(Material material)
@@ -6914,12 +6925,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                     LogToFile($"- {path}", 1);
                 }
             }
-            foreach (var receiver in GetMaterialContactReceiversUsingRenderer(targetRenderer))
+            foreach (var wrapper in GetMaterialContactReceiversUsingRenderer(targetRenderer))
             {
-                var targets = receiver.shaderTargetRenderers;
-                var validTargets = targets.Where(r => r != null).ToArray();
-                if (validTargets.Length != targets.Length)
-                    receiver.shaderTargetRenderers = validTargets;
+                wrapper.ApplyChanges();
             }
 
             Profiler.StartSection("AssetDatabase.SaveAssets()");
@@ -7199,20 +7207,19 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         if (meshesToConvert.Count > 0)
             LogToFile($"Converting {meshesToConvert.Count} static meshes to skinned meshes for merging:");
 
-        var materialContactTargets = new Dictionary<Renderer, List<(VRCContactReceiver receiver, int index)>>();
-        foreach (var receiver in FindAllMaterialContactReceivers())
+        var materialContactTargets = new Dictionary<Renderer, List<(MaterialContactWrapper wrapper, int index)>>();
+        foreach (var wrapper in FindAllMaterialContactReceivers())
         {
-            var targets = receiver.shaderTargetRenderers;
-            for (int i = 0; i < targets.Length; i++)
+            var targets = wrapper.targetRenderers;
+            for (int i = 0; i < targets.Count; i++)
             {
                 if (targets[i] == null)
                     continue;
                 if (!materialContactTargets.TryGetValue(targets[i], out var entries))
                 {
-                    entries = new List<(VRCContactReceiver, int)>();
-                    materialContactTargets[targets[i]] = entries;
+                    materialContactTargets[targets[i]] = entries = new();
                 }
-                entries.Add((receiver, i));
+                entries.Add((wrapper, i));
             }
         }
 
@@ -7236,8 +7243,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             if (contactTargetEntries != null)
             {
                 updatedContactTargets = true;
-                foreach (var (receiver, index) in contactTargetEntries)
-                    receiver.shaderTargetRenderers[index] = skinnedMeshRenderer;
+                foreach (var (wrapper, index) in contactTargetEntries)
+                    wrapper.targetRenderers[index] = skinnedMeshRenderer;
             }
         }
         if (updatedContactTargets)
