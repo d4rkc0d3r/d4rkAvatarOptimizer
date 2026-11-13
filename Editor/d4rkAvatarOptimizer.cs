@@ -581,7 +581,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         {
             trashBinRoot = packageInfo.assetPath;
         }
-        else if (asmdefPath.StartsWithSimple("Assets") && asmdefPath.EndsWith(inPackageAsmdefPath))
+        else if (!string.IsNullOrEmpty(asmdefPath) && asmdefPath.StartsWithSimple("Assets") && asmdefPath.EndsWith(inPackageAsmdefPath))
         {
             trashBinRoot = asmdefPath[..^inPackageAsmdefPath.Length];
         }
