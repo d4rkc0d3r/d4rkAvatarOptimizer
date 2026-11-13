@@ -4453,7 +4453,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogToFile($"- {group.Key}", 1);
                 foreach (var exclusion in group)
                 {
-                    LogToFile($"- {GetPathToRoot(exclusion.t)}{(exclusion.includeChildren ? " (including children)" : string.Empty)}", 2);
+                    LogToFile($"- '{GetPathToRoot(exclusion.t)}'{(exclusion.includeChildren ? " (including children)" : string.Empty)}", 2);
                 }
             }
         }
@@ -4462,7 +4462,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             LogToFile($"Excluding {manualExclusions.Count} user-specified transforms from optimization:");
             foreach (var exclusion in manualExclusions)
             {
-                LogToFile($"- {GetPathToRoot(exclusion.t)}{(exclusion.includeChildren ? " (including children)" : string.Empty)}", 1);
+                LogToFile($"- '{GetPathToRoot(exclusion.t)}'{(exclusion.includeChildren ? " (including children)" : string.Empty)}", 1);
             }
         }
     }
