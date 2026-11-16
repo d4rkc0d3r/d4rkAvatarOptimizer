@@ -4366,7 +4366,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 .Where(pb => !alwaysDisabledBehaviours.Contains(pb) || exclusions.Contains(pb.transform))
                 .SelectMany(pb => pb.colliders)
                 .Concat(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
-                    .Where(collider => collider != null && collider.globalCollisionFlags != 0))
+                    .Where(collider => collider != null && collider.globalCollision != VRCPhysBoneBase.AdvancedBool.False))
                 .ToHashSet();
 
             alwaysDisabledBehaviours.UnionWith(root.GetComponentsInChildren<VRCPhysBoneColliderBase>(true)
