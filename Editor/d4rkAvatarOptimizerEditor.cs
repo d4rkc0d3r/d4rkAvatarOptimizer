@@ -778,14 +778,15 @@ public class d4rkAvatarOptimizerEditor : Editor
             }
         }
 
-        if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
+        var allDescriptors = FindObjectsByType<VRCAvatarDescriptor>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (allDescriptors.Any(av => av != null && av.name.EndsWith("(OptimizedCopy)")))
         {
             HelpBox(
                 "Optimized copy of some avatar is present in the scene.\n" +
                 "Its assets will be deleted when creating a new optimized copy.", MessageType.Error);
         }
 
-        if (FindObjectsOfType<VRCAvatarDescriptor>().Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
+        if (allDescriptors.Any(av => av != null && av.name.EndsWith("(BrokenCopy)")))
         {
             HelpBox(
                 "Seems like the last optimization attempt failed.\n" +

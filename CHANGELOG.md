@@ -1,3 +1,7 @@
+## v4.7.3
+### Bug Fixes
+* Fix warnings in unity 6.
+
 ## v4.7.2
 ### Features
 * Material Contact Receivers are now treated as one receiver if they are on the same game object and have the same settings.
