@@ -5523,10 +5523,16 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
         }
     }
 
-    public List<List<MaterialSlot>> FindAllMergeAbleMaterials(IEnumerable<Renderer> renderers)
+    public List<List<MaterialSlot>> FindAllMergeAbleMaterials(IEnumerable<Renderer> renderers, bool logMergeErrors = false)
     {
         using var _ = new Profiler.Section("FindAllMergeAbleMaterials()");
         var matched = new List<List<MaterialSlot>>();
+        List<(string group, string path, string message)> mergeErrors = logMergeErrors ? new() : null;
+        static string DescribeSlot(MaterialSlot slot)
+        {
+            string materialName = slot.material == null ? "null" : slot.material.name;
+            return $"{slot.index} {materialName}";
+        }
         foreach (var renderer in renderers)
         {
             foreach (var candidate in MaterialSlot.GetAllSlotsFrom(renderer))
@@ -5534,16 +5540,51 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 bool foundMatch = false;
                 for (int i = 0; i < matched.Count; i++)
                 {
-                    if (CanCombineMaterialsError(matched[i], candidate) == null)
+                    string error = CanCombineMaterialsError(matched[i], candidate);
+                    if (error == null)
                     {
                         matched[i].Add(candidate);
                         foundMatch = true;
                         break;
                     }
+                    mergeErrors?.Add(($"Group {i} '{DescribeSlot(matched[i][0])}'", DescribeSlot(candidate), error.Replace("\r", " ").Replace("\n", " ")));
                 }
                 if (!foundMatch)
                 {
                     matched.Add(new List<MaterialSlot> { candidate });
+                }
+            }
+        }
+        if (logMergeErrors)
+        {
+            var renderer = renderers.First();
+            LogToFile($"- '{GetPathToRoot(renderer)}' ({renderer.sharedMaterials.Length} => {matched.Count})");
+            if (mergeErrors.Count > 0)
+            {
+                using var __ = log.IndentScope();
+                var errorGroups = mergeErrors.GroupBy(e => e.group)
+                    .OrderBy(g => g.Key.StartsWithSimple("Group ") ? int.Parse(g.Key.Split(' ')[1]) : int.MaxValue)
+                    .ToList();
+                LogToFile($"- Material merge errors:");
+                foreach (var errorGroup in errorGroups)
+                {
+                    LogToFile($"- {errorGroup.Key}:", 1);
+                    var innerGroups = errorGroup.GroupBy(e => e.message).ToList();
+                    foreach (var innerGroup in innerGroups)
+                    {
+                        if (innerGroup.Count() == 1)
+                        {
+                            LogToFile($"- '{innerGroup.First().path}': {innerGroup.Key}", 2);
+                        }
+                        else
+                        {
+                            LogToFile($"- {innerGroup.Key}:", 2);
+                            foreach (var error in innerGroup)
+                            {
+                                LogToFile($"- '{error.path}'", 3);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -5612,11 +5653,9 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             int meshCount = props.GetInt("d4rkAvatarOptimizer_CombinedMeshCount");
             string meshPath = GetPathToRoot(meshRenderer);
 
-            var matchedSlots = FindAllMergeAbleMaterials(new [] { meshRenderer });
+            var matchedSlots = FindAllMergeAbleMaterials(new [] { meshRenderer }, logMergeErrors: true);
             var uniqueMatchedSlots = matchedSlots.Select(list => list.Select(slot => list.First(slot2 => slot.material == slot2.material)).Distinct().ToList()).ToList();
             var mergedMeshIndices = new List<List<int>>();
-
-            LogToFile($"- '{meshPath}' ({meshRenderer.sharedMaterials.Length} => {matchedSlots.Count})");
             using var __ = log.IndentScope();
             LogToFile($"- Material slot merge layout (slot id, material name):");
             foreach (var slotGroup in matchedSlots)

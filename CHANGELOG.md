@@ -1,4 +1,8 @@
 ## v4.7.3
+### Changes
+* Log file:
+  * Add material merge errors per mesh.
+
 ### Bug Fixes
 * Fix warnings in unity 6.
 * Stop doing `AssetDatabase.StartAssetEditing()` around animator asset creation. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/215)
