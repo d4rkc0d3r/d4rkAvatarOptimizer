@@ -2,6 +2,8 @@
 ### Bug Fixes
 * Fix warnings in unity 6.
 * Stop doing `AssetDatabase.StartAssetEditing()` around animator asset creation. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/215)
+* Fix global vrc physbone colliders created by modular avatar getting deleted by `Delete Unused Components`. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/214)
+* Fix `TrashBin` location resolution when installed as git package. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/pull/211)
 
 ## v4.7.2
 ### Features
