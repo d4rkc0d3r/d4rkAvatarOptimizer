@@ -2673,8 +2673,7 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             }
         }
 
-        Profiler.StartSection("AnimatorOptimizer.Run()");
-        try
+        using (new Profiler.Section("AnimatorOptimizer.Run()"))
         {
             static string GetControllerFileName(AnimatorController controller)
             {
@@ -2685,7 +2684,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 }
                 return sanitized;
             }
-            AssetDatabase.StartAssetEditing();
             List<(string msg, int indent)> messages = new();
             void LogMessages(string controllerName)
             {
@@ -2724,11 +2722,6 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
                 LogMessages(controller.name);
             }
         }
-        finally
-        {
-            AssetDatabase.StopAssetEditing();
-        }
-        Profiler.EndSection();
 
         var animations = new HashSet<AnimationClip>();
         for (int i = 0; i < optimizedControllers.Length; i++)

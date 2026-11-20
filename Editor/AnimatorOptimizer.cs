@@ -15,40 +15,39 @@ namespace d4rkpl4y3r.AvatarOptimizer
     // based on https://github.com/VRLabs/Avatars-3.0-Manager/blob/main/Editor/AnimatorCloner.cs
     public class AnimatorOptimizer
     {
-        private string assetPath;
-        private AnimatorController source;
-        private AnimatorController target;
-        private Dictionary<AnimatorState, AnimatorState> stateMap = new Dictionary<AnimatorState, AnimatorState>();
-        private Dictionary<AnimatorStateMachine, AnimatorStateMachine> stateMachineMap = new Dictionary<AnimatorStateMachine, AnimatorStateMachine>();
-        private Dictionary<int, int> fxLayerMap = new Dictionary<int, int>();
-        private HashSet<int> layersToMerge = new HashSet<int>();
-        private HashSet<int> layersToDestroy = new HashSet<int>();
-        private HashSet<string> boolsToChangeToFloat = new HashSet<string>();
-        private HashSet<string> intsToChangeToFloat = new HashSet<string>();
-        private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new List<(EditorCurveBinding binding, float value)>();
+        private readonly string assetPath;
+        private readonly AnimatorController source;
+        private readonly AnimatorController target;
+        private readonly Dictionary<AnimatorState, AnimatorState> stateMap = new();
+        private readonly Dictionary<AnimatorStateMachine, AnimatorStateMachine> stateMachineMap = new();
+        private readonly HashSet<string> boolsToChangeToFloat = new();
+        private readonly HashSet<string> intsToChangeToFloat = new();
+        private readonly HashSet<string> usedParameters = new();
+        private Dictionary<int, int> fxLayerMap = new();
+        private HashSet<int> layersToMerge = new();
+        private HashSet<int> layersToDestroy = new();
+        private List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = new();
         private bool isFxLayer = false;
         private List<(string msg, int indent)> logMessages;
         private string mergedLayersParameter = "d4rkAvatarOptimizer_MergedLayers_Weight";
         private bool deleteUnusedParameters = true;
-        private HashSet<string> usedParameters = new HashSet<string>();
 
-        private AnimatorOptimizer(AnimatorController target, AnimatorController source, string path)
+        private AnimatorOptimizer(AnimatorController source, string path)
         {
-            this.target = target;
             this.source = source;
             assetPath = path;
+            target = new AnimatorController();
+            target.name = $"{source.name}(Optimized)";
+            AddToAsset(target);
         }
 
         public static AnimatorController Run(AnimatorController source, string path, Dictionary<int, int> fxLayerMap, List<(string msg, int indent)> logMessages, bool deleteUnusedParameters = true, List<int> layersToMerge = null, List<int> layersToDestroy = null, List<(EditorCurveBinding binding, float value)> constantCurvesToAdd = null)
         {
-            var target = new AnimatorController();
-            target.name = $"{source.name}(Optimized)";
             using (new Profiler.Section($"AnimatorOptimizer.CreateAsset"))
             {
                 AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<BinarySerializationSO>(), path);
-                AssetDatabase.AddObjectToAsset(target, path);
             }
-            var optimizer = new AnimatorOptimizer(target, source, path);
+            var optimizer = new AnimatorOptimizer(source, path);
             optimizer.fxLayerMap = new Dictionary<int, int>(fxLayerMap);
             optimizer.layersToMerge = new HashSet<int>(layersToMerge ?? new());
             optimizer.layersToDestroy = new HashSet<int>(layersToDestroy ?? new());
@@ -257,7 +256,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
             foreach (var binding in AnimationUtility.GetCurveBindings(clip))
             {
                 var curve = AnimationUtility.GetEditorCurve(clip, binding);
-                AnimationUtility.SetEditorCurve(newClip, binding, new AnimationCurve(new Keyframe[] { new Keyframe(0, curve.Evaluate(time)) }));
+                AnimationUtility.SetEditorCurve(newClip, binding, new AnimationCurve(new Keyframe[] { new(0, curve.Evaluate(time)) }));
             }
             AddToAsset(newClip);
             return newClip;
@@ -605,7 +604,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             // Create a child tree in the destination parent, this seems to be the only way to correctly 
             // add a child tree as opposed to AddChild(motion)
-            BlendTree pastedTree = new BlendTree();
+            BlendTree pastedTree = new();
             pastedTree.name = oldTree.name;
             pastedTree.blendType = oldTree.blendType;
             pastedTree.blendParameter = oldTree.blendParameter;
@@ -739,7 +738,7 @@ namespace d4rkpl4y3r.AvatarOptimizer
         {
             List<AnimatorStateMachine> childrenSm = sm.stateMachines.Select(x => x.stateMachine).ToList();
 
-            List<AnimatorStateMachine> gcsm = new List<AnimatorStateMachine>();
+            List<AnimatorStateMachine> gcsm = new();
             gcsm.Add(sm);
             foreach (var child in childrenSm)
             {

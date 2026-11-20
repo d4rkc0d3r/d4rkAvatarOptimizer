@@ -1,6 +1,7 @@
 ## v4.7.3
 ### Bug Fixes
 * Fix warnings in unity 6.
+* Stop doing `AssetDatabase.StartAssetEditing()` around animator asset creation. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/215)
 
 ## v4.7.2
 ### Features
