@@ -1,3 +1,7 @@
+## v4.7.4
+### Bug Fixes
+* Fix optimizer failing to merge materials with different properties on skinned meshes that didn't get merged with any other skinned meshes. [(more)](https://github.com/d4rkc0d3r/d4rkAvatarOptimizer/issues/212)
+
 ## v4.7.3
 ### Changes
 * Log file:

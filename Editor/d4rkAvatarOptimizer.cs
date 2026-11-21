@@ -6736,6 +6736,8 @@ public class d4rkAvatarOptimizer : MonoBehaviour, VRC.SDKBase.IEditorOnly
             Profiler.EndSection();
             
             var targetRenderer = combinableSkinnedMeshes[0];
+            // ensure renderer is in uv0zw cache so material merging doesnt detect the newly created zw channel
+            UsesUV0ZW(targetRenderer);
 
             if (HasFaceTrackingEnabled()
                 && avDescriptor.faceTrackingMeshes != null
